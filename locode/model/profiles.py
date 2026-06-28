@@ -57,6 +57,15 @@ _RULES: list[tuple[str, Profile]] = [
     ("Devstral", Profile(False, False, GB_1_5, "good",
                          "Mistral agentic coder; fenced only (native tools "
                          "conflict w/ its template); clean JSON")),
+    # Qwythos-9B (Claude-Mythos distill; text tower of a Qwen3.5-VL, mxfp8,
+    # 1M ctx, ~9.6GB peak). Verified live in locode on a real fix+test agentic
+    # task: clean fenced tool JSON, correct arg keys, applies multi-step edits
+    # cleanly — strong, economical everyday agentic model. Fenced was verified
+    # clean and its template carries a native tool protocol, so keep
+    # native_tools off; no thinking kwarg needed. Must precede generic "Qwen3".
+    ("Qwythos", Profile(False, False, GB_1_5, "good",
+                        "Qwen3.5-9B Claude-distill; clean fenced JSON, "
+                        "reliable multi-step editor (verified live)")),
     ("Qwen3-14B", Profile(True, True, GB_1_5, "good",
                           "best dense Qwen; reliable tool-caller")),
     ("Qwen3-0.6B", Profile(False, True, GB_1_5, "poor",
