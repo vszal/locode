@@ -824,8 +824,7 @@ or `:8081`** — the model client is exercised against a mocked HTTP transport.
   on the cancellation token within a bounded time and leave the session usable.
 
 Functional code lands **with its tests in the same change**, and `pytest -q`
-runs green before a task is called done. Delegation tiers + verification are
-governed by `AGENTS.md`.
+runs green before a task is called done.
 
 ---
 
@@ -907,9 +906,6 @@ governed by `AGENTS.md`.
   `prompt_toolkit`'s native event loop). Generation is a cancellable task; Esc
   sets a cancel event observed between stream chunks. This is also the substrate
   for the M6 `max_inflight` semaphore. (Decided 2026-06-24.)
-- **Delegation + verification** are governed by `AGENTS.md`: easy/specified work
-  → best-fit local model (`qwencoder14` for code), mechanical/broad → Haiku,
-  hard cores + framing + verification → Opus.
 - **Tests ship with code** (`pytest`, `tests/` mirrors the package; HTTP
   mocked). `pytest -q` green before a task is done.
 - **No git yet** — repo is created later; until then, no git operations.

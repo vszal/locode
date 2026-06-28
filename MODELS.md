@@ -1,80 +1,83 @@
 # Choosing and driving local models
 
-Practical guidance for picking a model per task on Apple Silicon (single GPU,
-~20 GB wired ceiling on a 24 GB machine). Aliases live in
-`~/.config/locode/config.toml`; a value containing `/` is a full HF id and works
-without an alias.
+Practical guidance for picking a local model per task. Aliases live in
+`~/.config/locode/config.toml`; any value containing `/` is treated as a full
+Hugging Face id and works without an alias. The model *traits* below matter more
+than any specific model — substitute whatever you've pulled.
 
-## TL;DR
+## Principles
 
-- **Default to `devstral24` for almost everything.** It both *analyzes* and
-  *edits* reliably — for most "analyze X and fix it" prompts you never switch.
-- **Keep `qwencoder30` as a planner/analyst**, not an editor. Reach for it only
-  on *large/architectural* work where its planning depth earns the model-swap
-  cost; then hand off to `devstral24` to apply the changes.
+- **Match the model to the task.** A model that reasons well about code does not
+  necessarily *apply edits* reliably, and vice versa.
+- **On local hardware the bottleneck is usually memory, then tool-call
+  reliability — rarely raw intelligence.** A model that fits comfortably in
+  memory and emits clean tool JSON will out-deliver a bigger, "smarter" one that
+  thrashes or mangles its edits.
+- **Prefer one model that both analyzes and edits** for everyday work. Only split
+  "plan with model A, apply with model B" when a task is big enough to justify
+  the model-swap cost (see below).
 
-## The two workhorses
+## Editor vs. planner
 
-### `devstral24` — the editor (default)
-`lmstudio-community/Devstral-Small-2507-MLX-4bit` · ~13 GB · Mistral agentic
-coder. Emits clean, **correctly-escaped** tool JSON and applies multi-step edits
-without corruption. This is the one to make actual changes with.
+Two rough roles a local coding model can play:
 
-> Profile note: it is configured **fenced-only** (`native_tools=False`).
-> Passing the OpenAI `tools` param makes `mlx_lm` render Mistral's
-> `[AVAILABLE_TOOLS]` protocol, which conflicts with locode's `\`\`\`tool` prompt
-> and returns an **empty** response. Fenced-only avoids that and works cleanly.
+- **Editor** — applies multi-step `edit_file` / `write_file` changes. This needs
+  clean, correctly-escaped tool JSON. Many models mis-escape quotes or newlines
+  inside code payloads and corrupt edits; locode's tolerant parser recovers a
+  lot, but a model with naturally clean JSON output is far nicer to edit with.
+- **Planner / analyst** — reads and reasons (`ls`, `read_file`, `grep`) and
+  produces prose: refactor plans, code review, "what's the best way to…". These
+  calls carry no code payloads, so even a model with weak edit-JSON hygiene is
+  reliable here.
 
-### `qwencoder30` — the planner/analyst
-`mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit` · ~17 GB (MoE, ~3B active, so
-fast) · strong agentic reasoner. **Caveat:** it mis-escapes quotes/newlines
-inside `edit_file`/`write_file` code payloads, so it's unreliable at *applying*
-edits (locode's tolerant parser recovers a lot, but not everything). Its
-read/navigate calls (`ls`, `read_file`, `grep`) are clean — those args have no
-embedded quotes — so it's great for **read + reason** work whose output is prose.
+A model can be strong in one role and weak in the other. When evaluating a
+candidate, run it on a real edit and watch whether its `edit_file` calls apply
+cleanly.
 
-Good uses: architecture/refactor planning, code review, "what's the best way
-to…", multi-file analysis. Avoid using it to make the edits.
+## Tool-call format gotchas
 
-## Prompt style for `qwencoder30` (keep it out of its failure zone)
+Local models disagree on *how* they emit tool calls, and the wrong setting can
+make a capable model look broken:
 
-Tell it explicitly **not to edit**, and ask for structured output:
+- Some expect a **native** tool protocol (the OpenAI `tools` param, rendered into
+  the model's own chat template); others do best with locode's **fenced**
+  ` ```tool ` blocks. Mixing the two can yield empty responses or garbled,
+  hybrid output. Each model's capability profile sets `native_tools` accordingly
+  — if a model returns empty or malformed calls, try flipping it.
+- Argument schemas also vary (nested `{"args": {…}}` vs. flat
+  `{"name": …, "path": …}`); locode tolerates both.
 
-> Read `kivy_toe.py` and any related files. Do NOT modify anything. Produce a
-> numbered refactor plan: for each problem, give the location, why it's wrong,
-> and the concrete change to make (described in words). Order the steps so they
-> don't conflict.
+## Driving a weak edit-JSON model (keep it in read+reason mode)
+
+If a model reasons well but mangles edits, use it as a planner and tell it
+explicitly **not to edit**:
+
+> Read `<file>` and any related files. Do NOT modify anything. Produce a numbered
+> plan: for each problem, give the location, why it's wrong, and the concrete
+> change to make (described in words). Order the steps so they don't conflict.
 
 This keeps it in read+reason mode and sidesteps the edit-JSON weakness entirely.
 
 ## Plan → execute handoff
 
 `/model` swaps the served model **but keeps your conversation context** (it does
-not clear history; that's `/clear`). So a plan made by one model is visible to
+not clear history — that's `/clear`). So a plan made by one model is visible to
 the next:
 
-1. Plan with `qwencoder30` (prompt above).
-2. `/model devstral24` — context carries over.
-3. "Implement the plan above. Make the edits." — `devstral24` executes it with
+1. Plan with your strongest reasoner (prompt above).
+2. `/model <editor>` — context carries over.
+3. "Implement the plan above. Make the edits." — the editor applies it with
    clean, approve-able diffs.
 
 **Cost caveat:** on a single GPU, switching models evicts and reloads weights
-(~1–2 min each way, plus a prompt-cache re-warm). So only split plan/execute
-across models when the task is big enough to be worth it. For small/medium
-changes, stay on `devstral24` and do the whole thing in one model.
+(often a minute or more each way, plus a prompt-cache re-warm). Only split
+plan/execute across models when the task is big enough to be worth it; for
+small/medium changes, stay on one model.
 
-## Other aliases (context)
+## Memory headroom on single-GPU setups
 
-From the starter config — edit to match what you've pulled:
-
-| alias         | role                                  |
-|---------------|---------------------------------------|
-| `devstral24`  | **edit + analyze (default)**          |
-| `qwencoder30` | large-refactor planning / analysis    |
-| `qwencoder14` | lighter coder; decent edits           |
-| `qwen14`      | general dense Qwen; reliable tool use  |
-| `qwen4i`      | fast trivial first-pass               |
-| `gemma12` / `gemma27` | strong reasoners, **weak tool-callers** — not for edits |
-
-To make `devstral24` the startup model, set `default = "devstral24"` under
-`[model]` in `~/.config/locode/config.toml`.
+On a single shared-memory GPU (e.g. Apple Silicon), the model weights, the KV
+cache, and transient working buffers must all fit at once. A model sized right at
+your memory ceiling may handle a short prompt but crash on a larger agentic
+context. Leave headroom: the largest model that fits *comfortably* beats a bigger
+one that sits at the edge.
