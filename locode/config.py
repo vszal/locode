@@ -1,0 +1,229 @@
+"""Configuration: defaults <- config.toml <- env (LOCODE_*) <- CLI overrides.
+
+CLI overrides are applied by cli.py via Config.override(); this module handles
+the first three layers and the XDG paths. Tolerant by design — a missing or
+partial config.toml just falls back to defaults so the tool always starts.
+"""
+
+from __future__ import annotations
+
+import os
+import tomllib
+from dataclasses import dataclass, field, replace
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
+
+_LOOPBACK = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
+
+
+def _xdg(env: str, default: Path) -> Path:
+    val = os.environ.get(env)
+    return Path(val) if val else default
+
+
+HOME = Path.home()
+CONFIG_DIR = _xdg("XDG_CONFIG_HOME", HOME / ".config") / "locode"
+STATE_DIR = _xdg("XDG_STATE_HOME", HOME / ".local" / "state") / "locode"
+CONFIG_PATH = CONFIG_DIR / "config.toml"
+HISTORY_PATH = STATE_DIR / "history"
+
+
+@dataclass
+class ServerConfig:
+    host: str = "127.0.0.1"
+    port: int = 8081
+    scheme: str = "http"          # "http" | "https" (for remote/proxied endpoints)
+    base_url: str = ""            # full override (e.g. https://gpu-box:8081); wins
+    auto_start: bool = True
+    # Manage a LOCAL mlx_lm.server process (start/stop/switch)? "auto" => yes only
+    # for a loopback endpoint; "no" treats the endpoint as remote/unmanaged.
+    manage: str = "auto"          # "auto" | "yes" | "no"
+    mlx_bin: str = ""  # auto-detected if empty
+    # Refuse to load a local model whose estimated footprint (weights × overhead
+    # + prompt cache) won't fit in (total RAM − this reserve), so a too-big model
+    # can't thrash the machine. 0 disables the guard.
+    memory_reserve_gb: float = 5.0
+
+    def endpoint(self) -> str:
+        """Resolved base URL: an explicit base_url wins, else scheme://host:port."""
+        if self.base_url:
+            return self.base_url.rstrip("/")
+        return f"{self.scheme}://{self.host}:{self.port}"
+
+    def is_managed(self) -> bool:
+        """Whether locode owns the server process (can start/stop it locally)."""
+        if self.manage == "yes":
+            return True
+        if self.manage == "no":
+            return False
+        host = (urlsplit(self.base_url).hostname if self.base_url else self.host) or ""
+        return host in _LOOPBACK
+
+
+@dataclass
+class ModelConfig:
+    default: str = "qwen14"
+    max_tokens: int = 8192  # headroom: edit-heavy turns reproduce file snippets
+    temperature: float = 0.3
+
+
+@dataclass
+class AgentConfig:
+    max_iterations: int = 25
+    max_wallclock_seconds: int = 600
+    max_malformed_retries: int = 3  # bail if the model keeps emitting bad tool JSON
+    max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
+
+
+@dataclass
+class PermissionsConfig:
+    # tool name -> "auto" | "ask" | "deny"
+    tools: dict[str, str] = field(default_factory=lambda: {
+        "read_file": "auto", "ls": "auto", "glob": "auto", "grep": "auto",
+        "write_file": "ask", "edit_file": "ask", "move_file": "ask", "bash": "ask",
+        "web_search": "ask", "web_fetch": "auto",
+    })
+    auto_allow_under: list[str] = field(default_factory=lambda: ["./sandbox"])
+    deny_paths: list[str] = field(default_factory=lambda: [
+        "~/.ssh", "~/.aws", "~/.config/locode",
+    ])
+
+
+@dataclass
+class EditorConfig:
+    command: str = ""
+    open_diffs: bool = True
+    diff_tool: str = ""
+    wait: bool = True
+
+
+@dataclass
+class WebConfig:
+    # web_search provider: "auto" (a keyed provider if configured, else the
+    # keyless "duckduckgo" default), "tavily", "brave", or "duckduckgo".
+    search_provider: str = "auto"
+    # Per-provider keys (env TAVILY_API_KEY / BRAVE_API_KEY also honored). With
+    # no key a provider stays registered but disabled with an actionable error.
+    tavily_api_key: str = ""
+    brave_api_key: str = ""
+    max_results: int = 5
+    # web_fetch egress allowlist — host SUFFIXES the model may fetch. Empty =>
+    # fail closed (every fetch refused). See tools/web.py for the SSRF guard.
+    fetch_allowlist: list[str] = field(default_factory=lambda: [
+        "docs.python.org", "developer.mozilla.org", "en.wikipedia.org",
+        "pkg.go.dev", "docs.rs", "example.com",
+    ])
+    fetch_max_bytes: int = 5_000_000
+    fetch_timeout: int = 20
+
+
+@dataclass
+class UIConfig:
+    markdown: bool = True       # line-buffered markdown styling of answers (TTY+color)
+    spinner: bool = True        # animated wait indicator for model load / first token
+    timing: bool = True         # per-turn `~tok · Ns · tok/s` trailer
+
+
+@dataclass
+class Config:
+    server: ServerConfig = field(default_factory=ServerConfig)
+    model: ModelConfig = field(default_factory=ModelConfig)
+    agent: AgentConfig = field(default_factory=AgentConfig)
+    permissions: PermissionsConfig = field(default_factory=PermissionsConfig)
+    editor: EditorConfig = field(default_factory=EditorConfig)
+    web: WebConfig = field(default_factory=WebConfig)
+    ui: UIConfig = field(default_factory=UIConfig)
+    aliases: dict[str, str] = field(default_factory=dict)  # extends the built-in table
+
+    # --- loading ---------------------------------------------------------
+    @classmethod
+    def load(cls, path: Path | None = None) -> "Config":
+        cfg = cls()
+        raw = _read_toml(path if path is not None else CONFIG_PATH)
+        if raw:
+            cfg._merge_toml(raw)
+        cfg._apply_env(os.environ)
+        return cfg
+
+    def _merge_toml(self, raw: dict[str, Any]) -> None:
+        _assign(self.server, raw.get("server", {}))
+        _assign(self.model, raw.get("model", {}))
+        _assign(self.agent, raw.get("agent", {}))
+        _assign(self.editor, raw.get("editor", {}))
+        _assign(self.web, raw.get("web", {}))
+        _assign(self.ui, raw.get("ui", {}))
+        perms = raw.get("permissions", {})
+        # Per-tool keys live flat in [permissions] alongside the list keys.
+        for k, v in perms.items():
+            if k == "auto_allow_under":
+                self.permissions.auto_allow_under = list(v)
+            elif k == "deny_paths":
+                self.permissions.deny_paths = list(v)
+            else:
+                self.permissions.tools[k] = v
+        self.aliases.update(raw.get("aliases", {}))
+
+    def _apply_env(self, env: dict[str, str]) -> None:
+        # A small, documented set of env overrides for the common knobs.
+        if "LOCODE_MODEL" in env:
+            self.model.default = env["LOCODE_MODEL"]
+        if "LOCODE_PORT" in env:
+            self.server.port = int(env["LOCODE_PORT"])
+        if "LOCODE_HOST" in env:
+            self.server.host = env["LOCODE_HOST"]
+        if "LOCODE_SCHEME" in env:
+            self.server.scheme = env["LOCODE_SCHEME"]
+        # One-shot remote endpoint: LOCODE_BASE_URL=https://gpu-box:8081 overrides
+        # scheme/host/port entirely (and, via is_managed(), marks it remote).
+        if "LOCODE_BASE_URL" in env:
+            self.server.base_url = env["LOCODE_BASE_URL"]
+        if "LOCODE_MANAGE_SERVER" in env:
+            self.server.manage = env["LOCODE_MANAGE_SERVER"]
+        if "LOCODE_NO_AUTOSTART" in env:
+            self.server.auto_start = False
+        if "LOCODE_EDITOR" in env:
+            self.editor.command = env["LOCODE_EDITOR"]
+        # Search keys: explicit config wins; otherwise fall back to standard envs.
+        if not self.web.tavily_api_key and env.get("TAVILY_API_KEY"):
+            self.web.tavily_api_key = env["TAVILY_API_KEY"]
+        if not self.web.brave_api_key and env.get("BRAVE_API_KEY"):
+            self.web.brave_api_key = env["BRAVE_API_KEY"]
+
+    def override(self, **kw: Any) -> "Config":
+        """Return a copy with top-level CLI overrides applied (highest priority)."""
+        model = self.model
+        schanges: dict[str, Any] = {}
+        if kw.get("model"):
+            model = replace(model, default=kw["model"])
+        if kw.get("port"):
+            schanges["port"] = kw["port"]
+        if kw.get("host"):
+            schanges["host"] = kw["host"]
+        if kw.get("base_url"):
+            schanges["base_url"] = kw["base_url"]
+        server = replace(self.server, **schanges) if schanges else self.server
+        return replace(self, model=model, server=server)
+
+    @property
+    def base_url(self) -> str:
+        return self.server.endpoint()
+
+
+def _read_toml(path: Path) -> dict[str, Any]:
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except FileNotFoundError:
+        return {}
+    except (OSError, tomllib.TOMLDecodeError):
+        # A broken config shouldn't prevent startup; fall back to defaults.
+        return {}
+
+
+def _assign(obj: Any, data: dict[str, Any]) -> None:
+    """Set only known dataclass fields from a TOML table; ignore extras."""
+    known = obj.__dataclass_fields__
+    for k, v in data.items():
+        if k in known:
+            setattr(obj, k, v)
