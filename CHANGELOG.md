@@ -25,6 +25,14 @@ source of truth (`locode --version`).
   hardcoded literal.
 
 ### Fixed
+- **Qwythos-9B "hangs."** Qwythos is a reasoning model that emits chain-of-thought
+  in a `reasoning` field before any `content`; since locode streams only `content`,
+  long thinking showed nothing (looked hung) and could exhaust the token budget,
+  failing the turn. Its profile now sets `thinking_arg=True` so the server launches
+  with `enable_thinking=false` — agentic turns dropped from seconds-of-thinking (and
+  intermittent multi-minute hangs) to a steady ~13s, 100% pass on the reliability
+  probe. Added `scripts/model_reliability_probe.sh` to catch this class of
+  regression for any model.
 - **Silent wrong-model serving.** mlx's `/v1/models` lists the whole HF cache,
   not the resident model, so requesting a *cached* model that wasn't loaded
   (`-m <other>`, or `/model`) skipped the switch and silently served whatever

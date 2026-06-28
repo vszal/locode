@@ -20,6 +20,16 @@ def test_instruct_2507_does_not_send_thinking_arg():
     assert p.thinking_arg is False
 
 
+def test_qwythos_suppresses_thinking():
+    # Qwythos-9B is a reasoning model: without enable_thinking=false it emits a
+    # long `reasoning` field before any content, which locode can't see and which
+    # read as multi-minute hangs. The profile MUST send the thinking kwarg so the
+    # server launches with it disabled. (Regression guard — see profiles.py.)
+    p = profiles.profile_for("sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx")
+    assert p.thinking_arg is True
+    assert p.native_tools is False   # fenced-only (template tool protocol conflicts)
+
+
 def test_qwen3_coder_30b_wins_over_generic_qwen3():
     # The Qwen3-Coder rule must match before the generic "Qwen3" rule.
     p = profiles.profile_for("mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit")

@@ -46,6 +46,13 @@ make a capable model look broken:
   — if a model returns empty or malformed calls, try flipping it.
 - Argument schemas also vary (nested `{"args": {…}}` vs. flat
   `{"name": …, "path": …}`); locode tolerates both.
+- **Reasoning models can look like they hang.** A model that emits chain-of-thought
+  in a separate `reasoning` field (e.g. Qwythos-9B) produces no `content` while it
+  thinks — locode streams only `content`, so a long think shows nothing, and if it
+  hits the token cap `content` comes back empty and the turn fails. Set such a
+  model's profile `thinking_arg=True` so locode launches the server with
+  `enable_thinking=false`; turns that spent seconds "thinking" then drop to instant,
+  direct answers. Verify with `scripts/model_reliability_probe.sh <alias>`.
 
 ## Driving a weak edit-JSON model (keep it in read+reason mode)
 

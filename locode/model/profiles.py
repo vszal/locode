@@ -58,14 +58,19 @@ _RULES: list[tuple[str, Profile]] = [
                          "Mistral agentic coder; fenced only (native tools "
                          "conflict w/ its template); clean JSON")),
     # Qwythos-9B (Claude-Mythos distill; text tower of a Qwen3.5-VL, mxfp8,
-    # 1M ctx, ~9.6GB peak). Verified live in locode on a real fix+test agentic
-    # task: clean fenced tool JSON, correct arg keys, applies multi-step edits
-    # cleanly — strong, economical everyday agentic model. Fenced was verified
-    # clean and its template carries a native tool protocol, so keep
-    # native_tools off; no thinking kwarg needed. Must precede generic "Qwen3".
-    ("Qwythos", Profile(False, False, GB_1_5, "good",
-                        "Qwen3.5-9B Claude-distill; clean fenced JSON, "
-                        "reliable multi-step editor (verified live)")),
+    # 1M ctx, ~9.6GB peak). It is a *reasoning* model: by default it emits a long
+    # `reasoning` (chain-of-thought) field before any `content`. locode streams
+    # only `content`, so while it thinks the UI shows nothing — which looked like
+    # multi-minute "hangs", and when the thinking hit the token cap `content`
+    # came back empty and the turn failed. enable_thinking=false suppresses it
+    # entirely: a turn that took ~6s of reasoning drops to ~0.3s of clean, direct
+    # content. So thinking_arg=True -> locode launches with
+    # --chat-template-args {"enable_thinking": false}. Fenced-only (its template
+    # carries a native tool protocol that conflicts). Must precede generic "Qwen3".
+    ("Qwythos", Profile(False, True, GB_1_5, "good",
+                        "Qwen3.5-9B Claude-distill REASONING model — MUST launch "
+                        "with enable_thinking=false or it runs away thinking "
+                        "(invisible to locode -> looks hung); fenced-only")),
     ("Qwen3-14B", Profile(True, True, GB_1_5, "good",
                           "best dense Qwen; reliable tool-caller")),
     ("Qwen3-0.6B", Profile(False, True, GB_1_5, "poor",
