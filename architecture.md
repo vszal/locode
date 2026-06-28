@@ -49,10 +49,10 @@ macOS (Apple Silicon, MLX) and Linux (any OpenAI-compatible `:8081`).
 
 ### Reuse vs. standalone
 Per decision, the CLI is **standalone**: it bundles its own server-lifecycle
-manager rather than depending on the `local-llm-offload` repo. Where the
-existing scripts encode hard-won knowledge (alias table, per-model memory
+manager rather than depending on an external offload/server repo. Where existing
+server scripts encode hard-won knowledge (alias table, per-model memory
 budgets, wired-memory teardown wait), we **port that logic** into the package
-(`locode/server/`) rather than shelling out to `mlx-server.sh`. The bundled
+(`locode/server/`) rather than shelling out to an external script. The bundled
 manager is a faithful reimplementation, documented as such, so the two can
 diverge independently. (See [§5](#5-model-server-lifecycle).)
 
@@ -114,7 +114,7 @@ quirks live in a small **capability profile** per model alias
 └───────┬─────────┘        └──────────────────────────────────┘
         │
 ┌───────▼──────────────────────────────────────────────────────┐
-│  Server lifecycle manager  (ported from mlx-server.sh/-lib)   │
+│  Server lifecycle manager  (ported from prior shell scripts)  │
 │  - alias table, start/stop/wait, model switch, mem budgets    │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -302,8 +302,8 @@ mirroring `run-local.sh`'s Seatbelt profile:
 
 ## 5. Model server lifecycle
 
-Ported into `locode/server/` (standalone). Mirrors `mlx-server.sh` +
-`mlx-lib.sh` behavior.
+Ported into `locode/server/` (standalone). Mirrors the prior shell-based
+server scripts' behavior.
 
 ### 5.1 Manager API (`server/manager.py`)
 A common interface with **two implementations** chosen by `[serving].mode`
@@ -335,8 +335,8 @@ manager.list_served()            -> union of GET /v1/models across backends
 
 ### 5.2 Alias resolution (`server/aliases.py` + config)
 Aliases are a **pure user-config concern** — locode ships **no** built-in model
-table (so it's portable to anyone's machine, with no dependency on the offload
-repo's `mlx-server.sh`). `server/aliases.py` is just the resolution *rule*:
+table (so it's portable to anyone's machine, with no dependency on an external
+server repo). `server/aliases.py` is just the resolution *rule*:
 `resolve(alias_or_id)` returns a value containing `/` verbatim (it's already a
 full HF id), looks a bare name up in the built-in table (empty by default, kept
 as an extension point), and otherwise raises pointing the user at `config.toml`.
@@ -363,7 +363,7 @@ Profile(
   notes="best dense Qwen; supports tools",
 )
 ```
-- **Memory budgets** port `mlx-server.sh`'s per-model `prompt-cache-bytes`
+- **Memory budgets** port the reference scripts' per-model `prompt-cache-bytes`
   (e.g. 1GB for the 15GB gemma-27b, 1.5GB otherwise) and the **hard rule**:
   never serve a model that pushes wired memory past the ~20GB ceiling
   (the documented Qwen3-32B crash). The manager refuses unknown models above

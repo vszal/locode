@@ -11,8 +11,7 @@ up the chain. Three tiers:
 
 ### Tier 1 — local model (cheapest; on-device, free)
 Defer **easy, well-specified, low-blast-radius** work to the *best local model
-for the job*, served on `:8081` (see the offload runner in
-`../agents/local-llm-offload/`). Pick the model by task:
+for the job*, served on `:8081`. Pick the model by task:
 - **`qwencoder14`** (Qwen2.5-Coder-14B) — code: boilerplate, a single
   well-specified function/class, mechanical refactors, docstrings, type hints.
 - **`qwen14`** — general text: drafting comments/README prose, summarizing.

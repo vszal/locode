@@ -1,6 +1,6 @@
 """Per-model capability profiles.
 
-Ports the model-specific knowledge from the offload repo's `mlx-server.sh`:
+Ports the model-specific knowledge from prior shell-based server scripts:
 the `enable_thinking` chat-template kwarg, per-model prompt-cache (wired memory)
 budgets, and — new for an agentic tool — how reliably each model tool-calls,
 which decides how hard the harness leans on native tool_calls vs. the fenced

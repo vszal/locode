@@ -1,6 +1,6 @@
 """Single-GPU model server lifecycle (Apple Silicon / mlx_lm.server).
 
-Ports mlx-server.sh + mlx-lib.sh: build the launch args (per-model prompt-cache
+Ports prior shell-based server scripts: build the launch args (per-model prompt-cache
 budget + enable_thinking kwarg from the capability profile), start/stop the
 server, and — critically — wait for wired Metal memory to fall before starting
 a different model, since MLX weights live in wired buffers and switching without
