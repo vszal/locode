@@ -12,6 +12,8 @@ COMMANDS: dict[str, str] = {
     "diff": "Show a file's working diff: /diff [path]",
     "retry": "Re-run your last prompt (or /retry <new text>)",
     "clear": "Reset the conversation context (keep the session)",
+    "save": "Save this conversation: /save [name]",
+    "resume": "Restore a saved conversation: /resume [name] (no name lists them)",
     "permissions": "Show the per-tool permission policy",
     "cwd": "Show or change the working directory: /cwd [path]",
     "help": "List commands",

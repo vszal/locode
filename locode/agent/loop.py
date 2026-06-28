@@ -62,6 +62,11 @@ class AgentLoop:
     def reset_context(self) -> None:
         self.history = self.history[:1]  # keep the system prompt
 
+    def set_history(self, history: list[dict[str, Any]]) -> None:
+        """Replace the conversation history wholesale (e.g. resuming a saved
+        session). Copied so the caller's list isn't aliased into the loop."""
+        self.history = list(history)
+
     async def run_turn(self, user_text: str) -> str:
         self.cancel.reset()
         # Server load / model switch can be a long, silent wait — let the UI spin.

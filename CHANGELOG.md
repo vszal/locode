@@ -16,6 +16,9 @@ source of truth (`locode --version`).
   method; `--check` previews without running, `--pre` allows pre-releases.
 - **`locode uninstall`** — removes locode behind a confirmation prompt; `--purge`
   also drops the config, state, and data dirs.
+- **Session persistence** — `/save [name]` writes the current conversation to
+  `~/.local/state/locode/sessions/`, `/resume [name]` restores it (no name lists
+  saved sessions). Names are sanitized so they can't escape the sessions dir.
 
 ### Changed
 - `__version__` is now single-sourced from package metadata instead of a

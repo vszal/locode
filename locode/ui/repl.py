@@ -247,6 +247,10 @@ class Repl:
         elif cmd == "clear":
             self._loop.reset_context()
             print("(context cleared)")
+        elif cmd == "save":
+            self._slash_save(rest)
+        elif cmd == "resume":
+            self._slash_resume(rest)
         elif cmd == "permissions":
             for t, d in self._cfg.permissions.tools.items():
                 print(f"  {t}: {d}")
@@ -304,6 +308,55 @@ class Repl:
             st = await self._manager.status()
             self._server_up = st.up
             print(f"server: {'up' if st.up else 'down'}  {st.model_id or ''}")
+
+    def _slash_save(self, rest: str) -> None:
+        from datetime import datetime
+
+        from locode import session as sess
+
+        name = rest.strip() or datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        s = sess.Session(
+            name=name, model=self._loop.model_alias, cwd=self._loop._cwd,
+            saved_at=datetime.now().isoformat(timespec="seconds"),
+            history=self._loop.history,
+        )
+        try:
+            path = sess.save_session(s)
+        except OSError as e:
+            print(f"could not save session: {e}")
+            return
+        print(f"saved session {sess.safe_name(name)!r} "
+              f"({len(s.history)} messages) → {path}")
+
+    def _slash_resume(self, rest: str) -> None:
+        from locode import session as sess
+
+        name = rest.strip()
+        if not name:
+            sessions = sess.list_sessions()
+            if not sessions:
+                print("(no saved sessions — use /save first)")
+                return
+            print("saved sessions (newest first):")
+            for s in sessions:
+                print(f"  {sess.safe_name(s.name)}  ·  {s.saved_at}  ·  "
+                      f"{s.model}  ·  {len(s.history)} msgs")
+            print("resume one with: /resume <name>")
+            return
+        try:
+            s = sess.load_session(name)
+        except FileNotFoundError:
+            print(f"no saved session named {sess.safe_name(name)!r} "
+                  "(run /resume with no name to list them)")
+            return
+        except ValueError:
+            print(f"session {sess.safe_name(name)!r} is corrupt and can't be loaded")
+            return
+        self._loop.set_history(s.history)
+        self._loop.set_model(s.model)
+        self._loop._cwd = s.cwd
+        print(f"resumed {sess.safe_name(name)!r} — {len(s.history)} messages, "
+              f"model {s.model}, cwd {s.cwd}. It loads on your next message.")
 
     async def _slash_diff(self, rest: str) -> None:
         import asyncio
