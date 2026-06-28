@@ -92,8 +92,110 @@ async def _interactive(args) -> int:
     return await repl.run(splash=not args.no_splash)
 
 
+def _cmd_upgrade(argv: list[str]) -> int:
+    """`locode upgrade [--check] [--pre]`: update locode in place per its
+    recorded install method (see install.py / upgrade.py)."""
+    import subprocess
+
+    from locode import install
+    from locode.upgrade import upgrade_argv
+
+    p = argparse.ArgumentParser(prog="locode upgrade",
+                                description="Update locode in place.")
+    p.add_argument("--check", action="store_true",
+                   help="Show the install method and planned commands; run nothing.")
+    p.add_argument("--pre", action="store_true",
+                   help="Allow pre-release versions (PyPI install methods).")
+    a = p.parse_args(argv)
+
+    m = install.read_method()
+    if m is None:
+        print("locode: can't tell how locode was installed (no install-method "
+              "marker). Upgrade with your package manager directly, or reinstall "
+              "via install.sh.", file=sys.stderr)
+        return 1
+    cmds = upgrade_argv(m.method, m.detail, pre=a.pre)
+    label = m.method + (f" ({m.detail})" if m.detail else "")
+    if a.check:
+        print(f"locode {__version__} — installed via {label}")
+        print("would run:")
+        for c in cmds:
+            print("  " + " ".join(c))
+        return 0
+    print(f"Upgrading locode (installed via {label})…", file=sys.stderr)
+    for c in cmds:
+        print("$ " + " ".join(c), file=sys.stderr)
+        rc = subprocess.run(c).returncode
+        if rc != 0:
+            print(f"locode: upgrade step failed (exit {rc}).", file=sys.stderr)
+            return rc
+    return 0
+
+
+def _cmd_uninstall(argv: list[str]) -> int:
+    """`locode uninstall [--purge] [--yes]`: remove locode per its recorded
+    install method. The plan is built in uninstall.py; deletion happens here,
+    behind a confirmation."""
+    import shutil
+    import subprocess
+
+    from locode import install
+    from locode.uninstall import uninstall_plan
+
+    p = argparse.ArgumentParser(prog="locode uninstall",
+                                description="Remove locode.")
+    p.add_argument("--purge", action="store_true",
+                   help="Also remove config, state, and data dirs.")
+    p.add_argument("--yes", "-y", action="store_true",
+                   help="Don't prompt for confirmation.")
+    a = p.parse_args(argv)
+
+    m = install.read_method()
+    if m is None:
+        print("locode: can't tell how locode was installed (no install-method "
+              "marker). Remove it with your package manager directly.",
+              file=sys.stderr)
+        return 1
+    commands, paths = uninstall_plan(m.method, m.detail, purge=a.purge)
+
+    print("This will:")
+    for c in commands:
+        print("  run:    " + " ".join(c))
+    for path in paths:
+        print(f"  delete: {path}")
+    if not a.yes:
+        try:
+            reply = input("Proceed? [y/N] ").strip().lower()
+        except EOFError:
+            reply = ""
+        if reply not in ("y", "yes"):
+            print("Aborted.", file=sys.stderr)
+            return 1
+
+    rc = 0
+    for c in commands:
+        if subprocess.run(c).returncode != 0:
+            print(f"locode: step failed: {' '.join(c)}", file=sys.stderr)
+            rc = 1
+    for path in paths:
+        try:
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            elif path.exists() or path.is_symlink():
+                path.unlink()
+        except OSError as e:
+            print(f"locode: could not remove {path}: {e}", file=sys.stderr)
+            rc = 1
+    return rc
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    raw = sys.argv[1:] if argv is None else argv
+    if raw and raw[0] == "upgrade":
+        return _cmd_upgrade(raw[1:])
+    if raw and raw[0] == "uninstall":
+        return _cmd_uninstall(raw[1:])
+    args = build_parser().parse_args(raw)
     if args.logo:
         from locode.ui import banner, render
         print(banner.render(args.model or "qwen14", False, str(Path.cwd()),

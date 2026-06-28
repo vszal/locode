@@ -888,8 +888,10 @@ runs green before a task is called done.
   hardened `web_fetch` (`tools/web.py`: allowlist + resolve-all-public SSRF
   guard + IP-pinned connection w/ SNI + no redirects + size cap). Inline,
   arrow-navigable approval UX and compact colored tool/result rendering.
-- **M5 — Install/upgrade + polish:** `install.sh` (PyPI + `--dev`),
-  `locode upgrade`, config, sessions persistence, `-p` headless mode, docs.
+- **M5 — Install/upgrade + polish:** 🚧 `install.sh` (PyPI + `--dev` + `--pre`
+  + `--dry-run`) ✅, `locode upgrade` (`--check`/`--pre`) ✅, `locode uninstall`
+  (`--purge`) ✅, install-method marker (`install.py`) ✅, version single-sourcing
+  ✅, `-p` headless mode ✅, `CHANGELOG.md` ✅. _Remaining: sessions persistence._
 - **M6 — Concurrency:** `PoolManager` + router, `[serving] mode=concurrent`,
   `max_resident`/`max_inflight`, multi-backend `/server` status.
 - **M7 — Hardening (phase 2):** `bash` sandboxing, context summarization,

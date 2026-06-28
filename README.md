@@ -43,12 +43,32 @@ touch sensitive paths.
   mlx_lm.server --model <hf-model-id> --port 8081
   ```
 
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vszal/locode/main/install.sh | bash
+```
+
+`install.sh` installs locode into an isolated environment — `pipx`, else `uv`,
+else a dedicated venv with a shim in `~/.local/bin` — and records how, so updates
+are one command. Power users can skip it: `pipx install locode`.
+
+```bash
+locode upgrade            # update in place (per how it was installed)
+locode upgrade --check    # show the install method + what it would run
+locode uninstall          # remove it (add --purge to drop config/state too)
+```
+
+Run `./install.sh --help` for `--dev` (editable from source), `--pre`, and
+`--dry-run`.
+
 ## Development setup (from source)
 
 ```bash
 git clone https://github.com/vszal/locode.git
 cd locode
 python -m venv .venv && .venv/bin/pip install -e ".[dev]"
+# or, equivalently:  ./install.sh --dev
 
 # In another shell, start a local model server (see Requirements), then:
 .venv/bin/locode                          # interactive REPL
