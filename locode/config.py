@@ -27,6 +27,7 @@ CONFIG_DIR = _xdg("XDG_CONFIG_HOME", HOME / ".config") / "locode"
 STATE_DIR = _xdg("XDG_STATE_HOME", HOME / ".local" / "state") / "locode"
 CONFIG_PATH = CONFIG_DIR / "config.toml"
 HISTORY_PATH = STATE_DIR / "history"
+DATA_DIR = _xdg("XDG_DATA_HOME", HOME / ".local" / "share") / "locode"
 
 
 @dataclass
