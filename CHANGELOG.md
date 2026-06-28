@@ -20,3 +20,11 @@ source of truth (`locode --version`).
 ### Changed
 - `__version__` is now single-sourced from package metadata instead of a
   hardcoded literal.
+
+### Fixed
+- **Silent wrong-model serving.** mlx's `/v1/models` lists the whole HF cache,
+  not the resident model, so requesting a *cached* model that wasn't loaded
+  (`-m <other>`, or `/model`) skipped the switch and silently served whatever
+  was already in memory. The manager now reads the resident model from the
+  server process's `--model` argument, so a different requested model actually
+  triggers a reload (and `/server` reports the real loaded model).

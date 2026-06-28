@@ -76,14 +76,40 @@ async def test_ensure_up_uses_running_server(monkeypatch):
     m = _mgr()
 
     async def fake_served():
-        return ["mlx-community/Qwen3-14B-4bit"]
+        # /v1/models lists the whole HF cache, not just the resident model.
+        return ["mlx-community/Qwen3-14B-4bit", "mlx-community/Qwen3-0.6B-4bit"]
 
     started = []
     monkeypatch.setattr(m, "list_served", fake_served)
+    monkeypatch.setattr(m, "_resident_model", lambda: "mlx-community/Qwen3-14B-4bit")
     monkeypatch.setattr(m, "start", lambda a: started.append(a))
     out = await m.ensure_up("qwen14")
     assert out == "mlx-community/Qwen3-14B-4bit"
-    assert started == []  # did not restart
+    assert started == []  # resident == target -> did not restart
+
+
+async def test_ensure_up_switches_when_requested_model_not_resident(monkeypatch):
+    # Regression for the silent-fallback bug: a requested model that is merely
+    # *cached* (so it shows up in /v1/models) but is NOT resident must trigger a
+    # real switch — not be silently served by whatever is loaded.
+    m = _mgr()
+
+    async def fake_served():
+        return ["mlx-community/Qwen3-14B-4bit",
+                "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"]  # both cached
+
+    switched = []
+
+    async def fake_switch(alias):
+        switched.append(alias)
+        return m.resolve(alias)
+
+    monkeypatch.setattr(m, "list_served", fake_served)
+    monkeypatch.setattr(m, "_resident_model", lambda: "mlx-community/Qwen3-14B-4bit")
+    monkeypatch.setattr(m, "switch", fake_switch)
+    out = await m.ensure_up("qwencoder14")
+    assert switched == ["qwencoder14"]
+    assert out == "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
 
 
 async def test_ensure_up_starts_when_down(monkeypatch):
@@ -115,14 +141,32 @@ async def test_switch_already_served_skips_restart(monkeypatch):
     m = _mgr()
     stopped = []
 
-    async def served():
-        return ["mlx-community/Qwen3-14B-4bit"]
-
-    monkeypatch.setattr(m, "list_served", served)
+    monkeypatch.setattr(m, "_resident_model", lambda: "mlx-community/Qwen3-14B-4bit")
     monkeypatch.setattr(m, "stop", lambda: stopped.append(True))
     out = await m.switch("qwen14")
     assert out == "mlx-community/Qwen3-14B-4bit"
     assert stopped == []  # already resident -> no destructive restart
+
+
+async def test_switch_reloads_when_target_cached_but_not_resident(monkeypatch):
+    # Regression: switching to a model that is in the HF cache but NOT resident
+    # must stop+start, not skip because it appears in the /v1/models list.
+    m = _mgr()
+    stopped, started = [], []
+
+    async def fake_stop():
+        stopped.append(True)
+
+    async def fake_start(alias):
+        started.append(alias)
+        return m.resolve(alias)
+
+    monkeypatch.setattr(m, "_resident_model", lambda: "mlx-community/Qwen3-14B-4bit")
+    monkeypatch.setattr(m, "stop", fake_stop)
+    monkeypatch.setattr(m, "start", fake_start)
+    out = await m.switch("qwencoder14")
+    assert stopped == [True] and started == ["qwencoder14"]
+    assert out == "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
 
 
 async def test_ensure_up_respects_autostart_off(monkeypatch):
@@ -233,6 +277,35 @@ async def test_wait_up_raises_when_launched_process_exits():
     m._proc = Dead()
     with pytest.raises(RuntimeError, match="exited during startup"):
         await m._wait_up("anything", secs=4)
+
+
+# --- resident-model detection (reads the server's --model arg, not /v1/models) -
+def test_resident_model_id_parses_ps(monkeypatch):
+    class R:
+        stdout = (
+            "/usr/bin/python /opt/homebrew/bin/mlx_lm.server --model org/My-Model"
+            " --host 127.0.0.1 --port 8081 --max-tokens 4096\n"
+            "/bin/zsh -l\n"
+        )
+
+    monkeypatch.setattr(mod.subprocess, "run", lambda *a, **k: R())
+    assert mod._resident_model_id() == "org/My-Model"
+
+
+def test_resident_model_id_none_when_no_server(monkeypatch):
+    class R:
+        stdout = "/bin/zsh\n/usr/bin/vim file.py\n"
+
+    monkeypatch.setattr(mod.subprocess, "run", lambda *a, **k: R())
+    assert mod._resident_model_id() is None
+
+
+def test_resident_model_id_none_on_ps_failure(monkeypatch):
+    def boom(*a, **k):
+        raise OSError("no ps")
+
+    monkeypatch.setattr(mod.subprocess, "run", boom)
+    assert mod._resident_model_id() is None
 
 
 # --- preflight memory guard ---------------------------------------------------

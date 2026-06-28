@@ -118,20 +118,44 @@ class SingleGpuManager:
 
     async def status(self) -> Status:
         served = await self.list_served()
-        return Status(up=bool(served), model_id=served[0] if served else None,
-                      base_url=self._base)
+        if not served:
+            return Status(up=False, model_id=None, base_url=self._base)
+        # Report the *resident* model, not served[0] (the HF cache's first entry).
+        loaded = self._resident_model() if self._managed else served[0]
+        return Status(up=True, model_id=loaded or served[0], base_url=self._base)
+
+    def _resident_model(self) -> str | None:
+        """The model the local mlx_lm.server is actually serving, or None.
+
+        mlx's /v1/models lists every cached model, not the resident one, so the
+        only reliable source of what's *loaded* is the server process's own
+        `--model <id>` launch argument."""
+        return _resident_model_id()
 
     # --- lifecycle -------------------------------------------------------
     async def ensure_up(self, alias: str | None = None) -> str:
         """Ensure a server is serving. Returns the resolved model id in use.
         An already-running server is used as-is (no restart) unless `alias` names
-        a model it isn't serving."""
+        a model it isn't *resident* — in which case we switch to it."""
         target = self.resolve(alias) if alias else None
         served = await self.list_served()
-        if served:
-            if target is None or target in served:
-                return target or served[0]
-            # A specific model was requested that isn't served -> switch.
+        if served:  # a server is up
+            # mlx's /v1/models lists the whole HF cache, NOT the resident model,
+            # so we can't use `served` to tell what's actually loaded. For a
+            # local server we read it from the process; for a remote one we can't
+            # introspect, so we trust the served list.
+            loaded = self._resident_model() if self._managed else served[0]
+            if target is None:
+                return loaded or served[0]
+            if target == loaded:
+                return target
+            if self._managed:
+                # Requested a model that isn't resident -> actually load it
+                # (don't silently serve whatever is in memory).
+                return await self.switch(alias)  # type: ignore[arg-type]
+            # Remote: route if it serves the target, else it's a fixed-model box.
+            if target in served:
+                return target
             return await self.switch(alias)  # type: ignore[arg-type]
         if not self._managed:
             raise RuntimeError(
@@ -258,15 +282,19 @@ class SingleGpuManager:
         # Validate the alias BEFORE touching the server: a typo must not kill a
         # running server only to fail on resolve afterwards.
         model_id = self.resolve(alias)
-        # If the target is already being served, route to it without a
-        # destructive stop/start (single-GPU restart is only needed to load a
-        # model that isn't resident).
-        if model_id in await self.list_served():
-            return model_id
         if not self._managed:
+            # Remote box serves a fixed model: route if it's that one, else fail.
+            if model_id in await self.list_served():
+                return model_id
             raise RuntimeError(
                 f"cannot switch models on remote/unmanaged endpoint {self._base}; "
                 f"it serves a fixed model. Requested {alias!r}.")
+        # Local: only skip the destructive stop/start if the target is *actually*
+        # resident. We must NOT check list_served() here — it's the whole HF
+        # cache, so it matches any cached model and we'd never reload (the model
+        # would silently stay whatever was already in memory).
+        if self._resident_model() == model_id:
+            return model_id
         await self.stop()
         return await self.start(alias)
 
@@ -316,6 +344,28 @@ def _model_disk_bytes(model_id: str) -> int | None:
         except OSError:
             pass
     return total if found else None
+
+
+def _resident_model_id() -> str | None:
+    """The model a local mlx_lm.server was launched with, read from its
+    `--model <id>` argument via `ps`. mlx's /v1/models lists the whole HF cache,
+    not the resident model, so the process command line is the only reliable
+    source of what is actually loaded. None if no server runs or the arg is
+    absent (also None off a system without a usable `ps`)."""
+    try:
+        out = subprocess.run(["ps", "-axo", "command"],
+                             capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in out.splitlines():
+        if "mlx_lm.server" not in line:
+            continue
+        parts = line.split()
+        if "--model" in parts:
+            i = parts.index("--model")
+            if i + 1 < len(parts):
+                return parts[i + 1]
+    return None
 
 
 def _server_pids() -> list[int]:
