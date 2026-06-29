@@ -9,9 +9,8 @@ unreliably (mis-escaped JSON, fenced vs. native tool calls, flat vs. nested
 argument schemas).
 
 > ### 🚧 Work in progress
-> locode is under active development and **not yet packaged for general use.**
-> **Installation instructions are coming soon.** The notes below describe a
-> from-source development setup and are subject to change.
+> locode is under active development. It's **installable today** (see
+> [Install](#install)), but still early — interfaces may change.
 
 ## Why
 
@@ -115,6 +114,7 @@ Configurable in `~/.config/locode/config.toml`.
 
 ## Status
 
-Early MVP, under active development. Packaged installation, expanded web
-tooling, concurrency, and `bash` sandboxing are on the roadmap, and interfaces
-may change.
+Early MVP, under active development. Packaged installation (`install.sh` +
+`locode upgrade`/`uninstall`), web tools, and the permission model are in place;
+concurrency (multi-model serving) and `bash` sandboxing remain on the roadmap,
+and interfaces may change.
