@@ -724,11 +724,17 @@ no client changes.
 
 ## 10. Install & upgrade
 
-**Distribution: PyPI is the primary channel; a git/source path exists for
-development.** Released to PyPI as `locode`; the repo stays installable
-directly for contributors and bleeding-edge users. Both paths land in an
-**isolated environment** and write an install-method marker so `upgrade`
-knows how it was installed.
+**Distribution: PyPI is the intended primary channel; a git/source path exists
+for development.** Both paths land in an **isolated environment** and write an
+install-method marker so `upgrade` knows how it was installed.
+
+> **Status (interim):** PyPI publishing is **deferred** — the `locode` name on
+> PyPI belongs to an unrelated project, so a release requires choosing an
+> available distribution name first. Until then `install.sh` (both the default
+> and `--dev`) installs **from this git repo** and records the `git` method;
+> `locode upgrade` does `git pull` + reinstall. The PyPI-specific behavior
+> described below (`pipx install locode`, `--pre`, the venv `pip install locode`
+> fallback, the release/CI flow) is the target end state, not what ships today.
 
 ### 10.1 End-user install (PyPI) — `install.sh`
 A single curl-able script (`curl -fsSL …/install.sh | bash`) that:

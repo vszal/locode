@@ -48,17 +48,21 @@ touch sensitive paths.
 curl -fsSL https://raw.githubusercontent.com/vszal/locode/main/install.sh | bash
 ```
 
-`install.sh` installs locode into an isolated environment — `pipx`, else `uv`,
-else a dedicated venv with a shim in `~/.local/bin` — and records how, so updates
-are one command. Power users can skip it: `pipx install locode`.
+`install.sh` clones the repo to `~/.local/share/locode/src` and installs locode
+from it (via `pipx`, else `uv`, else `pip install --user`), recording how so
+updates are one command.
+
+> **Note:** PyPI publishing is deferred (the `locode` name on PyPI is an
+> unrelated package), so for now the installer pulls from this git repo rather
+> than from PyPI. `locode upgrade` does a `git pull` + reinstall.
 
 ```bash
-locode upgrade            # update in place (per how it was installed)
+locode upgrade            # update in place (git pull + reinstall)
 locode upgrade --check    # show the install method + what it would run
 locode uninstall          # remove it (add --purge to drop config/state too)
 ```
 
-Run `./install.sh --help` for `--dev` (editable from source), `--pre`, and
+Run `./install.sh --help` for `--dev` (editable install from a checkout) and
 `--dry-run`.
 
 ## Development setup (from source)

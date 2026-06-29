@@ -8,10 +8,12 @@ source of truth (`locode --version`).
 ## [Unreleased]
 
 ### Added
-- **`install.sh`** — curl-able installer that drops locode into an isolated
-  environment (`pipx` → `uv` → dedicated venv + `~/.local/bin` shim) and records
-  the install method. Supports `--dev` (editable from source), `--pre`, and
-  `--dry-run`.
+- **`install.sh`** — curl-able installer that installs locode from this git repo
+  (cloned to `~/.local/share/locode/src`) via `pipx` → `uv` → `pip install
+  --user`, recording the install method. Supports `--dev` (editable from a
+  checkout) and `--dry-run`. _PyPI publishing is deferred — the `locode` name on
+  PyPI is an unrelated package — so the installer pulls from git for now; this
+  flips to a PyPI install once locode is published under an available name._
 - **`locode upgrade`** — updates locode in place per its recorded install
   method; `--check` previews without running, `--pre` allows pre-releases.
 - **`locode uninstall`** — removes locode behind a confirmation prompt; `--purge`

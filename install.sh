@@ -4,14 +4,17 @@
 # *how*, so `locode upgrade` can update it the same way later. See architecture.md
 # §10 (Install & upgrade).
 #
-#   End users:   curl -fsSL <raw-url>/install.sh | bash
-#   Power users: pipx install locode
-#   Developers:  ./install.sh --dev                 (editable install from a checkout)
+#   End users:   curl -fsSL <raw-url>/install.sh | bash   (installs from the git repo)
+#   Developers:  ./install.sh --dev                        (editable install from a checkout)
+#
+# NOTE: PyPI publishing is deferred (the `locode` name on PyPI belongs to an
+# unrelated project), so BOTH paths install from the git repo. The end-user
+# default clones it to ~/.local/share/locode/src and installs from there; once
+# locode is published to PyPI this default flips back to a PyPI install.
 #
 # Flags:
-#   --dev            install editable from source (cwd checkout, or clone LOCODE_REPO)
-#   --ref <rev>      with --dev, the branch/tag/commit to clone (default: default branch)
-#   --pre            allow pre-release versions (PyPI methods)
+#   --dev            editable install from the current checkout (for contributors)
+#   --ref <rev>      branch/tag/commit to clone for the end-user install (default: default branch)
 #   --dry-run        print what would happen; change nothing
 #   -h, --help       this help
 #
@@ -23,7 +26,6 @@ set -euo pipefail
 
 DEV=0
 REF=""
-PRE=0
 DRY=0
 LOCODE_REPO="${LOCODE_REPO:-https://github.com/vszal/locode.git}"
 
@@ -31,14 +33,13 @@ log()  { printf '%s\n' "$*" >&2; }
 run()  { if [ "$DRY" = 1 ]; then log "  + $*"; else "$@"; fi; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-usage() { sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --dev)      DEV=1 ;;
     --ref)      REF="${2:-}"; shift ;;
     --ref=*)    REF="${1#--ref=}" ;;
-    --pre)      PRE=1 ;;
     --dry-run)  DRY=1 ;;
     -h|--help)  usage; exit 0 ;;
     *) log "install.sh: unknown option: $1 (try --help)"; exit 2 ;;
@@ -73,52 +74,36 @@ write_marker() {  # method detail
   printf '%s\t%s\n' "$1" "${2:-}" > "$MARKER"
 }
 
-pre_pip_args() { [ "$PRE" = 1 ] && printf -- '--pip-args=--pre' || true; }
-
-# --- developer (editable) install --------------------------------------------
-if [ "$DEV" = 1 ]; then
-  if [ -f pyproject.toml ] && grep -q 'name = "locode"' pyproject.toml; then
-    SRC="$(pwd)"
-    log "Developer install (editable) from current checkout: $SRC"
+# --- resolve install source --------------------------------------------------
+# PyPI publishing is deferred, so BOTH paths install from the git checkout and
+# record the "git" install method (-> `locode upgrade` does git pull + reinstall).
+# --dev installs editable from the current checkout (contributors); the default
+# clones the repo to a persistent dir under the data dir so upgrades can pull it.
+if [ "$DEV" = 1 ] && [ -f pyproject.toml ] && grep -q 'name = "locode"' pyproject.toml; then
+  SRC="$(pwd)"
+  log "Developer install (editable) from current checkout: $SRC"
+else
+  SRC="$DATA_DIR/src"
+  if [ -d "$SRC/.git" ]; then
+    log "Updating existing locode checkout at $SRC"
+    run git -C "$SRC" pull --ff-only
   else
-    SRC="${TMPDIR:-/tmp}/locode-src"
-    log "Developer install (editable): cloning $LOCODE_REPO -> $SRC"
-    run rm -rf "$SRC"
+    log "Installing locode from $LOCODE_REPO -> $SRC"
+    run mkdir -p "$DATA_DIR"
     if [ -n "$REF" ]; then run git clone --branch "$REF" "$LOCODE_REPO" "$SRC"
     else run git clone "$LOCODE_REPO" "$SRC"; fi
   fi
-  if have pipx; then
-    run pipx install --editable "$SRC"
-  elif have uv; then
-    run uv tool install --editable "$SRC"
-  else
-    run "$PY" -m pip install --user -e "$SRC"
-  fi
-  write_marker git "$SRC"
-
-# --- end-user (PyPI) install -------------------------------------------------
-else
-  if have pipx; then
-    log "Installing locode with pipx..."
-    if [ "$PRE" = 1 ]; then run pipx install --pip-args=--pre locode
-    else run pipx install locode; fi
-    write_marker pipx ""
-  elif have uv; then
-    log "Installing locode with uv..."
-    if [ "$PRE" = 1 ]; then run uv tool install --prerelease=allow locode
-    else run uv tool install locode; fi
-    write_marker uv ""
-  else
-    VENV="$DATA_DIR/venv"
-    log "Installing locode into a dedicated venv at ${VENV}"
-    run "$PY" -m venv "$VENV"
-    if [ "$PRE" = 1 ]; then run "$VENV/bin/pip" install -U --pre locode
-    else run "$VENV/bin/pip" install -U locode; fi
-    run mkdir -p "$BIN_DIR"
-    run ln -sf "$VENV/bin/locode" "$BIN_DIR/locode"
-    write_marker venv ""
-  fi
 fi
+
+# --- install (editable) from the resolved source -----------------------------
+if have pipx; then
+  run pipx install --force --editable "$SRC"
+elif have uv; then
+  run uv tool install --force --editable "$SRC"
+else
+  run "$PY" -m pip install --user -e "$SRC"
+fi
+write_marker git "$SRC"
 
 # --- PATH advisory + next steps ----------------------------------------------
 case ":$PATH:" in
