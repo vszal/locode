@@ -53,6 +53,19 @@ make a capable model look broken:
   model's profile `thinking_arg=True` so locode launches the server with
   `enable_thinking=false`; turns that spent seconds "thinking" then drop to instant,
   direct answers. Verify with `scripts/model_reliability_probe.sh <alias>`.
+  Built-in profiles cover the known models, but you can override the launch-time
+  decision per model in `config.toml` without touching source:
+  ```toml
+  [thinking]
+  # alias or model-id substring -> "on" | "off" | "auto"
+  qythos9 = "off"      # suppress (enable_thinking=false)
+  "gpt-oss" = "off"
+  devstral24 = "on"    # force enable_thinking=true
+  ```
+  `"on"`/`"off"` force the kwarg; `"auto"` omits it entirely (template default),
+  which is how you *undo* a profile that bakes in `enable_thinking=false`. An
+  unlisted model keeps its profile default. This is the user-facing knob for the
+  same mechanism the profiles use internally.
 
 ## Driving a weak edit-JSON model (keep it in read+reason mode)
 

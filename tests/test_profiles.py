@@ -58,3 +58,49 @@ def test_unknown_model_is_conservative():
     p = profiles.profile_for("some/Unknown-Model")
     assert p is profiles.DEFAULT_PROFILE
     assert p.native_tools is False
+
+
+# --- per-model thinking override (config [thinking] table) -----------------
+
+def test_thinking_override_matches_alias_exactly():
+    ov = {"qythos9": "on", "gpt-oss": "off"}
+    assert profiles.lookup_thinking_override(ov, "org/Qwythos-9B", "qythos9") == "on"
+
+
+def test_thinking_override_matches_id_substring():
+    ov = {"gpt-oss": "off"}
+    assert profiles.lookup_thinking_override(ov, "org/gpt-oss-20b-mlx") == "off"
+
+
+def test_thinking_override_prefers_longest_id_key():
+    # A specific id fragment should win over a broad one.
+    ov = {"Qwen3": "on", "Qwen3-14B": "off"}
+    got = profiles.lookup_thinking_override(ov, "mlx-community/Qwen3-14B-4bit")
+    assert got == "off"
+
+
+def test_thinking_override_none_when_no_match():
+    assert profiles.lookup_thinking_override({"foo": "off"}, "org/Bar", "bar") is None
+    assert profiles.lookup_thinking_override({}, "org/Bar") is None
+
+
+def test_resolve_thinking_override_forces_value():
+    # An on/off override fully decides, regardless of the profile default.
+    suppress = profiles.profile_for("org/Qwythos-9B")  # thinking_arg=True
+    assert profiles.resolve_thinking(suppress, "on") is True
+    assert profiles.resolve_thinking(suppress, "off") is False
+
+
+def test_resolve_thinking_auto_omits_overriding_profile():
+    # "auto" suppresses the kwarg even when the profile would have sent false —
+    # the user's escape hatch to fall back to the template default.
+    suppress = profiles.profile_for("org/Qwythos-9B")
+    assert suppress.thinking_arg is True
+    assert profiles.resolve_thinking(suppress, "auto") is None
+
+
+def test_resolve_thinking_unset_falls_back_to_profile():
+    suppress = profiles.profile_for("org/Qwythos-9B")        # -> send false
+    plain = profiles.profile_for("mlx-community/Qwen2.5-Coder-14B-Instruct-4bit")
+    assert profiles.resolve_thinking(suppress, None) is False
+    assert profiles.resolve_thinking(plain, None) is None

@@ -54,6 +54,29 @@ def test_launch_argv_gemma27_tight_cache():
     assert "1073741824" in argv  # 1GB tight budget
 
 
+def _thinking_kwarg(argv):
+    if "--chat-template-args" not in argv:
+        return "omitted"
+    return json.loads(argv[argv.index("--chat-template-args") + 1])["enable_thinking"]
+
+
+def test_launch_argv_thinking_override_forces_on():
+    # A model whose profile suppresses thinking, overridden back ON via config.
+    mid = "mlx-community/Qwen3-14B-4bit"  # profile thinking_arg=True -> sends false
+    argv = build_launch_argv("/bin/mlx", mid, "127.0.0.1", 8081,
+                             profile_for(mid), thinking=True)
+    assert _thinking_kwarg(argv) is True
+
+
+def test_launch_argv_thinking_override_omits():
+    # None means omit the kwarg entirely (template default), even when the
+    # profile would have sent enable_thinking=false.
+    mid = "mlx-community/Qwen3-14B-4bit"
+    argv = build_launch_argv("/bin/mlx", mid, "127.0.0.1", 8081,
+                             profile_for(mid), thinking=None)
+    assert _thinking_kwarg(argv) == "omitted"
+
+
 def test_resolve_uses_config_aliases():
     cfg = _cfg()
     cfg.aliases["mymodel"] = "org/Custom-4bit"

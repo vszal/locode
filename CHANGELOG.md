@@ -19,6 +19,12 @@ source of truth (`locode --version`).
 - **Session persistence** — `/save [name]` writes the current conversation to
   `~/.local/state/locode/sessions/`, `/resume [name]` restores it (no name lists
   saved sessions). Names are sanitized so they can't escape the sessions dir.
+- **`[thinking]` config override** — control a model's reasoning per model from
+  `config.toml`, keyed by alias or model-id substring: `"on"` forces
+  `enable_thinking=true`, `"off"` forces it false, `"auto"` omits the kwarg
+  (template default). Layers over the built-in capability profile, so you can
+  suppress a reasoning model we haven't profiled — or re-enable thinking on one
+  we suppress — without editing source. (Generalizes the Qwythos-9B fix below.)
 
 ### Changed
 - `__version__` is now single-sourced from package metadata instead of a

@@ -21,11 +21,17 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import httpx
 
 from locode.config import Config, CONFIG_PATH, STATE_DIR
-from locode.model.profiles import Profile, profile_for
+from locode.model.profiles import (
+    Profile,
+    lookup_thinking_override,
+    profile_for,
+    resolve_thinking,
+)
 from locode.server import aliases
 
 GB = 1024 ** 3
@@ -51,12 +57,23 @@ def find_mlx_bin(configured: str = "") -> str:
     return configured or "mlx_lm.server"
 
 
+_USE_PROFILE = object()  # sentinel: derive enable_thinking from the profile
+
+
 def build_launch_argv(mlx_bin: str, model_id: str, host: str, port: int,
-                      profile: Profile) -> list[str]:
-    """Pure: the argv to launch mlx_lm.server for this model (testable)."""
+                      profile: Profile, thinking: Any = _USE_PROFILE) -> list[str]:
+    """Pure: the argv to launch mlx_lm.server for this model (testable).
+
+    `thinking` is the resolved enable_thinking decision: True/False force the
+    chat-template kwarg, None omits it, and the default sentinel derives it from
+    the profile (so existing callers keep the profile-only behavior).
+    """
+    if thinking is _USE_PROFILE:
+        thinking = False if profile.thinking_arg else None
     argv = [mlx_bin, "--model", model_id, "--host", host, "--port", str(port)]
-    if profile.thinking_arg:
-        argv += ["--chat-template-args", json.dumps({"enable_thinking": False})]
+    if thinking is not None:
+        argv += ["--chat-template-args",
+                 json.dumps({"enable_thinking": bool(thinking)})]
     argv += [
         "--max-tokens", "4096",
         "--prompt-cache-size", "4",
@@ -179,7 +196,10 @@ class SingleGpuManager:
                 "or set [server].mlx_bin")
         profile = profile_for(model_id)
         self._check_memory_budget(model_id, profile)
-        argv = build_launch_argv(self._mlx_bin, model_id, self._host, self._port, profile)
+        override = lookup_thinking_override(self._cfg.thinking, model_id, alias)
+        thinking = resolve_thinking(profile, override)
+        argv = build_launch_argv(self._mlx_bin, model_id, self._host, self._port,
+                                 profile, thinking)
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         log = open(STATE_DIR / "mlx-server.log", "ab")
         self._proc = subprocess.Popen(

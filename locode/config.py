@@ -136,6 +136,10 @@ class Config:
     web: WebConfig = field(default_factory=WebConfig)
     ui: UIConfig = field(default_factory=UIConfig)
     aliases: dict[str, str] = field(default_factory=dict)  # extends the built-in table
+    # Per-model reasoning override: alias or model-id substring -> "on" | "off"
+    # | "auto". Layers over the capability profile's default at server launch.
+    # "on"/"off" force the chat-template enable_thinking kwarg; "auto" omits it.
+    thinking: dict[str, str] = field(default_factory=dict)
 
     # --- loading ---------------------------------------------------------
     @classmethod
@@ -164,6 +168,7 @@ class Config:
             else:
                 self.permissions.tools[k] = v
         self.aliases.update(raw.get("aliases", {}))
+        self.thinking.update(raw.get("thinking", {}))
 
     def _apply_env(self, env: dict[str, str]) -> None:
         # A small, documented set of env overrides for the common knobs.

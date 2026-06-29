@@ -86,6 +86,16 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 - **Model selection:** `locode -m <alias-or-hf-id>`. Define short aliases in
   your config; any value containing `/` is treated as a full Hugging Face id.
 - **`--yolo`** flips ASK→AUTO (configured `deny_paths` are still enforced).
+- **Reasoning toggle:** some local models emit chain-of-thought that locode
+  can't stream (it looks like a hang). Override per model in `config.toml`:
+  ```toml
+  [thinking]
+  # alias or model-id substring -> "on" | "off" | "auto"
+  qythos9 = "off"   # suppress reasoning (enable_thinking=false)
+  devstral24 = "on" # force it on for hard diagnosis
+  ```
+  Unlisted models use locode's per-model default; `"auto"` omits the kwarg and
+  lets the model's own template decide.
 
 See [`MODELS.md`](MODELS.md) for guidance on choosing a local model per task and
 [`architecture.md`](architecture.md) for the design.

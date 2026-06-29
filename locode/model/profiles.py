@@ -99,3 +99,45 @@ def profile_for(model_id: str) -> Profile:
         if needle in model_id:
             return profile
     return DEFAULT_PROFILE
+
+
+def lookup_thinking_override(
+    overrides: dict[str, str], model_id: str, alias: str | None = None
+) -> str | None:
+    """Find the user's `[thinking]` override for this model, if any.
+
+    Keys may be either the alias the user passed (exact match wins) or a
+    substring of the resolved full model id (longest matching key wins, so a
+    specific id fragment beats a broad one). Returns the raw value ("on" /
+    "off" / "auto") or None when nothing matches.
+    """
+    if not overrides:
+        return None
+    if alias and alias in overrides:
+        return overrides[alias]
+    for key in sorted(overrides, key=len, reverse=True):
+        if key in model_id:
+            return overrides[key]
+    return None
+
+
+def resolve_thinking(profile: Profile, override: str | None) -> bool | None:
+    """Decide the effective `enable_thinking` value for a model launch.
+
+    Returns True (force thinking on -> `enable_thinking: true`), False (force
+    it off -> `enable_thinking: false`), or None (omit the kwarg entirely and
+    let the chat template default decide).
+
+    An explicit per-model override fully decides: "on"/"off" force the kwarg and
+    "auto" suppresses it (template default), which lets a user *undo* a profile
+    that bakes in `enable_thinking=false`. With no override (key unset) we fall
+    back to the profile default — its `thinking_arg` means "send false".
+    """
+    if override is not None:
+        o = override.strip().lower()
+        if o == "on":
+            return True
+        if o == "off":
+            return False
+        return None  # "auto" (or anything unrecognized) -> omit the kwarg
+    return False if profile.thinking_arg else None
