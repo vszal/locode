@@ -195,3 +195,35 @@ def test_strict_json_still_preferred_over_recovery():
     body = '{"name": "read_file", "args": {"path": "ok.py"}}'
     out = extract({"content": "```tool\n" + body + "\n```"}, KNOWN)
     assert out.calls[0].source == "fenced"
+
+
+def test_write_file_with_interior_code_fence_not_truncated():
+    # A write_file whose `content` is a Markdown doc containing its OWN ```python
+    # code fence must round-trip as a single call. The interior ``` must not be
+    # read as the end of the ```tool block — the "DESIGN.md stops at 22 lines"
+    # bug, where the non-greedy fence regex truncated the write at the first
+    # interior fence and the model then flailed, chunking into smaller writes.
+    doc = ("# Design\\n\\n## Overview\\n\\nThe scraper does X.\\n\\n"
+           "```python\\ndef fetch(url):\\n    return get(url)\\n```\\n\\n"
+           "## Notes\\n\\nDone.")
+    body = ('{"name": "write_file", "args": '
+            '{"path": "DESIGN.md", "content": "' + doc + '"}}')
+    out = extract({"content": "```tool\n" + body + "\n```"}, {"write_file"})
+    assert len(out.calls) == 1 and not out.malformed
+    c = out.calls[0]
+    assert c.name == "write_file" and c.source == "fenced"
+    # The full body survived, interior fence and all.
+    assert "```python" in c.args["content"]
+    assert c.args["content"].endswith("Done.")
+
+
+def test_interior_json_fence_inside_content_not_a_block_boundary():
+    # Harder variant: the file content contains a ```json block (same tag family
+    # our fence uses). String-aware scanning must still keep it inside the value.
+    doc = ('Config example:\\n\\n```json\\n'
+           '{\\"port\\": 8081}\\n```\\n\\nEnd.')
+    body = ('{"name": "write_file", "args": '
+            '{"path": "README.md", "content": "' + doc + '"}}')
+    out = extract({"content": "```tool\n" + body + "\n```"}, {"write_file"})
+    assert len(out.calls) == 1 and not out.malformed
+    assert out.calls[0].args["content"].endswith("End.")

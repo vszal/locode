@@ -25,9 +25,17 @@ from locode.tools.base import ToolCall
 # code model loves to emit to ILLUSTRATE a change — must NOT be parsed as a tool
 # call (that produced spurious "unparseable tool block" errors). Real tool calls
 # in a bare/other fence are still recovered by the tier-3 salvage scan.
-_FENCE_RE = re.compile(
-    r"```(?:tool_call|tool|json)[ \t]*\r?\n(.*?)```",
-    re.DOTALL | re.IGNORECASE,
+#
+# Only the OPENING fence is matched by regex; the closing ``` is located by a
+# JSON-string-aware scan (see _fence_blocks). A naive non-greedy `(.*?)```` would
+# stop at the FIRST ``` it sees — but a write_file/edit_file whose `content` is a
+# Markdown doc carries its own ```lang code fences inside the JSON string, so the
+# naive match truncated the call at the first interior fence (the "DESIGN.md
+# stops at 22 lines" bug). Scanning with string awareness keeps interior fences
+# literal and ends the block only at a ``` that sits OUTSIDE the JSON payload.
+_FENCE_OPEN_RE = re.compile(
+    r"```(?:tool_call|tool|json)[ \t]*\r?\n",
+    re.IGNORECASE,
 )
 _NAME_KEYS = ("name", "tool", "function")
 _ARG_KEYS = ("args", "arguments", "parameters", "input")
@@ -79,7 +87,7 @@ def extract(
 
     # --- tier 2: explicit tool fences (```tool / ```tool_call / ```json) -
     fenced_seen = False
-    for block in _FENCE_RE.findall(content):
+    for block in _fence_blocks(content):
         fenced_seen = True
         parsed, err = _loads(block)
         if err is None:
@@ -193,6 +201,57 @@ def _as_objects(parsed: Any) -> list[Any]:
     if isinstance(parsed, list):
         return parsed
     return [parsed]
+
+
+def _fence_blocks(content: str) -> Iterable[str]:
+    """Yield the body of each ```tool / ```tool_call / ```json fence.
+
+    The closing ``` is found by _closing_fence, which tracks JSON-string state,
+    so a ``` code fence *inside* a write_file/edit_file string value (a Markdown
+    document being written to disk) is kept literal instead of ending the block.
+    That is what lets a whole file — with its own ```lang blocks — round-trip as
+    one tool call rather than truncating at the first interior fence.
+
+    An OPENED-but-unclosed fence (a call cut off by the token limit) is skipped,
+    not yielded, so it flows through to the loop's truncation nudge unchanged.
+    """
+    pos = 0
+    while True:
+        m = _FENCE_OPEN_RE.search(content, pos)
+        if not m:
+            return
+        close = _closing_fence(content, m.end())
+        if close is None:
+            return  # unclosed fence (truncated) — leave for the loop to nudge
+        yield content[m.end():close]
+        pos = close + 3
+
+
+def _closing_fence(content: str, i: int) -> int | None:
+    """Index of the ``` that closes a fenced body starting at i, or None if the
+    body is never closed. A ``` is only a closer when it lies OUTSIDE the JSON
+    string context of the body, so interior code fences (inside a quoted value)
+    are ignored."""
+    n = len(content)
+    in_str = esc = False
+    while i < n:
+        c = content[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            i += 1
+        elif c == '"':
+            in_str = True
+            i += 1
+        elif c == "`" and content.startswith("```", i):
+            return i
+        else:
+            i += 1
+    return None
 
 
 _NAME_RE = re.compile(r'"(?:name|tool|function)"\s*:\s*"([A-Za-z0-9_.\-]+)"')
