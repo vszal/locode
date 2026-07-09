@@ -61,12 +61,17 @@ _USE_PROFILE = object()  # sentinel: derive enable_thinking from the profile
 
 
 def build_launch_argv(mlx_bin: str, model_id: str, host: str, port: int,
-                      profile: Profile, thinking: Any = _USE_PROFILE) -> list[str]:
+                      profile: Profile, thinking: Any = _USE_PROFILE,
+                      max_tokens: int = 32768) -> list[str]:
     """Pure: the argv to launch mlx_lm.server for this model (testable).
 
     `thinking` is the resolved enable_thinking decision: True/False force the
     chat-template kwarg, None omits it, and the default sentinel derives it from
     the profile (so existing callers keep the profile-only behavior).
+
+    `--max-tokens` is only the server's FALLBACK when a request omits the field;
+    locode always sends config.model.max_tokens per request, so this just keeps
+    the fallback from being a misleadingly-low cap. Pass the same config value.
     """
     if thinking is _USE_PROFILE:
         thinking = False if profile.thinking_arg else None
@@ -75,7 +80,7 @@ def build_launch_argv(mlx_bin: str, model_id: str, host: str, port: int,
         argv += ["--chat-template-args",
                  json.dumps({"enable_thinking": bool(thinking)})]
     argv += [
-        "--max-tokens", "4096",
+        "--max-tokens", str(max_tokens),
         "--prompt-cache-size", "4",
         "--prompt-cache-bytes", str(profile.prompt_cache_bytes),
     ]
@@ -199,7 +204,7 @@ class SingleGpuManager:
         override = lookup_thinking_override(self._cfg.thinking, model_id, alias)
         thinking = resolve_thinking(profile, override)
         argv = build_launch_argv(self._mlx_bin, model_id, self._host, self._port,
-                                 profile, thinking)
+                                 profile, thinking, self._cfg.model.max_tokens)
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         log = open(STATE_DIR / "mlx-server.log", "ab")
         self._proc = subprocess.Popen(

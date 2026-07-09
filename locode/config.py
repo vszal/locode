@@ -65,7 +65,13 @@ class ServerConfig:
 @dataclass
 class ModelConfig:
     default: str = "qwen14"
-    max_tokens: int = 8192  # headroom: edit-heavy turns reproduce file snippets
+    # Per-turn generation ceiling. A whole write_file/edit_file call — the file
+    # body included — must fit in ONE completion, and on a reasoning distill the
+    # <think> preamble eats into the same budget, so a tight cap truncates the
+    # tool call mid-write (the model then "chunks" a large file). Keep this
+    # generous enough to emit a full file in one turn; the agent loop's
+    # iteration/wallclock/repeat guards still bound a runaway model.
+    max_tokens: int = 32768
     temperature: float = 0.3
 
 
