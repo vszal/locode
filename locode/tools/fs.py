@@ -371,7 +371,11 @@ class EditFile:
         except OSError as e:
             return ToolResult(f"cannot read {p}: {e}", is_error=True)
         if old == new:
-            return ToolResult("old and new are identical; nothing to do", is_error=True)
+            return ToolResult(
+                "`old` and `new` are identical, so this edit changes nothing. If "
+                "you meant to change the file, `new` must differ from `old`. If the "
+                "file is already correct, do NOT repeat this edit — move on (run "
+                "your test, or give your final answer).", is_error=True)
         replace_all = bool(args.get("replace_all"))
 
         updated, note, status, count = try_edit(text, old, new, replace_all)

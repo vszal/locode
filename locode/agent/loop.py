@@ -82,6 +82,7 @@ class AgentLoop:
         deadline = time.monotonic() + self._cfg.agent.max_wallclock_seconds
         nudged_empty = False
         nudged_truncated = False
+        nudged_repeat = False
         consecutive_malformed = 0
         last_batch_sig = None
         repeat_count = 0
@@ -178,11 +179,22 @@ class AgentLoop:
                                             "continuing after its result"})
                 # A model that re-issues the EXACT same call(s) turn after turn is
                 # stuck (e.g. retrying an edit whose `old`/`new` are identical, a
-                # no-op): bail rather than grind to the iteration budget.
+                # no-op). Like the empty/truncated/malformed dead-ends, nudge once
+                # to break it out before bailing — skip re-running the duplicate,
+                # tell it the result won't change, and only stop if it repeats even
+                # after the nudge.
                 batch_sig = tuple(_call_sig(c) for c in calls)
-                repeat_count = repeat_count + 1 if batch_sig == last_batch_sig else 1
+                if batch_sig == last_batch_sig:
+                    repeat_count += 1
+                else:
+                    repeat_count = 1
+                    nudged_repeat = False
                 last_batch_sig = batch_sig
                 if repeat_count >= self._cfg.agent.max_repeat_calls:
+                    if not nudged_repeat:
+                        nudged_repeat = True
+                        self._nudge_repeat(calls)
+                        continue
                     return self._stop("the model repeated the same tool call "
                                       "without making progress")
                 consecutive_malformed = 0  # progress made
@@ -258,6 +270,20 @@ class AgentLoop:
                         "reply normally if no tool is needed."),
         })
         self._on_event({"phase": "nudge", "reason": reason})
+
+    def _nudge_repeat(self, calls) -> None:
+        names = ", ".join(dict.fromkeys(c.name for c in calls))
+        self.history.append({
+            "role": "user",
+            "content": (f"You have issued the same {names} call several times and "
+                        "it returned the same result each time — repeating it will "
+                        "not change anything. Stop repeating it. Either try a "
+                        "genuinely different approach (different arguments, a "
+                        "different tool, or re-read the file/error first), or if "
+                        "the task is already done or truly cannot proceed, give "
+                        "your final answer in plain text now."),
+        })
+        self._on_event({"phase": "nudge", "reason": "repeated call"})
 
     def _stop(self, why: str) -> str:
         self._on_event({"phase": "stopped", "reason": why})

@@ -388,6 +388,25 @@ async def test_repeated_identical_call_bails(tmp_path):
     assert runs < cfg.agent.max_repeat_calls
 
 
+async def test_repeated_call_nudged_before_bailing(tmp_path):
+    # Before hard-stopping a stuck repeat, the loop nudges once — and if the model
+    # takes the hint and changes course, the turn recovers instead of dying.
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    loop = make_loop(tmp_path, [
+        native_call("edit_file", path="a.txt", old="hello", new="hello"),
+        native_call("edit_file", path="a.txt", old="hello", new="hello"),
+        native_call("edit_file", path="a.txt", old="hello", new="hello"),
+        {"role": "assistant", "content": "OK, the file is already correct."},
+    ], cfg=cfg)
+    out = await loop.run_turn("fix it")
+    assert out == "OK, the file is already correct."  # recovered, did not stop
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "repeating it will not change anything" in m["content"]]
+    assert len(nudges) == 1
+
+
 async def test_budget_max_iterations(tmp_path):
     cfg = Config()
     cfg.agent.max_iterations = 2
