@@ -98,10 +98,10 @@ class Repl:
                 with patch_stdout():
                     line = await session.prompt_async(self._prompt(), style=_PROMPT_STYLE)
             except (EOFError, KeyboardInterrupt):
-                print(render.rule(self._term_width(), lead="╰", color=self._color))
+                print(self._bottom_rule())
                 print("bye")
                 return 0
-            print(render.rule(self._term_width(), lead="╰", color=self._color))
+            print(self._bottom_rule())
             line = line.strip()
             if not line:
                 continue
@@ -147,6 +147,11 @@ class Repl:
         except Exception:
             return self._term_width()
 
+    def _bottom_rule(self) -> str:
+        # Match the top rule: one column short of the edge so it never wraps.
+        w = self._term_width()
+        return render.rule(max(1, w - 1), lead="╰", color=self._color)
+
     def _prompt(self):
         # Return a *callable* so prompt_toolkit re-evaluates it on every redraw
         # (including resize): the box's titled top rule is redrawn at the current
@@ -154,8 +159,14 @@ class Repl:
         from html import escape
 
         def _fmt():
-            top = render.rule(self._live_width(), lead="╭",
-                              label=self._loop.model_alias, color=False)
+            w = self._live_width()
+            top = render.rule(w, lead="╭", label=self._loop.model_alias,
+                              color=False)
+            # Stay one column short of the edge and hard-truncate: a rule that
+            # exactly fills the width leaves the cursor in the terminal's
+            # pending-wrap state and spills onto a phantom line when the window
+            # is narrow (and a long alias could overflow a tiny width outright).
+            top = top[:max(1, w - 1)]
             return HTML(f"<edge>{escape(top)}</edge>\n"
                         "<edge>│</edge> <arrow>❯</arrow> ")
         return _fmt
