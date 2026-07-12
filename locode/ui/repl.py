@@ -87,20 +87,21 @@ class Repl:
             bottom_toolbar=self._toolbar,
             prompt_continuation=lambda width, line_no, wrap: HTML("<edge>│</edge> "))
         while True:
-            # Enclose the input area in a box: a titled top rule, a │ left edge on
-            # each input line, and a bottom rule printed once the line is
-            # submitted (so the enclosure persists in scrollback).
-            w = self._term_width()
-            print("\n" + render.rule(w, lead="╭", label=self._loop.model_alias,
-                                      color=self._color))
+            # Enclose the input area in a box: a titled top rule (drawn as the
+            # first line of the *live* prompt so prompt_toolkit reflows it on a
+            # terminal resize — a print()ed rule would keep its old width and
+            # overflow/gap), a │ left edge on each input line, and a bottom rule
+            # printed once the line is submitted so the enclosure persists in
+            # scrollback.
+            print()  # blank-line separator between turns
             try:
                 with patch_stdout():
                     line = await session.prompt_async(self._prompt(), style=_PROMPT_STYLE)
             except (EOFError, KeyboardInterrupt):
-                print(render.rule(w, lead="╰", color=self._color))
+                print(render.rule(self._term_width(), lead="╰", color=self._color))
                 print("bye")
                 return 0
-            print(render.rule(w, lead="╰", color=self._color))
+            print(render.rule(self._term_width(), lead="╰", color=self._color))
             line = line.strip()
             if not line:
                 continue
@@ -137,9 +138,27 @@ class Repl:
     def _term_width(self) -> int:
         return shutil.get_terminal_size((80, 24)).columns
 
+    def _live_width(self) -> int:
+        # Width as prompt_toolkit currently sees it, so the top rule tracks the
+        # live terminal on resize. Falls back to the OS size outside an app.
+        try:
+            from prompt_toolkit.application import get_app
+            return get_app().output.get_size().columns
+        except Exception:
+            return self._term_width()
+
     def _prompt(self):
-        # The │ left edge ties the input line to the top/bottom box rules.
-        return HTML("<edge>│</edge> <arrow>❯</arrow> ")
+        # Return a *callable* so prompt_toolkit re-evaluates it on every redraw
+        # (including resize): the box's titled top rule is redrawn at the current
+        # width, and the │ left edge ties the input line to the top/bottom rules.
+        from html import escape
+
+        def _fmt():
+            top = render.rule(self._live_width(), lead="╭",
+                              label=self._loop.model_alias, color=False)
+            return HTML(f"<edge>{escape(top)}</edge>\n"
+                        "<edge>│</edge> <arrow>❯</arrow> ")
+        return _fmt
 
     def _toolbar(self):
         up = "● up" if self._server_up else "○ down"
