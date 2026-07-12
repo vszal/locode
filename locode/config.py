@@ -77,7 +77,14 @@ class ModelConfig:
 
 @dataclass
 class AgentConfig:
-    max_iterations: int = 25
+    # The loop executes ONE tool call per iteration for non-native (fenced
+    # ```tool) callers — see loop.py's `trimmed` grounding logic — so this is
+    # ~one iteration per file read/edit/test-run, not per logical step. A
+    # genuinely multi-file refactor can easily need 30-40 calls; the real stuck
+    # loops are already bounded by max_repeat_calls/max_error_stall/wallclock,
+    # so this ceiling only needs to catch a model that's truly never going to
+    # finish, not cut off one that's still making progress.
+    max_iterations: int = 50
     max_wallclock_seconds: int = 600
     max_malformed_retries: int = 3  # bail if the model keeps emitting bad tool JSON
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress

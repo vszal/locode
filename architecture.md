@@ -628,7 +628,7 @@ max_tokens = 4096
 temperature = 0.3
 
 [agent]
-max_iterations = 25
+max_iterations = 50
 max_wallclock_seconds = 600
 context_summarize_at = 0.8        # fraction of window before summarizing
 

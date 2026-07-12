@@ -1,0 +1,106 @@
+# locode configuration — full reference.
+#
+# Every key below is shown with its built-in default, so this file is a no-op
+# if copied verbatim; uncomment/edit only what you want to change. All keys
+# are optional — a missing or partial config.toml just falls back to defaults.
+#
+# This is a REFERENCE, not what gets installed. First run instead writes a
+# short starter config (~/.config/locode/config.toml) with example model
+# aliases — see locode/scaffold.py. Copy sections from here into that file,
+# or replace it wholesale:
+#   cp config.toml.example ~/.config/locode/config.toml
+#
+# Precedence: CLI flags > env ($LOCODE_*) > config.toml > these defaults.
+
+[server]
+host = "127.0.0.1"     # hostname or IP of the model server
+port = 8081
+scheme = "http"        # "http" | "https" (https for a remote/proxied endpoint)
+base_url = ""          # full override, e.g. "https://gpu-box.lan:8081"; wins over
+                        # scheme/host/port. Empty => built from scheme://host:port.
+auto_start = true       # launch a LOCAL mlx server if none is reachable (managed only)
+manage = "auto"         # own the server process? "auto" (yes iff loopback) | "yes" | "no"
+mlx_bin = ""            # path to mlx_lm.server; auto-detected if empty
+# Refuse to load a local model whose estimated footprint (weights x overhead +
+# prompt cache) won't fit in (total RAM - this reserve), so a too-big model
+# can't thrash the machine. 0 disables the guard.
+memory_reserve_gb = 5.0
+
+[model]
+default = "qwen14"     # alias (or full "org/model" id) to load at startup
+# Per-turn generation ceiling. A whole write_file/edit_file call — the file
+# body included — must fit in ONE completion, and on a reasoning distill the
+# <think> preamble eats into the same budget, so keep this generous enough to
+# emit a full file in one turn.
+max_tokens = 32768
+temperature = 0.3
+
+[agent]
+# The loop executes ONE tool call per iteration for non-native (fenced
+# ```tool) callers, so this is ~one iteration per file read/edit/test-run,
+# not per logical step. A multi-file refactor can easily need 30-40 calls.
+max_iterations = 50
+max_wallclock_seconds = 600     # hard per-turn time budget
+max_malformed_retries = 3       # bail if the model keeps emitting bad tool JSON
+max_repeat_calls = 3            # bail if it repeats the same call w/o progress
+max_error_stall = 3             # nudge/bail if edits keep hitting the same error
+
+[permissions]
+# tool name -> "auto" (run silently) | "ask" (confirm) | "deny" (never run)
+read_file  = "auto"
+ls         = "auto"
+glob       = "auto"
+grep       = "auto"
+write_file = "ask"
+edit_file  = "ask"
+move_file  = "ask"
+bash       = "ask"
+web_search = "ask"
+web_fetch  = "auto"             # already bounded by allowlist + SSRF guard
+auto_allow_under = ["./sandbox"]   # paths under which ASK tools run without prompting
+# Hard-denied regardless of permission mode, including --yolo.
+deny_paths = ["~/.ssh", "~/.aws", "~/.config/locode"]
+
+[editor]
+command = ""            # else $LOCODE_EDITOR, $VISUAL, $EDITOR
+open_diffs = true       # open write/edit proposals as a diff to review
+diff_tool = ""           # e.g. "code --diff", "git difftool"; auto-detected if empty
+wait = true              # block until the editor closes (review-then-apply)
+
+[web]
+# "auto" (a keyed provider if configured, else the keyless "duckduckgo"
+# default) | "tavily" | "brave" | "duckduckgo"
+search_provider = "auto"
+tavily_api_key = ""      # else read from $TAVILY_API_KEY
+brave_api_key  = ""      # else read from $BRAVE_API_KEY
+max_results = 5
+# web_fetch egress allowlist — host SUFFIXES the model may fetch. Empty means
+# fail closed (every fetch refused). Private/loopback/link-local/metadata IPs
+# are always refused regardless of this list (SSRF guard); redirects are
+# never followed.
+fetch_allowlist = [
+  "docs.python.org", "developer.mozilla.org", "en.wikipedia.org",
+  "pkg.go.dev", "docs.rs", "example.com",
+]
+fetch_max_bytes = 5000000
+fetch_timeout = 20
+
+[ui]                      # interactive REPL polish (TTY only; honors $NO_COLOR)
+markdown = true            # line-buffered markdown styling of answers
+spinner  = true            # animated wait indicator for model load / first token
+timing   = true            # per-turn "~tok · Ns · tok/s" trailer
+
+[aliases]
+# Short names for full Hugging Face model ids; a full "org/model" id always
+# works with no alias defined. No table is shipped in code — the starter
+# config (locode/scaffold.py) seeds a few real 4-bit MLX examples on first run.
+# qwen14 = "mlx-community/Qwen3-14B-4bit"
+
+[thinking]
+# Per-model reasoning override: alias or model-id substring -> "on" | "off" |
+# "auto". Layers over the capability profile's default at server launch.
+# "on"/"off" force the chat-template enable_thinking kwarg; "auto" (the
+# implicit default for unlisted models) omits it and lets the model's own
+# template decide.
+# qythos9 = "off"
+# devstral24 = "on"

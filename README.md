@@ -65,6 +65,11 @@ locode uninstall          # remove it (add --purge to drop config/state too)
 Run `./install.sh --help` for `--dev` (editable install from a checkout) and
 `--dry-run`.
 
+First run writes a short starter config to `~/.config/locode/config.toml`
+(edit the model aliases to match what you've pulled). See
+[`config.toml.example`](config.toml.example) for every available option and
+its default.
+
 ## Development setup (from source)
 
 ```bash
@@ -99,6 +104,17 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
   ```
   Unlisted models use locode's per-model default; `"auto"` omits the kwarg and
   lets the model's own template decide.
+
+- **Turn budget:** a turn runs until the model stops calling tools or a budget
+  trips. For non-native (fenced ` ```tool `) callers the loop grounds one call
+  per iteration, so `max_iterations` is roughly one file read/edit/test-run
+  per count, not one logical step — a multi-file task can need dozens.
+  Runaway loops are caught separately (`max_repeat_calls`, `max_error_stall`),
+  so raising this only extends a turn that's still making progress:
+  ```toml
+  [agent]
+  max_iterations = 50   # default; bump for large multi-file tasks
+  ```
 
 See [`MODELS.md`](MODELS.md) for guidance on choosing a local model per task and
 [`architecture.md`](architecture.md) for the design.
