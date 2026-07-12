@@ -83,9 +83,12 @@ class AgentLoop:
         nudged_empty = False
         nudged_truncated = False
         nudged_repeat = False
+        nudged_stall = False
         consecutive_malformed = 0
         last_batch_sig = None
         repeat_count = 0
+        last_error_sig = None
+        error_stall = 0
         try:
             for _ in range(self._cfg.agent.max_iterations):
                 if time.monotonic() > deadline:
@@ -198,17 +201,45 @@ class AgentLoop:
                     return self._stop("the model repeated the same tool call "
                                       "without making progress")
                 consecutive_malformed = 0  # progress made
-                await self._run_calls(calls)
+                error_sig = await self._run_calls(calls)
+                # A subtler stuck signature than an identical *call*: the model
+                # varies its edits each turn (so the repeat detector never fires)
+                # yet the resulting ERROR is byte-for-byte the same every time —
+                # the classic "keeps text-swapping a structural bug" loop. Key off
+                # the error output, not the call. A clean (no-error) batch neither
+                # counts nor resets: an edit succeeds, the model re-runs the test,
+                # and only the recurring failure between them signals no progress.
+                # A *changed* error is real progress and resets the counter.
+                if error_sig is not None:
+                    if error_sig == last_error_sig:
+                        error_stall += 1
+                    else:
+                        error_stall = 1
+                        nudged_stall = False
+                    last_error_sig = error_sig
+                    if error_stall >= self._cfg.agent.max_error_stall:
+                        if not nudged_stall:
+                            nudged_stall = True
+                            self._nudge_stall()
+                            continue
+                        return self._stop("edits kept hitting the same error "
+                                          "without making progress")
             return self._stop("budget: max iterations reached")
         except CancelledByUser:
             self.history.append({"role": "assistant", "content": "⛔ interrupted"})
             return "⛔ interrupted"
 
     # --- internals -------------------------------------------------------
-    async def _run_calls(self, calls) -> None:
+    async def _run_calls(self, calls) -> str | None:
+        """Run the batch, feed results back, and return a signature of the error
+        output (the joined content of any is_error results, keyed by tool name),
+        or None if nothing errored — the loop uses it to detect edits that keep
+        hitting the same failure. Denials/unknown-tool aren't model-fixable code
+        errors, so they don't count toward the stall signal."""
         ctx = ToolContext(cwd=self._cwd, cancel=self.cancel,
                           confirm=self._confirm, select=self._select)
         results: list[tuple[str, str]] = []
+        error_parts: list[str] = []
         for call in calls:
             tool = self._registry.get(call.name)
             if tool is None:
@@ -226,7 +257,10 @@ class AgentLoop:
             self._on_event({"phase": "result", "name": call.name,
                             "error": res.is_error, "content": res.content})
             results.append((call.name, res.content))
+            if res.is_error:
+                error_parts.append(f"{call.name}: {res.content}")
         self.history.append({"role": "user", "content": tool_results_block(results)})
+        return "\n".join(error_parts) if error_parts else None
 
     async def _ask(self, call) -> str:
         if self._confirm is None:
@@ -284,6 +318,22 @@ class AgentLoop:
                         "your final answer in plain text now."),
         })
         self._on_event({"phase": "nudge", "reason": "repeated call"})
+
+    def _nudge_stall(self) -> None:
+        self.history.append({
+            "role": "user",
+            "content": ("Your last few edits have NOT changed the error — it is "
+                        "identical each time. That means the change you keep "
+                        "making is not the real fix: this is a STRUCTURAL problem "
+                        "(control flow, indentation/scope, or how the pieces fit "
+                        "together), not a small text substitution. Stop making the "
+                        "same kind of edit. Re-read the whole relevant function and "
+                        "reason about WHY the error happens, then rewrite the entire "
+                        "function in one shot with write_file instead of another "
+                        "small edit_file swap. If you genuinely cannot fix it, say "
+                        "so in plain text now."),
+        })
+        self._on_event({"phase": "nudge", "reason": "error unchanged across edits"})
 
     def _stop(self, why: str) -> str:
         self._on_event({"phase": "stopped", "reason": why})

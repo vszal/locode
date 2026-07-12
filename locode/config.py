@@ -81,6 +81,7 @@ class AgentConfig:
     max_wallclock_seconds: int = 600
     max_malformed_retries: int = 3  # bail if the model keeps emitting bad tool JSON
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
+    max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
 
 
 @dataclass

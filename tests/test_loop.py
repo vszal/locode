@@ -407,6 +407,56 @@ async def test_repeated_call_nudged_before_bailing(tmp_path):
     assert len(nudges) == 1
 
 
+async def test_error_stall_nudged_then_recovers(tmp_path):
+    # The subtler stuck signature: the model VARIES its edits every turn (so the
+    # identical-call detector never fires) yet keeps hitting the same error. The
+    # no-op "old == new" error text is constant regardless of the values, so each
+    # call is a distinct signature with an identical error — exactly the case.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_error_stall = 3
+    cfg.agent.max_repeat_calls = 99  # ensure the *repeat* path can't fire here
+    loop = make_loop(tmp_path, [
+        native_call("edit_file", path="a.txt", old="a", new="a"),
+        native_call("edit_file", path="a.txt", old="b", new="b"),
+        native_call("edit_file", path="a.txt", old="c", new="c"),
+        {"role": "assistant", "content": "Right — this needs a rewrite, not a swap."},
+    ], confirm=confirm, cfg=cfg)
+    out = await loop.run_turn("fix it")
+    assert out == "Right — this needs a rewrite, not a swap."  # recovered
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "identical each time" in m["content"]]
+    assert len(nudges) == 1
+
+
+async def test_error_stall_bails_when_ignored(tmp_path):
+    # If the model ignores the structural nudge and keeps hitting the same error,
+    # the loop bails cleanly instead of grinding to the iteration budget.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_error_stall = 3
+    cfg.agent.max_repeat_calls = 99
+    cfg.agent.max_iterations = 25
+    # Varying, always-erroring edits forever (FakeClient repeats the last).
+    loop = make_loop(tmp_path, [
+        native_call("edit_file", path="a.txt", old="a", new="a"),
+        native_call("edit_file", path="a.txt", old="b", new="b"),
+        native_call("edit_file", path="a.txt", old="c", new="c"),
+        native_call("edit_file", path="a.txt", old="d", new="d"),
+    ], confirm=confirm, cfg=cfg)
+    out = await loop.run_turn("fix it")
+    assert "stopped" in out and "same error" in out
+    runs = sum(1 for m in loop.history
+               if m["role"] == "user" and "Tool results" in m["content"])
+    assert runs < cfg.agent.max_iterations  # bailed early, not at the budget
+
+
 async def test_budget_max_iterations(tmp_path):
     cfg = Config()
     cfg.agent.max_iterations = 2
