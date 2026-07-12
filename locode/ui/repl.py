@@ -6,7 +6,6 @@ slash completion, per-turn timing, multiline input, friendly errors).
 
 from __future__ import annotations
 
-import shutil
 import time
 from pathlib import Path
 
@@ -87,21 +86,19 @@ class Repl:
             bottom_toolbar=self._toolbar,
             prompt_continuation=lambda width, line_no, wrap: HTML("<edge>│</edge> "))
         while True:
-            # Enclose the input area in a box: a titled top rule (drawn as the
-            # first line of the *live* prompt so prompt_toolkit reflows it on a
-            # terminal resize — a print()ed rule would keep its old width and
-            # overflow/gap), a │ left edge on each input line, and a bottom rule
-            # printed once the line is submitted so the enclosure persists in
-            # scrollback.
+            # Frame the input with a width-independent gutter (a ╭ header, a │
+            # left edge, a ╰ close) rather than full-width rules. Nothing spans
+            # the terminal width, so terminal reflow on resize can never wrap a
+            # decoration onto a phantom line — the box artifact this replaced.
             print()  # blank-line separator between turns
             try:
                 with patch_stdout():
                     line = await session.prompt_async(self._prompt(), style=_PROMPT_STYLE)
             except (EOFError, KeyboardInterrupt):
-                print(self._bottom_rule())
+                print(self._close_gutter())
                 print("bye")
                 return 0
-            print(self._bottom_rule())
+            print(self._close_gutter())
             line = line.strip()
             if not line:
                 continue
@@ -135,39 +132,21 @@ class Repl:
             print(render.format_timing(self._turn_chars, elapsed, color=self._color))
 
     # --- prompt / toolbar / keys -----------------------------------------
-    def _term_width(self) -> int:
-        return shutil.get_terminal_size((80, 24)).columns
-
-    def _live_width(self) -> int:
-        # Width as prompt_toolkit currently sees it, so the top rule tracks the
-        # live terminal on resize. Falls back to the OS size outside an app.
-        try:
-            from prompt_toolkit.application import get_app
-            return get_app().output.get_size().columns
-        except Exception:
-            return self._term_width()
-
-    def _bottom_rule(self) -> str:
-        # Match the top rule: one column short of the edge so it never wraps.
-        w = self._term_width()
-        return render.rule(max(1, w - 1), lead="╰", color=self._color)
+    def _close_gutter(self) -> str:
+        # A lone ╰ closes the gutter under an accepted prompt. One column wide,
+        # so it never reaches the right edge and never reflows on resize.
+        return render.rule(1, lead="╰", color=self._color)
 
     def _prompt(self):
-        # Return a *callable* so prompt_toolkit re-evaluates it on every redraw
-        # (including resize): the box's titled top rule is redrawn at the current
-        # width, and the │ left edge ties the input line to the top/bottom rules.
+        # A width-independent gutter: a ╭ header naming the model, then a │ ❯
+        # input edge. No trailing fill to the terminal edge, so there is nothing
+        # for a resize to wrap. (A callable so the header tracks a live /model
+        # switch on the next redraw.)
         from html import escape
 
         def _fmt():
-            w = self._live_width()
-            top = render.rule(w, lead="╭", label=self._loop.model_alias,
-                              color=False)
-            # Stay one column short of the edge and hard-truncate: a rule that
-            # exactly fills the width leaves the cursor in the terminal's
-            # pending-wrap state and spills onto a phantom line when the window
-            # is narrow (and a long alias could overflow a tiny width outright).
-            top = top[:max(1, w - 1)]
-            return HTML(f"<edge>{escape(top)}</edge>\n"
+            alias = escape(self._loop.model_alias)
+            return HTML(f"<edge>╭</edge> <model>{alias}</model>\n"
                         "<edge>│</edge> <arrow>❯</arrow> ")
         return _fmt
 
