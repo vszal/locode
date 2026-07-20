@@ -650,11 +650,14 @@ async def test_history_budget_stops_before_server_crash(tmp_path):
     # content each turn. Left unchecked this is exactly what grew a local mlx
     # server's prompt cache past 5GB until it hard-crashed on a Metal OOM
     # abort. The history-size budget must catch it independent of those
-    # behavioral detectors.
+    # behavioral detectors — and independent of auto-compact, which is
+    # disabled here so this test isolates the hard stop itself rather than
+    # exercising compaction (see test_compact.py for that).
     cfg = Config()
     cfg.agent.max_history_chars = 50_000
     cfg.agent.max_repeat_calls = 1000
     cfg.agent.max_error_stall = 1000
+    cfg.agent.auto_compact_ratio = 1000
 
     def big_call(i, size=30_000):
         return {"role": "assistant", "content": "x" * size,

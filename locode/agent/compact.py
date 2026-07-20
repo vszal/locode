@@ -62,6 +62,12 @@ _MAX_FIELD_CHARS = 400
 # prose, or a shape we don't recognize) is truncated outright.
 _MAX_MESSAGE_CHARS = 800
 
+# A single message inside the "recent" window this large is exactly the "one
+# huge read balloons the context" case compaction must still catch, even
+# though everything else in the window is left completely untouched. Well
+# above _MAX_MESSAGE_CHARS so ordinary recent turns are never affected.
+_RECENT_SHRINK_THRESHOLD = 4000
+
 
 def estimate_chars(history: list[dict]) -> int:
     """Total content size across all messages — the same cheap chars-as-a-
@@ -88,9 +94,6 @@ def compact_history(history: list[dict], *, keep_recent: int = 8) -> tuple[list[
 
     system = [m for m in history if m.get("role") == "system"]
     body = [m for m in history if m.get("role") != "system"]
-    if keep_recent >= len(body):
-        return history, (f"nothing to compact ({before_n} messages, "
-                         f"{before_chars:,} chars — within the recent window)")
     if keep_recent > 0:
         old, recent = body[:-keep_recent], body[-keep_recent:]
     else:
@@ -108,8 +111,13 @@ def compact_history(history: list[dict], *, keep_recent: int = 8) -> tuple[list[
         else:  # "assistant" (or an unrecognized kind — treat the same way)
             kept.append(_shrink_assistant(m))
 
-    new_history = system + kept + recent
+    shrunk_recent = [_shrink_if_oversized(m) for m in recent]
+
+    new_history = system + kept + shrunk_recent
     after_n, after_chars = len(new_history), estimate_chars(new_history)
+    if new_history == history:
+        return history, (f"nothing to compact ({before_n} messages, "
+                         f"{before_chars:,} chars — within the recent window)")
     report = (f"{before_n} -> {after_n} messages, "
              f"{before_chars:,} -> {after_chars:,} chars")
     return new_history, report
@@ -131,6 +139,24 @@ def _kind(msg: dict) -> str:
     if any(marker in content for marker in _NUDGE_MARKERS):
         return "nudge"
     return "user_prompt"
+
+
+def _shrink_if_oversized(msg: dict) -> dict:
+    """Applied to every message in the recent window — normally a pure no-op.
+    Prompts and live nudges are never touched here regardless of size. A
+    tool_result/assistant message is only touched if it individually exceeds
+    _RECENT_SHRINK_THRESHOLD, so an ordinary recent turn is untouched but a
+    single oversized dump (e.g. one big file read) can't hide behind
+    recency and defeat compaction entirely."""
+    kind = _kind(msg)
+    if kind in ("user_prompt", "nudge"):
+        return msg
+    content = msg.get("content") or ""
+    if len(content) <= _RECENT_SHRINK_THRESHOLD:
+        return msg
+    if kind == "tool_result":
+        return _shrink_tool_result(msg)
+    return _shrink_assistant(msg)
 
 
 def _shrink_tool_result(msg: dict) -> dict:

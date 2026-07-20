@@ -96,11 +96,42 @@ def test_large_write_file_arg_is_shrunk_but_shape_kept():
     assert "y" * 100 not in shrunk["content"]  # bulk gone
 
 
-def test_recent_window_left_untouched_even_if_bulky():
+def test_recent_window_left_untouched_below_the_oversize_threshold():
     big_read = "Tool results:\n\n[read_file]\n" + ("x" * 2000)
     history = [_sys(), _user("go"), _tool_result(big_read)]
-    new, _ = compact_history(history, keep_recent=8)  # window >= body -> no-op
+    new, report = compact_history(history, keep_recent=8)  # window >= body, small -> no-op
     assert new[-1]["content"] == big_read
+    assert "nothing to compact" in report
+
+
+def test_recent_window_still_shrinks_a_single_oversized_dump():
+    # The bug this guards against: a fresh session that reads one huge file
+    # produces very few messages, so message-count alone put the entire body
+    # inside the "recent window" and /compact reported "nothing to compact"
+    # no matter how many chars that one dump held.
+    huge_read = "Tool results:\n\n[read_file]\n" + ("x" * 10000)
+    history = [_sys(), _user("read big.py"), _tool_result(huge_read)]
+    new, report = compact_history(history, keep_recent=8)
+    assert "nothing to compact" not in report
+    shrunk = next(m for m in new if m.get("kind") == "tool_result")
+    assert "compacted" in shrunk["content"]
+    assert len(shrunk["content"]) < 200
+
+
+def test_recent_window_shrinks_oversized_assistant_call_too():
+    call = _write_call(size=5000)
+    history = [_sys(), _user("write it"), call]
+    new, report = compact_history(history, keep_recent=8)
+    assert "nothing to compact" not in report
+    shrunk = next(m for m in new if m.get("kind") == "assistant")
+    assert "chars omitted" in shrunk["content"]
+
+
+def test_recent_file_change_receipt_untouched_regardless_of_window():
+    receipt = "Tool results:\n\n[write_file]\nwrote a.py (12 lines)"
+    history = [_sys(), _user("write a.py"), _tool_result(receipt)]
+    new, _ = compact_history(history, keep_recent=8)
+    assert any(m["content"] == receipt for m in new)
 
 
 def test_idempotent_second_pass_is_a_cheap_noop():
