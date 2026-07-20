@@ -7,7 +7,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from locode import __version__
+from locode import __full_version__, __version__
 from locode.config import Config
 from locode.model.client import ModelClient
 from locode.permissions import AUTO, PermissionPolicy
@@ -199,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.logo:
         from locode.ui import banner, render
         print(banner.render(args.model or "qwen14", False, str(Path.cwd()),
-                            __version__, color=render.should_color()))
+                            __full_version__, color=render.should_color()))
         return 0
     headless = args.print or (args.prompt and not sys.stdin.isatty())
     try:

@@ -18,7 +18,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.styles import Style
 
-from locode import __version__
+from locode import __full_version__
 from locode.agent.loop import AgentLoop
 from locode.config import HISTORY_PATH, STATE_DIR
 from locode.permissions import PermissionPolicy
@@ -77,7 +77,7 @@ class Repl:
         self._server_up = await self._manager.is_up()
         if splash:
             print(banner.render(self._loop.model_alias, self._server_up,
-                                self._loop._cwd, __version__, color=self._color))
+                                self._loop._cwd, __full_version__, color=self._color))
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         session: PromptSession = PromptSession(
             history=FileHistory(str(HISTORY_PATH)), style=_PROMPT_STYLE,
