@@ -115,6 +115,18 @@ class AgentConfig:
     # conservative for a ~32K-token local model's context window; raise it for
     # models with a much larger window (e.g. a 1M-ctx model).
     max_history_chars: int = 100_000
+    # Soft threshold (fraction of max_history_chars) that triggers structural,
+    # deterministic compaction (agent/compact.py) BEFORE the hard stop above
+    # can fire — no model call involved, so a weak local model can't stall or
+    # hallucinate its way through it. Stale tool-result dumps collapse to a
+    # one-line summary and bulky tool-call args (a write_file's full file
+    # body) get shrunk; the system prompt, every real user prompt, file-change
+    # receipts, and a trailing window of compact_keep_recent messages are
+    # always kept verbatim. The same logic backs the explicit /compact command.
+    auto_compact_ratio: float = 0.75
+    # How many of the most recent messages auto-compact / /compact always
+    # leave untouched (the current work in progress).
+    compact_keep_recent: int = 8
 
 
 @dataclass

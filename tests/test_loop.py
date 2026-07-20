@@ -740,6 +740,88 @@ async def test_slow_progress_not_triggered_within_grace_period(tmp_path, monkeyp
     assert len(_nudge_messages(loop)) == 0
 
 
+async def test_kind_field_never_reaches_the_client(tmp_path):
+    # Internal bookkeeping ("kind": "user_prompt"/"assistant"/"tool_result"/
+    # "nudge"/"system", used by agent/compact.py) must be stripped before the
+    # history is sent to the model server — only role/content belong on the
+    # wire.
+    seen = []
+
+    class RecordingClient(FakeClient):
+        async def complete(self, messages, model, **kw):
+            seen.append(messages)
+            return await super().complete(messages, model, **kw)
+
+    (tmp_path / "a.txt").write_text("hi")
+    loop = make_loop_with_client(tmp_path, RecordingClient([
+        native_call("read_file", path="a.txt"),
+        {"role": "assistant", "content": "it says hi"},
+    ]))
+    out = await loop.run_turn("read a.txt")
+    assert out == "it says hi"
+    assert len(seen) >= 2
+    for batch in seen:
+        for m in batch:
+            assert set(m.keys()) == {"role", "content"}
+    # meanwhile the loop's OWN history keeps the "kind" tags
+    assert all("kind" in m for m in loop.history)
+
+
+async def test_explicit_compact_shrinks_history(tmp_path):
+    cfg = Config()
+    cfg.agent.compact_keep_recent = 2
+    loop = make_loop(tmp_path, [{"role": "assistant", "content": "done"}], cfg=cfg)
+    await loop.run_turn("hi")
+    for i in range(10):
+        loop.history.append({
+            "role": "user",
+            "content": "Tool results:\n\n[ls]\n" + ("x" * 500),
+            "kind": "tool_result",
+        })
+        loop.history.append({"role": "assistant", "content": f"step {i}",
+                             "kind": "assistant"})
+    before_chars = sum(len(m.get("content") or "") for m in loop.history)
+    report = loop.compact()
+    after_chars = sum(len(m.get("content") or "") for m in loop.history)
+    assert after_chars < before_chars
+    assert "->" in report
+
+
+async def test_auto_compact_fires_before_hard_stop(tmp_path):
+    # A long-but-not-stuck session (each turn's tool-result dump is bulky, but
+    # distinct, so max_repeat_calls/max_error_stall never trip) must get
+    # structurally compacted by the soft threshold BEFORE the hard
+    # max_history_chars stop gives up on it — recovering headroom instead of
+    # immediately bailing.
+    cfg = Config()
+    cfg.agent.max_history_chars = 20_000
+    cfg.agent.auto_compact_ratio = 0.5
+    cfg.agent.compact_keep_recent = 2
+    cfg.agent.max_repeat_calls = 1000
+    cfg.agent.max_error_stall = 1000
+
+    def big_call(i, size=3_000):
+        # Distinct args each turn (different path) so the repeat-call
+        # detector never fires; bulky content so history grows fast, like the
+        # real incident this whole budget system guards against.
+        return {"role": "assistant", "content": "x" * size,
+                "tool_calls": [{"id": str(i), "function": {
+                    "name": "ls", "arguments": json.dumps({"path": f"d{i}"})}}]}
+
+    events = []
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+
+    scripted = [big_call(i) for i in range(30)]
+    loop = AgentLoop(FakeClient(scripted), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg,
+                     cwd=str(tmp_path), on_event=events.append)
+    await loop.run_turn("list a bunch of directories")
+    assert any(e.get("phase") == "info" and "auto-compacted" in e.get("text", "")
+               for e in events)
+
+
 async def test_slow_progress_not_triggered_when_pace_keeps_up(tmp_path, monkeypatch):
     # Iterations advance in lockstep with (or faster than) the wallclock ratio
     # threshold, so the nudge should never fire even past the grace period.

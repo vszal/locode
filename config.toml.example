@@ -68,6 +68,16 @@ slow_progress_grace_iterations = 1
 # an error. Default is conservative for a ~32K-token local model's context
 # window; raise it for models with a much larger window (e.g. a 1M-ctx model).
 max_history_chars = 100000
+# Soft threshold (fraction of max_history_chars) that triggers structural,
+# deterministic compaction BEFORE the hard stop above can fire — no model
+# call involved, so a weak local model can't stall or hallucinate its way
+# through it. Stale tool-result dumps collapse to a one-line summary and
+# bulky tool-call args (a write_file's full file body) get shrunk; the system
+# prompt, every real user prompt, file-change receipts, and a trailing window
+# of compact_keep_recent messages are always kept verbatim. The same logic
+# backs the explicit /compact command.
+auto_compact_ratio = 0.75
+compact_keep_recent = 8
 
 [permissions]
 # tool name -> "auto" (run silently) | "ask" (confirm) | "deny" (never run)

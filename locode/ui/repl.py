@@ -256,6 +256,8 @@ class Repl:
         elif cmd == "clear":
             self._loop.reset_context()
             print("(context cleared)")
+        elif cmd == "compact":
+            print(self._loop.compact())
         elif cmd == "save":
             self._slash_save(rest)
         elif cmd == "resume":

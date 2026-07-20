@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Awaitable, Callable
 
 from locode.agent.cancel import CancelToken, CancelledByUser
+from locode.agent.compact import compact_history, estimate_chars
 from locode.agent.messages import build_system_prompt, tool_results_block
 from locode.model import toolparse
 from locode.model.profiles import profile_for
@@ -59,7 +60,8 @@ class AgentLoop:
         # run_turn(); accumulated in _ask().
         self._wallclock_pause = 0.0
         self.history: list[dict[str, Any]] = [
-            {"role": "system", "content": build_system_prompt(registry, cwd)}
+            {"role": "system", "content": build_system_prompt(registry, cwd),
+             "kind": "system"}
         ]
 
     def set_model(self, alias: str) -> None:
@@ -73,6 +75,14 @@ class AgentLoop:
         session). Copied so the caller's list isn't aliased into the loop."""
         self.history = list(history)
 
+    def compact(self) -> str:
+        """Explicit /compact: same structural rules as auto-compact (see
+        agent/compact.py), run on demand rather than triggered by a size
+        threshold. Returns a short human-readable report."""
+        self.history, report = compact_history(
+            self.history, keep_recent=self._cfg.agent.compact_keep_recent)
+        return report
+
     async def run_turn(self, user_text: str) -> str:
         self.cancel.reset()
         # Server load / model switch can be a long, silent wait — let the UI spin.
@@ -83,7 +93,8 @@ class AgentLoop:
             self._on_event({"phase": "busy_stop"})
         profile = profile_for(model_id)
         tools = self._registry.specs() if profile.native_tools else None
-        self.history.append({"role": "user", "content": user_text})
+        self.history.append({"role": "user", "content": user_text,
+                             "kind": "user_prompt"})
 
         start = time.monotonic()
         self._wallclock_pause = 0.0
@@ -134,7 +145,22 @@ class AgentLoop:
                 # not after — a crashed mlx server can't return an error to react
                 # to. See AgentConfig.max_history_chars for the incident this
                 # guards against.
-                history_chars = sum(len(m.get("content") or "") for m in self.history)
+                history_chars = estimate_chars(self.history)
+                # Soft threshold, checked first: shrink stale tool-result dumps
+                # and bulky tool-call args (agent/compact.py) before the hard
+                # stop below has to fire at all. Purely structural — no model
+                # call — so it can't itself get stuck the way summarizing with
+                # a weak local model could.
+                if history_chars > (self._cfg.agent.max_history_chars
+                                    * self._cfg.agent.auto_compact_ratio):
+                    self.history, report = compact_history(
+                        self.history,
+                        keep_recent=self._cfg.agent.compact_keep_recent)
+                    new_chars = estimate_chars(self.history)
+                    if new_chars != history_chars:
+                        self._on_event({"phase": "info",
+                                        "text": f"auto-compacted context: {report}"})
+                    history_chars = new_chars
                 if history_chars > self._cfg.agent.max_history_chars:
                     return self._stop(
                         f"budget: conversation too large (~{history_chars:,} chars) "
@@ -164,7 +190,7 @@ class AgentLoop:
                 try:
                     async with self._interrupt():
                         msg = await self._client.complete(
-                            self.history, model_id, tools=tools,
+                            _wire(self.history), model_id, tools=tools,
                             temperature=self._cfg.model.temperature,
                             max_tokens=self._cfg.model.max_tokens,
                             cancel=self.cancel, on_delta=self._on_delta,
@@ -208,7 +234,8 @@ class AgentLoop:
                         content = _render_calls_as_fenced(calls)
                     elif all(c.source == "native" for c in calls):
                         content = content.rstrip() + "\n" + _render_calls_as_fenced(calls)
-                self.history.append({"role": "assistant", "content": content})
+                self.history.append({"role": "assistant", "content": content,
+                                     "kind": "assistant"})
                 if calls:
                     since_last_deliverable_nudge_call = True
 
@@ -321,7 +348,8 @@ class AgentLoop:
                                           "without making progress")
             return self._stop("budget: max iterations reached")
         except CancelledByUser:
-            self.history.append({"role": "assistant", "content": "⛔ interrupted"})
+            self.history.append({"role": "assistant", "content": "⛔ interrupted",
+                                 "kind": "assistant"})
             return "⛔ interrupted"
 
     # --- internals -------------------------------------------------------
@@ -354,7 +382,8 @@ class AgentLoop:
             results.append((call.name, res.content))
             if res.is_error:
                 error_parts.append(f"{call.name}: {res.content}")
-        self.history.append({"role": "user", "content": tool_results_block(results)})
+        self.history.append({"role": "user", "content": tool_results_block(results),
+                             "kind": "tool_result"})
         return "\n".join(error_parts) if error_parts else None
 
     async def _ask(self, call) -> str:
@@ -380,6 +409,7 @@ class AgentLoop:
             "content": ("You replied with an empty message. Either call a tool "
                         "using the ```tool format, or give your final answer in "
                         "plain text now."),
+            "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "empty response"})
 
@@ -391,6 +421,7 @@ class AgentLoop:
                         "SMALLEST unique snippet that needs changing (a few "
                         "lines), not the whole file, and make several small "
                         "edit_file calls instead of one giant one."),
+            "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "tool call truncated"})
 
@@ -401,6 +432,7 @@ class AgentLoop:
             "content": (f"Your tool call could not be parsed ({reason}). "
                         "Emit exactly one ```tool block with valid JSON, or "
                         "reply normally if no tool is needed."),
+            "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": reason})
 
@@ -419,6 +451,7 @@ class AgentLoop:
                         "different tool, or re-read the file/error first), or if "
                         "the task is already done or truly cannot proceed, give "
                         "your final answer in plain text now."),
+            "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "repeated call"})
 
@@ -435,6 +468,7 @@ class AgentLoop:
                         "function in one shot with write_file instead of another "
                         "small edit_file swap. If you genuinely cannot fix it, say "
                         "so in plain text now."),
+            "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "error unchanged across edits"})
 
@@ -446,6 +480,7 @@ class AgentLoop:
                         "edit_file call for it has happened yet — you've only "
                         "looked around. Either create it now with a tool call, or "
                         "if you genuinely cannot, say exactly why in plain text."),
+            "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": f"missing deliverable: {names}"})
 
@@ -458,12 +493,21 @@ class AgentLoop:
                         "making proportional progress. Be more decisive: skip "
                         "restating the plan, keep any explanation brief, and "
                         "move straight to the next concrete tool call."),
+            "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "slow progress vs wallclock"})
 
     def _stop(self, why: str) -> str:
         self._on_event({"phase": "stopped", "reason": why})
         return f"⏹ stopped ({why})"
+
+
+def _wire(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The history as sent to the model server: role/content only. `history`
+    entries also carry a "kind" tag (agent/compact.py's classification of
+    system/user_prompt/assistant/tool_result/nudge) that's purely internal
+    bookkeeping and must never leak onto the wire."""
+    return [{"role": m["role"], "content": m["content"]} for m in history]
 
 
 _OPEN_FENCE_RE = re.compile(r"```(?:tool_call|tool|json)\b", re.IGNORECASE)
