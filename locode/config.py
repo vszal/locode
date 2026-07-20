@@ -89,6 +89,32 @@ class AgentConfig:
     max_malformed_retries: int = 3  # bail if the model keeps emitting bad tool JSON
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
+    # Bail if the model keeps trying to end the turn without EVER having
+    # attempted a write_file/edit_file call for a deliverable it was explicitly
+    # asked to produce (e.g. "writing a PLAN.md") — as opposed to having tried
+    # and failed/been denied, which is trusted after a single nudge.
+    max_missing_deliverable_retries: int = 3
+    # Catches a model burning wallclock on slow/rambling completions WITHOUT
+    # advancing iterations — a different failure mode than simply running out of
+    # time. Nudged once (never a hard stop; the wallclock/iteration caps above
+    # already bound the turn) when the fraction of iterations consumed falls
+    # below slow_progress_ratio x the fraction of wallclock consumed. Held off
+    # until BOTH grace thresholds pass, so first-iteration cold-start / first-
+    # token latency can't skew the ratio into a false positive.
+    slow_progress_ratio: float = 0.5
+    slow_progress_grace_seconds: float = 60.0
+    slow_progress_grace_iterations: int = 1
+    # Hard ceiling on total history size (chars, summed across all messages —
+    # a cheap proxy for tokens at ~4 chars/token; no tokenizer dependency).
+    # locode has no context compaction: history only shrinks via an explicit
+    # reset, so a long session (or a stuck loop re-appending similar content
+    # each turn) grows it unboundedly. A local mlx server doesn't reliably
+    # reject an over-budget prompt — observed in practice: a stuck edit loop
+    # grew the prompt cache past 5GB and mlx_lm hard-crashed with a Metal
+    # "Insufficient Memory" abort instead of returning an error. Default is
+    # conservative for a ~32K-token local model's context window; raise it for
+    # models with a much larger window (e.g. a 1M-ctx model).
+    max_history_chars: int = 100_000
 
 
 @dataclass

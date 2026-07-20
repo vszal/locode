@@ -10,6 +10,7 @@ unit-testable with stubs.
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from contextlib import asynccontextmanager
@@ -52,6 +53,11 @@ class AgentLoop:
         self._interrupt = interrupt or _null_scope
         self.model_alias = config.model.default
         self.cancel = CancelToken()
+        # Wallclock time spent inside confirm() this turn — waiting on the human
+        # to approve/deny a tool call isn't the model's fault, so it's excluded
+        # from both the hard deadline and the slow-progress ratio. Reset each
+        # run_turn(); accumulated in _ask().
+        self._wallclock_pause = 0.0
         self.history: list[dict[str, Any]] = [
             {"role": "system", "content": build_system_prompt(registry, cwd)}
         ]
@@ -79,20 +85,77 @@ class AgentLoop:
         tools = self._registry.specs() if profile.native_tools else None
         self.history.append({"role": "user", "content": user_text})
 
-        deadline = time.monotonic() + self._cfg.agent.max_wallclock_seconds
+        start = time.monotonic()
+        self._wallclock_pause = 0.0
         nudged_empty = False
         nudged_truncated = False
         nudged_repeat = False
         nudged_stall = False
+        nudged_slow = False
+        missing_deliverable_nudges = 0
+        # Whether a real tool call has happened since the last missing-
+        # deliverable nudge — distinguishes "the model answered the nudge
+        # directly" (trust it, even a plain refusal) from "the model detoured
+        # through some other action and STILL didn't resolve it" (keep
+        # pressing, bounded), which is what let a hallucinated "the file was
+        # created" claim followed by a failed verify-read slip through as a
+        # trusted final answer on the dead-end right after it.
+        since_last_deliverable_nudge_call = False
         consecutive_malformed = 0
         last_batch_sig = None
         repeat_count = 0
         last_error_sig = None
         error_stall = 0
+        # Filenames the user asked to be WRITTEN this turn (e.g. "writing a
+        # PLAN.md") — tracked against write_file/edit_file calls actually
+        # attempted, to catch a model that reads around and then narrates a
+        # plan in prose instead of ever producing the file.
+        expected_artifacts = _expected_artifacts(user_text)
+        attempted_paths: set[str] = set()
+        # ALL file-like names mentioned in the request (read or write intent),
+        # vs. which of them have actually been read — lets a repeat-call nudge
+        # point at a concrete unread file instead of a vague "try something
+        # different" that a stuck model just ignores.
+        mentioned_files = _mentioned_files(user_text)
+        read_paths: set[str] = set()
         try:
-            for _ in range(self._cfg.agent.max_iterations):
-                if time.monotonic() > deadline:
+            for i in range(self._cfg.agent.max_iterations):
+                now = time.monotonic()
+                # Time spent inside confirm() (waiting on the human, not the
+                # model) doesn't count against the turn's wallclock budget.
+                elapsed = now - start - self._wallclock_pause
+                if elapsed > self._cfg.agent.max_wallclock_seconds:
                     return self._stop("budget: wallclock exceeded")
+                # A stuck loop (or just a long session — history only shrinks via
+                # an explicit reset) can grow the prompt past what the local
+                # server can safely allocate; unlike the other budgets this isn't
+                # about the MODEL's behavior; it's a resource guard. Checked
+                # before every completion so it trips before the next request,
+                # not after — a crashed mlx server can't return an error to react
+                # to. See AgentConfig.max_history_chars for the incident this
+                # guards against.
+                history_chars = sum(len(m.get("content") or "") for m in self.history)
+                if history_chars > self._cfg.agent.max_history_chars:
+                    return self._stop(
+                        f"budget: conversation too large (~{history_chars:,} chars) "
+                        "— risk of exhausting the local server's memory; start a "
+                        "new session or /reset before continuing")
+                # A model can be "on track" by iteration count yet still be
+                # quietly burning the wallclock budget on slow/rambling
+                # completions — the iteration cap alone won't catch that until
+                # it's too late. Compare how much of each budget is spent: if
+                # iterations are lagging wallclock by more than the configured
+                # ratio, nudge once toward shorter, more decisive turns. Held
+                # off by a grace period (both elapsed time AND iterations) so
+                # ordinary first-iteration cold-start latency can't trip it.
+                if (not nudged_slow
+                        and elapsed >= self._cfg.agent.slow_progress_grace_seconds
+                        and i >= self._cfg.agent.slow_progress_grace_iterations):
+                    wallclock_frac = elapsed / self._cfg.agent.max_wallclock_seconds
+                    iter_frac = i / self._cfg.agent.max_iterations
+                    if iter_frac < wallclock_frac * self._cfg.agent.slow_progress_ratio:
+                        nudged_slow = True
+                        self._nudge_slow()
                 # Esc/Ctrl-C listening is active ONLY around streaming; tool
                 # approval prompts below run outside it with a clean terminal.
                 # start/end frame each streamed reply so the UI can reset its
@@ -146,6 +209,8 @@ class AgentLoop:
                     elif all(c.source == "native" for c in calls):
                         content = content.rstrip() + "\n" + _render_calls_as_fenced(calls)
                 self.history.append({"role": "assistant", "content": content})
+                if calls:
+                    since_last_deliverable_nudge_call = True
 
                 if not calls:
                     if outcome.malformed:
@@ -175,6 +240,21 @@ class AgentLoop:
                         nudged_truncated = True
                         self._nudge_truncated()
                         continue
+                    # The model is about to stop with prose instead of the file(s)
+                    # it was explicitly asked to write — the "reads everything,
+                    # then just describes a plan" dead-end. Nudge for it to
+                    # either produce the deliverable now or explain why it can't.
+                    missing = expected_artifacts - attempted_paths
+                    if missing and (missing_deliverable_nudges == 0
+                                    or since_last_deliverable_nudge_call):
+                        if missing_deliverable_nudges < self._cfg.agent.max_missing_deliverable_retries:
+                            missing_deliverable_nudges += 1
+                            since_last_deliverable_nudge_call = False
+                            self._nudge_missing_deliverable(missing)
+                            continue
+                        return self._stop(
+                            "the model never produced "
+                            + ", ".join(sorted(missing)))
                     return content  # final answer
                 if trimmed:
                     self._on_event({"phase": "info",
@@ -196,11 +276,26 @@ class AgentLoop:
                 if repeat_count >= self._cfg.agent.max_repeat_calls:
                     if not nudged_repeat:
                         nudged_repeat = True
-                        self._nudge_repeat(calls)
+                        # "Try something different" is too vague for a weak model
+                        # to act on — it just repeats again and burns the nudge.
+                        # If the task mentioned other files this call hasn't
+                        # touched yet, name them: a concrete next action is far
+                        # more likely to break the loop than a generic prod.
+                        unread = mentioned_files - read_paths - expected_artifacts
+                        self._nudge_repeat(calls, unread)
                         continue
                     return self._stop("the model repeated the same tool call "
                                       "without making progress")
                 consecutive_malformed = 0  # progress made
+                for c in calls:
+                    if c.name in ("write_file", "edit_file"):
+                        path = c.args.get("path")
+                        if path:
+                            attempted_paths.add(os.path.basename(str(path)).lower())
+                    elif c.name == "read_file":
+                        path = c.args.get("path")
+                        if path:
+                            read_paths.add(os.path.basename(str(path)).lower())
                 error_sig = await self._run_calls(calls)
                 # A subtler stuck signature than an identical *call*: the model
                 # varies its edits each turn (so the repeat detector never fires)
@@ -266,7 +361,11 @@ class AgentLoop:
         if self._confirm is None:
             return DENY  # no human available (e.g. headless) -> refuse ASK tools
         preview = _preview(call)
-        answer = await self._confirm(call.name, call.args, preview)
+        pause_start = time.monotonic()
+        try:
+            answer = await self._confirm(call.name, call.args, preview)
+        finally:
+            self._wallclock_pause += time.monotonic() - pause_start
         if answer == "always":
             self._policy.remember(call.name, AUTO)
             return AUTO
@@ -305,13 +404,17 @@ class AgentLoop:
         })
         self._on_event({"phase": "nudge", "reason": reason})
 
-    def _nudge_repeat(self, calls) -> None:
+    def _nudge_repeat(self, calls, unread: set[str] = frozenset()) -> None:
         names = ", ".join(dict.fromkeys(c.name for c in calls))
+        hint = ""
+        if unread:
+            hint = (" You have NOT yet looked at: " + ", ".join(sorted(unread)) +
+                    " — read one of those next instead of repeating this call.")
         self.history.append({
             "role": "user",
             "content": (f"You have issued the same {names} call several times and "
                         "it returned the same result each time — repeating it will "
-                        "not change anything. Stop repeating it. Either try a "
+                        f"not change anything. Stop repeating it.{hint} Either try a "
                         "genuinely different approach (different arguments, a "
                         "different tool, or re-read the file/error first), or if "
                         "the task is already done or truly cannot proceed, give "
@@ -335,12 +438,70 @@ class AgentLoop:
         })
         self._on_event({"phase": "nudge", "reason": "error unchanged across edits"})
 
+    def _nudge_missing_deliverable(self, missing: set[str]) -> None:
+        names = ", ".join(sorted(missing))
+        self.history.append({
+            "role": "user",
+            "content": (f"You were asked to write {names}, but no write_file or "
+                        "edit_file call for it has happened yet — you've only "
+                        "looked around. Either create it now with a tool call, or "
+                        "if you genuinely cannot, say exactly why in plain text."),
+        })
+        self._on_event({"phase": "nudge", "reason": f"missing deliverable: {names}"})
+
+    def _nudge_slow(self) -> None:
+        self.history.append({
+            "role": "user",
+            "content": ("You're spending a lot of wallclock time relative to how "
+                        "many steps you've actually taken — long or rambling "
+                        "replies are burning the turn's time budget without "
+                        "making proportional progress. Be more decisive: skip "
+                        "restating the plan, keep any explanation brief, and "
+                        "move straight to the next concrete tool call."),
+        })
+        self._on_event({"phase": "nudge", "reason": "slow progress vs wallclock"})
+
     def _stop(self, why: str) -> str:
         self._on_event({"phase": "stopped", "reason": why})
         return f"⏹ stopped ({why})"
 
 
 _OPEN_FENCE_RE = re.compile(r"```(?:tool_call|tool|json)\b", re.IGNORECASE)
+
+# A file-like token — deliberately restricted to common text/code/doc
+# extensions (not e.g. "3.10" or "example.com") to keep false positives down.
+_ARTIFACT_RE = re.compile(
+    r"\b[\w][\w\-]{0,80}\.(?:md|markdown|txt|rst|json|ya?ml|toml|csv|log"
+    r"|py|ts|tsx|js|jsx|sh|cfg|ini)\b",
+    re.IGNORECASE,
+)
+_WRITE_VERB_RE = re.compile(
+    r"\b(?:writ(?:e|es|ing)|creat(?:e|es|ing)|generat(?:e|es|ing)"
+    r"|produc(?:e|es|ing)|sav(?:e|es|ing)|draft(?:s|ing)?|output(?:s|ting)?"
+    r"|updat(?:e|es|ing))\b",
+    re.IGNORECASE,
+)
+
+
+def _expected_artifacts(user_text: str) -> set[str]:
+    """Filenames the user's message asked to be WRITTEN this turn — an
+    artifact-looking token (e.g. "PLAN.md") preceded within a short window by a
+    write-ish verb ("writing a PLAN.md"), so a file merely mentioned for reading
+    ("read config.py") doesn't count. Returns lowercased basenames, for later
+    comparison against write_file/edit_file call paths."""
+    artifacts = set()
+    for m in _ARTIFACT_RE.finditer(user_text):
+        window = user_text[max(0, m.start() - 60):m.start()]
+        if _WRITE_VERB_RE.search(window):
+            artifacts.add(m.group(0).lower())
+    return artifacts
+
+
+def _mentioned_files(user_text: str) -> set[str]:
+    """All file-like names mentioned in the request, regardless of whether the
+    intent was to read or write them — used to point a stuck model at a
+    concrete unread file instead of a vague "do something different"."""
+    return {m.group(0).lower() for m in _ARTIFACT_RE.finditer(user_text)}
 
 
 def _looks_truncated(content: str) -> bool:

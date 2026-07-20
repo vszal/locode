@@ -115,6 +115,17 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
   [agent]
   max_iterations = 50   # default; bump for large multi-file tasks
   ```
+  A model can also stay "on track" by iteration count while quietly burning
+  wallclock on slow, rambling completions. locode watches the ratio of
+  iterations-consumed to wallclock-consumed and nudges (once, not a hard stop)
+  toward shorter, more decisive replies if it drops too low, after an initial
+  grace period so first-iteration cold-start latency doesn't trip it:
+  ```toml
+  [agent]
+  slow_progress_ratio = 0.5              # nudge threshold
+  slow_progress_grace_seconds = 60.0     # no check before this much elapsed
+  slow_progress_grace_iterations = 1     # ...and this many iterations done
+  ```
 
 See [`MODELS.md`](MODELS.md) for guidance on choosing a local model per task and
 [`architecture.md`](architecture.md) for the design.

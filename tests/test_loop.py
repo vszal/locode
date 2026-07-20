@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+import locode.agent.loop as loop_mod
 from locode.agent.loop import AgentLoop
 from locode.config import Config
 from locode.permissions import PermissionPolicy
@@ -61,6 +62,44 @@ def make_loop(tmp_path, scripted, confirm=None, cfg=None):
     return AgentLoop(FakeClient(scripted), FakeManager(), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), confirm=confirm)
+
+
+def make_loop_with_client(tmp_path, client, confirm=None, cfg=None):
+    """Like make_loop, but takes a pre-built client — for tests (below) that
+    need a client wired to a fake clock instead of the plain FakeClient."""
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    cfg = cfg or Config()
+    return AgentLoop(client, FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg,
+                     cwd=str(tmp_path), confirm=confirm)
+
+
+class FakeClock:
+    """A controllable stand-in for time.monotonic(), advanced explicitly."""
+    def __init__(self):
+        self.t = 0.0
+
+    def advance(self, dt: float) -> None:
+        self.t += dt
+
+    def now(self) -> float:
+        return self.t
+
+
+class SlowFakeClient(FakeClient):
+    """A FakeClient whose completions each burn a fixed slice of (fake)
+    wallclock time, so tests can exercise the slow-progress ratio nudge
+    without a real 60s+ grace period actually elapsing."""
+    def __init__(self, scripted, clock: FakeClock, seconds_per_call: float):
+        super().__init__(scripted)
+        self._clock = clock
+        self._seconds_per_call = seconds_per_call
+
+    async def complete(self, *a, **kw):
+        self._clock.advance(self._seconds_per_call)
+        return await super().complete(*a, **kw)
 
 
 async def test_plain_answer_no_tools(tmp_path):
@@ -388,6 +427,32 @@ async def test_repeated_identical_call_bails(tmp_path):
     assert runs < cfg.agent.max_repeat_calls
 
 
+async def test_repeated_read_nudge_names_unread_file(tmp_path):
+    # Reported bug: asked to compare DESIGN.md against test_scraper.py and write
+    # POC_TASKS.md, a weak model gets stuck re-reading DESIGN.md and never
+    # touches test_scraper.py. The generic "try something different" nudge
+    # wasn't actionable enough — it must name the concrete unread file.
+    (tmp_path / "DESIGN.md").write_text("design doc")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    loop = make_loop(tmp_path, [
+        native_call("read_file", path="DESIGN.md"),
+        native_call("read_file", path="DESIGN.md"),
+        native_call("read_file", path="DESIGN.md"),
+        {"role": "assistant", "content": "Comparing now."},
+    ], cfg=cfg)
+    out = await loop.run_turn(
+        "compare the DESIGN.md with the code in test_scraper.py. Create a new "
+        "file POC_TASKS.md and suggest next steps for the POC there.")
+    assert out == "Comparing now."
+    nudges = [m["content"] for m in loop.history if m["role"] == "user"
+              and "repeating it will" in m["content"]]
+    assert len(nudges) == 1
+    assert "test_scraper.py" in nudges[0]
+    assert "poc_tasks.md" not in nudges[0]  # the file to CREATE, not read
+    assert "design.md" not in nudges[0]     # already read, not the hint
+
+
 async def test_repeated_call_nudged_before_bailing(tmp_path):
     # Before hard-stopping a stuck repeat, the loop nudges once — and if the model
     # takes the hint and changes course, the turn recovers instead of dying.
@@ -457,6 +522,118 @@ async def test_error_stall_bails_when_ignored(tmp_path):
     assert runs < cfg.agent.max_iterations  # bailed early, not at the budget
 
 
+async def test_missing_deliverable_nudges_then_recovers(tmp_path):
+    # The reported bug: asked to read files then write a PLAN.md, a weak model
+    # reads around and then just narrates a plan in prose without ever calling
+    # write_file. Must nudge once instead of silently returning the narration.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    (tmp_path / "a.txt").write_text("stuff")
+    loop = make_loop(tmp_path, [
+        native_call("read_file", path="a.txt"),
+        {"role": "assistant", "content": "Here's my plan: first we should..."},
+        native_call("write_file", path="PLAN.md", content="# Plan\n..."),
+        {"role": "assistant", "content": "Done, wrote PLAN.md."},
+    ], confirm=confirm)
+    out = await loop.run_turn("read a.txt and then make a plan for next steps "
+                              "by writing a PLAN.md")
+    assert out == "Done, wrote PLAN.md."
+    assert (tmp_path / "PLAN.md").read_text() == "# Plan\n..."
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "no write_file or edit_file call" in m["content"]]
+    assert len(nudges) == 1
+
+
+async def test_missing_deliverable_nudges_then_accepts_explanation(tmp_path):
+    # If the model still doesn't write the file after the nudge, but explains
+    # why, the harness must accept that explanation as the final answer rather
+    # than nudging forever or hard-stopping.
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "I'll write a PLAN.md with next steps."},
+        {"role": "assistant", "content": "I can't write PLAN.md: no clear next "
+                                         "steps exist yet without more info."},
+    ])
+    out = await loop.run_turn("make a plan for next steps by writing a PLAN.md")
+    assert out == ("I can't write PLAN.md: no clear next steps exist yet "
+                   "without more info.")
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "no write_file or edit_file call" in m["content"]]
+    assert len(nudges) == 1
+
+
+async def test_missing_deliverable_not_triggered_when_written(tmp_path):
+    # A model that writes the requested file on the very first turn must not be
+    # nudged at all.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    loop = make_loop(tmp_path, [
+        native_call("write_file", path="PLAN.md", content="# Plan"),
+        {"role": "assistant", "content": "Wrote PLAN.md."},
+    ], confirm=confirm)
+    out = await loop.run_turn("write a PLAN.md with next steps")
+    assert out == "Wrote PLAN.md."
+    assert not any("no write_file or edit_file call" in m["content"]
+                   for m in loop.history if m["role"] == "user")
+
+
+async def test_missing_deliverable_survives_a_detour_then_recovers(tmp_path):
+    # The real bug this guards against: after one nudge, the model hallucinates
+    # success and detours through a (failing) verification read instead of
+    # actually writing. The old single-nudge design would then trust the NEXT
+    # dead-end unconditionally, silently returning it as "done". It must nudge
+    # again instead of letting the false claim slip through.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "Let me create the POC_TASKS.md file."},
+        native_call("read_file", path="POC_TASKS.md"),  # hallucinated "verify"
+        {"role": "assistant", "content": "Let me create it properly:"},
+        native_call("write_file", path="POC_TASKS.md", content="# tasks"),
+        {"role": "assistant", "content": "Done, wrote POC_TASKS.md."},
+    ], confirm=confirm)
+    out = await loop.run_turn("Create a new file POC_TASKS.md with next steps.")
+    assert out == "Done, wrote POC_TASKS.md."
+    assert (tmp_path / "POC_TASKS.md").read_text() == "# tasks"
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "no write_file or edit_file call" in m["content"]]
+    assert len(nudges) == 2  # nudged again after the detour, not trusted blindly
+
+
+async def test_missing_deliverable_bails_after_repeated_detours(tmp_path):
+    # If the model keeps detouring (e.g. ls) and dead-ending without ever
+    # attempting the write, it must bail with a clear message at the cap
+    # instead of grinding or silently accepting a false "done".
+    cfg = Config()
+    cfg.agent.max_missing_deliverable_retries = 2
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "I'll create POC_TASKS.md now."},
+        native_call("ls"),
+        {"role": "assistant", "content": "Let me create it properly."},
+        native_call("ls"),
+        {"role": "assistant", "content": "Working on it."},
+    ], cfg=cfg)
+    out = await loop.run_turn("Create a new file POC_TASKS.md with next steps.")
+    assert "stopped" in out and "poc_tasks.md" in out
+    assert not (tmp_path / "POC_TASKS.md").exists()
+
+
+async def test_missing_deliverable_not_triggered_for_read_only_mentions(tmp_path):
+    # A filename mentioned only in a reading context ("read config.py") must not
+    # be treated as an expected deliverable — no false-positive nudge.
+    (tmp_path / "config.py").write_text("X = 1")
+    loop = make_loop(tmp_path, [
+        native_call("read_file", path="config.py"),
+        {"role": "assistant", "content": "It sets X to 1."},
+    ])
+    out = await loop.run_turn("read config.py and explain it")
+    assert out == "It sets X to 1."
+    assert not any("no write_file or edit_file call" in m["content"]
+                   for m in loop.history if m["role"] == "user")
+
+
 async def test_budget_max_iterations(tmp_path):
     cfg = Config()
     cfg.agent.max_iterations = 2
@@ -464,3 +641,125 @@ async def test_budget_max_iterations(tmp_path):
     loop = make_loop(tmp_path, [native_call("ls")], cfg=cfg)
     out = await loop.run_turn("loop forever")
     assert "stopped" in out and "iterations" in out
+
+
+async def test_history_budget_stops_before_server_crash(tmp_path):
+    # Reproduces the shape of a real incident: a model that never repeats an
+    # identical call (so max_repeat_calls never fires) or hits the same error
+    # twice (so max_error_stall never fires), but keeps re-appending large
+    # content each turn. Left unchecked this is exactly what grew a local mlx
+    # server's prompt cache past 5GB until it hard-crashed on a Metal OOM
+    # abort. The history-size budget must catch it independent of those
+    # behavioral detectors.
+    cfg = Config()
+    cfg.agent.max_history_chars = 50_000
+    cfg.agent.max_repeat_calls = 1000
+    cfg.agent.max_error_stall = 1000
+
+    def big_call(i, size=30_000):
+        return {"role": "assistant", "content": "x" * size,
+                "tool_calls": [{"id": str(i), "function": {
+                    "name": "ls", "arguments": json.dumps({"path": f"d{i}"})}}]}
+
+    scripted = [big_call(i) for i in range(10)]
+    loop = make_loop(tmp_path, scripted, cfg=cfg)
+    out = await loop.run_turn("do it")
+    assert "stopped" in out and "too large" in out
+
+
+async def test_wallclock_pauses_during_confirm(tmp_path, monkeypatch):
+    # A human taking a long time to approve/deny an ASK tool call isn't the
+    # model dawdling — that wait must not count against the turn's wallclock
+    # budget. Confirm burns 200s of (fake) wallclock against a 100s budget;
+    # without pause-tracking this would hard-stop on "wallclock exceeded"
+    # right after the write.
+    clock = FakeClock()
+    monkeypatch.setattr(loop_mod.time, "monotonic", clock.now)
+    cfg = Config()
+    cfg.agent.max_wallclock_seconds = 100
+
+    async def confirm(name, args, preview):
+        clock.advance(200)
+        return "yes"
+
+    loop = make_loop(tmp_path, [
+        native_call("write_file", path="out.txt", content="x"),
+        {"role": "assistant", "content": "done"},
+    ], confirm=confirm, cfg=cfg)
+    out = await loop.run_turn("write out.txt")
+    assert out == "done"
+    assert (tmp_path / "out.txt").read_text() == "x"
+
+
+def _nudge_messages(loop):
+    return [m for m in loop.history if m["role"] == "user"
+            and "wallclock time relative" in m["content"]]
+
+
+async def test_slow_progress_nudges_once_past_grace(tmp_path, monkeypatch):
+    # A model that keeps calling tools (so it never hits max_repeat_calls or
+    # finishes on its own) but takes 50s per completion, against a 200s
+    # wallclock budget and a 50-iteration cap: iterations badly lag wallclock,
+    # so the ratio nudge should fire exactly once, then the turn should still
+    # hard-stop on the wallclock deadline (the nudge doesn't buy extra time).
+    clock = FakeClock()
+    monkeypatch.setattr(loop_mod.time, "monotonic", clock.now)
+    cfg = Config()
+    cfg.agent.max_iterations = 50
+    cfg.agent.max_wallclock_seconds = 200
+    cfg.agent.max_repeat_calls = 1000
+    cfg.agent.max_error_stall = 1000
+    cfg.agent.slow_progress_ratio = 0.5
+    cfg.agent.slow_progress_grace_seconds = 10
+    cfg.agent.slow_progress_grace_iterations = 1
+    scripted = [native_call("ls", path=f"d{i}") for i in range(20)]
+    client = SlowFakeClient(scripted, clock, seconds_per_call=50)
+    loop = make_loop_with_client(tmp_path, client, cfg=cfg)
+    out = await loop.run_turn("do it")
+    assert "stopped" in out and "wallclock exceeded" in out
+    assert len(_nudge_messages(loop)) == 1
+
+
+async def test_slow_progress_not_triggered_within_grace_period(tmp_path, monkeypatch):
+    # Without the grace period, one 50s-costing completion against the default
+    # 600s wallclock budget and 50-iteration cap WOULD trip the ratio check
+    # (iter_frac 1/50=0.02 < 0.5 x 50/600~=0.0417). A large grace window holds
+    # it off, so no nudge should land even though the ratio is unfavorable.
+    clock = FakeClock()
+    monkeypatch.setattr(loop_mod.time, "monotonic", clock.now)
+    cfg = Config()
+    cfg.agent.slow_progress_grace_seconds = 1000.0
+    scripted = [
+        native_call("ls", path="."),
+        {"role": "assistant", "content": "done"},
+    ]
+    client = SlowFakeClient(scripted, clock, seconds_per_call=50)
+    loop = make_loop_with_client(tmp_path, client, cfg=cfg)
+    out = await loop.run_turn("do it")
+    assert out == "done"
+    assert len(_nudge_messages(loop)) == 0
+
+
+async def test_slow_progress_not_triggered_when_pace_keeps_up(tmp_path, monkeypatch):
+    # Iterations advance in lockstep with (or faster than) the wallclock ratio
+    # threshold, so the nudge should never fire even past the grace period.
+    clock = FakeClock()
+    monkeypatch.setattr(loop_mod.time, "monotonic", clock.now)
+    cfg = Config()
+    cfg.agent.max_iterations = 50
+    cfg.agent.max_wallclock_seconds = 600
+    cfg.agent.max_repeat_calls = 99
+    cfg.agent.slow_progress_ratio = 0.5
+    cfg.agent.slow_progress_grace_seconds = 10
+    cfg.agent.slow_progress_grace_iterations = 1
+    scripted = [
+        native_call("ls", path="a"),
+        native_call("ls", path="b"),
+        native_call("ls", path="c"),
+        {"role": "assistant", "content": "done"},
+    ]
+    client = SlowFakeClient(scripted, clock, seconds_per_call=20)
+    loop = make_loop_with_client(tmp_path, client, cfg=cfg)
+    out = await loop.run_turn("do it")
+    assert out == "done"
+    assert len(_nudge_messages(loop)) == 0
