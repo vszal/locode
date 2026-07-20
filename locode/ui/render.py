@@ -29,6 +29,9 @@ _TOOL_MARKER = "```tool"
 _RESET = "\033[0m"
 _DIM = "\033[2m"
 _BOLD = "\033[1m"
+_ITALIC = "\033[3m"
+_UNDERLINE = "\033[4m"
+_STRIKE = "\033[9m"
 _CYAN = "\033[36m"
 _GREEN = "\033[32m"
 _RED = "\033[31m"
@@ -63,12 +66,28 @@ def _prefix_overlap(s: str, marker: str) -> int:
 
 class _MarkdownColorizer:
     """Light markdown styling for streamed answers. Line-buffered (emits on each
-    newline) so it can color whole ```code blocks and bold # headings; inline
-    **bold** / `code` are styled per line. Tokens within a line are held only
-    until the newline, so prose still appears promptly line-by-line."""
+    newline) so it can color whole ```code blocks, bold # headings, and style
+    list/quote/rule lines; inline **bold**, *italic*, ~~strike~~, `code`, and
+    [links](url) are styled per line. Tokens within a line are held only until
+    the newline, so prose still appears promptly line-by-line.
+
+    This is a regex-based approximation, not a CommonMark parser — it's meant
+    to make the common cases readable, not to be spec-correct on every edge
+    case (nested emphasis, escaped markers, etc.)."""
 
     _BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
     _CODE_RE = re.compile(r"`([^`]+)`")
+    _STRIKE_RE = re.compile(r"~~(.+?)~~")
+    _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+    # Single * or _ emphasis — the (?!\*)/(?!_) guards keep this from firing
+    # inside an already-consumed **bold** span or a literal snake_case_name.
+    _ITALIC_STAR_RE = re.compile(r"(?<!\*)\*(?!\*)(\S(?:.*?\S)?)\*(?!\*)")
+    _ITALIC_US_RE = re.compile(r"(?<![\w_])_(\S(?:.*?\S)?)_(?![\w_])")
+    _HEADING_RE = re.compile(r"#{1,6}\s")
+    _QUOTE_RE = re.compile(r"^(\s*)>\s?(.*)$")
+    _BULLET_RE = re.compile(r"^(\s*)([-*+])(\s+)(.*)$")
+    _NUMBERED_RE = re.compile(r"^(\s*)(\d+[.)])(\s+)(.*)$")
+    _HR_RE = re.compile(r"^\s{0,3}([-*_])(?:\s*\1){2,}\s*$")
 
     def __init__(self, emit: Callable[[str], None]):
         self._emit = emit
@@ -95,11 +114,33 @@ class _MarkdownColorizer:
             return _DIM + line + _RESET
         if self._in_code:
             return _CYAN + line + _RESET
-        if re.match(r"#{1,6}\s", line):
+        if self._HR_RE.match(line):
+            return _DIM + "─" * 40 + _RESET
+        if self._HEADING_RE.match(line):
             return _BOLD + line + _RESET
-        line = self._BOLD_RE.sub(_BOLD + r"\1" + _RESET, line)
-        line = self._CODE_RE.sub(_YELLOW + r"\1" + _RESET, line)
-        return line
+        m = self._QUOTE_RE.match(line)
+        if m:
+            indent, rest = m.groups()
+            return _DIM + indent + "▏ " + self._inline(rest) + _RESET
+        m = self._BULLET_RE.match(line)
+        if m:
+            indent, _marker, sp, rest = m.groups()
+            return indent + _CYAN + "•" + _RESET + sp + self._inline(rest)
+        m = self._NUMBERED_RE.match(line)
+        if m:
+            indent, marker, sp, rest = m.groups()
+            return indent + _BOLD + marker + _RESET + sp + self._inline(rest)
+        return self._inline(line)
+
+    def _inline(self, text: str) -> str:
+        text = self._BOLD_RE.sub(_BOLD + r"\1" + _RESET, text)
+        text = self._CODE_RE.sub(_YELLOW + r"\1" + _RESET, text)
+        text = self._STRIKE_RE.sub(_STRIKE + r"\1" + _RESET, text)
+        text = self._LINK_RE.sub(
+            _UNDERLINE + r"\1" + _RESET + _DIM + r" (\2)" + _RESET, text)
+        text = self._ITALIC_STAR_RE.sub(_ITALIC + r"\1" + _RESET, text)
+        text = self._ITALIC_US_RE.sub(_ITALIC + r"\1" + _RESET, text)
+        return text
 
 
 class StreamSink:

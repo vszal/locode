@@ -101,6 +101,38 @@ def test_markdown_still_suppresses_tool_fence():
     assert "```tool" not in text and "ok" in text
 
 
+def test_markdown_styles_lists_quote_link_strike_italic_hr():
+    out = []
+    s = StreamSink(out.append, markdown=True)
+    for piece in [
+        "- bullet one\n", "* bullet two\n", "1. first\n", "2) second\n",
+        "> a quote\n", "[a link](https://example.com)\n", "~~gone~~\n",
+        "*it* and _also_\n", "---\n",
+    ]:
+        s.feed(piece)
+    s.flush()
+    text = "".join(out)
+    assert "\033[36m•\033[0m bullet one" in text
+    assert "\033[36m•\033[0m bullet two" in text
+    assert "\033[1m1.\033[0m first" in text
+    assert "\033[1m2)\033[0m second" in text
+    assert "\033[2m▏ a quote\033[0m" in text
+    assert "\033[4ma link\033[0m\033[2m (https://example.com)\033[0m" in text
+    assert "\033[9mgone\033[0m" in text
+    assert "\033[3mit\033[0m" in text and "\033[3malso\033[0m" in text
+    assert "\033[2m" + "─" * 40 + "\033[0m" in text
+
+
+def test_markdown_bold_not_mistaken_for_italic():
+    out = []
+    s = StreamSink(out.append, markdown=True)
+    s.feed("**bold only**\n")
+    s.flush()
+    text = "".join(out)
+    assert "\033[1mbold only\033[0m" in text
+    assert "\033[3m" not in text  # no stray italic from the leftover single *
+
+
 # --- diff preview for approvals -----------------------------------------------
 def test_format_change_write_new_file(tmp_path):
     out = render.format_change("write_file", {"path": "new.txt", "content": "a\nb"},

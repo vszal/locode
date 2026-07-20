@@ -881,7 +881,10 @@ runs green before a task is called done.
 
 - **M1 — Conversational core:** ✅ model client + REPL + streaming +
   Esc/Ctrl-C interrupt + `SingleGpuManager` lifecycle (status/ensure_up/
-  start/stop/switch).
+  start/stop/switch). _Deferred: language-aware syntax highlighting for
+  ```lang code fences in the markdown streamer (`ui/render.py`
+  `_MarkdownColorizer`) — currently a flat cyan for the whole body regardless
+  of the fence's language tag._
 - **M2 — Tool harness:** ✅ tool registry, `read_file`/`ls`/`grep`/`glob`,
   tolerant `toolparse` (native + fenced + salvage), agent loop with
   iteration/wallclock budgets + malformed-call nudge.
