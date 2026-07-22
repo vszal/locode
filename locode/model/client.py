@@ -11,11 +11,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import time
 from typing import Any, Awaitable, Callable, Iterable
 
 import httpx
 
-from locode.agent.cancel import CancelToken, CancelledByUser
+from locode.agent.cancel import (CancelToken, CancelledByUser,
+                                 DeadlineExceeded)
 
 OnDelta = Callable[[str], Any]
 
@@ -50,10 +52,18 @@ class ModelClient:
         max_tokens: int = 4096,
         cancel: CancelToken | None = None,
         on_delta: OnDelta | None = None,
+        deadline: float | None = None,
     ) -> dict[str, Any]:
         """Run one streamed completion. Returns the assembled assistant message
         {"role": "assistant", "content": str, "tool_calls": [...]}.
-        Raises CancelledByUser if the cancel token fires mid-stream."""
+
+        Raises CancelledByUser if the cancel token fires mid-stream, and
+        DeadlineExceeded if `deadline` (a `time.monotonic()` value) passes
+        while still generating. The deadline matters because httpx's timeout is
+        per-read: a model streaming steadily toward a 32k-token reply never
+        trips it, so without this a single completion can outrun the whole
+        turn's wallclock budget — which the agent loop can only check *between*
+        iterations."""
         if model.startswith("mlx:"):
             model = model[4:]
         body: dict[str, Any] = {
@@ -81,7 +91,8 @@ class ModelClient:
                 cancel_wait = asyncio.ensure_future(cancel.wait()) if cancel else None
                 try:
                     while True:
-                        line = await _next_line(line_iter, cancel, cancel_wait)
+                        line = await _next_line(line_iter, cancel, cancel_wait,
+                                                deadline)
                         if line is _STREAM_DONE:
                             break
                         if not line or not line.startswith("data:"):
@@ -105,6 +116,12 @@ class ModelClient:
                             reasoning_parts.append(rpiece)
                         for tc in delta.get("tool_calls") or []:
                             _accumulate_tool_call(tool_acc, tc)
+                except DeadlineExceeded:
+                    # Re-raise carrying what we already streamed, so the caller
+                    # can report/keep the partial reply rather than losing
+                    # minutes of generation to a bare exception.
+                    raise DeadlineExceeded("".join(content_parts)
+                                           or "".join(reasoning_parts)) from None
                 finally:
                     if cancel_wait is not None and not cancel_wait.done():
                         cancel_wait.cancel()
@@ -119,22 +136,36 @@ class ModelClient:
         return msg
 
 
-async def _next_line(line_iter, cancel: CancelToken | None, cancel_wait):
+async def _next_line(line_iter, cancel: CancelToken | None, cancel_wait,
+                     deadline: float | None = None):
     """Return the next SSE line, or `_STREAM_DONE` at end of stream.
 
     Races the read against the cancel token so an interrupt aborts promptly even
     while blocked awaiting bytes (a silent model still stops on Esc), instead of
-    only being noticed between already-arriving lines."""
+    only being noticed between already-arriving lines. When `deadline` is set,
+    the race also has a timeout, so a steadily-generating model is cut off at
+    the turn's budget rather than running as long as it likes."""
     if cancel is not None and cancel.cancelled:
         raise CancelledByUser()
+    if deadline is not None and time.monotonic() >= deadline:
+        raise DeadlineExceeded()
+    timeout = (deadline - time.monotonic()) if deadline is not None else None
     if cancel_wait is None:
         try:
-            return await line_iter.__anext__()
+            return await asyncio.wait_for(line_iter.__anext__(), timeout)
         except StopAsyncIteration:
             return _STREAM_DONE
+        except asyncio.TimeoutError:
+            raise DeadlineExceeded() from None
     line_task = asyncio.ensure_future(line_iter.__anext__())
     done, _ = await asyncio.wait({line_task, cancel_wait},
-                                 return_when=asyncio.FIRST_COMPLETED)
+                                 return_when=asyncio.FIRST_COMPLETED,
+                                 timeout=timeout)
+    if not done:  # neither finished before the deadline
+        line_task.cancel()
+        with contextlib.suppress(BaseException):
+            await line_task
+        raise DeadlineExceeded()
     if cancel_wait in done:
         line_task.cancel()
         with contextlib.suppress(BaseException):  # let the cancelled read unwind

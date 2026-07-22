@@ -1,0 +1,9 @@
+{
+  "id": "e2e-spec-to-code",
+  "track": "e2e",
+  "description": "the headline case: spec -> DESIGN.md -> PLAN.md -> working code with green tests",
+  "allow_tools": ["read_file", "write_file", "edit_file", "bash", "ls", "grep", "glob"],
+  "timeout": 1500,
+  "weight": 2.0,
+  "extra_args": ["--max-iterations", "70", "--max-wallclock", "1200"]
+}

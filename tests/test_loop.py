@@ -17,7 +17,8 @@ class FakeClient:
         self.n = 0
 
     async def complete(self, messages, model, *, tools=None, temperature=0.3,
-                       max_tokens=4096, cancel=None, on_delta=None):
+                       max_tokens=4096, cancel=None, on_delta=None,
+                       deadline=None):
         msg = self.scripted[min(self.n, len(self.scripted) - 1)]
         self.n += 1
         if on_delta and msg.get("content"):
@@ -848,3 +849,113 @@ async def test_slow_progress_not_triggered_when_pace_keeps_up(tmp_path, monkeypa
     out = await loop.run_turn("do it")
     assert out == "done"
     assert len(_nudge_messages(loop)) == 0
+
+
+# --- announced-intent dead-end -------------------------------------------
+# A model that says "I'll examine the file:" and emits no tool call used to
+# have that narration returned as a confident final answer.
+
+@pytest.mark.parametrize("text", [
+    "I'll first examine the file to understand the current implementation:",
+    "Let me check the tests before making a change.",
+    "Now I will implement the fix.",
+    "Sure! Here's what I found:",
+    "First, I need to read the config file",
+])
+def test_announces_next_action_detects_dead_ends(text):
+    assert loop_mod._announces_next_action(text)
+
+
+@pytest.mark.parametrize("text", [
+    "The bug was an off-by-one in truncate(). I fixed it and the tests pass.",
+    "Done. Let me know if you want the docstrings updated too.",
+    "There are three functions in this module: word_wrap, truncate, and "
+    "title_case. All of them now behave as the tests require.",
+    "",
+    "   ",
+])
+def test_announces_next_action_ignores_real_answers(text):
+    assert not loop_mod._announces_next_action(text)
+
+
+async def test_announced_intent_nudges_then_acts(tmp_path):
+    (tmp_path / "a.txt").write_text("hello")
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "I'll read the file now:"},
+        native_call("read_file", path="a.txt"),
+        {"role": "assistant", "content": "The file contains the word hello."},
+    ])
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("what is in a.txt?")
+    assert "hello" in out
+    assert any(e.get("reason") == "announced intent, no action" for e in events)
+
+
+async def test_announced_intent_nudged_only_once(tmp_path):
+    """If it announces intent again after the nudge, take the second reply as
+    the answer rather than grinding the whole iteration budget."""
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "Let me look at the code:"},
+    ])
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("check the code")
+    assert out == "Let me look at the code:"
+    nudges = [e for e in events
+              if e.get("reason") == "announced intent, no action"]
+    assert len(nudges) == 1
+
+
+async def test_real_answer_is_not_nudged(tmp_path):
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "The answer is 42."},
+    ])
+    events = []
+    loop._on_event = events.append
+    assert await loop.run_turn("what is the answer?") == "The answer is 42."
+    assert not any(e.get("phase") == "nudge" for e in events)
+
+
+# --- single-reply wallclock deadline --------------------------------------
+
+async def test_runaway_reply_stops_at_budget_and_keeps_partial(tmp_path):
+    """A completion that outruns the turn budget must end the turn with a
+    budget stop, not propagate a raw exception — and the partial text it did
+    produce stays in history rather than vanishing."""
+    class DeadlineClient:
+        async def complete(self, messages, model, **kw):
+            assert kw.get("deadline") is not None, "loop must pass a deadline"
+            raise loop_mod.DeadlineExceeded("half a design doc")
+
+    loop = make_loop_with_client(tmp_path, DeadlineClient())
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("write DESIGN.md")
+
+    assert out.startswith("⏹")
+    assert "wallclock exceeded during a single reply" in out
+    assert loop.history[-1]["content"] == "half a design doc"
+    assert any(e.get("phase") == "stopped" for e in events)
+
+
+async def test_deadline_shrinks_as_the_turn_progresses(tmp_path):
+    """The deadline is the turn's budget, not a per-call one: a later call in
+    the same turn gets a deadline no further away than the first."""
+    seen = []
+
+    class RecordingClient(FakeClient):
+        async def complete(self, messages, model, **kw):
+            seen.append(kw.get("deadline"))
+            return await super().complete(messages, model, **kw)
+
+    (tmp_path / "a.txt").write_text("x")
+    client = RecordingClient([
+        native_call("read_file", path="a.txt"),
+        {"role": "assistant", "content": "It contains x."},
+    ])
+    loop = make_loop_with_client(tmp_path, client)
+    await loop.run_turn("read a.txt")
+
+    assert len(seen) == 2 and all(d is not None for d in seen)
+    assert seen[1] <= seen[0] + 0.01  # same turn budget, not refreshed

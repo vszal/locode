@@ -17,6 +17,20 @@ class CancelledByUser(Exception):
     """Raised when work is abandoned because the user interrupted it."""
 
 
+class DeadlineExceeded(Exception):
+    """Raised when a single streamed completion outruns the turn's wallclock
+    budget. Distinct from CancelledByUser: nobody asked for this, the model
+    simply generated for longer than the turn was allowed to take.
+
+    Carries whatever text had been assembled so far, so the caller can log or
+    surface the partial reply instead of discarding it silently.
+    """
+
+    def __init__(self, partial: str = "") -> None:
+        super().__init__("generation exceeded the turn's wallclock budget")
+        self.partial = partial
+
+
 class CancelToken:
     def __init__(self) -> None:
         self._event = asyncio.Event()

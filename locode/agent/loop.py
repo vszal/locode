@@ -16,7 +16,8 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, Awaitable, Callable
 
-from locode.agent.cancel import CancelToken, CancelledByUser
+from locode.agent.cancel import (CancelToken, CancelledByUser,
+                                 DeadlineExceeded)
 from locode.agent.compact import compact_history, estimate_chars
 from locode.agent.messages import build_system_prompt, tool_results_block
 from locode.model import toolparse
@@ -84,6 +85,16 @@ class AgentLoop:
         return report
 
     async def run_turn(self, user_text: str) -> str:
+        result = "(no result)"
+        self._on_event({"phase": "turn_start", "model": self.model_alias,
+                        "prompt_chars": len(user_text)})
+        try:
+            result = await self._run_turn(user_text)
+            return result
+        finally:
+            self._on_event({"phase": "turn_end", "result": result})
+
+    async def _run_turn(self, user_text: str) -> str:
         self.cancel.reset()
         # Server load / model switch can be a long, silent wait — let the UI spin.
         self._on_event({"phase": "busy_start", "text": f"loading {self.model_alias}…"})
@@ -103,6 +114,7 @@ class AgentLoop:
         nudged_repeat = False
         nudged_stall = False
         nudged_slow = False
+        nudged_intent = False
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
         # deliverable nudge — distinguishes "the model answered the nudge
@@ -132,6 +144,8 @@ class AgentLoop:
         try:
             for i in range(self._cfg.agent.max_iterations):
                 now = time.monotonic()
+                self._on_event({"phase": "iteration", "n": i,
+                                "elapsed": round(now - start, 2)})
                 # Time spent inside confirm() (waiting on the human, not the
                 # model) doesn't count against the turn's wallclock budget.
                 elapsed = now - start - self._wallclock_pause
@@ -194,7 +208,23 @@ class AgentLoop:
                             temperature=self._cfg.model.temperature,
                             max_tokens=self._cfg.model.max_tokens,
                             cancel=self.cancel, on_delta=self._on_delta,
+                            # Cut a single runaway reply off at the turn's
+                            # budget. Without this the wallclock check above
+                            # only runs BETWEEN iterations, so one steadily
+                            # streaming completion can overrun it many times
+                            # over (httpx's timeout is per-read, and a model
+                            # emitting tokens never trips it).
+                            deadline=(start + self._wallclock_pause
+                                      + self._cfg.agent.max_wallclock_seconds),
                         )
+                except DeadlineExceeded as e:
+                    if e.partial:
+                        self.history.append({"role": "assistant",
+                                             "content": e.partial,
+                                             "kind": "assistant"})
+                    return self._stop(
+                        "budget: wallclock exceeded during a single reply "
+                        f"(~{len(e.partial):,} chars generated)")
                 finally:
                     # Must fire even when the stream is cancelled mid-flight, or
                     # the UI's wait spinner is never stopped and flickers into the
@@ -282,6 +312,19 @@ class AgentLoop:
                         return self._stop(
                             "the model never produced "
                             + ", ".join(sorted(missing)))
+                    # The reply ENDS by announcing an action it never took —
+                    # "I'll examine the file:" followed by no tool call. The
+                    # loop would otherwise hand that back as a final answer, so
+                    # the turn reads as a confident no-op. Distinct from the
+                    # missing-deliverable case above, which only fires when the
+                    # request named a file to write; this catches the same
+                    # dead-end for read/investigate/run work that names no
+                    # artifact. Nudge once — if it announces intent twice, the
+                    # second reply is returned rather than grinding.
+                    if not nudged_intent and _announces_next_action(content):
+                        nudged_intent = True
+                        self._nudge_announced_intent()
+                        continue
                     return content  # final answer
                 if trimmed:
                     self._on_event({"phase": "info",
@@ -376,9 +419,11 @@ class AgentLoop:
                 self._on_event({"phase": "denied", "name": call.name})
                 continue
             self._on_event({"phase": "run", "name": call.name, "args": call.args})
+            t0 = time.monotonic()
             res = await tool.run(call.args, ctx)
             self._on_event({"phase": "result", "name": call.name,
-                            "error": res.is_error, "content": res.content})
+                            "error": res.is_error, "content": res.content,
+                            "seconds": round(time.monotonic() - t0, 3)})
             results.append((call.name, res.content))
             if res.is_error:
                 error_parts.append(f"{call.name}: {res.content}")
@@ -484,6 +529,19 @@ class AgentLoop:
         })
         self._on_event({"phase": "nudge", "reason": f"missing deliverable: {names}"})
 
+    def _nudge_announced_intent(self) -> None:
+        self.history.append({
+            "role": "user",
+            "content": ("You described what you were about to do but never did "
+                        "it — no tool call followed. Saying it is not doing it. "
+                        "Carry out that step now by emitting the ```tool block "
+                        "for it. If you have actually finished, state your "
+                        "conclusion in plain text instead, with no announcement "
+                        "of further work."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "announced intent, no action"})
+
     def _nudge_slow(self) -> None:
         self.history.append({
             "role": "user",
@@ -559,6 +617,44 @@ def _looks_truncated(content: str) -> bool:
     if last_open is None:
         return False
     return "```" not in content[last_open.end():]
+
+
+# An announcement of work about to be done. Deliberately requires an action
+# verb after the intent phrase: "let me know if…" is a perfectly good way to end
+# a real final answer, while "let me check the file" is not.
+_ANNOUNCED_INTENT_RE = re.compile(
+    r"\b(?:i'?ll|i\s+will|i'?m\s+going\s+to|i\s+need\s+to|let\s+me|let'?s|"
+    r"now\s+i|next\s+i|first\s+i|i\s+should)\s+(?:just\s+|now\s+|first\s+|"
+    r"quickly\s+|also\s+|then\s+)*"
+    r"(?:start|begin|look|check|examine|inspect|read|open|review|explore|"
+    r"search|find|analyz\w*|investigat\w*|create|writ\w*|implement|add|fix|"
+    r"updat\w*|modif\w*|edit|run|test|verif\w*|make|build|generat\w*|"
+    r"produc\w*|draft|continue|proceed)\b",
+    re.IGNORECASE,
+)
+
+
+def _announces_next_action(content: str) -> bool:
+    """True if the reply ENDS by announcing an action it never took — the
+    "I'll examine the file:" dead-end, where a model narrates intent, emits no
+    tool call, and the loop hands that back as a confident final answer.
+
+    Judged on the tail only. A genuine answer may mention what it did in the
+    middle and then conclude; what marks the dead-end is the message *stopping*
+    on the announcement, either with a dangling colon (the list or block it
+    promised never arrived) or with the last line still in future tense.
+    """
+    tail = content.rstrip()
+    if not tail:
+        return False
+    if tail.endswith(":"):
+        return True
+    last_line = tail.splitlines()[-1].strip()
+    # A long trailing paragraph is prose, not an announcement; and a line that
+    # is only a fence/bullet marker carries no intent either way.
+    if not 3 < len(last_line) <= 200:
+        return False
+    return bool(_ANNOUNCED_INTENT_RE.search(last_line))
 
 
 def _call_sig(call) -> tuple:

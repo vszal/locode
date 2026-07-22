@@ -1,0 +1,8 @@
+{
+  "id": "exec-bugfix",
+  "track": "execute",
+  "description": "three seeded logic bugs in a string library; fix until pytest is green",
+  "allow_tools": ["read_file", "write_file", "edit_file", "bash", "ls", "grep", "glob"],
+  "timeout": 900,
+  "weight": 1.0
+}

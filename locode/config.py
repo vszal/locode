@@ -261,7 +261,13 @@ class Config:
         if kw.get("base_url"):
             schanges["base_url"] = kw["base_url"]
         server = replace(self.server, **schanges) if schanges else self.server
-        return replace(self, model=model, server=server)
+        achanges: dict[str, Any] = {}
+        if kw.get("max_iterations"):
+            achanges["max_iterations"] = kw["max_iterations"]
+        if kw.get("max_wallclock"):
+            achanges["max_wallclock_seconds"] = kw["max_wallclock"]
+        agent = replace(self.agent, **achanges) if achanges else self.agent
+        return replace(self, model=model, server=server, agent=agent)
 
     @property
     def base_url(self) -> str:

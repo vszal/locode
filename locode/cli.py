@@ -13,6 +13,7 @@ from locode.model.client import ModelClient
 from locode.permissions import AUTO, PermissionPolicy
 from locode.scaffold import ensure_user_config, first_run_notice
 from locode.server.manager import SingleGpuManager
+from locode.telemetry import EventLog, tee
 from locode.tools import build_registry
 
 
@@ -32,6 +33,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Comma list of ASK tools to auto-allow (headless).")
     p.add_argument("--yolo", action="store_true",
                    help="Flip ASK tools to AUTO (deny_paths still enforced).")
+    p.add_argument("--max-iterations", dest="max_iterations", type=int,
+                   metavar="N",
+                   help="Override the agent's per-turn iteration budget.")
+    p.add_argument("--max-wallclock", dest="max_wallclock", type=int,
+                   metavar="SECONDS",
+                   help="Override the agent's per-turn wallclock budget.")
+    p.add_argument("--log-events", dest="log_events", metavar="PATH",
+                   help="Append structured JSONL telemetry (iterations, tool "
+                        "calls, nudges, stop reason) to PATH. For eval "
+                        "harnesses and post-mortem debugging.")
     p.add_argument("--no-splash", action="store_true", help="Suppress the banner.")
     p.add_argument("--no-markdown", action="store_true",
                    help="Stream raw tokens instead of line-buffered markdown.")
@@ -47,7 +58,9 @@ def _assemble(args):
     if ensure_user_config():
         print(first_run_notice(), file=sys.stderr)
     cfg = Config.load().override(model=args.model, port=args.port,
-                                 host=args.host, base_url=args.base_url)
+                                 host=args.host, base_url=args.base_url,
+                                 max_iterations=args.max_iterations,
+                                 max_wallclock=args.max_wallclock)
     if args.no_markdown:
         cfg.ui.markdown = False
     manager = SingleGpuManager(cfg)
@@ -69,14 +82,21 @@ async def _headless(args) -> int:
     policy = PermissionPolicy(cfg.permissions, yolo=args.yolo)
     for t in (x.strip() for x in args.allow_tool.split(",") if x.strip()):
         policy.remember(t, AUTO)
+    event_log = EventLog(args.log_events) if args.log_events else None
     # Headless: no confirm/select -> ASK tools that weren't pre-allowed are denied.
     loop = AgentLoop(client, manager, registry, policy, cfg, cwd=str(Path.cwd()),
-                     on_delta=lambda s: (sys.stdout.write(s), sys.stdout.flush()))
+                     on_delta=lambda s: (sys.stdout.write(s), sys.stdout.flush()),
+                     on_event=tee(event_log, None))
     try:
         result = await loop.run_turn(text)
     except Exception as e:
+        if event_log:
+            event_log.emit({"phase": "error", "text": str(e)})
         print(f"\n[error] {e}", file=sys.stderr)
         return 1
+    finally:
+        if event_log:
+            event_log.close()
     if result and result.startswith(("⛔", "⏹")):
         print(f"\n{result}")
     else:
@@ -88,8 +108,14 @@ async def _interactive(args) -> int:
     cfg, manager, client, registry = _assemble(args)
     from locode.ui.repl import Repl
 
-    repl = Repl(cfg, client, manager, registry, yolo=args.yolo)
-    return await repl.run(splash=not args.no_splash)
+    event_log = EventLog(args.log_events) if args.log_events else None
+    repl = Repl(cfg, client, manager, registry, yolo=args.yolo,
+                event_log=event_log)
+    try:
+        return await repl.run(splash=not args.no_splash)
+    finally:
+        if event_log:
+            event_log.close()
 
 
 def _cmd_upgrade(argv: list[str]) -> int:

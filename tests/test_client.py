@@ -1,9 +1,12 @@
+import asyncio
 import json
+import time
 
 import httpx
 import pytest
 
-from locode.agent.cancel import CancelToken, CancelledByUser
+from locode.agent.cancel import (CancelToken, CancelledByUser,
+                                 DeadlineExceeded)
 from locode.model.client import ModelClient
 
 
@@ -146,3 +149,66 @@ async def test_list_models():
         return httpx.Response(200, json={"data": [{"id": "m1"}, {"id": "m2"}]})
 
     assert await make_client(handler).list_models() == ["m1", "m2"]
+
+
+# --- wallclock deadline during streaming ----------------------------------
+# httpx's timeout is per-read, so a model that keeps emitting tokens never
+# trips it. Without an explicit deadline one completion can outrun the whole
+# turn's budget, which the agent loop only re-checks between iterations.
+
+
+async def test_deadline_cuts_off_a_long_stream():
+    def handler(req):
+        async def body():
+            for i in range(1000):
+                await asyncio.sleep(0.01)
+                yield f"data: {json.dumps(delta(content=f'tok{i} '))}\n".encode()
+            yield b"data: [DONE]\n"
+        return httpx.Response(200, content=body())
+
+    deadline = time.monotonic() + 0.2
+    with pytest.raises(DeadlineExceeded) as ei:
+        await make_client(handler).complete(
+            [{"role": "user", "content": "hi"}], "qwen14", deadline=deadline)
+    # The partial reply survives the cut-off rather than being thrown away.
+    assert "tok0" in ei.value.partial
+
+
+async def test_deadline_already_passed_raises_immediately():
+    def handler(req):
+        return httpx.Response(200, content=sse(delta(content="hi")))
+
+    with pytest.raises(DeadlineExceeded):
+        await make_client(handler).complete(
+            [{"role": "user", "content": "hi"}], "qwen14",
+            deadline=time.monotonic() - 1)
+
+
+async def test_stream_finishing_inside_the_deadline_is_unaffected():
+    def handler(req):
+        return httpx.Response(200, content=sse(
+            delta(content="all "), delta(content="done")))
+
+    msg = await make_client(handler).complete(
+        [{"role": "user", "content": "hi"}], "qwen14",
+        deadline=time.monotonic() + 30)
+    assert msg["content"] == "all done"
+
+
+async def test_cancel_still_wins_over_deadline():
+    """A user interrupt and a generous deadline together must still report the
+    interrupt — the two paths race in the same wait()."""
+    token = CancelToken()
+
+    def handler(req):
+        async def body():
+            token.cancel()
+            for i in range(100):
+                await asyncio.sleep(0.05)
+                yield f"data: {json.dumps(delta(content='x'))}\n".encode()
+        return httpx.Response(200, content=body())
+
+    with pytest.raises(CancelledByUser):
+        await make_client(handler).complete(
+            [{"role": "user", "content": "hi"}], "qwen14", cancel=token,
+            deadline=time.monotonic() + 30)

@@ -22,6 +22,7 @@ from locode import __full_version__
 from locode.agent.loop import AgentLoop
 from locode.config import HISTORY_PATH, STATE_DIR
 from locode.permissions import PermissionPolicy
+from locode.telemetry import tee
 from locode.ui import banner, choice, editor, render, slash
 from locode.ui.interrupt import RawWriter, interrupt_scope
 from locode.ui.spinner import Spinner
@@ -48,8 +49,10 @@ class _SlashCompleter(Completer):
 
 
 class Repl:
-    def __init__(self, config, client, manager, registry, *, yolo=False):
+    def __init__(self, config, client, manager, registry, *, yolo=False,
+                 event_log=None):
         self._cfg = config
+        self._event_log = event_log
         self._client = client
         self._manager = manager
         self._registry = registry
@@ -66,7 +69,7 @@ class Repl:
             client, manager, registry, self._policy, config,
             cwd=str(Path.cwd()),
             on_delta=self._on_delta,
-            on_event=self._on_event,
+            on_event=tee(event_log, self._on_event),
             confirm=self._confirm,
             select=choice.select,
             interrupt=lambda: interrupt_scope(self._loop.cancel, self._writer),
