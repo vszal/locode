@@ -1191,3 +1191,115 @@ async def test_assistant_end_reports_generated_chars(tmp_path):
     await loop.run_turn("hi")
     ends = [e for e in events if e.get("phase") == "assistant_end"]
     assert ends and ends[0]["chars"] == 106
+
+
+# --- repeated PROSE (a stall with no tool call) ---------------------------
+# Every other stuck-detector keys on a tool-call signature, so a model that
+# repeats *itself* rather than a *call* is invisible to all of them. Observed
+# in the r6-baseline sweep: an 18,709-char document regenerated verbatim, 245s
+# then 266s of a 600s turn, with write_file never called and PLAN.md never
+# written.
+
+def long_prose(tag="Milestone 1"):
+    """A reply big enough that regenerating it is what burns the turn."""
+    body = "# PLAN.md\n\n" + f"{tag}: build the queue.\n" * 200
+    assert len(body) >= loop_mod.PROSE_REPEAT_MIN_CHARS
+    return {"role": "assistant", "content": body}
+
+
+async def test_repeated_prose_stops_when_the_deliverable_is_still_missing(
+        tmp_path):
+    """The r6 failure, in miniature: asked to write a file, the model narrates
+    it instead, is nudged, and narrates the identical text again."""
+    loop = make_loop(tmp_path, [long_prose()])
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("write a PLAN.md for the queue")
+    assert "repeated the same reply" in out
+    assert any(e.get("phase") == "stopped"
+               and "repeated the same reply" in e.get("reason", "")
+               for e in events)
+
+
+async def test_repeated_prose_stops_on_the_first_repeat(tmp_path):
+    """It must not nudge twice. A turn holds only about two max-length
+    replies, so a second nudge just dies mid-reply instead."""
+    loop = make_loop(tmp_path, [long_prose()])
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("write a PLAN.md for the queue")
+    assert len([e for e in events if e.get("phase") == "nudge"]) == 1
+
+
+async def test_repeated_prose_stops_while_the_model_plan_has_open_tasks(
+        tmp_path):
+    """The other grinding path: no named deliverable, but the model's own plan
+    says it isn't finished."""
+    loop = make_loop(tmp_path, [
+        plan_call("[ ] do the impossible thing"),
+        long_prose(),
+    ])
+    out = await loop.run_turn("do the impossible thing")
+    assert "repeated the same reply" in out
+
+
+async def test_differing_prose_is_not_a_repeat(tmp_path):
+    """A model that reacts to the nudge with different text is making progress
+    and must not be stopped."""
+    loop = make_loop(tmp_path, [
+        long_prose("Milestone 1"),
+        long_prose("Milestone 2"),
+    ])
+    out = await loop.run_turn("write a PLAN.md for the queue")
+    assert "repeated the same reply" not in out
+    assert "Milestone 2" in out
+
+
+async def test_repeat_check_ignores_whitespace_reflow(tmp_path):
+    """Byte-identical is too strict: the same document re-emitted with a
+    different line wrap is the same stall."""
+    body = long_prose()["content"]
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": body},
+        {"role": "assistant", "content": body.replace("\n", "\n  ")},
+    ])
+    out = await loop.run_turn("write a PLAN.md for the queue")
+    assert "repeated the same reply" in out
+
+
+async def test_a_short_repeated_answer_is_still_returned(tmp_path):
+    """Regenerating a terse reply costs nothing, so it keeps its ordinary
+    handling — the size gate is what keeps this check from hijacking the
+    announced-intent and missing-deliverable paths."""
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "Let me look at the code:"},
+    ])
+    out = await loop.run_turn("check the code")
+    assert out == "Let me look at the code:"
+
+
+async def test_missing_deliverable_nudge_names_the_drafted_document(tmp_path):
+    """When the model wrote the document into chat, the nudge must say so.
+    The generic text claims it "only looked around" — false here, and a model
+    that just spent a quarter of the turn composing the document answers that
+    by composing it again."""
+    loop = make_loop(tmp_path, [long_prose()])
+    out = await loop.run_turn("write a PLAN.md for the queue")
+    nudge = next(m for m in loop.history if m.get("kind") == "nudge")
+    assert "into your reply" in nudge["content"]
+    assert "do NOT write that text out again".lower() in nudge["content"].lower()
+    assert "write_file" in nudge["content"]
+    assert "only looked around" not in nudge["content"]
+
+
+async def test_missing_deliverable_nudge_is_unchanged_when_nothing_was_drafted(
+        tmp_path):
+    """A model that genuinely only read files still gets the original wording."""
+    (tmp_path / "a.txt").write_text("hi")
+    loop = make_loop(tmp_path, [
+        native_call("read_file", path="a.txt"),
+        {"role": "assistant", "content": "I looked at it."},
+    ])
+    await loop.run_turn("write a PLAN.md for the queue")
+    nudge = next(m for m in loop.history if m.get("kind") == "nudge")
+    assert "only looked around" in nudge["content"]

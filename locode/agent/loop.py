@@ -30,6 +30,14 @@ from locode.tools.base import Registry, ToolContext
 Confirm = Callable[[str, dict, str], Awaitable[str]]
 OnEvent = Callable[[dict], Any]
 
+# How long a no-tool-call reply must be before repeating it counts as a stall.
+# The harm is proportional to what regenerating it costs: a terse "done" that
+# gets nudged and repeated wastes nothing and keeps its ordinary handling, while
+# a narrated document is a quarter of the turn budget each time it is re-emitted
+# (18,709 chars took 245s in the sweep that motivated this). Well above any
+# terse answer, well below a document.
+PROSE_REPEAT_MIN_CHARS = 2000
+
 
 @asynccontextmanager
 async def _null_scope():
@@ -118,6 +126,7 @@ class AgentLoop:
         truncated_nudges = 0
         nudged_repeat: set = set()
         nudged_stall: set = set()
+        seen_prose: set = set()
         nudged_slow = False
         nudged_intent = False
         open_task_nudges = 0
@@ -326,6 +335,39 @@ class AgentLoop:
                             self._nudge_empty()
                             continue
                         return "(the model returned an empty response)"
+                    # The same dead-end as a repeated tool call, one level up:
+                    # the model repeats ITSELF rather than a call. Every stuck-
+                    # detector below keys on a call signature, so a reply that
+                    # makes no call is invisible to all of them.
+                    #
+                    # Stopping on the FIRST exact repeat is deliberate. Reaching
+                    # here twice with identical text means a nudge was appended
+                    # in between — every path that continues from this branch
+                    # appends one — and the model produced byte-identical output
+                    # anyway, so the nudge is proven inert. That is stronger
+                    # evidence than a repeated tool call, which can be an honest
+                    # retry, and it is far costlier to absorb: the case that
+                    # motivated this regenerated an 18,709-char document
+                    # verbatim, 245s and then 266s of a 600s turn, having never
+                    # called write_file. A turn holds about two such replies, so
+                    # nudging again just dies mid-reply with nothing written.
+                    #
+                    # Scoped to the branches below that NUDGE AND CONTINUE —
+                    # truncation, a missing deliverable, open plan tasks. Those
+                    # are the ones that grind. The announced-intent path already
+                    # returns after a single nudge, and it guesses from phrasing,
+                    # so a repeat there may still be a real answer that merely
+                    # trips the heuristic; taking it is better than discarding it.
+                    prose_sig = " ".join(content.split())
+                    prose_repeat = (prose_sig in seen_prose
+                                    and len(prose_sig) >= PROSE_REPEAT_MIN_CHARS)
+                    seen_prose.add(prose_sig)
+                    if prose_repeat and (
+                            hit_token_limit or _looks_truncated(content)
+                            or (expected_artifacts - attempted_paths)
+                            or self.plan.open):
+                        return self._stop("the model repeated the same reply "
+                                          "without making progress")
                     # An opened-but-unclosed ```tool fence means the call was cut
                     # off by the token limit: the parser can't recover it, and
                     # returning the half-written block as a "final answer" is the
@@ -350,7 +392,9 @@ class AgentLoop:
                         if missing_deliverable_nudges < self._cfg.agent.max_missing_deliverable_retries:
                             missing_deliverable_nudges += 1
                             since_last_deliverable_nudge_call = False
-                            self._nudge_missing_deliverable(missing)
+                            self._nudge_missing_deliverable(
+                                missing,
+                                drafted=len(prose_sig) >= PROSE_REPEAT_MIN_CHARS)
                             continue
                         return self._stop(
                             "the model never produced "
@@ -584,16 +628,28 @@ class AgentLoop:
         })
         self._on_event({"phase": "nudge", "reason": "error unchanged across edits"})
 
-    def _nudge_missing_deliverable(self, missing: set[str]) -> None:
+    def _nudge_missing_deliverable(self, missing: set[str],
+                                   drafted: bool = False) -> None:
         names = ", ".join(sorted(missing))
+        if drafted:
+            # The model didn't fail to do the work — it did the work into the
+            # wrong channel, writing the whole document as chat prose. Telling
+            # it "you've only looked around" is simply false, and a model that
+            # has just spent a quarter of the turn budget composing the document
+            # answers that by composing it again. Name what it actually did and
+            # give it the one concrete action left.
+            body = (f"You wrote the contents of {names} into your reply instead "
+                    "of creating the file — so the file still does not exist. Do "
+                    "NOT write that text out again. Call write_file now with "
+                    f"path {names} and pass the text you just wrote as the "
+                    "content argument.")
+        else:
+            body = (f"You were asked to write {names}, but no write_file or "
+                    "edit_file call for it has happened yet — you've only "
+                    "looked around. Either create it now with a tool call, or "
+                    "if you genuinely cannot, say exactly why in plain text.")
         self.history.append({
-            "role": "user",
-            "content": (f"You were asked to write {names}, but no write_file or "
-                        "edit_file call for it has happened yet — you've only "
-                        "looked around. Either create it now with a tool call, or "
-                        "if you genuinely cannot, say exactly why in plain text."),
-            "kind": "nudge",
-        })
+            "role": "user", "content": body, "kind": "nudge"})
         self._on_event({"phase": "nudge", "reason": f"missing deliverable: {names}"})
 
     def _nudge_open_tasks(self) -> None:
