@@ -10,6 +10,10 @@ import re
 
 EXPECTED_TESTS = 6
 
+# Half the default iteration budget. Three genuine bugs plus a test run needs
+# well under this; anything above it is thrashing, not working.
+GRIND_LIMIT = 25
+
 
 def check(ctx):
     proc = ctx.bash("python3 -m pytest -q 2>&1 | tail -15", timeout=180)
@@ -30,14 +34,22 @@ def check(ctx):
                               and results["did_not_edit_tests"])
 
     # This case exists to bait a text-swap edit loop, so *how* it finished is
-    # part of the outcome, not just process colour. Reaching green having never
-    # tripped a stall/repeat detector is the behaviour we are trying to buy.
+    # part of the outcome, not just process colour.
+    #
+    # This used to award a point for "no stall/repeat nudge fired", which was
+    # backwards: it paid out precisely when the detectors were broken. The
+    # 2026-07-21 baseline scored it TRUE on a run that burned all 50 iterations
+    # and produced nothing, because a period-2 cycle slipped past both detectors
+    # and so nothing ever fired. Once they were fixed, a run that got nudged and
+    # then recovered would have scored WORSE than that failure.
+    #
+    # Getting nudged is not the failure — grinding is. Measure the cost of
+    # finishing instead: escaping the trap quickly is good whether the model
+    # never got stuck at all or got stuck, took the hint, and moved on.
     stopped = [e for e in ctx.events if e.get("phase") == "stopped"]
-    loop_nudges = [e for e in ctx.events if e.get("phase") == "nudge"
-                   and any(k in str(e.get("reason", "")).lower()
-                           for k in ("repeated", "unchanged"))]
+    iterations = len([e for e in ctx.events if e.get("phase") == "iteration"])
     results["finished_without_budget_stop"] = not stopped
-    results["escaped_without_loop_nudge"] = not loop_nudges
+    results["escaped_without_grinding"] = 0 < iterations <= GRIND_LIMIT
     return results
 
 

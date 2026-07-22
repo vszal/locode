@@ -116,8 +116,8 @@ class AgentLoop:
         self._wallclock_pause = 0.0
         nudged_empty = False
         truncated_nudges = 0
-        nudged_repeat = False
-        nudged_stall = False
+        nudged_repeat: set = set()
+        nudged_stall: set = set()
         nudged_slow = False
         nudged_intent = False
         open_task_nudges = 0
@@ -131,10 +131,24 @@ class AgentLoop:
         # trusted final answer on the dead-end right after it.
         since_last_deliverable_nudge_call = False
         consecutive_malformed = 0
-        last_batch_sig = None
-        repeat_count = 0
-        last_error_sig = None
-        error_stall = 0
+        # Both stuck-detectors below key off a STREAK PER SIGNATURE rather than
+        # "is this batch equal to the one immediately before it".
+        #
+        # The older shape could only ever see a period-1 stall. What weak models
+        # actually do is CYCLE: edit, run the test, make the same edit again, run
+        # the same test again. No two adjacent iterations match, so the counters
+        # reset every single turn and never fired. Measured 2026-07-21: a run
+        # alternating a no-op edit_file with an identical pytest invocation burned
+        # all 50 iterations, took 321s and emitted ZERO nudges. Keying per
+        # signature makes whatever is interleaved irrelevant — each distinct call
+        # and each distinct error accumulates its own streak.
+        #
+        # repeat_streaks also stores the RESULT each signature last produced, and
+        # only counts a repeat when the result is unchanged too. Without that,
+        # interleaving-immunity would misfire on ordinary work: running the same
+        # test command between three different edits is progress, not a stall.
+        repeat_streaks: dict[tuple, tuple[str, int]] = {}
+        error_streaks: dict[str, int] = {}
         # Filenames the user asked to be WRITTEN this turn (e.g. "writing a
         # PLAN.md") — tracked against write_file/edit_file calls actually
         # attempted, to catch a model that reads around and then narrates a
@@ -360,22 +374,22 @@ class AgentLoop:
                     self._on_event({"phase": "info",
                                     "text": "ran the first proposed step; "
                                             "continuing after its result"})
-                # A model that re-issues the EXACT same call(s) turn after turn is
-                # stuck (e.g. retrying an edit whose `old`/`new` are identical, a
-                # no-op). Like the empty/truncated/malformed dead-ends, nudge once
-                # to break it out before bailing — skip re-running the duplicate,
-                # tell it the result won't change, and only stop if it repeats even
-                # after the nudge.
+                # A model that re-issues the same call(s) — not necessarily back
+                # to back — and keeps getting the same answer is stuck (e.g.
+                # retrying an edit whose `old`/`new` are identical, a no-op). Like
+                # the empty/truncated/malformed dead-ends, nudge once to break it
+                # out before bailing — skip re-running the known-futile call, tell
+                # it the result won't change, and only stop if it persists.
+                #
+                # Checked BEFORE running, using the result this signature produced
+                # last time: at a streak of max_repeat_calls - 1 the next identical
+                # call is already known to be futile, so re-running it is pure
+                # waste.
                 batch_sig = tuple(_call_sig(c) for c in calls)
-                if batch_sig == last_batch_sig:
-                    repeat_count += 1
-                else:
-                    repeat_count = 1
-                    nudged_repeat = False
-                last_batch_sig = batch_sig
-                if repeat_count >= self._cfg.agent.max_repeat_calls:
-                    if not nudged_repeat:
-                        nudged_repeat = True
+                seen_result, seen_streak = repeat_streaks.get(batch_sig, (None, 0))
+                if seen_streak >= self._cfg.agent.max_repeat_calls - 1:
+                    if batch_sig not in nudged_repeat:
+                        nudged_repeat.add(batch_sig)
                         # "Try something different" is too vague for a weak model
                         # to act on — it just repeats again and burns the nudge.
                         # If the task mentioned other files this call hasn't
@@ -396,7 +410,12 @@ class AgentLoop:
                         path = c.args.get("path")
                         if path:
                             read_paths.add(os.path.basename(str(path)).lower())
-                error_sig = await self._run_calls(calls)
+                error_sig, result_sig = await self._run_calls(calls)
+                # Same call, same answer -> the streak grows; a *changed* result
+                # means the call did something new, so it starts over.
+                repeat_streaks[batch_sig] = (
+                    result_sig,
+                    seen_streak + 1 if result_sig == seen_result else 1)
                 # A subtler stuck signature than an identical *call*: the model
                 # varies its edits each turn (so the repeat detector never fires)
                 # yet the resulting ERROR is byte-for-byte the same every time —
@@ -404,17 +423,12 @@ class AgentLoop:
                 # the error output, not the call. A clean (no-error) batch neither
                 # counts nor resets: an edit succeeds, the model re-runs the test,
                 # and only the recurring failure between them signals no progress.
-                # A *changed* error is real progress and resets the counter.
                 if error_sig is not None:
-                    if error_sig == last_error_sig:
-                        error_stall += 1
-                    else:
-                        error_stall = 1
-                        nudged_stall = False
-                    last_error_sig = error_sig
+                    error_stall = error_streaks[error_sig] = \
+                        error_streaks.get(error_sig, 0) + 1
                     if error_stall >= self._cfg.agent.max_error_stall:
-                        if not nudged_stall:
-                            nudged_stall = True
+                        if error_sig not in nudged_stall:
+                            nudged_stall.add(error_sig)
                             self._nudge_stall()
                             continue
                         return self._stop("edits kept hitting the same error "
@@ -426,12 +440,20 @@ class AgentLoop:
             return "⛔ interrupted"
 
     # --- internals -------------------------------------------------------
-    async def _run_calls(self, calls) -> str | None:
-        """Run the batch, feed results back, and return a signature of the error
-        output (the joined content of any is_error results, keyed by tool name),
-        or None if nothing errored — the loop uses it to detect edits that keep
-        hitting the same failure. Denials/unknown-tool aren't model-fixable code
-        errors, so they don't count toward the stall signal."""
+    async def _run_calls(self, calls) -> tuple[str | None, str]:
+        """Run the batch, feed the results back, and return two signatures.
+
+        The first is the ERROR signature — the joined content of any is_error
+        results, keyed by tool name, or None if nothing errored — which the loop
+        uses to detect edits that keep hitting the same failure. Denials and
+        unknown-tool aren't model-fixable code errors, so they don't count
+        toward the stall signal.
+
+        The second is the FULL result signature, errors and successes alike. It
+        answers a different question: "did this exact call actually do anything
+        different this time?" A repeated call whose output changes is working;
+        one whose output is identical cannot make progress no matter how often
+        it is retried."""
         ctx = ToolContext(cwd=self._cwd, cancel=self.cancel,
                           confirm=self._confirm, select=self._select,
                           plan=self.plan)
@@ -460,7 +482,8 @@ class AgentLoop:
                 error_parts.append(f"{call.name}: {res.content}")
         self.history.append({"role": "user", "content": tool_results_block(results),
                              "kind": "tool_result"})
-        return "\n".join(error_parts) if error_parts else None
+        result_sig = "\n".join(f"{name}: {content}" for name, content in results)
+        return ("\n".join(error_parts) if error_parts else None), result_sig
 
     async def _ask(self, call) -> str:
         if self._confirm is None:

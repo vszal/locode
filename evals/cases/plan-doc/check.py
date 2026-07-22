@@ -51,9 +51,15 @@ def check(ctx):
     # task regex mis-segments its formatting.
     file_mentions = len(re.findall(r"\b[\w/]+\.(?:py|sql|md|toml)\b", doc))
     results["tasks_name_files"] = file_mentions >= 6
+    # False negative found 2026-07-21: a plan that gave a done-condition for
+    # every one of its ten tasks scored zero here, because it phrased them all
+    # as "How to know it's done: ..." and the pattern only accepted "done when".
+    # Match the shape ("done" used as a completion criterion) rather than one
+    # blessed wording. `plans_test_work` still separately penalises a plan whose
+    # done-conditions never name an actual test.
     done_mentions = len(re.findall(
-        r"(?i)\b(done when|acceptance|verif\w+|prove[sd]?\b|test[s]? that|"
-        r"assert\w*|passes?\b|check that)", doc))
+        r"(?i)\b(done when|done:|know it.s done|acceptance|verif\w+|"
+        r"prove[sd]?\b|test[s]? that|assert\w*|passes?\b|check that)", doc))
     results["tasks_have_done_criteria"] = done_mentions >= 6
 
     body = doc

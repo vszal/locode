@@ -19,6 +19,58 @@ Run it between harness changes; gate the change on `compare`.
 `compare` exits non-zero on a regression: any case whose mean score drops more
 than 0.15, or an overall score drop over 0.05.
 
+To read what actually happened inside a run:
+
+```
+.venv/bin/python evals/trace.py evals/results/<label>/events/
+tail -f evals/results/<label>/stdout/<case>__<model>__r1.txt
+```
+
+## Comparing two versions of the harness honestly
+
+Every case spawns a **fresh `locode` process**, which imports the working tree
+as it is *at that moment*. Editing the agent while a sweep runs therefore
+changes the thing being measured partway through — silently, since the results
+file still records one `git_head`. A sweep now records `git_dirty` and prints a
+warning when the tree is modified.
+
+The clean way to A/B two versions of the agent while holding the *measurement*
+code constant:
+
+```
+git checkout <old-commit> -- locode/     # agent at the old version
+.venv/bin/python evals/harness.py run --label old
+git checkout HEAD -- locode/             # agent back to current
+.venv/bin/python evals/harness.py run --label new
+.venv/bin/python evals/harness.py compare evals/results/old evals/results/new
+```
+
+This deliberately leaves the tree dirty during the first sweep — that is the
+one case where the warning is expected rather than a mistake.
+
+## When you fix a checker
+
+Changing a `check.py` silently breaks every comparison against an older sweep:
+the baseline keeps the scores its old checker produced, the candidate gets the
+new one, and the gate compares two different rulers. Re-running the baseline is
+the wrong fix — it costs an hour of GPU and, since the model is sampled, would
+not reproduce those runs anyway.
+
+Re-grade instead. The scratch workspace, event log and stdout of every run are
+kept, and grading needs nothing else:
+
+```
+.venv/bin/python evals/harness.py rescore evals/results/<label> --dry-run
+.venv/bin/python evals/harness.py rescore evals/results/<label>
+```
+
+It prints every run whose score moved and rewrites `results.json` in place,
+carrying the original `git_head` and `created` stamp forward (the numbers
+describe the agent that produced those runs, not whatever is checked out now)
+and adding a `rescored` timestamp. Rescoring with unchanged checkers must report
+`0 run(s) changed` — if it doesn't, a checker is non-deterministic, which is a
+bug in the checker.
+
 ## Why two numbers
 
 - **score** — outcome. The fraction of a case's checks that passed. Did it

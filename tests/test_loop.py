@@ -27,6 +27,23 @@ class FakeClient:
         return msg
 
 
+class CyclingClient(FakeClient):
+    """Cycles the script forever instead of repeating the last message.
+
+    FakeClient's repeat-the-last behaviour can only express a period-1 stall.
+    The stall that actually shows up in the wild is a *cycle*: edit, run the
+    test, edit the same way again, run the same test again. Reproducing it
+    needs a client that loops.
+    """
+    async def complete(self, messages, model, **kw):
+        msg = self.scripted[self.n % len(self.scripted)]
+        self.n += 1
+        on_delta = kw.get("on_delta")
+        if on_delta and msg.get("content"):
+            on_delta(msg["content"])
+        return msg
+
+
 class FakeManager:
     def __init__(self, model_id="mlx-community/Qwen3-14B-4bit"):
         self.model_id = model_id
@@ -549,6 +566,80 @@ async def test_error_stall_bails_when_ignored(tmp_path):
     runs = sum(1 for m in loop.history
                if m["role"] == "user" and "Tool results" in m["content"])
     assert runs < cfg.agent.max_iterations  # bailed early, not at the budget
+
+
+async def test_alternating_call_cycle_is_caught(tmp_path):
+    # Measured in the eval suite (2026-07-21): a real run alternated a no-op
+    # edit_file with an identical `pytest` invocation for all 50 iterations and
+    # fired ZERO nudges. Both detectors compared each batch only against the one
+    # immediately before it, so a period-2 cycle reset them every single turn.
+    # Neither call is ever *consecutively* repeated here, yet the turn is plainly
+    # going nowhere.
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    cfg.agent.max_iterations = 25
+    client = CyclingClient([
+        native_call("edit_file", path="a.txt", old="hello", new="hello"),
+        native_call("read_file", path="a.txt"),
+    ])
+    loop = make_loop_with_client(tmp_path, client, cfg=cfg)
+    out = await loop.run_turn("fix it")
+    assert "stopped" in out
+    runs = sum(1 for m in loop.history
+               if m["role"] == "user" and "Tool results" in m["content"])
+    assert runs < cfg.agent.max_iterations  # caught the cycle, not the budget
+
+
+async def test_alternating_error_cycle_is_caught(tmp_path):
+    # The same period-2 blindness in the error-stall detector: two *different*
+    # failing calls alternating means `error_sig == last_error_sig` is never true,
+    # so the streak reset every turn even though each individual error recurred
+    # verbatim. max_repeat_calls is disabled so only the error path can fire.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_error_stall = 3
+    cfg.agent.max_repeat_calls = 999
+    cfg.agent.max_iterations = 25
+    client = CyclingClient([
+        native_call("edit_file", path="a.txt", old="nope", new="x"),
+        native_call("edit_file", path="missing.txt", old="a", new="b"),
+    ])
+    loop = make_loop_with_client(tmp_path, client, confirm=confirm, cfg=cfg)
+    out = await loop.run_turn("fix it")
+    assert "stopped" in out and "same error" in out
+    runs = sum(1 for m in loop.history
+               if m["role"] == "user" and "Tool results" in m["content"])
+    assert runs < cfg.agent.max_iterations
+
+
+async def test_repeated_call_with_changing_result_is_not_a_stall(tmp_path):
+    # The counterpart guard. Making the detectors interleaving-immune must not
+    # make them trigger-happy: re-reading a file between edits that actually
+    # change it is normal, productive work. The same call appears three times
+    # here, but its RESULT differs every time, so nothing is stuck.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    loop = make_loop(tmp_path, [
+        native_call("read_file", path="a.txt"),
+        native_call("edit_file", path="a.txt", old="hello", new="world"),
+        native_call("read_file", path="a.txt"),
+        native_call("edit_file", path="a.txt", old="world", new="there"),
+        native_call("read_file", path="a.txt"),
+        {"role": "assistant", "content": "Done — it now reads 'there'."},
+    ], confirm=confirm, cfg=cfg)
+    out = await loop.run_turn("update the greeting")
+    assert out == "Done — it now reads 'there'."
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "repeating it will not change anything" in m["content"]]
+    assert nudges == []
 
 
 async def test_missing_deliverable_nudges_then_recovers(tmp_path):

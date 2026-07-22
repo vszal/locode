@@ -1,0 +1,711 @@
+{
+  "label": "r1-baseline",
+  "created": "2026-07-21 22:31:55",
+  "git_head": "bd592f8",
+  "git_dirty": true,
+  "runs": [
+    {
+      "case": "design-doc",
+      "track": "design",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "wrote_design_doc": true,
+        "substantial": true,
+        "structured": true,
+        "covers_public_api": true,
+        "covers_schema": true,
+        "covers_atomic_claim": true,
+        "covers_claim_expiry": true,
+        "covers_backoff": true,
+        "covers_dead_letter": true,
+        "covers_idempotency": true,
+        "covers_crash_recovery": true,
+        "covers_handler_contract": true,
+        "covers_tradeoffs": true,
+        "covers_observability": true,
+        "stayed_in_design_mode": true
+      },
+      "metrics": {
+        "iterations": 3,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 59.7,
+        "model_seconds": 59.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 59.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-design-doc__qwencoder14__r1-6fy_aow0",
+      "error": ""
+    },
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.9,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": true,
+        "plan_has_milestones": true,
+        "plan_has_tasks": true,
+        "wrote_module": true,
+        "wrote_tests": true,
+        "own_tests_pass": true,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 10,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 4,
+          "bash": 3,
+          "edit_file": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 161.4,
+        "model_seconds": 160.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 161.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qwencoder14__r1-j0g22hpk",
+      "error": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "kept_all_tests": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 9,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 4,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.375,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 77.2,
+        "model_seconds": 75.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 77.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r1-ukcxghj8",
+      "error": ""
+    },
+    {
+      "case": "exec-from-plan",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "kept_all_tests": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 4,
+          "bash": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.143,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 59.3,
+        "model_seconds": 59.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 59.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-from-plan__qwencoder14__r1-p5xj6ts4",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.167,
+      "checks": {
+        "tests_pass": false,
+        "kept_all_tests": false,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": false,
+        "escaped_without_grinding": false
+      },
+      "metrics": {
+        "iterations": 50,
+        "tool_calls": 50,
+        "tool_calls_by_name": {
+          "bash": 25,
+          "read_file": 1,
+          "edit_file": 24
+        },
+        "tool_errors": 48,
+        "tool_error_rate": 0.96,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": "budget: max iterations reached",
+        "clean_finish": false,
+        "wallclock": 321.1,
+        "model_seconds": 311.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 321.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__qwencoder14__r1-h9313eo9",
+      "error": ""
+    },
+    {
+      "case": "plan-doc",
+      "track": "plan",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.714,
+      "checks": {
+        "wrote_plan_doc": true,
+        "has_milestones": true,
+        "enough_tasks": true,
+        "tasks_name_files": true,
+        "tasks_have_done_criteria": true,
+        "plans_schema_work": false,
+        "plans_claim_work": true,
+        "plans_retry_work": true,
+        "plans_reaper_work": false,
+        "plans_dead_letter_work": true,
+        "plans_idempotency_work": false,
+        "plans_test_work": false,
+        "names_shippable_slice": true,
+        "stayed_in_plan_mode": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 69.9,
+        "model_seconds": 69.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 70.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-doc__qwencoder14__r1-rv122wl5",
+      "error": ""
+    },
+    {
+      "case": "design-doc",
+      "track": "design",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.8,
+      "checks": {
+        "wrote_design_doc": true,
+        "substantial": true,
+        "structured": false,
+        "covers_public_api": true,
+        "covers_schema": true,
+        "covers_atomic_claim": true,
+        "covers_claim_expiry": true,
+        "covers_backoff": true,
+        "covers_dead_letter": true,
+        "covers_idempotency": false,
+        "covers_crash_recovery": false,
+        "covers_handler_contract": true,
+        "covers_tradeoffs": true,
+        "covers_observability": true,
+        "stayed_in_design_mode": true
+      },
+      "metrics": {
+        "iterations": 9,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 6
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "truncated": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 462.1,
+        "model_seconds": 462.1,
+        "plan_updates": 0,
+        "truncations": 1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 462.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-design-doc__qythos9__r1-l8gs06tu",
+      "error": ""
+    },
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.7,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": true,
+        "plan_has_milestones": true,
+        "plan_has_tasks": false,
+        "wrote_module": true,
+        "wrote_tests": true,
+        "own_tests_pass": false,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 14,
+        "tool_calls": 10,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "write_file": 4,
+          "bash": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.3,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "missing deliverable": 1,
+          "truncated": 2,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 1038.4,
+        "model_seconds": 1037.6,
+        "plan_updates": 0,
+        "truncations": 3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 1038.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qythos9__r1-xr642pz3",
+      "error": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "kept_all_tests": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 42.4,
+        "model_seconds": 41.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 42.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-emkeucb8",
+      "error": ""
+    },
+    {
+      "case": "exec-from-plan",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "kept_all_tests": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 10,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "edit_file": 4,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.1,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 51.1,
+        "model_seconds": 50.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 51.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-from-plan__qythos9__r1-k1clhv3q",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "kept_all_tests": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true,
+        "finished_without_budget_stop": true,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.25,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 50.7,
+        "model_seconds": 50.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 50.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__qythos9__r1-9txiwr7p",
+      "error": ""
+    },
+    {
+      "case": "plan-doc",
+      "track": "plan",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "wrote_plan_doc": true,
+        "has_milestones": true,
+        "enough_tasks": true,
+        "tasks_name_files": true,
+        "tasks_have_done_criteria": true,
+        "plans_schema_work": true,
+        "plans_claim_work": true,
+        "plans_retry_work": true,
+        "plans_reaper_work": true,
+        "plans_dead_letter_work": true,
+        "plans_idempotency_work": true,
+        "plans_test_work": true,
+        "names_shippable_slice": true,
+        "stayed_in_plan_mode": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "write_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 174.7,
+        "model_seconds": 174.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 174.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-doc__qythos9__r1-53pgiy_i",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.857,
+    "clean_finish_rate": 0.917,
+    "total_nudges": 8,
+    "total_iterations": 136,
+    "nudge_histogram": {
+      "slow progress": 4,
+      "truncated": 3,
+      "missing deliverable": 1
+    },
+    "rows": {
+      "design-doc::qwencoder14": {
+        "case": "design-doc",
+        "track": "design",
+        "model": "qwencoder14",
+        "n": 1,
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "iterations_mean": 3,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 59.8,
+        "stop_reasons": []
+      },
+      "design-doc::qythos9": {
+        "case": "design-doc",
+        "track": "design",
+        "model": "qythos9",
+        "n": 1,
+        "score_mean": 0.8,
+        "score_min": 0.8,
+        "iterations_mean": 9,
+        "nudges_mean": 2,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 462.3,
+        "stop_reasons": []
+      },
+      "e2e-spec-to-code::qwencoder14": {
+        "case": "e2e-spec-to-code",
+        "track": "e2e",
+        "model": "qwencoder14",
+        "n": 1,
+        "score_mean": 0.9,
+        "score_min": 0.9,
+        "iterations_mean": 11,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 161.5,
+        "stop_reasons": []
+      },
+      "e2e-spec-to-code::qythos9": {
+        "case": "e2e-spec-to-code",
+        "track": "e2e",
+        "model": "qythos9",
+        "n": 1,
+        "score_mean": 0.7,
+        "score_min": 0.7,
+        "iterations_mean": 14,
+        "nudges_mean": 4,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 1038.5,
+        "stop_reasons": []
+      },
+      "exec-bugfix::qwencoder14": {
+        "case": "exec-bugfix",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 1,
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "iterations_mean": 9,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 77.3,
+        "stop_reasons": []
+      },
+      "exec-bugfix::qythos9": {
+        "case": "exec-bugfix",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 1,
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "iterations_mean": 7,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 42.4,
+        "stop_reasons": []
+      },
+      "exec-from-plan::qwencoder14": {
+        "case": "exec-from-plan",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 1,
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "iterations_mean": 8,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 59.5,
+        "stop_reasons": []
+      },
+      "exec-from-plan::qythos9": {
+        "case": "exec-from-plan",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 1,
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "iterations_mean": 11,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 51.2,
+        "stop_reasons": []
+      },
+      "exec-stall-trap::qwencoder14": {
+        "case": "exec-stall-trap",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 1,
+        "score_mean": 0.167,
+        "score_min": 0.167,
+        "iterations_mean": 50,
+        "nudges_mean": 0,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 321.2,
+        "stop_reasons": [
+          "budget: max iterations reached"
+        ]
+      },
+      "exec-stall-trap::qythos9": {
+        "case": "exec-stall-trap",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 1,
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "iterations_mean": 5,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 50.8,
+        "stop_reasons": []
+      },
+      "plan-doc::qwencoder14": {
+        "case": "plan-doc",
+        "track": "plan",
+        "model": "qwencoder14",
+        "n": 1,
+        "score_mean": 0.714,
+        "score_min": 0.714,
+        "iterations_mean": 4,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 70.1,
+        "stop_reasons": []
+      },
+      "plan-doc::qythos9": {
+        "case": "plan-doc",
+        "track": "plan",
+        "model": "qythos9",
+        "n": 1,
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "iterations_mean": 5,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 174.9,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "design-doc": 1.0,
+      "e2e-spec-to-code": 1.0,
+      "exec-bugfix": 1.0,
+      "exec-from-plan": 1.0,
+      "exec-stall-trap": 1.0,
+      "plan-doc": 1.0
+    }
+  },
+  "rescored": "2026-07-21 22:34:04"
+}

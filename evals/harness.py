@@ -164,6 +164,13 @@ def metrics_from_events(events: list[dict]) -> dict:
         "clean_finish": stopped is None,
         "wallclock": round(_last_stamp(events), 1),
         "model_seconds": _model_seconds(events),
+        # Did the model decompose the request at all, and did it stick with it?
+        # Whether update_plan gets used WITHOUT being asked for is the whole
+        # question for a tool that only helps if the model discovers it.
+        "plan_updates": tool_calls.get("update_plan", 0),
+        # Replies cut off at max_tokens. A run that finishes clean but truncated
+        # repeatedly is telling us the cap is too tight for the task.
+        "truncations": sum(1 for e in events if e.get("phase") == "truncated"),
     }
 
 
@@ -182,7 +189,8 @@ def _nudge_bucket(reason: str) -> str:
     the specific missing filename, which would fragment the histogram)."""
     r = reason.lower()
     for key in ("empty response", "truncated", "repeated call", "unchanged",
-                "missing deliverable", "slow progress"):
+                "missing deliverable", "slow progress", "open plan tasks",
+                "announced intent"):
         if key in r:
             return key
     return "malformed" if r else "other"
@@ -502,7 +510,12 @@ def cmd_run(args) -> int:
     return 0
 
 
-def _persist(results_dir: Path, runs: list[RunResult], label: str) -> None:
+def _persist(results_dir: Path, runs: list[RunResult], label: str,
+             provenance: dict | None = None) -> None:
+    """Write results.json. `provenance` carries forward the git head/created
+    stamp of an ORIGINAL sweep when this is a rescore — the numbers describe the
+    agent that produced those runs, not whatever is checked out at grading time,
+    and stamping today's HEAD on them would quietly mislabel the baseline."""
     payload = {
         "label": label,
         "created": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -511,6 +524,8 @@ def _persist(results_dir: Path, runs: list[RunResult], label: str) -> None:
         "runs": [asdict(r) for r in runs],
         "summary": summarize(runs),
     }
+    if provenance:
+        payload.update(provenance)
     (results_dir / "results.json").write_text(json.dumps(payload, indent=2))
 
 
@@ -561,6 +576,79 @@ def cmd_compare(args) -> int:
     return compare(b["summary"], c["summary"])
 
 
+def cmd_rescore(args) -> int:
+    """Re-grade a finished sweep with the CURRENT checkers and event miners.
+
+    Fixing a checker bug used to poison the whole comparison: the baseline kept
+    the scores its old checker produced, the candidate got the new one, and the
+    gate silently compared two different rulers. Re-running the baseline instead
+    costs an hour of GPU and — because the model is sampled, not deterministic —
+    would not reproduce the same runs anyway.
+
+    Nothing about grading needs the model: the scratch workspace, the event log
+    and the stdout of every run are all kept. So re-grade in place. Scores and
+    metrics are recomputed; timings and return codes are left exactly as the
+    original run recorded them.
+    """
+    path = Path(args.results)
+    results_dir = path if path.is_dir() else path.parent
+    data = _load_results(args.results)
+    cases = {c.id: c for c in discover_cases()}
+
+    runs: list[RunResult] = []
+    changed = 0
+    for raw in data["runs"]:
+        old_score = raw.get("score", 0.0)
+        case = cases.get(raw["case"])
+        workdir = Path(raw.get("workdir", ""))
+        if case is None or not workdir.is_dir():
+            why = ("case no longer exists" if case is None
+                   else "scratch workspace is gone (run with --clean?)")
+            print(f"  !! {raw['case']} · {raw['model']} — {why}; kept as-is")
+            runs.append(RunResult(**raw))
+            continue
+
+        stamp = f"{raw['case']}__{raw['model']}__r{raw['repeat']}"
+        events = parse_events(results_dir / "events" / f"{stamp}.jsonl")
+        out_path = results_dir / "stdout" / f"{stamp}.txt"
+        stdout = out_path.read_text(errors="replace") if out_path.is_file() else ""
+
+        metrics = metrics_from_events(events)
+        metrics["harness_timeout"] = raw.get("timed_out", False)
+        checks, err = {}, ""
+        checker = _load_checker(case)
+        if checker:
+            ctx = CheckCtx(workdir=workdir, events=events, stdout=stdout,
+                           case=case)
+            try:
+                checks = dict(checker(ctx))
+            except Exception as e:
+                err = f"checker raised: {type(e).__name__}: {e}"
+        score = _score(checks)
+
+        raw = dict(raw, score=score, checks=checks, metrics=metrics, error=err)
+        runs.append(RunResult(**raw))
+        if abs(score - old_score) > 1e-9:
+            changed += 1
+            print(f"  {raw['case']:<20} {raw['model']:<14} "
+                  f"{old_score:.3f} -> {score:.3f}")
+
+    label = data.get("label", results_dir.name)
+    if args.dry_run:
+        print(f"\n{changed} run(s) would change; --dry-run, nothing written")
+    else:
+        _persist(results_dir, runs, label, provenance={
+            "created": data.get("created", "?"),
+            "git_head": data.get("git_head", "?"),
+            "git_dirty": data.get("git_dirty", False),
+            "rescored": time.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+        print(f"\n{changed} run(s) changed; rewrote "
+              f"{results_dir / 'results.json'}")
+    print_report(summarize(runs), f"RESCORED · {label}")
+    return 0
+
+
 def cmd_list(args) -> int:
     for case in discover_cases():
         print(f"{case.id:<26} [{case.track:<7}] {case.description}")
@@ -591,6 +679,13 @@ def main(argv=None) -> int:
     cmp_.add_argument("baseline")
     cmp_.add_argument("candidate")
     cmp_.set_defaults(func=cmd_compare)
+
+    rs = sub.add_parser("rescore",
+                        help="re-grade a saved sweep with the current checkers")
+    rs.add_argument("results")
+    rs.add_argument("--dry-run", action="store_true",
+                    help="show what would change without rewriting results.json")
+    rs.set_defaults(func=cmd_rescore)
 
     ls = sub.add_parser("list", help="list cases")
     ls.set_defaults(func=cmd_list)
