@@ -477,6 +477,40 @@ def print_report(summary: dict, title: str = "") -> None:
             print(f"    ⏹ {sr}")
 
 
+# A sweep generating below this is not measuring the agent, it is measuring the
+# box. Set well under the ~72.8 chars/s a healthy full sweep pools at, so normal
+# variation and a slower model mix never trip it — the failure this exists to
+# catch ran at ~11 chars/s, an order of magnitude down, when a draining battery
+# put the host into Low Power Mode overnight.
+MIN_GEN_RATE = 30.0
+
+
+def _power_state() -> tuple[bool | None, str]:
+    """(on_wall_power, human description). None when it can't be determined.
+
+    A full sweep is roughly an hour of sustained GPU. Run it on battery and two
+    things happen, both of which cost a whole round: Apple Silicon drops into
+    Low Power Mode and throttles generation by ~10x, and then the host dies
+    partway and leaves a partial results.json that still looks scorable."""
+    if sys.platform != "darwin":
+        return None, "not macOS — power state unchecked"
+    try:
+        out = subprocess.run(["pmset", "-g", "batt"], capture_output=True,
+                             text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None, "could not read power state"
+    if "AC Power" in out:
+        return True, "AC power"
+    if "Battery Power" in out:
+        pct = ""
+        for token in out.split():
+            if token.rstrip(";").endswith("%"):
+                pct = f" at {token.rstrip(';')}"
+                break
+        return False, f"BATTERY power{pct}"
+    return None, "could not read power state"
+
+
 def _validity_warnings(baseline: dict, candidate: dict) -> list[str]:
     """Reasons the two sweeps cannot be compared as like for like.
 
@@ -506,6 +540,16 @@ def _validity_warnings(baseline: dict, candidate: dict) -> list[str]:
             f"candidate generated at {cr:.1f} chars/s vs the baseline's "
             f"{br:.1f} ({cr / br:.0%}) — the box was slower, and every budget "
             "in the loop is a wallclock budget")
+    elif cr and cr < MIN_GEN_RATE:
+        # The relative check above needs a baseline that recorded throughput,
+        # and no sweep before 2026-07-22 did — so against every existing
+        # baseline it silently skips. An absolute floor needs nothing to compare
+        # against, which makes it the check that actually fires on a degraded
+        # run. `elif` only because the relative message is strictly more
+        # informative when both would trip.
+        warnings.append(
+            f"candidate generated at {cr:.1f} chars/s, below the {MIN_GEN_RATE:.0f} "
+            "floor — that is a throttled or contended box, not a slow agent")
     return warnings
 
 
@@ -581,6 +625,20 @@ def cmd_run(args) -> int:
               "during this sweep change what is being measured. Fine for a "
               "probe; do not use these numbers as a baseline.\n", flush=True)
 
+    on_ac, power = _power_state()
+    if on_ac is False and not args.force:
+        print(f"!! refusing to start: running on {power}.\n"
+              "   A sweep is ~an hour of sustained GPU. On battery, Apple "
+              "Silicon drops into Low Power Mode and throttles generation by "
+              "~10x, then the host dies partway and leaves a partial "
+              "results.json that still looks scorable. That is exactly how the "
+              "2026-07-21 sweep was lost.\n"
+              "   Plug in, or pass --force if you mean it.", file=sys.stderr)
+        return 2
+    if on_ac is False:
+        print(f"!! --force: starting on {power} anyway. Expect throttling.\n",
+              flush=True)
+
     runs: list[RunResult] = []
     total = len(cases) * len(args.model) * args.repeat
     n = 0
@@ -601,6 +659,19 @@ def cmd_run(args) -> int:
                 _persist(results_dir, runs, label)
     summary = summarize(runs)
     print_report(summary, f"RESULTS · {label}")
+    # Flag a degraded sweep at the point it finishes, not an hour later when
+    # someone tries to compare it. The rate is the sweep's own number, so this
+    # needs no baseline to fire.
+    rate = summary.get("gen_rate")
+    if rate and rate < MIN_GEN_RATE:
+        print(f"\n!! generated at {rate:.1f} chars/s, below the "
+              f"{MIN_GEN_RATE:.0f} floor — the box was throttled or contended. "
+              "Every budget in the loop is a wallclock budget, so these scores "
+              "measure the machine as much as the agent. Do not use them as a "
+              "baseline.", flush=True)
+    if len(runs) < total:
+        print(f"\n!! only {len(runs)} of {total} runs completed — partial sweep.",
+              flush=True)
     print(f"\nwrote {results_dir / 'results.json'}")
     return 0
 
@@ -764,6 +835,8 @@ def main(argv=None) -> int:
     r.add_argument("--label", help="results dir name (default: timestamp)")
     r.add_argument("--clean", action="store_true",
                    help="delete scratch workspaces after each run")
+    r.add_argument("--force", action="store_true",
+                   help="start even on battery power (expect throttling)")
     r.set_defaults(func=cmd_run)
 
     rep = sub.add_parser("report", help="print a saved results file")

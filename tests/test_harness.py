@@ -121,10 +121,17 @@ def test_faster_candidate_is_not_flagged():
     assert harness._validity_warnings(base, cand) == []
 
 
-def test_missing_rate_on_either_side_skips_the_throughput_check():
+def test_missing_baseline_rate_skips_the_RELATIVE_check_but_not_the_floor():
+    """Superseded an earlier assertion that this produced no warning at all.
+    That encoded the gap the absolute floor was added to close: with no baseline
+    throughput there is nothing to compare against, but 1 char/s is self-evidently
+    a broken box and needs no comparison to say so."""
     base = _summary(["a::m"], rate=None)
     cand = _summary(["a::m"], rate=1.0)
-    assert harness._validity_warnings(base, cand) == []
+    warns = harness._validity_warnings(base, cand)
+    assert len(warns) == 1
+    assert "floor" in warns[0]
+    assert "vs the baseline's" not in warns[0]
 
 
 def test_extra_candidate_rows_are_not_a_problem():
@@ -178,3 +185,76 @@ def test_compare_is_inconclusive_when_the_box_was_slow(capsys):
     cand = _full({"a::m": 0.1}, rate=11.0, overall=0.1)
     assert harness.compare(base, cand) == 2
     assert "INCONCLUSIVE" in capsys.readouterr().out
+
+
+# --- absolute throughput floor --------------------------------------------
+def test_absolute_floor_fires_without_a_comparable_baseline():
+    """The relative check needs a baseline that recorded throughput, and no
+    sweep before 2026-07-22 did — so against every existing baseline it silently
+    skips. The floor is the check that actually fires on a degraded run."""
+    base = _summary(["a::m"], rate=None)
+    cand = _summary(["a::m"], rate=11.0)
+    warns = harness._validity_warnings(base, cand)
+    assert len(warns) == 1
+    assert "floor" in warns[0]
+
+
+def test_a_healthy_rate_does_not_trip_the_floor():
+    base = _summary(["a::m"], rate=None)
+    cand = _summary(["a::m"], rate=harness.MIN_GEN_RATE + 1)
+    assert harness._validity_warnings(base, cand) == []
+
+
+def test_relative_check_wins_when_both_would_trip():
+    """Both apply at 11 vs 106, but the relative message is strictly more
+    informative, so it should be the one reported — and only once."""
+    base = _summary(["a::m"], rate=106.0)
+    cand = _summary(["a::m"], rate=11.0)
+    warns = harness._validity_warnings(base, cand)
+    assert len(warns) == 1
+    assert "vs the baseline's" in warns[0]
+
+
+def test_floor_is_skipped_when_throughput_is_unknown():
+    base = _summary(["a::m"], rate=100.0)
+    cand = _summary(["a::m"], rate=None)
+    assert harness._validity_warnings(base, cand) == []
+
+
+# --- power preflight ------------------------------------------------------
+def test_power_state_reads_ac(monkeypatch):
+    monkeypatch.setattr(harness.sys, "platform", "darwin")
+    monkeypatch.setattr(harness.subprocess, "run", lambda *a, **k: type(
+        "R", (), {"stdout": "Now drawing from 'AC Power'\n"})())
+    assert harness._power_state()[0] is True
+
+
+def test_power_state_reads_battery_with_percentage(monkeypatch):
+    monkeypatch.setattr(harness.sys, "platform", "darwin")
+    monkeypatch.setattr(harness.subprocess, "run", lambda *a, **k: type(
+        "R", (), {"stdout": "Now drawing from 'Battery Power'\n"
+                            " -InternalBattery-0\t14%; discharging; 0:21\n"})())
+    on_ac, desc = harness._power_state()
+    assert on_ac is False
+    assert "14%" in desc
+
+
+def test_power_state_is_unknown_off_macos(monkeypatch):
+    monkeypatch.setattr(harness.sys, "platform", "linux")
+    assert harness._power_state()[0] is None
+
+
+def test_power_state_survives_a_missing_pmset(monkeypatch):
+    monkeypatch.setattr(harness.sys, "platform", "darwin")
+    def boom(*a, **k):
+        raise OSError("no pmset")
+    monkeypatch.setattr(harness.subprocess, "run", boom)
+    assert harness._power_state()[0] is None
+
+
+def test_unknown_power_state_never_blocks_a_sweep(monkeypatch):
+    """A box that can't report power must still be able to run evals — the
+    preflight refuses only on a POSITIVE battery reading."""
+    monkeypatch.setattr(harness.sys, "platform", "linux")
+    on_ac, _ = harness._power_state()
+    assert on_ac is not False
