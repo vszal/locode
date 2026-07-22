@@ -320,3 +320,84 @@ that no code change caused.
 **Tests:** 389 → 410 green.
 
 ---
+## Round 5 — a valid sweep, and an uncompletable plan
+
+**Goal:** re-measure Rounds 2–3 on a complete sweep and a quiet box, now that
+Round 4 made an invalid sweep say so.
+
+### The sweep
+
+`r4-clean`: all 12 runs, **72.8 chars/s** pooled — against the ~11 chars/s of the
+sweep Round 4 threw out. (Note that 72.8 is the honest *sweep-level* figure; the
+~106 chars/s from Round 1 was a synthetic probe with a tiny prompt and a warm
+cache, and is not the number to compare a real run against. 72.8 is the new
+reference.) Overall 0.857 → 0.801, gate FAIL at −0.056 against a −0.05 threshold.
+
+Almost everything held or improved — `design-doc`/`qythos9` **0.80 → 1.00 and
+462s → 139s**, `plan-doc`/`qwencoder14` 0.71 → 0.79, `exec-stall-trap`/
+`qwencoder14` 0.17 → 0.33 with 50 iterations → 11. The entire regression was one
+case, `e2e-spec-to-code`, on both models.
+
+### The finding: an uncompletable plan kills the turn
+
+`e2e-spec-to-code`/`qythos9` scored **0.00 while reporting a clean finish** — 216
+seconds, four nudges, nothing produced. The model sent `tasks` as a truncated
+fragment:
+
+```
+["[>] Write DESIGN.md — the approach
+```
+
+`update_plan`'s string-recovery path splits on newlines. That fragment has none,
+so it became a **one-task plan whose text was the raw JSON garbage**. It carried
+no recognized status marker, so it parsed as *open* — and no subsequent call
+could ever mark it done. Round 2's completion gate then refused every final
+answer for the rest of the turn, nudged `open plan tasks` to its cap of three,
+and the turn ended with the model's reply still mid-tool-call.
+
+The lesson generalizes past this parse bug: **Round 2 gave the model's own output
+authority over when the turn may end, which makes any unparseable plan a
+turn-killer.** A leniency that quietly *adopts* malformed input is far more
+dangerous once that input gates completion than it was when it only shaped a
+display string. Leniency has to stop where authority begins.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D22 | A `tasks` string opening with `[` is tried as JSON first | Also fixes the correctly-JSON-encoded-but-stringified array, which the newline split mangled just as badly. |
+| D23 | If it neither parses nor opens with a *recognized* status marker, reject it | Failing loudly costs one iteration. Adopting it cost the entire turn. |
+| D24 | The discriminator is a new `plan.has_status_marker`, not `_MARKER_RE` | The regex is deliberately permissive and matches `["[>] Write…` with a marker group of `"[>` — exactly how the fragment got adopted. Permissive is right for *parsing* a task and wrong for deciding whether a string is a task list at all. |
+
+### Verification, and its limit
+
+`r5-planfix` re-ran the case: `e2e-spec-to-code`/`qythos9` **0.00 → 0.80**, above
+its 0.70 baseline, with zero `open plan tasks` nudges.
+
+**But that run never called `update_plan` at all**, so it does not isolate the
+fix — it shows the case can score well, not that the fixed path works. What
+proves the fix is `test_tool_rejects_a_truncated_json_array`. Worth recording
+plainly: an eval score moving in the right direction is not evidence that the
+change you just made is the reason.
+
+### Obstacles / debugging notes
+
+- **The first cut of the fix broke a working path, and its own test caught it.**
+  Keying off `startswith("[")` alone rejected the legitimate newline-joined
+  `[x] a\n[ ] b` recovery. Writing the regression test for the *old* behavior
+  before the new one is what surfaced it.
+- **Every repeat-detector stop traced so far has been a true positive.** Across
+  r3 and r4: a byte-identical `PLAN.md` written four times, an identical
+  `edit_file`/`read_file` cycle, and `envcfg.py` rewritten with byte-identical
+  content three times between edits — which is why its `pytest` never moved past
+  `..FFFF`. Round 3 stands.
+- **`e2e-spec-to-code` is now the weakest case on both models**, and both are
+  stopped by the repeat detector rather than finishing. It is the obvious next
+  target, and unlike the rows around it, its failure is not sampling noise.
+- **n=1 remains the suite's real limitation.** `e2e`/`qwencoder14` read 0.90,
+  0.70, 0.60 across three sweeps of the same code. No per-row verdict at this
+  sample size means anything.
+
+**Tests:** 389 → 415 green.
+
+---

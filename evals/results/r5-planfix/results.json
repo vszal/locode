@@ -1,0 +1,160 @@
+{
+  "label": "r5-planfix",
+  "created": "2026-07-22 07:54:58",
+  "git_head": "a46d226",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.6,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": false,
+        "plan_has_milestones": true,
+        "plan_has_tasks": false,
+        "wrote_module": true,
+        "wrote_tests": true,
+        "own_tests_pass": false,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 19,
+        "tool_calls": 17,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "update_plan": 5,
+          "write_file": 4,
+          "bash": 4,
+          "edit_file": 3
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.235,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "wallclock": 196.4,
+        "model_seconds": 194.5,
+        "plan_updates": 5,
+        "truncations": 0,
+        "gen_seconds": 160.2,
+        "gen_chars": 9205,
+        "gen_chars_per_sec": 57.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 196.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qwencoder14__r1-jc3mmzum",
+      "error": ""
+    },
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.8,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": true,
+        "plan_has_milestones": true,
+        "plan_has_tasks": true,
+        "wrote_module": true,
+        "wrote_tests": true,
+        "own_tests_pass": false,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 26,
+        "tool_calls": 24,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 6,
+          "bash": 10,
+          "edit_file": 6
+        },
+        "tool_errors": 10,
+        "tool_error_rate": 0.417,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "slow progress": 1,
+          "unchanged": 2,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "wallclock": 506.8,
+        "model_seconds": 503.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 468.7,
+        "gen_chars": 34597,
+        "gen_chars_per_sec": 73.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 506.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qythos9__r1-b9xfoc8b",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.7,
+    "clean_finish_rate": 0.0,
+    "total_nudges": 5,
+    "total_iterations": 45,
+    "nudge_histogram": {
+      "repeated call": 2,
+      "slow progress": 1,
+      "unchanged": 2
+    },
+    "gen_rate": 69.6,
+    "rows": {
+      "e2e-spec-to-code::qwencoder14": {
+        "case": "e2e-spec-to-code",
+        "track": "e2e",
+        "model": "qwencoder14",
+        "n": 1,
+        "score_mean": 0.6,
+        "score_min": 0.6,
+        "iterations_mean": 19,
+        "nudges_mean": 1,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 196.5,
+        "gen_rate_mean": 57.5,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "e2e-spec-to-code::qythos9": {
+        "case": "e2e-spec-to-code",
+        "track": "e2e",
+        "model": "qythos9",
+        "n": 1,
+        "score_mean": 0.8,
+        "score_min": 0.8,
+        "iterations_mean": 26,
+        "nudges_mean": 4,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 506.9,
+        "gen_rate_mean": 73.8,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "e2e-spec-to-code": 1.0
+    }
+  }
+}
