@@ -138,6 +138,21 @@ class Plan:
         return f"{len(self.done)}/{len(self.tasks)} done"
 
 
+def has_status_marker(text: str) -> bool:
+    """True when `text` opens with a status marker this module RECOGNIZES.
+
+    Distinct from "matches the marker regex", which is deliberately permissive:
+    `["[>] Write DESIGN.md` matches it too, with a marker group of `"[>`. That
+    permissiveness is right for parsing a task (keep the model's words rather
+    than eat them) and wrong for deciding whether a string is a task list at all
+    — which is what the update_plan tool needs in order to tell a newline-joined
+    list from a mangled JSON array."""
+    m = _MARKER_RE.match(text)
+    if not m:
+        return False
+    return m.group(1).strip().lower() in _MARKERS
+
+
 def _parse_task(text: str) -> Task:
     m = _MARKER_RE.match(text)
     if not m:

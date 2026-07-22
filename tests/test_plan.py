@@ -155,3 +155,53 @@ async def test_tool_rejects_an_empty_list():
 async def test_tool_errors_without_a_plan_in_context():
     res = await UpdatePlan().run({"tasks": ["[ ] a"]}, ToolContext(cwd="/tmp"))
     assert not res.ok
+
+async def test_tool_rejects_a_truncated_json_array():
+    """The turn-killer from the r4-clean sweep: a model sent the fragment
+    `["[>] Write DESIGN.md — the approach` and the tool adopted it as one task.
+    With no status marker it parsed as open, could never be marked done, and the
+    loop's completion gate then refused every final answer for the rest of the
+    turn — the run produced nothing and scored 0.00. Reject, don't adopt."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": '["[>] Write DESIGN.md — the approach'}, make_ctx(plan))
+    assert not res.ok
+    assert "cut off" in res.content
+    assert plan.tasks == []
+
+
+async def test_tool_accepts_a_well_formed_json_array_string():
+    """The lenient path still has to work for a model that JSON-encodes the
+    argument correctly but sends it as a string."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": '["[x] a", "[ ] b"]'}, make_ctx(plan))
+    assert res.ok
+    assert len(plan.tasks) == 2
+
+
+async def test_a_plain_task_starting_with_a_bracket_still_splits_by_line():
+    """`[ ] a` opens with a bracket but is not JSON — it must not be dragged
+    into the JSON path and rejected."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": _joined("[ ] a", "[ ] b")}, make_ctx(plan))
+    assert res.ok
+    assert len(plan.tasks) == 2
+
+
+def test_has_status_marker_accepts_recognized_markers():
+    from locode.agent.plan import has_status_marker
+    assert has_status_marker("[x] done thing")
+    assert has_status_marker("[>] doing thing")
+    assert has_status_marker("[ ] todo thing")
+    assert has_status_marker("[wip] thing")
+
+
+def test_has_status_marker_rejects_a_mangled_json_array():
+    """The regex alone matches this, with a marker group of `\"[>` — which is
+    precisely how the truncated fragment got adopted as a task."""
+    from locode.agent.plan import has_status_marker
+    assert not has_status_marker('["[>] Write DESIGN.md — the approach')
+    assert not has_status_marker("no marker at all")
+    assert not has_status_marker("[label] probably not a status")

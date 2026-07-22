@@ -12,7 +12,9 @@ what a 9B model reads when deciding whether this turn needs a plan at all.
 
 from __future__ import annotations
 
-from locode.agent.plan import MAX_TASKS, Plan
+import json
+
+from locode.agent.plan import MAX_TASKS, Plan, has_status_marker
 from locode.tools.base import ToolContext, ToolResult
 
 
@@ -49,9 +51,40 @@ class UpdatePlan:
                               is_error=True)
         raw = args.get("tasks")
         if isinstance(raw, str):
-            # Models sometimes send a newline- or comma-joined string instead of
-            # an array. Recovering it costs three lines and saves an iteration.
-            raw = [p for p in raw.replace("\r", "").split("\n") if p.strip()]
+            # Models sometimes send a newline-joined string instead of an array.
+            # Recovering it costs three lines and saves an iteration.
+            #
+            # But a string that OPENS like a JSON array is a different animal: it
+            # is a mangled array, not prose, and adopting it whole is worse than
+            # rejecting it. Measured 2026-07-22 — a model sent the truncated
+            # fragment `["[>] Write DESIGN.md — the approach` and the old code
+            # took it as a single task. It had no status marker, so it parsed as
+            # open, could never be marked done, and the loop's completion gate
+            # then refused every final answer for the rest of the turn. The run
+            # produced nothing and scored 0.00. A bad plan that
+            # cannot be completed is a turn-killer, so fail loudly and let the
+            # model retry with a real array.
+            text = raw.strip()
+            parsed = None
+            if text.startswith("["):
+                try:
+                    parsed = json.loads(text)
+                except ValueError:
+                    parsed = None
+            if isinstance(parsed, list):
+                raw = parsed
+            elif text.startswith("[") and not has_status_marker(text):
+                # Opens like a JSON array, didn't parse as one, and isn't a task
+                # line either. `has_status_marker` rather than the marker regex:
+                # the regex matches `["[>] Write…` with a marker group of `"[>`,
+                # which is exactly how the fragment got adopted in the first
+                # place.
+                return ToolResult(
+                    "`tasks` looks like a JSON array but did not parse — it may "
+                    "have been cut off. Send it as a real array of strings, each "
+                    "starting with [x], [>] or [ ].", is_error=True)
+            else:
+                raw = [p for p in text.replace("\r", "").split("\n") if p.strip()]
         if not isinstance(raw, list) or not raw:
             return ToolResult(
                 "update_plan needs a non-empty `tasks` array of strings, each "
