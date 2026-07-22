@@ -20,6 +20,7 @@ from locode.agent.cancel import (CancelToken, CancelledByUser,
                                  DeadlineExceeded)
 from locode.agent.compact import compact_history, estimate_chars
 from locode.agent.messages import build_system_prompt, tool_results_block
+from locode.agent.plan import Plan
 from locode.model import toolparse
 from locode.model.profiles import profile_for
 from locode.permissions import AUTO, ASK, DENY, PermissionPolicy
@@ -55,6 +56,10 @@ class AgentLoop:
         self._interrupt = interrupt or _null_scope
         self.model_alias = config.model.default
         self.cancel = CancelToken()
+        # The model's task list. Session-scoped rather than turn-scoped: a user
+        # who says "ok, do step 3 now" is continuing the same plan, and throwing
+        # it away between turns would make the loop forget what it agreed to.
+        self.plan = Plan()
         # Wallclock time spent inside confirm() this turn — waiting on the human
         # to approve/deny a tool call isn't the model's fault, so it's excluded
         # from both the hard deadline and the slow-progress ratio. Reset each
@@ -115,6 +120,7 @@ class AgentLoop:
         nudged_stall = False
         nudged_slow = False
         nudged_intent = False
+        open_task_nudges = 0
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
         # deliverable nudge — distinguishes "the model answered the nudge
@@ -325,6 +331,17 @@ class AgentLoop:
                         return self._stop(
                             "the model never produced "
                             + ", ".join(sorted(missing)))
+                    # The model is stopping with tasks IT declared unfinished.
+                    # Its own plan is the strongest available evidence that the
+                    # turn isn't over — stronger than any heuristic below, and
+                    # unlike the deliverable check it works for requests that
+                    # name no output file. Bounded, because a model that can't
+                    # finish a task shouldn't be nudged at it forever.
+                    if (self.plan.open and open_task_nudges
+                            < self._cfg.agent.max_open_task_retries):
+                        open_task_nudges += 1
+                        self._nudge_open_tasks()
+                        continue
                     # The reply ENDS by announcing an action it never took —
                     # "I'll examine the file:" followed by no tool call. The
                     # loop would otherwise hand that back as a final answer, so
@@ -416,7 +433,8 @@ class AgentLoop:
         hitting the same failure. Denials/unknown-tool aren't model-fixable code
         errors, so they don't count toward the stall signal."""
         ctx = ToolContext(cwd=self._cwd, cancel=self.cancel,
-                          confirm=self._confirm, select=self._select)
+                          confirm=self._confirm, select=self._select,
+                          plan=self.plan)
         results: list[tuple[str, str]] = []
         error_parts: list[str] = []
         for call in calls:
@@ -544,6 +562,23 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": f"missing deliverable: {names}"})
+
+    def _nudge_open_tasks(self) -> None:
+        nxt = self.plan.current
+        self.history.append({
+            "role": "user",
+            "content": (f"You are not finished — your own plan still has "
+                        f"{len(self.plan.open)} task(s) open:\n\n"
+                        f"{self.plan.render()}\n\n"
+                        f"Continue with: {nxt.text if nxt else 'the next task'}. "
+                        "Do the work now with a tool call — do not reply with a "
+                        "summary. If a task turned out to be unnecessary or "
+                        "impossible, call update_plan to mark it done and say "
+                        "why, then carry on with the rest."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "open plan tasks",
+                        "plan": self.plan.summary()})
 
     def _nudge_announced_intent(self) -> None:
         self.history.append({

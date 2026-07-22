@@ -110,6 +110,11 @@ class AgentConfig:
     # asked to produce (e.g. "writing a PLAN.md") — as opposed to having tried
     # and failed/been denied, which is trusted after a single nudge.
     max_missing_deliverable_retries: int = 3
+    # How many times a model that tries to end the turn with tasks still open
+    # in its OWN update_plan list gets pushed back to the work. Bounded because
+    # a task it genuinely cannot finish must not become an infinite loop; the
+    # nudge explicitly offers "mark it done and say why" as the way out.
+    max_open_task_retries: int = 3
     # Catches a model burning wallclock on slow/rambling completions WITHOUT
     # advancing iterations — a different failure mode than simply running out of
     # time. Nudged once (never a hard stop; the wallclock/iteration caps above
@@ -152,6 +157,12 @@ class PermissionsConfig:
         "read_file": "auto", "ls": "auto", "glob": "auto", "grep": "auto",
         "write_file": "ask", "edit_file": "ask", "move_file": "ask", "bash": "ask",
         "web_search": "ask", "web_fetch": "auto",
+        # Bookkeeping only — update_plan touches nothing but the agent's own
+        # in-memory task list, so prompting for it would be pure noise. It must
+        # be listed explicitly: unlisted tools resolve to "ask" regardless of
+        # the tool class's own `permission` attribute, which headless means
+        # "silently denied".
+        "update_plan": "auto",
     })
     auto_allow_under: list[str] = field(default_factory=lambda: ["./sandbox"])
     deny_paths: list[str] = field(default_factory=lambda: [

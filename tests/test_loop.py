@@ -7,6 +7,7 @@ from locode.agent.loop import AgentLoop
 from locode.config import Config
 from locode.permissions import PermissionPolicy
 from locode.tools.base import Registry
+from locode.tools.plan import UpdatePlan
 from locode.tools import fs
 
 
@@ -59,6 +60,7 @@ def make_loop(tmp_path, scripted, confirm=None, cfg=None):
     reg = Registry()
     for t in fs.all_tools():
         reg.register(t)
+    reg.register(UpdatePlan())
     cfg = cfg or Config()
     return AgentLoop(FakeClient(scripted), FakeManager(), reg,
                      PermissionPolicy(cfg.permissions), cfg,
@@ -985,3 +987,72 @@ async def test_deadline_shrinks_as_the_turn_progresses(tmp_path):
 
     assert len(seen) == 2 and all(d is not None for d in seen)
     assert seen[1] <= seen[0] + 0.01  # same turn budget, not refreshed
+
+
+# --- plan-aware stopping -----------------------------------------------------
+# The model's own update_plan list is the strongest evidence available that a
+# turn isn't over: unlike the deliverable check it needs no named output file,
+# and unlike the intent heuristic it isn't guessing from phrasing.
+
+def plan_call(*tasks):
+    return native_call("update_plan", tasks=list(tasks))
+
+
+async def test_stopping_with_open_tasks_is_nudged_back_to_work(tmp_path):
+    loop = make_loop(tmp_path, [
+        plan_call("[>] write DESIGN.md", "[ ] write PLAN.md"),
+        {"role": "assistant", "content": "I've written the design."},  # stops early
+        plan_call("[x] write DESIGN.md", "[x] write PLAN.md"),         # goes back to work
+        {"role": "assistant", "content": "Both documents are written now."},
+    ])
+    out = await loop.run_turn("design it, then plan it")
+    assert out == "Both documents are written now."
+    nudge = [m["content"] for m in loop.history
+             if m.get("kind") == "nudge" and "not finished" in m["content"]]
+    assert len(nudge) == 1
+    assert "write PLAN.md" in nudge[0]     # names the actual next task
+
+
+async def test_no_nudge_once_every_task_is_done(tmp_path):
+    loop = make_loop(tmp_path, [
+        plan_call("[x] write DESIGN.md", "[x] write PLAN.md"),
+        {"role": "assistant", "content": "Both documents are written."},
+    ])
+    out = await loop.run_turn("design it, then plan it")
+    assert out == "Both documents are written."
+    assert not any("not finished" in m["content"]
+                   for m in loop.history if m.get("kind") == "nudge")
+
+
+async def test_open_task_nudges_are_bounded(tmp_path):
+    # A task the model genuinely can't finish must not become an infinite loop.
+    loop = make_loop(tmp_path, [
+        plan_call("[ ] do the impossible thing"),
+        {"role": "assistant", "content": "I cannot do that."},
+    ])
+    out = await loop.run_turn("do it")
+    assert out == "I cannot do that."
+    nudges = [m for m in loop.history
+              if m.get("kind") == "nudge" and "not finished" in m["content"]]
+    assert len(nudges) == Config().agent.max_open_task_retries
+
+
+async def test_turn_without_a_plan_is_unaffected(tmp_path):
+    # The plan is opt-in: a model that never calls update_plan must behave
+    # exactly as it did before the feature existed.
+    loop = make_loop(tmp_path, [{"role": "assistant", "content": "Hello."}])
+    assert await loop.run_turn("hi") == "Hello."
+    assert not loop.plan
+
+
+async def test_plan_survives_across_turns(tmp_path):
+    # "ok, now do step 3" is a continuation, not a new plan.
+    loop = make_loop(tmp_path, [
+        plan_call("[x] a", "[ ] b"),
+        {"role": "assistant", "content": "done a."},
+        {"role": "assistant", "content": "done a."},
+        {"role": "assistant", "content": "done a."},
+        {"role": "assistant", "content": "done a."},
+    ])
+    await loop.run_turn("do a and b")
+    assert loop.plan.summary() == "1/2 done"

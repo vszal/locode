@@ -269,6 +269,11 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
 
     log_path = results_dir / "events" / f"{stamp}.jsonl"
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    # --log-events APPENDS (a user's session log must not be destroyed by
+    # pointing at it twice). Re-running a label would then splice two runs into
+    # one file and double-count every metric mined from it, so the harness owns
+    # clearing the slot.
+    log_path.unlink(missing_ok=True)
     out_path = results_dir / "stdout" / f"{stamp}.txt"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -467,6 +472,12 @@ def cmd_run(args) -> int:
     results_dir = RESULTS_DIR / label
     results_dir.mkdir(parents=True, exist_ok=True)
 
+    if _git_dirty():
+        print(f"!! working tree is dirty at {_git_head()} — each case spawns a "
+              "fresh locode and imports the tree AS IT IS THEN, so edits made "
+              "during this sweep change what is being measured. Fine for a "
+              "probe; do not use these numbers as a baseline.\n", flush=True)
+
     runs: list[RunResult] = []
     total = len(cases) * len(args.model) * args.repeat
     n = 0
@@ -496,6 +507,7 @@ def _persist(results_dir: Path, runs: list[RunResult], label: str) -> None:
         "label": label,
         "created": time.strftime("%Y-%m-%d %H:%M:%S"),
         "git_head": _git_head(),
+        "git_dirty": _git_dirty(),
         "runs": [asdict(r) for r in runs],
         "summary": summarize(runs),
     }
@@ -509,6 +521,25 @@ def _git_head() -> str:
                               timeout=10).stdout.strip()
     except Exception:
         return "?"
+
+
+def _git_dirty() -> bool:
+    """Is the working tree modified relative to HEAD?
+
+    This matters more here than it looks. Every case spawns a FRESH `locode`
+    process, which imports the working tree as it is *at that moment* — so
+    editing the agent while a sweep runs silently changes the thing under test
+    partway through, and the results file still claims a single clean git_head.
+    (Lost a sweep to exactly this.) A sweep on a dirty tree is fine for probing;
+    it is not a baseline, and the results must say so.
+    """
+    try:
+        out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+                             cwd=REPO_ROOT, capture_output=True, text=True,
+                             timeout=10).stdout.strip()
+        return bool(out)
+    except Exception:
+        return False
 
 
 def _load_results(path: str) -> dict:

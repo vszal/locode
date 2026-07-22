@@ -102,3 +102,84 @@ Six harness-mitigable failures were identified in that session. Status now:
 **Tests:** 304 → 313 green.
 
 ---
+
+## Round 1 — the measurement layer pays for itself immediately
+
+**Goal:** get one real number out of the harness built in Round 0, and fix
+whatever the number exposes.
+
+### The finding
+
+The first smoke run (`design-doc` / `qythos9`) was killed by the harness at its
+900-second ceiling having produced **nothing**. The event log showed why in two
+lines:
+
+```
+{"seq": 9,  "t": 41.348, "phase": "iteration", "n": 1, "elapsed": 6.9}
+{"seq": 10, "t": 41.348, "phase": "assistant_start"}
+```
+
+No further events. **860 of the run's 900 seconds were spent inside a single
+completion.** Without `--log-events` this is indistinguishable from "the model
+is slow" or "the harness hung", which is exactly why Round 0 came first.
+
+### Root cause: a token budget that was really a time budget
+
+`model.max_tokens` was `32768`. Measured directly against the running server —
+1200 tokens, tiny prompt, warm cache:
+
+```
+chunks=1200 first_token=0.56s total=45.4s -> 26.4 tok/s
+```
+
+At 26.4 tok/s a 32768-token reply takes **~21 minutes**. The turn budget is 600
+seconds. So *one* reply was allowed to overrun the entire turn by 2×, and none
+of the loop's guards could notice: `max_iterations`, `max_repeat_calls`,
+`max_error_stall` and the wallclock check all run **between** iterations. The
+old comment on the field said the loop's guards "still bound a runaway model" —
+they did not, and could not.
+
+This is the general lesson worth keeping: **on local hardware, generation-length
+settings are wallclock settings.** A ceiling copied from a hosted-model config
+means something completely different at 26 tok/s.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D7 | `model.max_tokens` 32768 → **6144** | ~4 min of generation. Still fits the largest thing the loop legitimately emits in one call (a ~2500-word design doc, a ~300-line module — both ≈4k tokens). |
+| D8 | Client surfaces the server's `finish_reason` | "cut off at the limit" and "chose to stop" are identical in the text. The existing unclosed-fence heuristic only sees the tool-call case; prose cut mid-sentence was being returned as a confident final answer. |
+| D9 | Truncation nudge allowed **twice** (`agent.max_truncated_retries = 2`) | With a tighter cap, a long deliverable can legitimately need two passes; one-shot would return the half-written *second* attempt as the answer. |
+| D10 | Stream case stdout to disk instead of capturing | A ten-minute case was a black box until it exited. Also removed a `bytes`/`str` crash in the `TimeoutExpired` path that destroyed the whole run's result. |
+| D11 | `config.toml.example` sync is a **test**, not a rule | AGENTS.md required it; nothing checked it. `tests/test_config_example.py` asserts field-for-field parity *and* that documented values equal the defaults. |
+
+### Measured improvement
+
+Same case, same model, same prompt — only the harness changed:
+
+| | `smoke-01` (before) | `probe-02` (after) |
+|---|---|---|
+| outcome | killed at 900s, no artifact | **clean finish** |
+| score | 0.00 | **0.93** |
+| wallclock | 900s (timeout) | **176s** |
+| iterations | 1 | 4 |
+| nudges | 0 | 1 (`slow progress`) |
+
+### Obstacles / debugging notes
+
+- **Misread the run's own progress twice.** Concluded "hung for 15+ minutes"
+  from file mtimes when `date` showed 3 and 6 minutes. Fix: read `date` and the
+  server process's CPU, don't infer elapsed time from artifacts.
+- **A checker false negative.** `covers_claim_expiry` required "lease" adjacent
+  to "expire" and scored a document *false* that used `expires_at` on a claim
+  row in six places. The concept was covered; only the vocabulary differed.
+  Widened the synonym set. This is the second time the "verify every check
+  independently against the artifact" rule has caught a grading bug — a checker
+  that is too strict silently caps the achievable score.
+- **Design quality is not graded.** The 0.93 document confidently specifies
+  `SELECT ... FOR UPDATE`, which SQLite does not have. The coverage checkers
+  cannot see this. Noted as a known limitation, not fixed this round.
+
+**Tests:** 332 → 355 green.
+
+---

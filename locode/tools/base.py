@@ -39,6 +39,7 @@ class ToolContext:
     cancel: Any = None             # agent.cancel.CancelToken (avoid import cycle)
     confirm: Callable[..., Any] | None = None  # permission/editor hook
     select: Callable[..., Any] | None = None   # model-initiated multiple-choice
+    plan: Any = None               # agent.plan.Plan — the turn's task list
 
 
 @runtime_checkable

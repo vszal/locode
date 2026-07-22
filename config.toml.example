@@ -56,6 +56,11 @@ max_error_stall = 3             # nudge/bail if edits keep hitting the same erro
 # is trusted after a single nudge instead — this only guards against a model
 # that narrates success (or just stalls) without ever calling the tool.
 max_missing_deliverable_retries = 3
+# How many times a model that tries to end the turn with tasks still open in
+# its OWN update_plan list gets pushed back to the work. Bounded so a task it
+# genuinely cannot finish doesn't loop forever; the nudge offers "mark it done
+# and say why" as the escape hatch.
+max_open_task_retries = 3
 # Nudge (once, never a hard stop) when the fraction of iterations used falls
 # below slow_progress_ratio x the fraction of wallclock used — a model that's
 # "on track" on iteration count but burning time on slow/rambling completions.
@@ -97,6 +102,7 @@ move_file  = "ask"
 bash       = "ask"
 web_search = "ask"
 web_fetch  = "auto"             # already bounded by allowlist + SSRF guard
+update_plan = "auto"            # bookkeeping only; touches no files
 auto_allow_under = ["./sandbox"]   # paths under which ASK tools run without prompting
 # Hard-denied regardless of permission mode, including --yolo.
 deny_paths = ["~/.ssh", "~/.aws", "~/.config/locode"]
