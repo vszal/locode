@@ -401,3 +401,98 @@ change you just made is the reason.
 **Tests:** 389 → 415 green.
 
 ---
+
+## Round 6 — the first honest baseline (`r6-baseline`, HEAD `0ca50bf`, n=3)
+
+**36 runs = 12 rows × `--repeat 3`.** Clean tree, AC power, generation rate
+**73.4 chars/s** against the 72.8 reference — so for the first time the numbers
+are known to have been measured on a healthy box rather than assumed to be.
+
+| | r1-baseline (n=1) | r4-clean (n=1) | **r6-baseline (n=3)** |
+|---|---|---|---|
+| overall score | 0.857 | 0.801 | **0.736** |
+| clean-finish | 0.917 | 0.750 | **0.500** |
+| gen rate | *unrecorded* | 72.8 ch/s | 73.4 ch/s |
+
+The gate returns **FAIL** against both. It is wrong, and the reason it is wrong
+is the point of this round: **it is comparing a mean of three against a single
+sample, and the single samples were optimistic.**
+
+### Variance is concentrated, not uniform
+
+The useful surprise from n=3 is how *little* most rows move. Eight of twelve
+returned the identical score three times running (`e2e`/qwencoder14 0.70×3,
+`exec-bugfix`/qwencoder14 0.50×3, `exec-stall-trap` 0.33×3 and 1.00×3,
+`exec-from-plan` 1.00×3 both models, `design-doc`/qythos9 0.93×3) — two of them
+with byte-identical tool trajectories, at temperature 0.3. Variance lives in two
+rows only, and there it is not noise but **bimodality**: `plan-doc`/qythos9 ran
+0.08 / 0.93 / 0.08. Averaging that row reports 0.36, a value it never produced.
+
+So the earlier worry — "no per-row verdict at n=1 means anything" — was both
+right and wrong. Most rows were reproducible all along; the cross-sweep drift
+recorded in Round 5 came from comparing *different commits*, not from sampling.
+
+### Both gate flags are n=1 optimism, traced to the run
+
+- **`exec-bugfix`/qwencoder14 1.00 → 0.50.** Not a regression. All three runs
+  scored 0.50, and run 3 is decisive: it took the repeat nudge, recovered,
+  worked through every task in its own plan, finished clean — **and still scored
+  0.50**. r4's 1.00 came from a flail that happened to end in a full-file
+  `write_file` rewrite. 0.50 is the row's true value; 1.00 was the lucky sample.
+- **`plan-doc`/qythos9 0.93 → 0.36.** The 0.93 reproduces exactly. The 0.08 runs
+  are a distinct failure mode, below.
+
+### The real finding: models stall in prose, and nothing watches for it
+
+Seven of the eighteen unclean finishes are `budget: wallclock exceeded during a
+single reply`, all on qythos9, all on the three document cases. The reply sizes
+name the cause:
+
+```
+plan-doc/qythos9 run 3 — replies (seconds, chars):
+  (5.7, 162) (5.4, 164) (245.5, 18709) (265.8, 18709) (77.6, 4534)
+```
+
+Two replies, **byte-identical at 18,709 chars**, 245s and 266s of a 600s turn,
+with no tool call in either. The model wrote the whole of PLAN.md *as chat
+prose* instead of calling `write_file`, was nudged, and regenerated the same
+document verbatim. `wrote_plan_doc: False` — after ten minutes of work the file
+never existed. Run 2, which called `write_file` on its third reply, scored 0.93.
+`design-doc`/qythos9 dies the same way at ~21,506 and ~20,886 chars.
+
+Every stall detector we have keys on a **tool-call** signature: `batch_sig` is
+computed inside the `if calls:` branch, and a reply with no calls is handled
+separately at `loop.py:310`. A model that repeats *itself* rather than a *call*
+is therefore invisible to all of them. Round 3 closed the loop on repeated
+calls; this is the same failure one level up.
+
+The arithmetic makes it unforgiving. `max_tokens=6144` is ~21–24k characters
+observed; at 73–95 chars/s that is 225–265 seconds. Against
+`max_wallclock_seconds=600`, **a turn holds roughly two max-length replies.**
+Two wasted ones end it.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D25 | `r6-baseline` replaces `r1-baseline` as the reference | r1 was recorded on a **dirty tree** (`git_dirty: true`) at n=1 with no throughput data. It cannot support a verdict and should not have been the gate's baseline this long. |
+| D26 | A FAIL against an n=1 baseline is advisory, not a verdict | Both flags this round were the baseline's sampling luck, not the candidate's regression. Confirmed per-run, not inferred from means. |
+| D27 | Report bimodal rows by their distribution, not their mean | `plan-doc`/qythos9's 0.36 is a number the row never produced. The mean hides that the failure is total (no file) rather than partial. |
+| D28 | Next target is prose-repeat detection, ahead of `e2e-spec-to-code` | It costs three of twelve rows their clean finish and is the single largest source of lost score. `e2e` remains next after it. |
+| D29 | Throughput telemetry stays, and earned its keep immediately | 73.4 vs 72.8 is what licenses reading this sweep at all; without it, Round 6 would be indistinguishable from the degraded r3-cycle. |
+
+### Obstacles / debugging notes
+
+- **The plan fix (`a46d226`) was briefly a suspect** for the score drop, since it
+  is the only production change between r4 and r6. Ruled out by counting: 3
+  `update_plan` errors in 125 calls across r6 (r4: 2 in 37). It is not burning
+  turns.
+- **Round 3 continues to hold.** `exec-stall-trap`/qwencoder14 sits at 0.33
+  against r1's 0.17, and qythos9 clears it 3/3 in 24 seconds.
+- **`--repeat 3` costs ~2.5× wallclock for information concentrated in two
+  rows.** Worth it here to establish which rows are stable; not obviously worth
+  it every sweep. Consider n=3 on the bimodal rows and n=1 elsewhere.
+
+**Tests:** 424 green.
+
+---
