@@ -1,0 +1,373 @@
+{
+  "label": "r7b-prose",
+  "created": "2026-07-22 12:51:35",
+  "git_head": "18e5974",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "design-doc",
+      "track": "design",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "wrote_design_doc": true,
+        "substantial": true,
+        "structured": true,
+        "covers_public_api": true,
+        "covers_schema": true,
+        "covers_atomic_claim": true,
+        "covers_claim_expiry": true,
+        "covers_backoff": true,
+        "covers_dead_letter": true,
+        "covers_idempotency": true,
+        "covers_crash_recovery": true,
+        "covers_handler_contract": true,
+        "covers_tradeoffs": true,
+        "covers_observability": true,
+        "stayed_in_design_mode": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 212.2,
+        "model_seconds": 212.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 212.2,
+        "gen_chars": 10238,
+        "gen_chars_per_sec": 48.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 212.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-design-doc__qythos9__r1-1nt4x7ky",
+      "error": ""
+    },
+    {
+      "case": "design-doc",
+      "track": "design",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "wrote_design_doc": true,
+        "substantial": true,
+        "structured": true,
+        "covers_public_api": true,
+        "covers_schema": true,
+        "covers_atomic_claim": true,
+        "covers_claim_expiry": true,
+        "covers_backoff": true,
+        "covers_dead_letter": true,
+        "covers_idempotency": true,
+        "covers_crash_recovery": true,
+        "covers_handler_contract": true,
+        "covers_tradeoffs": true,
+        "covers_observability": true,
+        "stayed_in_design_mode": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 172.1,
+        "model_seconds": 172.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 172.0,
+        "gen_chars": 9816,
+        "gen_chars_per_sec": 57.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 172.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-design-doc__qythos9__r2-zfwgbh3l",
+      "error": ""
+    },
+    {
+      "case": "design-doc",
+      "track": "design",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "wrote_design_doc": true,
+        "substantial": true,
+        "structured": true,
+        "covers_public_api": true,
+        "covers_schema": true,
+        "covers_atomic_claim": true,
+        "covers_claim_expiry": true,
+        "covers_backoff": true,
+        "covers_dead_letter": true,
+        "covers_idempotency": true,
+        "covers_crash_recovery": true,
+        "covers_handler_contract": true,
+        "covers_tradeoffs": true,
+        "covers_observability": true,
+        "stayed_in_design_mode": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 1,
+          "write_file": 4
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "truncated": 1,
+          "slow progress": 1
+        },
+        "stop_reason": "budget: wallclock exceeded during a single reply (~7,087 chars generated)",
+        "clean_finish": false,
+        "wallclock": 600.1,
+        "model_seconds": 600.1,
+        "plan_updates": 0,
+        "truncations": 1,
+        "gen_seconds": 600.0,
+        "gen_chars": 53333,
+        "gen_chars_per_sec": 88.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 600.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-design-doc__qythos9__r3-6iqh8nz_",
+      "error": ""
+    },
+    {
+      "case": "plan-doc",
+      "track": "plan",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.077,
+      "checks": {
+        "wrote_plan_doc": false,
+        "plans_schema_work": false,
+        "plans_claim_work": false,
+        "plans_retry_work": false,
+        "plans_reaper_work": false,
+        "plans_dead_letter_work": false,
+        "plans_idempotency_work": false,
+        "plans_test_work": false,
+        "has_milestones": false,
+        "enough_tasks": false,
+        "tasks_name_files": false,
+        "tasks_have_done_criteria": false,
+        "stayed_in_plan_mode": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 2
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "truncated": 1,
+          "slow progress": 1
+        },
+        "stop_reason": "the model repeated the same reply without making progress",
+        "clean_finish": false,
+        "wallclock": 525.1,
+        "model_seconds": 525.1,
+        "plan_updates": 0,
+        "truncations": 2,
+        "gen_seconds": 525.0,
+        "gen_chars": 36522,
+        "gen_chars_per_sec": 69.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 525.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-doc__qythos9__r1-ravqxrjv",
+      "error": ""
+    },
+    {
+      "case": "plan-doc",
+      "track": "plan",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 0.077,
+      "checks": {
+        "wrote_plan_doc": false,
+        "plans_schema_work": false,
+        "plans_claim_work": false,
+        "plans_retry_work": false,
+        "plans_reaper_work": false,
+        "plans_dead_letter_work": false,
+        "plans_idempotency_work": false,
+        "plans_test_work": false,
+        "has_milestones": false,
+        "enough_tasks": false,
+        "tasks_name_files": false,
+        "tasks_have_done_criteria": false,
+        "stayed_in_plan_mode": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 2
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "truncated": 1,
+          "slow progress": 1
+        },
+        "stop_reason": "the model repeated the same reply without making progress",
+        "clean_finish": false,
+        "wallclock": 524.5,
+        "model_seconds": 524.5,
+        "plan_updates": 0,
+        "truncations": 2,
+        "gen_seconds": 524.5,
+        "gen_chars": 39458,
+        "gen_chars_per_sec": 75.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 524.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-doc__qythos9__r2-e83nea2v",
+      "error": ""
+    },
+    {
+      "case": "plan-doc",
+      "track": "plan",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 0.077,
+      "checks": {
+        "wrote_plan_doc": false,
+        "plans_schema_work": false,
+        "plans_claim_work": false,
+        "plans_retry_work": false,
+        "plans_reaper_work": false,
+        "plans_dead_letter_work": false,
+        "plans_idempotency_work": false,
+        "plans_test_work": false,
+        "has_milestones": false,
+        "enough_tasks": false,
+        "tasks_name_files": false,
+        "tasks_have_done_criteria": false,
+        "stayed_in_plan_mode": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 2
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "truncated": 1,
+          "slow progress": 1
+        },
+        "stop_reason": "the model repeated the same reply without making progress",
+        "clean_finish": false,
+        "wallclock": 525.0,
+        "model_seconds": 525.0,
+        "plan_updates": 0,
+        "truncations": 2,
+        "gen_seconds": 524.9,
+        "gen_chars": 38330,
+        "gen_chars_per_sec": 73.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 525.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-doc__qythos9__r3-5ur2m9dk",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.538,
+    "clean_finish_rate": 0.333,
+    "total_nudges": 10,
+    "total_iterations": 28,
+    "nudge_histogram": {
+      "slow progress": 6,
+      "truncated": 4
+    },
+    "gen_rate": 73.4,
+    "rows": {
+      "design-doc::qythos9": {
+        "case": "design-doc",
+        "track": "design",
+        "model": "qythos9",
+        "n": 3,
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "iterations_mean": 5.3,
+        "nudges_mean": 1.3,
+        "clean_finish_rate": 0.667,
+        "seconds_mean": 328.3,
+        "gen_rate_mean": 74.6,
+        "stop_reasons": [
+          "budget: wallclock exceeded during a single reply (~7,087 chars generated)"
+        ]
+      },
+      "plan-doc::qythos9": {
+        "case": "plan-doc",
+        "track": "plan",
+        "model": "qythos9",
+        "n": 3,
+        "score_mean": 0.077,
+        "score_min": 0.077,
+        "iterations_mean": 4,
+        "nudges_mean": 2,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 525.0,
+        "gen_rate_mean": 72.6,
+        "stop_reasons": [
+          "the model repeated the same reply without making progress",
+          "the model repeated the same reply without making progress",
+          "the model repeated the same reply without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "design-doc": 1.0,
+      "plan-doc": 1.0
+    }
+  }
+}

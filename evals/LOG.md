@@ -496,3 +496,113 @@ Two wasted ones end it.
 **Tests:** 424 green.
 
 ---
+
+## Round 7 — catching a model that repeats *itself* (`2ed5b07`, `18e5974`)
+
+Round 6's finding: every stuck-detector keys on a tool-call signature, so a
+reply that makes no call is invisible to all of them. Two changes.
+
+**Detection.** A repeated no-tool-call reply now ends the turn on the *first*
+repeat. Reaching that point twice with the same text means a nudge was appended
+in between and the model produced the same output anyway — the nudge is proven
+inert. That is stronger evidence than a repeated tool call, which can be an
+honest retry, and much costlier to sit through. Scoped to the branches that
+nudge and continue (truncation, missing deliverable, open plan tasks), and gated
+on `PROSE_REPEAT_MIN_CHARS` because the harm scales with what regenerating the
+reply costs — a terse `done` that gets nudged and repeated wastes nothing.
+
+**Cause.** The missing-deliverable nudge told a model that had just composed an
+entire document that it had "only looked around". That is false, and a model
+that just spent a quarter of the turn budget composing the document answers it
+by composing it again. When the reply was a substantial draft, the nudge now
+names what happened and gives the one action left: call `write_file` and pass
+the text you already wrote.
+
+### The first verification run caught the fix not working
+
+`r7-prose` (HEAD `2ed5b07`) was killed after one run, because that run died on
+wallclock exactly as before. The model had regenerated a 25,391-character
+document that differed in **one character, 13,659 in** — a real newline where
+the first copy had a literal backslash-n — and byte-exact matching, even
+whitespace-normalized, called it a different reply.
+
+**Byte-identical detection does not survive contact with a sampled model.** r6's
+`plan-doc` repeat happened to be exact; that was luck, not the rule. `18e5974`
+matches on a normalized opening plus a length within 2%. The length half is
+load-bearing rather than incidental: what a truncation nudge *asks for* is a
+shorter document, and a shorter document opens exactly the same way — so on the
+prefix alone, complying would be indistinguishable from stalling.
+
+### `r7b-prose` (HEAD `18e5974`, 6 runs, 73.4 chars/s)
+
+| row | r6-baseline | r7b-prose |
+|---|---|---|
+| `design-doc`/qythos9 | 0.93 ×3, clean 0.00, 591s | **1.00 ×3, clean 0.67, 328s** |
+| `plan-doc`/qythos9 | 0.08 / 0.93 / 0.08, clean 0.33, 450s | **0.08 ×3, clean 0.00, 525s** |
+
+The detector fires on precisely the target failure, 3 of 3: an 18,098 /
+19,566 / 19,002-char reply re-emitted, caught at ~525s with `the model repeated
+the same reply without making progress` instead of dying mid-reply at 600s. No
+false positive — `design-doc` run 3 answered its truncation nudge with genuinely
+different, progressively smaller `write_file` calls (1,699 → 4,250 → 6,269 →
+7,378 chars) and was correctly left alone.
+
+**It did not improve the score, and it was never going to.** Stopping early is
+honest, not productive: `plan-doc` still ends with no PLAN.md, 75 seconds
+sooner. Two things must be said plainly rather than claimed as wins:
+
+- **`design-doc` 0.93 → 1.00 is not attributable to Round 7.** No prose repeat
+  and no missing-deliverable nudge occurred in any of those runs, so neither
+  change was reached. The delta is `covers_tradeoffs` flipping true — model
+  variance.
+- **`plan-doc` 0.36 → 0.08 is not a regression.** It is the same bimodal row
+  drawing 0 successes from 3 where r6 drew 1. At p≈1/3 that happens 30% of the
+  time. The detector cannot cause it: it only fires on a repeat, and the
+  successful run has none.
+
+### The real blocker, now unmistakable
+
+Both document cases fail the same way, and it is not a detection problem:
+
+    plan-doc/qythos9 — one reply of ~19,000 chars, cut at the token limit
+    design-doc/qythos9 run 3 — 23,264 chars, cut at the token limit
+
+The model wants to emit an 18–25k-character document through
+`model.max_tokens = 6144` (~24k chars). It does not fit, `write_file` is
+truncated, and the file never lands. `_nudge_truncated` already gives the right
+advice — write the first sections, append the rest — and the model *sometimes*
+takes it (design-doc run 3) and sometimes re-emits the whole document verbatim
+(all three plan-doc runs).
+
+This is Round 1's tradeoff coming due. Lowering `max_tokens` 32768 → 6144 was
+correct on the evidence then — generation length is a wallclock setting — but
+for document cases the cap now sits *below the artifact size*, so the artifact
+can never be written in one call at all.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D30 | Repeated prose ends the turn on the FIRST repeat | An intervening nudge produced the same output, so the nudge is inert. Waiting for a second costs another ~250s, which the turn does not have. |
+| D31 | Gate it on reply size | The harm is proportional to regeneration cost. Without the gate it hijacks three existing paths — caught by the existing tests, not by review. |
+| D32 | Match on opening + length, never byte equality | A one-character diff 13,659 in defeated exact matching in the wild. Length is what distinguishes "regenerated it" from "complied and shortened it". |
+| D33 | Keep Round 7 despite a flat score | It fires 3/3 on the target, has produced no false positive, and converts a silent 600s death into a labelled 525s stop. Legibility is worth landing; it is not worth *claiming* as a score win. |
+| D34 | `max_tokens` vs document size is the next round — decide it with a sweep, not a hunch | Raising it trades these rows against every row's wallclock, and Round 1 lowered it *after* measuring. It is a `config.py` default, so `config.toml.example` moves with it. |
+
+### Obstacles / debugging notes
+
+- **The verification run is what found the bug in the fix.** The unit tests were
+  green and the logic read correctly; only real sampled output showed that
+  "identical" is not a property model replies have. Round 5's lesson inverted:
+  there, a passing eval failed to prove the fix worked; here, a failing eval
+  proved it did not.
+- **A 2-row targeted sweep gates as INCONCLUSIVE**, correctly — it is missing 10
+  of 12 baseline rows. Round 4's machinery behaving as intended.
+- **`design-doc` is far more variable than r6 suggested.** r6 read 0.93 ×3;
+  across r7/r7b it produced 0.07, 1.00, 1.00, 1.00. Whether the model writes a
+  ~9.5k-char document (fits, clean finish ~200s) or a ~24k one (truncated, dies)
+  looks close to a coin flip, and it dominates the row's score.
+
+**Tests:** 424 → 436 green.
+
+---
