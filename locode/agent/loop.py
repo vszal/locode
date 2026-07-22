@@ -221,6 +221,14 @@ class AgentLoop:
                 # start/end frame each streamed reply so the UI can reset its
                 # stream filter and flush any held-back tail.
                 self._on_event({"phase": "assistant_start"})
+                # Characters this reply actually generated, reported on
+                # assistant_end so a run's throughput can be measured after the
+                # fact. On local hardware tok/s is not a constant — memory
+                # pressure from another process can drop it by an order of
+                # magnitude, and every wallclock-derived budget silently
+                # tightens with it. A sweep run on a degraded box looks like a
+                # quality regression unless throughput is recorded alongside it.
+                gen_chars = 0
                 try:
                     async with self._interrupt():
                         msg = await self._client.complete(
@@ -237,7 +245,9 @@ class AgentLoop:
                             deadline=(start + self._wallclock_pause
                                       + self._cfg.agent.max_wallclock_seconds),
                         )
+                    gen_chars = _reply_chars(msg)
                 except DeadlineExceeded as e:
+                    gen_chars = len(e.partial)
                     if e.partial:
                         self.history.append({"role": "assistant",
                                              "content": e.partial,
@@ -249,7 +259,7 @@ class AgentLoop:
                     # Must fire even when the stream is cancelled mid-flight, or
                     # the UI's wait spinner is never stopped and flickers into the
                     # prompt after an interrupt.
-                    self._on_event({"phase": "assistant_end"})
+                    self._on_event({"phase": "assistant_end", "chars": gen_chars})
                 content = msg.get("content", "") or ""
                 # The server tells us *why* generation stopped. "length" means
                 # the reply was cut off at max_tokens — the text alone can't
@@ -729,6 +739,23 @@ def _announces_next_action(content: str) -> bool:
     if not 3 < len(last_line) <= 200:
         return False
     return bool(_ANNOUNCED_INTENT_RE.search(last_line))
+
+
+def _reply_chars(msg) -> int:
+    """How many characters a completed reply generated, for throughput metering.
+
+    Counts the prose plus any NATIVE tool_calls. A reply that arrives as
+    structured tool_calls has empty content but was every bit as expensive to
+    generate, so counting content alone would report a fast model as stalled on
+    exactly the turns where it was working."""
+    total = len(msg.get("content", "") or "")
+    calls = msg.get("tool_calls") or ()
+    for c in calls:
+        try:
+            total += len(json.dumps(c, ensure_ascii=False))
+        except (TypeError, ValueError):
+            total += len(str(c))
+    return total
 
 
 def _call_sig(call) -> tuple:

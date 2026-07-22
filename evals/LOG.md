@@ -183,3 +183,140 @@ Same case, same model, same prompt — only the harness changed:
 **Tests:** 332 → 355 green.
 
 ---
+## Round 2 — the model gets a task list
+
+**Goal:** stop the loop accepting a confident "done" while the work the model
+itself said it would do is still outstanding.
+
+### The change (`bd592f8`)
+
+An `update_plan` tool plus `agent/plan.py`: the model writes its own task list,
+and the loop refuses a final answer while that list has open tasks, nudging with
+the specific unfinished items instead. The point is not the plan document — it
+is that the model's own stated intent becomes a *checkable* artifact the loop can
+hold it to, rather than prose the loop has to interpret.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D12 | `update_plan` is a real tool, not a prompt convention | A convention is invisible to the loop. A tool call is an event, so "did it decompose the task, and did it finish what it listed" becomes a metric (`plan_updates`) instead of a reading exercise. |
+| D13 | Open tasks nudge, capped, rather than block | An unbounded "you're not done" is its own infinite loop with a weak model that cannot close the task. |
+
+### Obstacle: `Tool.permission` is decorative
+
+`update_plan` did nothing under the headless eval until it was given an explicit
+entry in the permissions table. The policy resolves an unlisted tool to **ask**
+and never consults the `permission` attribute the `Tool` class advertises — so a
+tool that declares itself safe is still silently gated. Worked around for the
+eval; the attribute is either wired up or deleted. **Still open.**
+
+**Tests:** 355 → 373 green.
+
+---
+
+## Round 3 — stalls are cycles, not repeats
+
+**Goal:** make the stuck-detectors fire on how weak models actually get stuck.
+
+### The finding
+
+`exec-stall-trap` / `qwencoder14` burned all 50 iterations, 321 seconds, and
+emitted **zero nudges** — while alternating a no-op `edit_file` with an identical
+`pytest` invocation. Both stuck-detectors compared each iteration only to the one
+immediately before it, so they could see a period-1 stall and nothing else. No
+two *adjacent* iterations matched, so both counters reset every single turn.
+
+This is the general shape worth keeping: **a detector keyed on "same as last
+time" only catches the degenerate case.** Real stalls have a period. Keying each
+detector off a streak *per signature* makes whatever is interleaved irrelevant.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D14 | Both detectors key off a per-signature streak | Immune to interleaving; each distinct call and each distinct error accumulates its own streak. |
+| D15 | A repeat counts only when the **result** is also unchanged | Without it, interleaving-immunity misfires on ordinary work — re-running the same test between three different edits is progress, not a stall. |
+| D16 | `harness.py rescore` re-grades a finished sweep from its preserved workdirs | Fixing a checker used to poison every comparison against an older sweep: baseline graded by the old ruler, candidate by the new. Re-running is not the fix — it costs an hour of GPU and, the model being sampled, would not reproduce those runs anyway. |
+| D17 | `exec-stall-trap` scores iterations spent, not "no stall nudge fired" | The old check paid out precisely when the detectors were broken, and would have scored a nudged-then-recovered run *worse*. A check that rewards the bug it is meant to catch is worse than no check. |
+
+**Tests:** 373 → 389 green.
+
+---
+
+## Round 4 — the gate reports a verdict it had no standing to reach
+
+**Goal:** measure Round 3. Instead, learned that the measurement was invalid —
+and that the gate said "FAIL" anyway.
+
+### The finding
+
+The `r3-cycle` sweep scored **0.591 against the baseline's 0.857**, clean-finish
+0.92 → 0.38, and the gate printed `❌ REGRESSION GATE: FAIL` naming four cases.
+Taken at face value that is an instruction to revert Round 3. All of it was
+wrong, for three independent reasons:
+
+1. **The sweep never finished.** 8 of 12 runs — every `qythos9` row after
+   `e2e-spec-to-code` is missing. `results.json` is written incrementally, so an
+   interrupted sweep still produces a scorable-looking file, and `overall_score`
+   then averages *a different set of cases* than the baseline's. The four
+   missing rows scored 1.00, 1.00, 1.00 and 0.71 in the baseline; dropping them
+   alone moves the headline number.
+
+2. **The box was degraded.** `design-doc`/`qythos9` died with "wallclock
+   exceeded during a single reply (~6,199 chars)" after **572 seconds in one
+   completion** — about **11 chars/s**, against the ~106 chars/s (26.4 tok/s)
+   measured in Round 1. A ten-fold throughput collapse. In the baseline the same
+   case took 462s of a 600s budget; it was already at 77% of the ceiling, so any
+   slowdown pushes it over. Both `qythos9` failures are wallclock deaths, not
+   quality regressions, and the qwencoder14 half of the sweep (22:36–22:53) ran
+   over an hour before the qythos9 half (23:55–00:50).
+
+3. **The two flagged qwencoder14 stops were the fix working.** Replaying the
+   event logs against the detector logic: `plan-doc` wrote a **byte-identical**
+   `PLAN.md` four times, and `exec-from-plan` cycled an identical
+   `edit_file`(`old` not found)/`read_file` pair. Both are true positives —
+   precisely the interleaved cycles Round 3 set out to catch. They cost the
+   `clean_finish` flag and, on `exec-from-plan`, a score the model had already
+   thrown away by getting stuck. The run that *does* measure the fix directly:
+   `exec-stall-trap`/`qwencoder14`, **0.17 → 0.67, 50 iterations → 3, 321s →
+   35s.**
+
+### The general lesson
+
+**A gate that returns FAIL on data that could not have returned PASS is worse
+than one that admits it does not know.** The verdict was not a wrong number — it
+was a confident answer to a question the data could not address, and its only
+possible action was to revert a good change. Round 1's lesson was that on local
+hardware generation-length settings are wallclock settings; the corollary is
+that **throughput is a confounder for the entire suite**, because every budget in
+the loop is a wallclock budget. At half the tok/s the same model doing the same
+work misses deadlines it previously cleared, and the sweep reads as a regression
+that no code change caused.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D18 | `assistant_end` carries `chars`; the harness derives `gen_chars_per_sec` | Throughput was invisible after the fact. Native `tool_calls` count toward it too, or a model would read as stalled on exactly the turns it was working. |
+| D19 | `compare` returns **INCONCLUSIVE** (exit 2) on a missing-rows or throughput confound | Distinct from PASS and FAIL because the correct response is distinct: re-run, don't revert. Deltas still print, explicitly labelled "not as a verdict". |
+| D20 | Missing-rows check is one-directional | Losing a baseline row means the sweep broke; gaining one means the suite grew. |
+| D21 | Throughput check is one-directional and skipped when either side is unknown | A *faster* box cannot manufacture a passing score from a failing change, and sweeps recorded before D18 must compare as unknown rather than as infinitely slow. |
+
+### Obstacles / debugging notes
+
+- **Nearly reverted Round 3 on the gate's word.** The per-row deltas looked
+  damning until the event logs were replayed against the detector's own logic.
+  The reflex to trust a red gate is the thing that needed guarding here.
+- **The replay initially disagreed with the run**, showing no streak reaching
+  the trigger. Cause: when the repeat nudge fires, the loop `continue`s without
+  running the calls, so those iterations emit no `run`/`result` events and are
+  invisible in the event stream. The skipped batches have to be inferred from
+  the gap.
+- **n=1 per cell, on a sampled model.** Even a complete sweep on a quiet box
+  cannot support a per-row verdict at n=1; `exec-from-plan` scoring 1.00 then
+  0.25 is well within what sampling alone produces.
+
+**Tests:** 389 → 410 green.
+
+---

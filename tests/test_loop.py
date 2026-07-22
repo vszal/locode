@@ -1147,3 +1147,47 @@ async def test_plan_survives_across_turns(tmp_path):
     ])
     await loop.run_turn("do a and b")
     assert loop.plan.summary() == "1/2 done"
+
+
+# --- generation throughput -------------------------------------------------
+def test_reply_chars_counts_prose():
+    assert loop_mod._reply_chars({"content": "hello"}) == 5
+
+
+def test_reply_chars_counts_native_tool_calls():
+    """A reply that arrives as structured tool_calls has empty content but cost
+    just as much to generate. Counting content alone would report a working
+    model as stalled on exactly the turns where it was doing the work."""
+    msg = {"content": "", "tool_calls": [{"name": "read_file",
+                                          "args": {"path": "a.py"}}]}
+    assert loop_mod._reply_chars(msg) > 20
+
+
+def test_reply_chars_survives_unserializable_tool_calls():
+    msg = {"content": "", "tool_calls": [object()]}
+    assert loop_mod._reply_chars(msg) > 0
+
+
+def test_reply_chars_handles_empty_and_missing_fields():
+    assert loop_mod._reply_chars({}) == 0
+    assert loop_mod._reply_chars({"content": None, "tool_calls": None}) == 0
+
+
+async def test_assistant_end_reports_generated_chars(tmp_path):
+    """The throughput metric the eval harness mines is only as good as this
+    event, so pin the field end to end."""
+    class OneShotClient:
+        async def complete(self, messages, model, **kw):
+            return {"content": "done: " + "x" * 100, "finish_reason": "stop"}
+
+    events = []
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    cfg = Config()
+    loop = AgentLoop(OneShotClient(), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg,
+                     cwd=str(tmp_path), on_event=events.append)
+    await loop.run_turn("hi")
+    ends = [e for e in events if e.get("phase") == "assistant_end"]
+    assert ends and ends[0]["chars"] == 106

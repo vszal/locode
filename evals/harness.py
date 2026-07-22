@@ -171,7 +171,39 @@ def metrics_from_events(events: list[dict]) -> dict:
         # Replies cut off at max_tokens. A run that finishes clean but truncated
         # repeatedly is telling us the cap is too tight for the task.
         "truncations": sum(1 for e in events if e.get("phase") == "truncated"),
+        # Generation speed, so a sweep run on a degraded box is visible AS a
+        # degraded box rather than as a quality regression. See _gen_rate.
+        **_gen_rate(events),
     }
+
+
+def _gen_rate(events: list[dict]) -> dict:
+    """Characters generated per second of generation time.
+
+    Every budget in the loop is a wallclock budget, so throughput is a
+    confounder for the whole suite: at half the tok/s, the same model doing the
+    same work hits the turn deadline it previously cleared, and the sweep reads
+    as a regression that no code change caused. Measured 2026-07-22 — a sweep
+    whose second half ran under memory pressure generated at ~11 chars/s against
+    a ~106 chars/s baseline, and its two slow cases died mid-reply on the
+    wallclock.
+
+    Pairs each assistant_start with its assistant_end. Returns None for the rate
+    on event logs written before `chars` was recorded, so old sweeps compare as
+    'unknown' rather than as 'infinitely slow'."""
+    gen_seconds, gen_chars, started = 0.0, 0, None
+    for e in events:
+        phase = e.get("phase")
+        if phase == "assistant_start":
+            started = e.get("t")
+        elif phase == "assistant_end" and started is not None:
+            gen_seconds += max(0.0, float(e.get("t", 0.0)) - float(started))
+            gen_chars += int(e.get("chars", 0) or 0)
+            started = None
+    rate = round(gen_chars / gen_seconds, 1) if gen_chars and gen_seconds else None
+    return {"gen_seconds": round(gen_seconds, 1),
+            "gen_chars": gen_chars,
+            "gen_chars_per_sec": rate}
 
 
 def _last_stamp(events: list[dict]) -> float:
@@ -387,6 +419,7 @@ def summarize(runs: list[RunResult]) -> dict:
             "clean_finish_rate": round(statistics.mean(
                 [1.0 if r.metrics.get("clean_finish") else 0.0 for r in group]), 3),
             "seconds_mean": round(statistics.mean([r.seconds for r in group]), 1),
+            "gen_rate_mean": _mean_rate(group),
             "stop_reasons": [r.metrics.get("stop_reason") for r in group
                              if r.metrics.get("stop_reason")],
         }
@@ -403,9 +436,20 @@ def summarize(runs: list[RunResult]) -> dict:
         "nudge_histogram": dict(sum(
             (Counter(r.metrics.get("nudges_by_reason", {})) for r in runs),
             Counter())),
+        # Aggregated over the whole sweep rather than averaged per row, so one
+        # short case can't outvote a long one on what the box was doing.
+        "gen_rate": _mean_rate(runs),
         "rows": rows,
         "_weights": weights,
     }
+
+
+def _mean_rate(runs: list[RunResult]) -> float | None:
+    """Pooled chars/sec across runs: total chars over total generation seconds.
+    None when no run recorded throughput (a sweep from before it was tracked)."""
+    chars = sum(r.metrics.get("gen_chars", 0) or 0 for r in runs)
+    seconds = sum(r.metrics.get("gen_seconds", 0.0) or 0.0 for r in runs)
+    return round(chars / seconds, 1) if chars and seconds else None
 
 
 def print_report(summary: dict, title: str = "") -> None:
@@ -416,22 +460,57 @@ def print_report(summary: dict, title: str = "") -> None:
     print(f"total iterations   : {summary['total_iterations']}")
     print(f"total nudges       : {summary['total_nudges']}  "
           f"{summary['nudge_histogram'] or ''}")
+    rate = summary.get("gen_rate")
+    print(f"generation rate    : {f'{rate:.1f} chars/s' if rate else 'n/a'}")
     print()
     hdr = f"{'case':<26}{'model':<14}{'n':>2} {'score':>6} {'iter':>5} " \
-          f"{'nudge':>6} {'clean':>6} {'secs':>7}"
+          f"{'nudge':>6} {'clean':>6} {'secs':>7} {'ch/s':>7}"
     print(hdr)
     print("-" * len(hdr))
     for row in summary["rows"].values():
+        rr = row.get("gen_rate_mean")
         print(f"{row['case']:<26}{row['model']:<14}{row['n']:>2} "
               f"{row['score_mean']:>6.2f} {row['iterations_mean']:>5.1f} "
               f"{row['nudges_mean']:>6.1f} {row['clean_finish_rate']:>6.2f} "
-              f"{row['seconds_mean']:>7.1f}")
+              f"{row['seconds_mean']:>7.1f} {(f'{rr:.0f}' if rr else '-'):>7}")
         for sr in dict.fromkeys(row["stop_reasons"]):
             print(f"    ⏹ {sr}")
 
 
+def _validity_warnings(baseline: dict, candidate: dict) -> list[str]:
+    """Reasons the two sweeps cannot be compared as like for like.
+
+    A gate that reports FAIL on data that could not have shown a PASS is worse
+    than one that admits it does not know: it invites reverting a good change.
+    Both checks below come from a real sweep (2026-07-22) that reported a large
+    regression it had no standing to measure.
+
+    1. MISSING ROWS. An interrupted sweep still writes results.json, and the
+       overall score then averages a different set of cases than the baseline's
+       — the headline number moves for reasons that have nothing to do with the
+       code under test.
+    2. THROUGHPUT. Every budget in the loop is wallclock. Generating at a
+       fraction of the baseline's chars/s makes the same work miss deadlines it
+       previously cleared, which reads as a quality regression."""
+    warnings = []
+    missing = [k for k in baseline["rows"] if k not in candidate["rows"]]
+    if missing:
+        warnings.append(
+            f"candidate is missing {len(missing)} of {len(baseline['rows'])} "
+            f"baseline rows ({', '.join(sorted(missing)[:4])}"
+            f"{', …' if len(missing) > 4 else ''}) — it did not finish, so the "
+            "overall score averages a different set of cases")
+    br, cr = baseline.get("gen_rate"), candidate.get("gen_rate")
+    if br and cr and cr < br * 0.7:
+        warnings.append(
+            f"candidate generated at {cr:.1f} chars/s vs the baseline's "
+            f"{br:.1f} ({cr / br:.0%}) — the box was slower, and every budget "
+            "in the loop is a wallclock budget")
+    return warnings
+
+
 def compare(baseline: dict, candidate: dict) -> int:
-    """Regression gate. Returns a process exit code: 0 = pass, 1 = regression."""
+    """Regression gate. Exit code: 0 = pass, 1 = regression, 2 = inconclusive."""
     print_report(baseline, "BASELINE")
     print_report(candidate, "CANDIDATE")
 
@@ -457,6 +536,22 @@ def compare(baseline: dict, candidate: dict) -> int:
                 f"{key}: score {brow['score_mean']:.2f} -> {crow['score_mean']:.2f}")
     if c < b - 0.05:
         regressions.append(f"overall score {b:.3f} -> {c:.3f}")
+
+    invalid = _validity_warnings(baseline, candidate)
+    if invalid:
+        # Report the deltas anyway — they are still worth eyeballing per row —
+        # but refuse to turn them into a verdict.
+        print("\n⚠️  REGRESSION GATE: INCONCLUSIVE — this is not a like-for-like "
+              "comparison")
+        for w in invalid:
+            print("   - " + w)
+        if regressions:
+            print("   deltas below are reported for inspection, NOT as a verdict:")
+            for r in regressions:
+                print("     · " + r)
+        print("   re-run the sweep to completion on an unloaded box before "
+              "acting on these numbers.")
+        return 2
 
     if regressions:
         print("\n❌ REGRESSION GATE: FAIL")
