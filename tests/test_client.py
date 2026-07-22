@@ -212,3 +212,41 @@ async def test_cancel_still_wins_over_deadline():
         await make_client(handler).complete(
             [{"role": "user", "content": "hi"}], "qwen14", cancel=token,
             deadline=time.monotonic() + 30)
+
+
+# --- finish_reason -----------------------------------------------------------
+# "the model stopped" and "the model was cut off at max_tokens" produce
+# identical-looking text; only the server's verdict tells them apart.
+
+def _final(reason: str):
+    return {"choices": [{"delta": {}, "finish_reason": reason}]}
+
+
+async def test_length_finish_reason_is_surfaced():
+    def handler(req):
+        return httpx.Response(200, content=sse(
+            delta(content="a long half-written answ"), _final("length")))
+
+    msg = await make_client(handler).complete(
+        [{"role": "user", "content": "write"}], "qwen14")
+    assert msg["finish_reason"] == "length"
+    assert msg["content"] == "a long half-written answ"
+
+
+async def test_normal_stop_reports_stop_not_length():
+    def handler(req):
+        return httpx.Response(200, content=sse(
+            delta(content="done."), _final("stop")))
+
+    msg = await make_client(handler).complete(
+        [{"role": "user", "content": "write"}], "qwen14")
+    assert msg["finish_reason"] == "stop"
+
+
+async def test_absent_finish_reason_is_omitted():
+    def handler(req):
+        return httpx.Response(200, content=sse(delta(content="hi")))
+
+    msg = await make_client(handler).complete(
+        [{"role": "user", "content": "hi"}], "qwen14")
+    assert "finish_reason" not in msg

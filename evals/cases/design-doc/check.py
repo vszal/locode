@@ -21,9 +21,13 @@ TOPICS = {
     "covers_schema": [r"CREATE TABLE", r"\bschema\b", r"\bcolumns?\b"],
     "covers_atomic_claim": [r"\batomic", r"\bclaim(ed|ing)?\b", r"\blease\b",
                             r"BEGIN IMMEDIATE", r"\btransaction\b"],
-    "covers_claim_expiry": [r"visibility timeout", r"\blease\s+(expir|timeout)",
+    # The synonym set has to be wide: models pick very different vocabulary for
+    # the same mechanism. An earlier version required the word "lease" next to
+    # "expire" and scored a doc false that used `expires_at` on a claim row in
+    # six places — the concept was covered, the phrasing just wasn't ours.
+    "covers_claim_expiry": [r"visibility timeout", r"\bexpir\w*",
                             r"stale", r"\bheartbeat\b", r"claimed_until",
-                            r"reclaim"],
+                            r"claimed_at", r"reclaim", r"\bunclaim"],
     "covers_backoff": [r"\bbackoff\b", r"exponential", r"\bjitter\b",
                        r"retry\s+delay"],
     "covers_dead_letter": [r"dead[- ]?letter", r"\bDLQ\b", r"max_attempts",

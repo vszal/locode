@@ -68,10 +68,21 @@ class ModelConfig:
     # Per-turn generation ceiling. A whole write_file/edit_file call — the file
     # body included — must fit in ONE completion, and on a reasoning distill the
     # <think> preamble eats into the same budget, so a tight cap truncates the
-    # tool call mid-write (the model then "chunks" a large file). Keep this
-    # generous enough to emit a full file in one turn; the agent loop's
-    # iteration/wallclock/repeat guards still bound a runaway model.
-    max_tokens: int = 32768
+    # tool call mid-write (the model then "chunks" a large file).
+    #
+    # But this is also a WALLCLOCK setting in disguise, which is easy to miss.
+    # A 9B MXFP8 model on an M4 Max streams ~26 tok/s, so the old 32768 ceiling
+    # let ONE reply run for ~21 minutes — twice the entire turn budget — and the
+    # loop's iteration/repeat guards can't see it, because they only run
+    # BETWEEN iterations (measured 2026-07-21: a design-doc run spent 860 of its
+    # 900 seconds inside a single completion and produced nothing).
+    #
+    # 6144 tokens is ~4 minutes of generation and still comfortably fits the
+    # largest thing the loop legitimately emits at once — a ~2500-word design
+    # document or a ~300-line module, both around 4k tokens. A model that needs
+    # more gets a truncation nudge and writes the rest in a second call, which
+    # is a far better failure mode than losing the whole turn.
+    max_tokens: int = 6144
     temperature: float = 0.3
 
 
@@ -87,6 +98,11 @@ class AgentConfig:
     max_iterations: int = 50
     max_wallclock_seconds: int = 600
     max_malformed_retries: int = 3  # bail if the model keeps emitting bad tool JSON
+    # How many times a reply cut off at the token limit may be re-nudged. More
+    # than one because a genuinely long deliverable (a full design document) can
+    # legitimately need two passes to fit under model.max_tokens — one-shot
+    # would return the half-written second attempt as if it were the answer.
+    max_truncated_retries: int = 2
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     # Bail if the model keeps trying to end the turn without EVER having

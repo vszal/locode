@@ -270,6 +270,32 @@ async def test_truncated_tool_call_nudges_not_dead_ends(tmp_path):
                for m in loop.history if m["role"] == "user")
 
 
+async def test_length_finish_reason_nudges_even_without_a_broken_fence(tmp_path):
+    # Prose cut off mid-sentence at max_tokens has no unclosed fence for the
+    # heuristic to see, so it used to be returned as a confident final answer —
+    # half a design document, reported as done. The server's own "length"
+    # verdict is the reliable signal.
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "finish_reason": "length",
+         "content": "The design has three layers. The first is the storage lay"},
+        {"role": "assistant", "content": "Here is the shorter version."},
+    ])
+    out = await loop.run_turn("describe the design")
+    assert out == "Here is the shorter version."
+    assert any("cut off" in m["content"]
+               for m in loop.history if m["role"] == "user")
+
+
+async def test_stop_finish_reason_is_a_real_answer(tmp_path):
+    # The normal case must not be dragged into the truncation path.
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "finish_reason": "stop", "content": "All done."},
+    ])
+    assert await loop.run_turn("status?") == "All done."
+    assert not any("cut off" in m["content"]
+                   for m in loop.history if m["role"] == "user")
+
+
 async def test_complete_fenced_call_is_not_truncation(tmp_path):
     # A normal, closed ```tool fence must parse and run — never be mistaken for a
     # truncated call.

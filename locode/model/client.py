@@ -79,6 +79,7 @@ class ModelClient:
         content_parts: list[str] = []
         reasoning_parts: list[str] = []
         tool_acc: dict[int, dict[str, Any]] = {}
+        finish_reason: str | None = None
 
         async with self._client() as c:
             async with c.stream("POST", "/v1/chat/completions", json=body) as r:
@@ -101,9 +102,16 @@ class ModelClient:
                         if data == "[DONE]":
                             break
                         try:
-                            delta = json.loads(data)["choices"][0]["delta"]
+                            choice = json.loads(data)["choices"][0]
+                            delta = choice["delta"]
                         except (json.JSONDecodeError, KeyError, IndexError):
                             continue
+                        # Kept because "stopped because the token limit hit"
+                        # and "stopped because it was done" are indistinguish-
+                        # able from the text alone, yet the caller must react
+                        # very differently to each.
+                        if choice.get("finish_reason"):
+                            finish_reason = choice["finish_reason"]
                         piece = delta.get("content")
                         if piece:
                             content_parts.append(piece)
@@ -133,6 +141,8 @@ class ModelClient:
         msg: dict[str, Any] = {"role": "assistant", "content": content}
         if tool_acc:
             msg["tool_calls"] = [tool_acc[i] for i in sorted(tool_acc)]
+        if finish_reason:
+            msg["finish_reason"] = finish_reason
         return msg
 
 

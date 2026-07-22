@@ -1,0 +1,82 @@
+{
+  "label": "probe-02",
+  "created": "2026-07-21 21:37:15",
+  "git_head": "6b3c93f",
+  "runs": [
+    {
+      "case": "design-doc",
+      "track": "design",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.933,
+      "checks": {
+        "wrote_design_doc": true,
+        "substantial": true,
+        "structured": true,
+        "covers_public_api": true,
+        "covers_schema": true,
+        "covers_atomic_claim": true,
+        "covers_claim_expiry": false,
+        "covers_backoff": true,
+        "covers_dead_letter": true,
+        "covers_idempotency": true,
+        "covers_crash_recovery": true,
+        "covers_handler_contract": true,
+        "covers_tradeoffs": true,
+        "covers_observability": true,
+        "stayed_in_design_mode": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "wallclock": 175.8,
+        "model_seconds": 175.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 175.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-design-doc__qythos9__r1-kqwdyb5j",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.933,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 1,
+    "total_iterations": 4,
+    "nudge_histogram": {
+      "slow progress": 1
+    },
+    "rows": {
+      "design-doc::qythos9": {
+        "case": "design-doc",
+        "track": "design",
+        "model": "qythos9",
+        "n": 1,
+        "score_mean": 0.933,
+        "score_min": 0.933,
+        "iterations_mean": 4,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 175.9,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "design-doc": 1.0
+    }
+  }
+}

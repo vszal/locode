@@ -110,7 +110,7 @@ class AgentLoop:
         start = time.monotonic()
         self._wallclock_pause = 0.0
         nudged_empty = False
-        nudged_truncated = False
+        truncated_nudges = 0
         nudged_repeat = False
         nudged_stall = False
         nudged_slow = False
@@ -231,6 +231,14 @@ class AgentLoop:
                     # prompt after an interrupt.
                     self._on_event({"phase": "assistant_end"})
                 content = msg.get("content", "") or ""
+                # The server tells us *why* generation stopped. "length" means
+                # the reply was cut off at max_tokens — the text alone can't
+                # distinguish that from a deliberate ending, and treating a
+                # half-written reply as a final answer is a dead-end.
+                hit_token_limit = msg.get("finish_reason") == "length"
+                if hit_token_limit:
+                    self._on_event({"phase": "truncated",
+                                    "chars": len(content)})
                 outcome = toolparse.extract(msg, self._registry.names(),
                                             self._registry.arg_names())
                 calls = outcome.calls
@@ -292,9 +300,14 @@ class AgentLoop:
                     # off by the token limit: the parser can't recover it, and
                     # returning the half-written block as a "final answer" is the
                     # exact dead-end that looks like "stops without editing". Nudge
-                    # the model to re-issue a smaller call before giving up.
-                    if _looks_truncated(content) and not nudged_truncated:
-                        nudged_truncated = True
+                    # the model to re-issue a smaller call before giving up. The
+                    # server's own "length" verdict catches the cases the fence
+                    # heuristic can't see — prose cut mid-sentence, or a call cut
+                    # before its fence was ever opened.
+                    if ((hit_token_limit or _looks_truncated(content))
+                            and truncated_nudges
+                            < self._cfg.agent.max_truncated_retries):
+                        truncated_nudges += 1
                         self._nudge_truncated()
                         continue
                     # The model is about to stop with prose instead of the file(s)
@@ -461,11 +474,14 @@ class AgentLoop:
     def _nudge_truncated(self) -> None:
         self.history.append({
             "role": "user",
-            "content": ("Your last tool call was cut off before it finished — it "
-                        "was too long. Re-issue it now, but keep `old` to the "
-                        "SMALLEST unique snippet that needs changing (a few "
-                        "lines), not the whole file, and make several small "
-                        "edit_file calls instead of one giant one."),
+            "content": ("Your last reply was cut off at the token limit before "
+                        "it finished — it was too long. Do it again in SMALLER "
+                        "pieces. For an edit, keep `old` to the SMALLEST unique "
+                        "snippet that needs changing (a few lines), not the "
+                        "whole file, and make several small edit_file calls "
+                        "instead of one giant one. For a long document, "
+                        "write_file the first sections now and append the rest "
+                        "with follow-up calls."),
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "tool call truncated"})

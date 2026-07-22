@@ -52,6 +52,7 @@ import importlib.util
 import json
 import os
 import shutil
+import signal
 import statistics
 import subprocess
 import sys
@@ -280,22 +281,27 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
 
     t0 = time.monotonic()
     timed_out = False
-    stdout = ""
     rc = -1
     try:
-        proc = subprocess.run(cmd, cwd=workdir, env=env, capture_output=True,
-                              text=True, timeout=case.timeout)
-        stdout = proc.stdout + ("\n[stderr]\n" + proc.stderr if proc.stderr else "")
-        rc = proc.returncode
-    except subprocess.TimeoutExpired as e:
-        timed_out = True
-        stdout = (e.stdout or "") + "\n[TIMEOUT: harness killed the process]"
+        # Stream straight to disk instead of capturing. A single case can run for
+        # ten minutes; being able to `tail -f` the transcript is the only window
+        # into what the model is doing while it is still doing it.
+        with out_path.open("w") as out_fh:
+            proc = subprocess.Popen(cmd, cwd=workdir, env=env, text=True,
+                                    stdout=out_fh, stderr=subprocess.STDOUT,
+                                    start_new_session=True)
+            try:
+                rc = proc.wait(timeout=case.timeout)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                _kill_tree(proc)
+                out_fh.write("\n[TIMEOUT: harness killed the process]\n")
     except FileNotFoundError:
         return RunResult(case.id, case.track, model, repeat, 0.0, {}, {}, -1,
                          False, 0.0, str(workdir),
                          error=f"locode not found at {LOCODE_BIN}")
     seconds = round(time.monotonic() - t0, 1)
-    out_path.write_text(stdout)
+    stdout = out_path.read_text(errors="replace")
 
     events = parse_events(log_path)
     metrics = metrics_from_events(events)
@@ -316,6 +322,23 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
         shutil.rmtree(workdir, ignore_errors=True)
     return RunResult(case.id, case.track, model, repeat, score, checks, metrics,
                      rc, timed_out, seconds, str(workdir), error=err)
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill the timed-out run and anything it spawned.
+
+    locode's bash tool starts child processes; killing only the parent would
+    leave those holding the scratch dir (and the GPU) after the case is over.
+    The run is in its own session, so one killpg reaches all of them.
+    """
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        proc.kill()
+    try:
+        proc.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def _score(checks: dict) -> float:

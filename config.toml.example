@@ -31,8 +31,11 @@ default = "qwen14"     # alias (or full "org/model" id) to load at startup
 # Per-turn generation ceiling. A whole write_file/edit_file call — the file
 # body included — must fit in ONE completion, and on a reasoning distill the
 # <think> preamble eats into the same budget, so keep this generous enough to
-# emit a full file in one turn.
-max_tokens = 32768
+# emit a full file in one turn. It is also a wallclock setting in disguise: at
+# the ~26 tok/s a 9B model streams on an M4 Max, 6144 tokens is ~4 minutes of
+# generation, and a 32768 ceiling would let ONE reply outrun the whole turn
+# budget below. Raise it only if you also raise max_wallclock_seconds.
+max_tokens = 6144
 temperature = 0.3
 
 [agent]
@@ -42,6 +45,9 @@ temperature = 0.3
 max_iterations = 50
 max_wallclock_seconds = 600     # hard per-turn time budget
 max_malformed_retries = 3       # bail if the model keeps emitting bad tool JSON
+# How many times a reply cut off at model.max_tokens may be re-nudged. >1
+# because a long deliverable can legitimately need two passes to fit.
+max_truncated_retries = 2
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 # Bail if the model keeps trying to end the turn without EVER having attempted

@@ -26,3 +26,8 @@ CLAUDE.md
 
 # session resume notes (local only)
 .claude_resume
+
+# eval run artifacts: results.json is the record worth keeping (the regression
+# gate diffs it); raw event logs and transcripts are bulky and per-run.
+evals/results/*/events/
+evals/results/*/stdout/
