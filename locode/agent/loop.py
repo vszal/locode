@@ -38,6 +38,11 @@ OnEvent = Callable[[dict], Any]
 # terse answer, well below a document.
 PROSE_REPEAT_MIN_CHARS = 2000
 
+# How much of a reply's opening identifies it. Long enough that two unrelated
+# replies don't collide, short enough to sit well inside the region a
+# regenerated document reproduces verbatim.
+_PROSE_PREFIX = 400
+
 
 @asynccontextmanager
 async def _null_scope():
@@ -126,7 +131,7 @@ class AgentLoop:
         truncated_nudges = 0
         nudged_repeat: set = set()
         nudged_stall: set = set()
-        seen_prose: set = set()
+        seen_prose: list = []
         nudged_slow = False
         nudged_intent = False
         open_task_nudges = 0
@@ -358,10 +363,11 @@ class AgentLoop:
                     # returns after a single nudge, and it guesses from phrasing,
                     # so a repeat there may still be a real answer that merely
                     # trips the heuristic; taking it is better than discarding it.
-                    prose_sig = " ".join(content.split())
-                    prose_repeat = (prose_sig in seen_prose
-                                    and len(prose_sig) >= PROSE_REPEAT_MIN_CHARS)
-                    seen_prose.add(prose_sig)
+                    prose_sig = _prose_sig(content)
+                    prose_repeat = (prose_sig[0] >= PROSE_REPEAT_MIN_CHARS
+                                    and any(_same_prose(prose_sig, s)
+                                            for s in seen_prose))
+                    seen_prose.append(prose_sig)
                     if prose_repeat and (
                             hit_token_limit or _looks_truncated(content)
                             or (expected_artifacts - attempted_paths)
@@ -394,7 +400,7 @@ class AgentLoop:
                             since_last_deliverable_nudge_call = False
                             self._nudge_missing_deliverable(
                                 missing,
-                                drafted=len(prose_sig) >= PROSE_REPEAT_MIN_CHARS)
+                                drafted=prose_sig[0] >= PROSE_REPEAT_MIN_CHARS)
                             continue
                         return self._stop(
                             "the model never produced "
@@ -795,6 +801,32 @@ def _announces_next_action(content: str) -> bool:
     if not 3 < len(last_line) <= 200:
         return False
     return bool(_ANNOUNCED_INTENT_RE.search(last_line))
+
+
+def _prose_sig(content: str) -> tuple[int, str]:
+    """Signature for spotting a reply the model has essentially re-emitted.
+
+    Returns its normalized length and a normalized opening. Exact equality does
+    not survive contact with a sampled model: the run that exposed this
+    regenerated a 25,391-character document that differed in a SINGLE character
+    13,659 in — a real newline where the first copy had a literal backslash-n —
+    which an exact match, and even a whitespace-normalized one, both call a
+    different reply."""
+    norm = " ".join(content.split())
+    return len(norm), norm[:_PROSE_PREFIX]
+
+
+def _same_prose(a: tuple[int, str], b: tuple[int, str]) -> bool:
+    """Whether two replies are the same document written twice.
+
+    Same opening AND near-identical length. The length test is what keeps this
+    honest: a model that ANSWERS a truncation nudge writes a materially shorter
+    document, and a shorter document opens exactly the same way — so on the
+    prefix alone, doing the right thing would be indistinguishable from
+    stalling."""
+    if a[1] != b[1]:
+        return False
+    return abs(a[0] - b[0]) <= max(64, int(0.02 * max(a[0], b[0])))
 
 
 def _reply_chars(msg) -> int:

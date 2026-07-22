@@ -1303,3 +1303,51 @@ async def test_missing_deliverable_nudge_is_unchanged_when_nothing_was_drafted(
     await loop.run_turn("write a PLAN.md for the queue")
     nudge = next(m for m in loop.history if m.get("kind") == "nudge")
     assert "only looked around" in nudge["content"]
+
+
+# --- the prose signature, against real sampled output ---------------------
+
+def test_prose_signature_tolerates_a_single_character_of_sampling_noise():
+    """The r7-prose run regenerated a 25,391-char document that differed in ONE
+    character 13,659 in — a real newline where the first copy had a literal
+    backslash-n. Exact equality called that a different reply, so the detector
+    never fired and the turn died on wallclock exactly as before."""
+    a = "# taskq Design Document\n" + ("filler line here\n" * 900) + "|\\\n| tail"
+    b = a.replace("|\\\n| tail", "|\\n| tail")
+    assert a != b and len(a) == len(b)
+    assert loop_mod._same_prose(loop_mod._prose_sig(a), loop_mod._prose_sig(b))
+
+
+def test_a_materially_shorter_document_is_not_a_repeat():
+    """What a truncation nudge ASKS for is a shorter document — and a shorter
+    document opens exactly the same way. On the prefix alone, complying would be
+    indistinguishable from stalling, so the length test is load-bearing."""
+    long_doc = "# taskq Design Document\n" + ("filler line here\n" * 900)
+    short_doc = "# taskq Design Document\n" + ("filler line here\n" * 200)
+    assert not loop_mod._same_prose(loop_mod._prose_sig(long_doc),
+                                    loop_mod._prose_sig(short_doc))
+
+
+def test_replies_with_different_openings_are_not_a_repeat():
+    a = "# Design\n" + ("x" * 5000)
+    b = "# Plan\n" + ("x" * 5000)
+    assert not loop_mod._same_prose(loop_mod._prose_sig(a),
+                                    loop_mod._prose_sig(b))
+
+
+async def test_near_identical_truncated_reply_stops_the_turn(tmp_path):
+    """End to end, on the shape that actually occurred: a truncated write_file
+    re-emitted with one character changed."""
+    head = ('```tool\n{"name": "write_file", "args": {"path": "DESIGN.md", '
+            '"content": "# taskq Design Document\\n')
+    a = head + ("section text here\\n" * 300) + "|\\\n| tail"
+    b = head + ("section text here\\n" * 300) + "|\\n| tail"
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": a},
+        {"role": "assistant", "content": b},
+    ])
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("write a DESIGN.md for the queue")
+    assert "repeated the same reply" in out
+    assert len([e for e in events if e.get("phase") == "nudge"]) == 1
