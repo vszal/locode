@@ -11,5 +11,5 @@ except PackageNotFoundError:  # running from a source tree that isn't installed
 # distinct from __version__ (which tracks pyproject.toml and doesn't move per
 # commit). Shown on the splash screen so a locally-built binary can be
 # eyeballed against the latest edits. Not a semantic version; just a tripwire.
-__build__ = 17
+__build__ = 18
 __full_version__ = f"{__version__}+{__build__}"

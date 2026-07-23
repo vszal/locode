@@ -89,6 +89,44 @@ async def test_edit_file_replace_all(ctx, tmp_path):
     assert (tmp_path / "c.py").read_text() == "b\nb\n"
 
 
+async def test_edit_file_empty_old_is_refused_not_exploded(ctx, tmp_path):
+    """An empty `old` used to be the worst input edit_file accepted.
+
+    `"".count(text)` is len(text)+1, so it read as "ambiguous" and the error told
+    the model to pass replace_all — at which point `text.replace("", new)` splices
+    `new` between every character. Observed in eval r11: one file went 867 chars ->
+    273,105 -> 79,746,660 across three obeyed retries, and the run died when pytest
+    could no longer parse it. The harness was instructing the model to do this."""
+    (tmp_path / "c.py").write_text("x = 1\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "", "new": "zzz"}, ctx)
+    assert res.is_error
+    assert "`old` is empty" in res.content
+    # Point it at the tool that actually does what it was reaching for.
+    assert "append_file" in res.content
+    # And crucially: no "pass replace_all" advice, which is the destructive path.
+    assert "replace_all" not in res.content
+    assert (tmp_path / "c.py").read_text() == "x = 1\n"
+
+
+async def test_edit_file_empty_old_stays_refused_under_replace_all(ctx, tmp_path):
+    """replace_all is the flag that turned the bug destructive — guard it too."""
+    (tmp_path / "c.py").write_text("x = 1\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "", "new": "zzz", "replace_all": True}, ctx)
+    assert res.is_error
+    assert (tmp_path / "c.py").read_text() == "x = 1\n"
+
+
+def test_try_edit_refuses_an_empty_old_at_the_matcher(tmp_path):
+    """Guard the shared matcher, not just the tool: the ASK diff preview calls
+    try_edit directly, so an unguarded matcher would render a 300x blowup as the
+    change the user is being asked to approve."""
+    for replace_all in (False, True):
+        updated, _note, status, count = fs.try_edit("abc", "", "Z", replace_all)
+        assert status == "empty_old"
+        assert updated is None and count == 0
+
+
 async def test_edit_file_not_found_string(ctx, tmp_path):
     (tmp_path / "c.py").write_text("hello\n")
     res = await fs.EditFile().run({"path": "c.py", "old": "zzz", "new": "q"}, ctx)

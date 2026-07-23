@@ -882,3 +882,113 @@ configuration.
 **Tests:** 480 → 482 green.
 
 ---
+
+## Round 11 — the null sweep fails its own gate (`r11-repeat`, HEAD `a299f9f`, n=3)
+
+D47's sweep. It tests nothing: same wording as r9, same cases, same models. The
+only shipped delta is D45's crash guard. If the harness measured what six rounds
+of write-ups have assumed it measured, this should have reproduced r9.
+
+    overall score     : 0.807 -> 0.667  (-0.140)
+    clean-finish rate : 0.667 -> 0.472  (-0.195)
+    ❌ REGRESSION GATE: FAIL
+       design-doc::qythos9        0.98 -> 0.38
+       exec-bugfix::qythos9       1.00 -> 0.50
+       exec-from-plan::qwencoder14 1.00 -> 0.17
+
+r10 — a real change, judged a failure and reverted — scored −0.156. Repeating a
+configuration against itself scores −0.140. **The two are indistinguishable.**
+
+### What this invalidates
+
+`design-doc`/qythos9's longest reply, by round:
+
+| round | wording | run 1 | run 2 | run 3 |
+|---|---|---|---|---|
+| r6 | (pre-`append_file`) | 23,340 | 24,130 | 25,971 |
+| r8 | append nudge | 35,726 | 32,654 | 9,912 |
+| r9 | flat "about 6000" | **11,994** | **12,271** | **13,911** |
+| r10 | softened to 8000 | 36,563 | 41,560 | 33,774 |
+| r11 | flat "about 6000" | 39,969 | 32,718 | **11,206** |
+
+The distribution is bimodal — the model either obeys and writes 11–14k, or
+ignores the cap and writes 33–42k — and **r9 drew the short mode three times in
+a row.** Under the identical prompt r11 drew it once. Fisher exact on
+r9+r11 (4/6 short) against r10 (0/3 short) gives p ≈ 0.19.
+
+So D44 — "the brake is the low number stated flatly" — is **unsupported**. Not
+disproven: r10 has never produced a short reply in three runs, and the flat
+number has produced four in six. The wording may well help. The claim that it
+was *measured* is what was wrong, and it was written into `fs.py` as settled
+fact with an instruction not to revisit it. That comment now says what is
+actually known.
+
+The other two flagged rows are not the same phenomenon and were not variance.
+
+### The bug the null sweep found
+
+`exec-from-plan`/qwencoder14, 1.00 → 0.17. The model wanted to *add* a function,
+so it called `edit_file` with `old` set to the **empty string**:
+
+    edit_file(old="", new="def median(...)")     -> "`old` appears 867 times;
+                                                    pass replace_all"
+    edit_file(old="", new=..., replace_all=True) -> "edited"
+    edit_file(old="", new=..., )                 -> "`old` appears 273105 times"
+    edit_file(old="", new=..., replace_all=True) -> "edited"
+    edit_file(old="", new=..., )                 -> "`old` appears 79746660 times"
+
+`"".count(text)` is `len(text)+1`, so an empty `old` reads as *ambiguous*, and
+the ambiguity message tells the model to pass `replace_all`. `text.replace("",
+new)` splices `new` between every character. 867 chars → 273,104 → 79,746,659,
+a ~300x blowup per obeyed retry. The arithmetic closes exactly:
+`273,104 + 273,105 x 291 + 1 = 79,746,660`, the third reported count.
+
+Run 1 of that row died with the checker's `pytest` timing out after 180s — it
+could no longer parse the file. It scored 0.00.
+
+**The harness was instructing the model to destroy the file, and the model was
+doing as it was told.** Empty `old` appears in r9 too (7 calls) — not one
+escalated to `replace_all`, which is the whole of why that row read 1.00. Zero
+occurrences in the eight rounds before r9.
+
+Fixed at both layers: `try_edit` returns a new `empty_old` status before any
+matching tier runs, and `edit_file` answers with "to ADD text use append_file …
+to CHANGE text copy the exact existing lines" — no `replace_all` advice on the
+one input where it is destructive. The matcher guard is the load-bearing one:
+the ASK diff preview calls `try_edit` directly, so unguarded it would render a
+79 MB blowup as the change a user is asked to approve.
+
+This also answers D46 from the other direction. `append_file` has zero calls in
+144 runs not because the model never wants to append — it wants to append here,
+and reaches for `edit_file(old="")` to do it. It was never choosing between the
+two tools; it was never finding the second one.
+
+`exec-bugfix`/qythos9 (1.00 → 0.50) is ordinary sampling: r9's third edit landed
+on the buggy span and fixed it, r11's landed one line off, "succeeded", left the
+test red, and the model then re-sent it verbatim until the repeat detector fired.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D48 | An empty `old` is refused at the matcher, never routed to `replace_all` | A tool must not answer malformed input with advice that multiplies the file 300x. Reachable from a plain intent ("add this function"), and it destroyed a run before anyone noticed. |
+| D49 | Treat every past per-row verdict as provisional; n=3 does not resolve a 0.15 gate threshold | The null sweep moved 0.14 overall and flipped three rows. Any finding rounds 6–10 rested on a single row's delta needs re-measuring before it is trusted. |
+| D50 | Reverse the reading of a gate failure: it flags rows to trace, and no row is a mechanism until the event log shows one | Both real findings this round came from tracing. The gate ranked the noise row (`design-doc`) above the row hiding a data-destroying bug (`exec-from-plan`). |
+| D51 | Raise n before running another wording experiment; do not re-litigate D44 at n=3 | Six runs across two sweeps cannot separate a bimodal 40/60 split from a real effect. Anything smaller than the r10-sized collapse is currently unmeasurable. |
+
+### Obstacles / debugging notes
+
+- The sweep that was designed to measure nothing is the most productive round
+  so far. Both findings were invisible to the aggregate: one row's collapse was
+  pure variance and the other was a live bug, and they scored within 0.2 of each
+  other.
+- The gate's own threshold is now suspect. It flags at 0.15; the null sweep's
+  overall move was 0.14 and three individual rows moved 0.48–0.83. A threshold
+  tuned below the noise floor reports mostly noise.
+- The checker's `pytest` timeout (180s) is doing real work as a safety net, but
+  it scores an infrastructure kill as 0.00, which reads as a model failure.
+  Same class of bug as c00e8a4; worth the same treatment.
+
+**Tests:** 482 → 485 green.
+
+---

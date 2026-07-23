@@ -115,8 +115,14 @@ def _fuzzy_span(text: str, old: str, threshold: float = 0.8):
 def try_edit(text: str, old: str, new: str, replace_all: bool):
     """Resolve an edit across all matching tiers. Returns
     (updated_text|None, note, status, count) with status in
-    {'ok', 'ambiguous', 'not_found'}. Shared by edit_file and its diff preview
-    so the approved diff is exactly what gets written."""
+    {'ok', 'ambiguous', 'not_found', 'empty_old'}. Shared by edit_file and its
+    diff preview so the approved diff is exactly what gets written."""
+    if old == "":
+        # `"".count` is len(text)+1 and `text.replace("", new)` inserts `new`
+        # between EVERY character — a ~len(new)x blowup per call. A model that
+        # means "add this function" reaches for old="" naturally, so this is
+        # reachable input, not a hypothetical. Refuse it before any tier runs.
+        return None, "", "empty_old", 0
     count = text.count(old)
     if count > 1 and not replace_all:
         return None, "", "ambiguous", count
@@ -297,20 +303,27 @@ class WriteFile:
     # because by the time the nudge fires the turn is over. The instruction has
     # to be in the tool the model is about to call.
     #
-    # The exact wording is load-bearing and has been measured twice. Round 9
-    # said "keep content under about 6000 characters" and scored design-doc
-    # 0.38 -> 0.98. Round 10 tried to soften the cap into a branch — "write
-    # COMPLETE content ... if the finished file would run past roughly 8000
-    # characters, use append_file" — and the same row collapsed to 0.07, with
-    # replies of 36,563 / 41,560 / 33,774 chars and not one successful
-    # write_file in three runs.
+    # Keep the flat number. What is actually known, and what is not:
     #
-    # So the brake is the low number stated flatly, and NOT the reasoning
-    # around it: qythos9 never obeys 6000 (it writes ~12k) and never once
-    # called append_file in 108 runs. The number works by pulling the target
-    # down, not by being followed, and the moment "COMPLETE" outranked it the
-    # model went back to emitting a whole document into the token ceiling.
-    # Do not soften this sentence again without a sweep. See LOG.md D44.
+    # qythos9's reply length on design-doc is BIMODAL — it either obeys and
+    # writes 11-14k chars, or ignores the cap and writes 33-42k, in which case
+    # the reply is truncated and no document lands at all. Longest reply per
+    # run, by round:
+    #     r9  "about 6000", flat     11,994 / 12,271 / 13,911   <- short x3
+    #     r10 softened to 8000       36,563 / 41,560 / 33,774   <- long x3
+    #     r11 "about 6000", flat     39,969 / 32,718 / 11,206   <- short x1
+    #
+    # r11 repeated r9 EXACTLY and drew the short mode once. So the flat number
+    # has 4/6 short and the softened branch 0/3 — suggestive (p ~ 0.19, Fisher)
+    # but not significant. Round 10's write-up called this settled and told the
+    # next reader not to revisit it; that was wrong, and r11 is why.
+    #
+    # Note the model never obeys 6000 either way (its "short" mode is ~12k), so
+    # if the number helps it is by pulling the target down, not by being read as
+    # a limit. Treat that as the working hypothesis, not a result.
+    #
+    # Before changing this sentence, raise n — six runs cannot separate a 40/60
+    # split from an effect. See LOG.md D44, superseded by D49 and D51.
     description = (
         "Create or overwrite a file with the given content. Keep `content` "
         "under about 6000 characters. If the document you are writing is "
@@ -456,6 +469,12 @@ class EditFile:
         replace_all = bool(args.get("replace_all"))
 
         updated, note, status, count = try_edit(text, old, new, replace_all)
+        if status == "empty_old":
+            return ToolResult(
+                "`old` is empty, so there is nothing to replace. To ADD text, "
+                "use append_file to put it at the end of the file, or write_file "
+                "to replace the whole file. To CHANGE text, copy the exact "
+                "existing lines into `old`.", is_error=True)
         if status == "ambiguous":
             return ToolResult(
                 f"`old` appears {count} times in {p}; pass replace_all or add "
