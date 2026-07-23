@@ -537,17 +537,42 @@ class AgentLoop:
             if tool is None:
                 results.append((call.name, f"error: no such tool {call.name!r}"))
                 continue
-            decision = self._policy.resolve(call.name, call.args, self._cwd)
-            if decision == ASK:
-                decision = await self._ask(call)
+            decision = self._policy.resolve(call.name, call.args, self._cwd,
+                                            getattr(tool, "permission", None))
+            # Why a call was refused decides both what we tell the model and
+            # what the UI can show. "It just quit without prompting me" has
+            # several very different causes and none of them used to leave a
+            # trace: a "no (always)" answer earlier in the session disarms the
+            # tool permanently, a config deny never prompts at all, and headless
+            # has nobody to ask. Name it once, here.
             if decision == DENY:
-                results.append((call.name, self._denial_text(call.name)))
+                reason = ("session policy"
+                          if self._policy.session_decision(call.name) == DENY
+                          else "config")
+            elif decision == ASK:
+                decision = await self._ask(call)
+                reason = ("no approver" if self._confirm is None
+                          else "user declined")
+            if decision == DENY:
+                results.append((call.name, self._denial_text(call.name, reason)))
                 self._denials += 1
-                self._on_event({"phase": "denied", "name": call.name})
+                self._on_event({"phase": "denied", "name": call.name,
+                                "reason": reason})
                 continue
             self._on_event({"phase": "run", "name": call.name, "args": call.args})
             t0 = time.monotonic()
-            res = await tool.run(call.args, ctx)
+            # Listen for Esc while the tool runs, not just while the model
+            # streams. A bash call can hold the turn for 120s with nothing
+            # watching the keyboard, which is most of what "it appears stuck and
+            # there is no way to stop it" actually is; Bash already registers a
+            # hook that SIGTERMs the process group, so the scope is what makes
+            # it reachable. Nothing may print inside the scope — raw mode drops
+            # newline translation — and the run/result events bracket the call,
+            # so the window is silent.
+            scope = (_null_scope if getattr(tool, "prompts_user", False)
+                     else self._interrupt)
+            async with scope():
+                res = await tool.run(call.args, ctx)
             self._on_event({"phase": "result", "name": call.name,
                             "error": res.is_error, "content": res.content,
                             "seconds": round(time.monotonic() - t0, 3)})
@@ -559,7 +584,7 @@ class AgentLoop:
         result_sig = "\n".join(f"{name}: {content}" for name, content in results)
         return ("\n".join(error_parts) if error_parts else None), result_sig
 
-    def _denial_text(self, name: str) -> str:
+    def _denial_text(self, name: str, reason: str = "user declined") -> str:
         """What a refused tool call tells the model.
 
         "denied by permission policy" was true and useless: it named no reason
@@ -567,14 +592,23 @@ class AgentLoop:
         model reading that does the obvious thing and runs a variant — `npm
         install -g x`, then without -g, then with sudo — until a stuck-detector
         ends the turn three calls later. When the refusal is permanent, say so
-        in the words a model acts on."""
-        if self._confirm is None:
-            # Headless: nobody can ever approve this, so every retry is wasted.
-            return (f"denied: {name} is not available in this session — there "
-                    f"is no one present to approve it, so calling it again "
-                    f"will be refused every time. Do NOT retry {name}. Finish "
-                    f"with the tools you do have, or stop and state plainly "
-                    f"what you could not do without it.")
+        in the words a model acts on.
+
+        Only "user declined" leaves the door open: a human said no to one call
+        and might say yes to a different one. The other three are settled for
+        the rest of the session, and a model told to "try a different approach"
+        will keep spending turns rediscovering that."""
+        if reason != "user declined":
+            why = {
+                "no approver": "there is no one present to approve it",
+                "session policy": "you were refused it earlier and that answer "
+                                  "stands for the whole session",
+                "config": "this session's configuration forbids it",
+            }.get(reason, "it is not permitted here")
+            return (f"denied: {name} is not available in this session — {why}, "
+                    f"so calling it again will be refused every time. Do NOT "
+                    f"retry {name}. Finish with the tools you do have, or stop "
+                    f"and state plainly what you could not do without it.")
         return (f"denied: the user refused this {name} call. Do not repeat it. "
                 f"Try a different approach, or ask what they would prefer.")
 

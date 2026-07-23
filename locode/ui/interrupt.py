@@ -1,7 +1,7 @@
 """Esc / Ctrl-C interruption, scoped to model streaming only.
 
 The key-listener owns the terminal (raw mode) ONLY while the model is
-generating. It must NOT be active during interactive confirm/选择 prompts — those
+generating. It must NOT be active during interactive confirm/select prompts — those
 open their own prompt_toolkit dialog and the two cannot share stdin/raw-mode at
 once (doing so wedges the terminal). So the agent loop wraps just the streaming
 call in `interrupt_scope`; tool-approval prompts run outside it with a clean

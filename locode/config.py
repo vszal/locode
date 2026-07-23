@@ -163,11 +163,14 @@ class PermissionsConfig:
         "move_file": "ask", "bash": "ask",
         "web_search": "ask", "web_fetch": "auto",
         # Bookkeeping only — update_plan touches nothing but the agent's own
-        # in-memory task list, so prompting for it would be pure noise. It must
-        # be listed explicitly: unlisted tools resolve to "ask" regardless of
-        # the tool class's own `permission` attribute, which headless means
-        # "silently denied".
+        # in-memory task list, so prompting for it would be pure noise.
         "update_plan": "auto",
+        # Asking the user a question is not an action that needs approving, and
+        # prompting "allow ask_user?" before the question itself is absurd. In
+        # headless mode there is no selector, and the tool declines on its own
+        # with a message the model can act on — which is the point: it has to
+        # REACH its own run() to do that, so it must not resolve to "ask".
+        "ask_user": "auto",
     })
     auto_allow_under: list[str] = field(default_factory=lambda: ["./sandbox"])
     deny_paths: list[str] = field(default_factory=lambda: [

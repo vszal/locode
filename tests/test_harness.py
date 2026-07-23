@@ -258,3 +258,45 @@ def test_unknown_power_state_never_blocks_a_sweep(monkeypatch):
     monkeypatch.setattr(harness.sys, "platform", "linux")
     on_ac, _ = harness._power_state()
     assert on_ac is not False
+
+
+def test_a_transport_death_is_not_a_clean_finish():
+    # r8: mlx-server dropped the connection mid-document on two runs. The turn
+    # ended without reaching any stop-detector, so `stopped is None` and both
+    # scored a perfect clean finish — the row that produced nothing at all
+    # carried the sweep's best clean-finish number.
+    h = _load_harness()
+    m = h.metrics_from_events([
+        {"phase": "turn_start"},
+        {"phase": "assistant_end", "chars": 32654},
+        {"phase": "turn_end", "result": "(no result)"},
+        {"phase": "error", "text": "Server disconnected without sending a response."},
+    ])
+    assert m["clean_finish"] is False
+    assert m["infra_error"].startswith("infrastructure: Server disconnected")
+    # And it reads as a stop reason, so the report names it instead of leaving
+    # a blank row for someone to go spelunking in the event log for.
+    assert "Server disconnected" in m["stop_reason"]
+
+
+def test_an_ordinary_finished_turn_is_still_clean():
+    h = _load_harness()
+    m = h.metrics_from_events([
+        {"phase": "turn_start"},
+        {"phase": "assistant_end", "chars": 120},
+        {"phase": "turn_end", "result": "Done."},
+    ])
+    assert m["clean_finish"] is True
+    assert m["infra_error"] is None
+    assert m["stop_reason"] is None
+
+
+def test_a_detector_stop_still_wins_the_stop_reason():
+    h = _load_harness()
+    m = h.metrics_from_events([
+        {"phase": "stopped", "reason": "the model repeated the same tool call"},
+        {"phase": "turn_end", "result": "⏹ stopped"},
+        {"phase": "error", "text": "All connection attempts failed"},
+    ])
+    assert m["clean_finish"] is False
+    assert m["stop_reason"] == "the model repeated the same tool call"

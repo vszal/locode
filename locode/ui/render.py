@@ -246,8 +246,25 @@ def format_result(name: str, content: str, is_error: bool, *, color: bool = True
     return f"    {_wrap('✓', _GREEN, color)} {_wrap(summ, _DIM, color)}"
 
 
-def format_denied(name: str, *, color: bool = True) -> str:
-    return f"    {_wrap('⛔ ' + name + ' denied', _YELLOW, color)}"
+_DENY_WHY = {
+    "session policy": "you answered “no (always)” earlier this session",
+    "config": "denied by config",
+    "no approver": "no approver in this session",
+    "user declined": "you declined",
+}
+
+
+def format_denied(name: str, reason: str = "", *, color: bool = True) -> str:
+    """A refusal has to say WHY, because most of them never showed a prompt.
+
+    "⛔ bash denied" appearing with no preceding question looks like the tool is
+    broken. Three of the four reasons are settled before the call is made — a
+    remembered "no (always)", a config deny, or headless — and only the fourth
+    is the user having just said no, which is the one case they already know
+    about."""
+    why = _DENY_WHY.get(reason, reason)
+    text = f"⛔ {name} denied" + (f" — {why}" if why else "")
+    return f"    {_wrap(text, _YELLOW, color)}"
 
 
 def error(msg: str, *, color: bool = True) -> str:

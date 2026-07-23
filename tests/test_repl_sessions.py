@@ -45,3 +45,26 @@ def test_resume_no_arg_lists_saved(tmp_path, monkeypatch, capsys):
     capsys.readouterr()  # drop the save line
     r._slash_resume("")
     assert "alpha" in capsys.readouterr().out
+
+
+async def test_ctrl_c_during_a_turn_leaves_the_repl_alive(tmp_path, monkeypatch):
+    # The interrupt scope only listens while the model streams, so a Ctrl-C
+    # during a tool run or between iterations raises KeyboardInterrupt out of
+    # run_turn. It is a BaseException, so `except Exception` never caught it and
+    # it took the whole session down. _turn must absorb it and cancel the token.
+    r = _repl(tmp_path, monkeypatch)
+
+    async def boom(text):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(r._loop, "run_turn", boom)
+    await r._turn("do something slow")          # must not propagate
+    assert r._loop.cancel.cancelled
+
+    # And the next turn still works: run_turn resets the token itself, but the
+    # REPL must not have latched anything of its own.
+    async def ok(text):
+        return "fine"
+
+    monkeypatch.setattr(r._loop, "run_turn", ok)
+    await r._turn("again")

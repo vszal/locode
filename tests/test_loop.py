@@ -230,7 +230,9 @@ async def test_confirm_runs_outside_interrupt_scope(tmp_path):
         cwd=str(tmp_path), confirm=confirm, interrupt=scope)
     out = await loop.run_turn("write x")
     assert out == "Done."
-    assert state["entered"] == 2           # scope wrapped each model call
+    # Two model calls plus the tool run itself — Esc has to reach a long bash,
+    # not just a long generation.
+    assert state["entered"] == 3
     assert state["confirm_saw_active"] is False  # confirm ran OUTSIDE the scope
     assert (tmp_path / "x.txt").read_text() == "hi"
 
@@ -1415,3 +1417,86 @@ async def test_interactive_denials_do_not_end_the_turn(tmp_path):
     out = await loop.run_turn("write four files")
     assert out == "Wrote the one you allowed."
     assert (tmp_path / "keep.txt").read_text() == "4"
+
+
+async def test_denial_events_carry_a_reason(tmp_path):
+    # "⛔ bash denied" with no preceding prompt is indistinguishable from a
+    # broken tool. Every refusal has to say which of the four things happened.
+    events = []
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    cfg = Config()
+    cfg.permissions.tools["write_file"] = "deny"
+    loop = AgentLoop(
+        FakeClient([native_call("write_file", path="out.txt", content="x"),
+                    {"role": "assistant", "content": "Okay."}]),
+        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        cwd=str(tmp_path), on_event=events.append)
+    await loop.run_turn("write out.txt")
+    denied = [e for e in events if e["phase"] == "denied"]
+    assert [e["reason"] for e in denied] == ["config"]
+
+
+async def test_a_remembered_no_always_is_permanent_for_the_model_too(tmp_path):
+    # "no (always)" pins DENY for the session, and every later call is refused
+    # with no prompt. Telling the model to "try a different approach" then sends
+    # it round the same loop; it has to hear that the tool is gone.
+    asked = []
+
+    async def confirm(name, args, preview):
+        asked.append(args["path"])
+        return "no_always"
+
+    events = []
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    cfg = Config()
+    loop = AgentLoop(
+        FakeClient([native_call("write_file", path="a.txt", content="1"),
+                    native_call("write_file", path="b.txt", content="2"),
+                    {"role": "assistant", "content": "Stopped."}]),
+        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        cwd=str(tmp_path), confirm=confirm, on_event=events.append)
+    await loop.run_turn("write two files")
+    assert asked == ["a.txt"]                    # the second never prompted
+    reasons = [e["reason"] for e in events if e["phase"] == "denied"]
+    assert reasons == ["user declined", "session policy"]
+    fed = "\n".join(m["content"] for m in loop.history if m["role"] == "user")
+    assert "that answer stands for the whole session" in fed
+
+
+async def test_a_tool_that_prompts_runs_outside_the_interrupt_scope(tmp_path):
+    # ask_user opens its own prompt_toolkit selector from inside run(). Raw mode
+    # and a prompt_toolkit Application cannot share stdin, so the loop must skip
+    # the scope for it — by the prompts_user flag, not by tool name.
+    from contextlib import asynccontextmanager
+
+    from locode.tools.ask import AskUser
+
+    state = {"active": False, "saw_active": None}
+
+    @asynccontextmanager
+    async def scope():
+        state["active"] = True
+        try:
+            yield
+        finally:
+            state["active"] = False
+
+    async def select(question, options):
+        state["saw_active"] = state["active"]
+        return options[0]
+
+    reg = Registry()
+    reg.register(AskUser())
+    cfg = Config()
+    loop = AgentLoop(
+        FakeClient([native_call("ask_user", question="which?",
+                                options=["a", "b"]),
+                    {"role": "assistant", "content": "Got it."}]),
+        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        cwd=str(tmp_path), select=select, interrupt=scope)
+    await loop.run_turn("ask me")
+    assert state["saw_active"] is False

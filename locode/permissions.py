@@ -46,7 +46,25 @@ class PermissionPolicy:
     def remember(self, tool: str, decision: str) -> None:
         self._session[tool] = decision
 
-    def resolve(self, tool_name: str, args: dict, cwd: str) -> str:
+    def session_decision(self, tool: str) -> str | None:
+        """The decision an "always" answer pinned for this session, if any.
+
+        Callers need this to explain a refusal. A remembered DENY refuses every
+        later call to the tool with no prompt and nothing on screen, which is
+        indistinguishable from the tool being broken — one "no (always)" early
+        in a session silently disarms it for the rest."""
+        return self._session.get(tool)
+
+    def resolve(self, tool_name: str, args: dict, cwd: str,
+                declared: str | None = None) -> str:
+        """`declared` is the tool class's own `permission` attribute.
+
+        It used to be ignored entirely, so any tool the config did not list fell
+        to ASK — which headless means "silently denied". `ask_user` was exactly
+        that tool: declared "auto", unlisted, and therefore refused in the one
+        mode where the install-escalation path depends on it. The config still
+        wins when it names the tool; this only replaces the blind ASK default.
+        """
         if tool_name in self._session:
             return self._session[tool_name]
 
@@ -75,7 +93,8 @@ class PermissionPolicy:
             if any(_under(target, a, cwd) for a in self._perms.auto_allow_under):
                 return AUTO
 
-        base = self._perms.tools.get(tool_name, self._default_for(tool_name))
+        base = self._perms.tools.get(tool_name,
+                                     declared or self._default_for(tool_name))
         if base == DENY:
             return DENY
         if self._yolo and base == ASK:
@@ -84,5 +103,5 @@ class PermissionPolicy:
 
     @staticmethod
     def _default_for(tool_name: str) -> str:
-        # Unknown tools default to ASK (conservative).
+        # A tool that declares nothing at all defaults to ASK (conservative).
         return ASK

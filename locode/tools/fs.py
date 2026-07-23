@@ -289,13 +289,30 @@ class Grep:
 
 class WriteFile:
     name = "write_file"
-    description = "Create or overwrite a file with the given content."
+    # The size sentence is not style advice, it is the only brake that acts
+    # BEFORE generation. A model asked for a long document generates flat into
+    # the token ceiling, the JSON is cut mid-string, and ~450 seconds are gone
+    # before any nudge can say so. Round 8 shipped append_file and a truncation
+    # nudge naming it; across 36 eval runs append_file was called zero times,
+    # because by the time the nudge fires the turn is over. The instruction has
+    # to be in the tool the model is about to call.
+    description = (
+        "Create or overwrite a file with the given content. Keep `content` "
+        "under about 6000 characters. If the document you are writing is "
+        "longer than that, write_file only its first section now and add each "
+        "remaining section with a separate append_file call — never try to "
+        "emit the whole document in one call."
+    )
     permission = "ask"
     schema = {
         "type": "object",
         "properties": {
             "path": {"type": "string"},
-            "content": {"type": "string"},
+            "content": {
+                "type": "string",
+                "description": "File body. Keep under ~6000 characters; "
+                               "continue longer documents with append_file.",
+            },
         },
         "required": ["path", "content"],
     }

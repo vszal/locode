@@ -118,6 +118,17 @@ class Repl:
         t0 = time.monotonic()
         try:
             result = await self._loop.run_turn(text)
+        except KeyboardInterrupt:
+            # The interrupt scope only listens while the model is streaming, so
+            # Ctrl-C during a tool run (bash can take 120s), during compaction,
+            # or between iterations arrives here instead. KeyboardInterrupt is a
+            # BaseException, so `except Exception` below never saw it: it escaped
+            # _turn, escaped run(), and took the whole REPL down with a
+            # traceback. Cancel what is running and go back to the prompt —
+            # "there is no good way to stop" should not mean "quit the session".
+            self._loop.cancel.cancel()
+            print("\n⛔ interrupted")
+            return
         except Exception as e:  # surface model/server errors without crashing
             self._server_up = not _is_conn_error(e)
             print("\n" + self._format_error(e))
@@ -200,7 +211,8 @@ class Repl:
             print(render.format_result(event["name"], event.get("content", ""),
                                         event.get("error", False), color=self._color))
         elif phase == "denied":
-            print(render.format_denied(event["name"], color=self._color))
+            print(render.format_denied(event["name"], event.get("reason", ""),
+                                       color=self._color))
         elif phase == "nudge":
             print(render.format_nudge(event.get("reason", ""), color=self._color))
         elif phase == "info":

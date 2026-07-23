@@ -95,3 +95,26 @@ def test_move_file_normal_is_ask_then_yolo_auto():
 def test_move_file_auto_allow_under_sandbox():
     pol = PermissionPolicy(PermissionsConfig())  # auto_allow_under=["./sandbox"]
     assert pol.resolve("move_file", {"src": "sandbox/a", "dst": "sandbox/b"}, "/work") == AUTO
+
+
+def test_an_unlisted_tool_falls_back_to_its_declared_permission():
+    # Round 2 left `Tool.permission` decorative: the policy ignored it, so any
+    # tool the config did not list resolved to ASK — silently denied headless.
+    pol = PermissionPolicy(PermissionsConfig())
+    assert pol.resolve("some_new_tool", {}, "/work") == ASK          # declares nothing
+    assert pol.resolve("some_new_tool", {}, "/work", "auto") == AUTO
+    assert pol.resolve("some_new_tool", {}, "/work", "deny") == DENY
+
+
+def test_config_still_beats_the_declared_permission():
+    pol = PermissionPolicy(PermissionsConfig(tools={"bash": "deny"}))
+    assert pol.resolve("bash", {"cmd": "ls"}, "/work", "auto") == DENY
+
+
+def test_ask_user_is_not_silently_denied_headless():
+    # The install-escalation path tells the model to call ask_user when a global
+    # tool is missing. Headless, ask_user must reach its own run() and decline
+    # with a usable message — not be refused before it gets there.
+    pol = PermissionPolicy(PermissionsConfig())
+    assert pol.resolve("ask_user", {"question": "?", "options": ["a"]},
+                       "/work") == AUTO

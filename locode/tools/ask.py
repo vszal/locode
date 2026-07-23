@@ -15,6 +15,12 @@ class AskUser:
     description = ("Ask the user a multiple-choice question and get their "
                    "selection. Use when you need a decision only the user can make.")
     permission = "auto"
+    # This tool opens its own prompt_toolkit selector from inside run(), so the
+    # agent loop must NOT put its raw-mode key listener around the call — raw
+    # mode and a prompt_toolkit Application cannot share stdin, and running both
+    # wedges the terminal. Every other tool leaves stdin alone and is
+    # interruptible; see AgentLoop._run_calls.
+    prompts_user = True
     schema = {
         "type": "object",
         "properties": {

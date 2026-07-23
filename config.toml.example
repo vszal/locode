@@ -107,6 +107,7 @@ bash       = "ask"
 web_search = "ask"
 web_fetch  = "auto"             # already bounded by allowlist + SSRF guard
 update_plan = "auto"            # bookkeeping only; touches no files
+ask_user   = "auto"             # asking a question needs no approval
 auto_allow_under = ["./sandbox"]   # paths under which ASK tools run without prompting
 # Hard-denied regardless of permission mode, including --yolo.
 deny_paths = ["~/.ssh", "~/.aws", "~/.config/locode"]
