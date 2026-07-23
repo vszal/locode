@@ -270,9 +270,17 @@ class AgentLoop:
                         self.history.append({"role": "assistant",
                                              "content": e.partial,
                                              "kind": "assistant"})
+                    # The deadline is the TURN's, not this reply's, so the same
+                    # exception covers two very different runs: one reply that
+                    # generated for most of the budget, and a turn that spent
+                    # its budget elsewhere and tripped on the next reply before
+                    # it produced anything. The old wording asserted the first
+                    # in both cases — an eval row that had cycled edit_file for
+                    # 600s read as "~0 chars generated during a single reply",
+                    # which is a sentence that cannot be true.
                     return self._stop(
-                        "budget: wallclock exceeded during a single reply "
-                        f"(~{len(e.partial):,} chars generated)")
+                        "budget: the turn's wallclock ran out while generating "
+                        f"(~{len(e.partial):,} chars into this reply)")
                 finally:
                     # Must fire even when the stream is cancelled mid-flight, or
                     # the UI's wait spinner is never stopped and flickers into the

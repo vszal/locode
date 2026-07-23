@@ -296,12 +296,21 @@ class WriteFile:
     # nudge naming it; across 36 eval runs append_file was called zero times,
     # because by the time the nudge fires the turn is over. The instruction has
     # to be in the tool the model is about to call.
+    #
+    # "Write COMPLETE content" leads for a reason. Round 9 phrased this as a
+    # 6000-character cap and the two models read it in opposite directions:
+    # qythos9 ignored the number (still ~12k) but stopped running away to 35k,
+    # design-doc 0.38 -> 0.98; qwencoder14 obeyed it too well, wrote a 632-char
+    # stub and then cycled edit_file for 500s trying to grow it, plan-doc 0.81
+    # -> 0.64. A ceiling a weak model can satisfy by writing less is a trap, so
+    # completeness is stated first and the ceiling is a branch to append_file
+    # rather than a budget to fit inside.
     description = (
-        "Create or overwrite a file with the given content. Keep `content` "
-        "under about 6000 characters. If the document you are writing is "
-        "longer than that, write_file only its first section now and add each "
-        "remaining section with a separate append_file call — never try to "
-        "emit the whole document in one call."
+        "Create or overwrite a file with the given content. Write COMPLETE "
+        "content — never a placeholder, outline or stub you intend to fill in "
+        "later with edit_file. If the finished file would run past roughly "
+        "8000 characters, write its first complete sections now and add each "
+        "remaining section with a separate append_file call."
     )
     permission = "ask"
     schema = {

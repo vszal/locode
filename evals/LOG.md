@@ -709,3 +709,87 @@ of the sweep is measured under load and does not deserve to be believed.
 **Tests:** 436 → 469 green.
 
 ---
+
+## Round 9 — moving the instruction to where it can act (`r9-writesize`, HEAD `c00e8a4`, n=3)
+
+D36's change: the size guidance moved out of `_nudge_truncated` (which fires
+after ~450s of doomed generation) and into `write_file`'s own description —
+"keep content under about 6000 characters; longer documents go write_file then
+append_file". Shipped alongside the Ctrl-C/Esc/denial-visibility fixes and the
+`ask_user` permission wiring.
+
+    overall score     : 0.736 -> 0.807  (+0.071)
+    clean-finish rate : 0.500 -> 0.667  (+0.167)
+    total nudges      : 78 -> 47
+    ✅ GATE PASS vs r6-baseline
+    (vs r8-append: +0.055 / +0.084, one flagged row — plan-doc/qwencoder14 0.81 -> 0.64)
+
+### The target row, fixed
+
+    design-doc/qythos9   0.38 -> 0.98,  3/3 clean,  4.0 iters,  189s  (was 451s)
+
+No infrastructure deaths, no truncation nudges, half the wallclock. This is the
+row that cost Round 8 its gate.
+
+### But not by the mechanism the instruction described
+
+**`append_file` was called zero times again — 0 for 72 runs across two sweeps.**
+And qythos9 did not obey the 6000-character number either: its design docs came
+in at 11,675 / 11,882 / 13,557 characters, *larger* than the 9,662 of r8's one
+surviving run. What the sentence actually did was stop the runaway — 35,726 and
+32,654 became ~12k — without changing anything it literally asked for. The
+useful content of the instruction is "do not emit one enormous document"; the
+number and the chunking recipe are both being ignored.
+
+That matters, because the same sentence read to the weaker model said something
+else entirely.
+
+### The flagged row: the instruction backfiring (`plan-doc`/qwencoder14 0.81 -> 0.64)
+
+    r8:  one write_file of 1,438 / 2,821 / 1,904 chars, 10 iters, 253s
+    r9:  write_file 632, then 33, then 166 — then 6-9 edit_file calls, 26 iters, 507s
+
+qwencoder14 obeyed the cap by writing a **stub** and then trying to grow it with
+`edit_file`. Run 3 never produced a plan at all: it cycled `edit_file
+taskq/queue.py` → `update_plan` five times, each edit larger than the last,
+until the turn's 600s ran out. A ceiling a weak model can satisfy by writing
+less is a trap — "shorter" and "incomplete" are the same move if nothing says
+otherwise.
+
+The cycle also slipped every stuck-detector, because each `edit_file` carried
+growing content (new signature every time) and each `update_plan` returned the
+same 597-char reply between them. Period-2 alternation with a mutating limb is
+still uncaught.
+
+### A measurement correction
+
+I read document sizes off the event log's `args.content` and got a suspicious
+2,021 characters for six different runs across two cases and two models.
+`telemetry.MAX_FIELD_CHARS = 2000` clips logged strings and appends
+`…<clipped N chars>` — so every one of those was the clip, not the document.
+The real length is recoverable from the suffix, and the numbers above use it.
+`assistant_end.chars` is a count, not a clipped string, so Round 8's 35,726 /
+32,654 / 9,912 figures stand.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D40 | Keep the instruction in the tool description; it works | +0.071 overall and the target row 0.38 -> 0.98 at half the wallclock. The placement was right even though the wording was read two different ways. |
+| D41 | Lead with COMPLETENESS, make the ceiling a branch not a budget | The observed failure is a stub plus an edit loop, so the sentence must forbid stubs by name. "Write COMPLETE content — never a placeholder you intend to fill in later with edit_file", then the ceiling as a branch to append_file. Ceiling raised 6000 -> 8000, since 6000 was ignored upward and over-obeyed downward. |
+| D42 | Stop asserting a cause the exception does not know | `DeadlineExceeded` carries the TURN's deadline, so it fires both on one long reply and on a turn that spent its budget elsewhere. The message claimed the former in both cases and printed "~0 chars generated during a single reply" — a sentence that cannot be true. |
+| D43 | Do not treat "append_file is unused" as a wording problem any more | Two rounds, two phrasings, 72 runs, zero calls. If Round 10 does not move it, the next lever is structural (the loop offering the continuation itself), not another sentence. |
+
+### Obstacles / debugging notes
+
+- **The gate passed and the interesting finding was still in the flagged row.**
+  Fifth round running.
+- `plan-doc`/qythos9 r2 wrote **22,860 characters in one call** and hit the
+  wallclock stop, so the runaway is reduced, not eliminated.
+- The new `⏹ infrastructure:` label did its job: zero infrastructure deaths this
+  sweep, which is itself the evidence that r8's two were caused by the 8192 cap
+  meeting a 35k-character reply.
+
+**Tests:** 473 → 480 green.
+
+---

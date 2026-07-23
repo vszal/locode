@@ -1055,7 +1055,7 @@ async def test_runaway_reply_stops_at_budget_and_keeps_partial(tmp_path):
     out = await loop.run_turn("write DESIGN.md")
 
     assert out.startswith("⏹")
-    assert "wallclock exceeded during a single reply" in out
+    assert "the turn's wallclock ran out" in out
     assert loop.history[-1]["content"] == "half a design doc"
     assert any(e.get("phase") == "stopped" for e in events)
 

@@ -223,3 +223,17 @@ async def test_grep(ctx, tmp_path):
     (tmp_path / "a.py").write_text("def foo():\n    return 1\n")
     res = await fs.Grep().run({"pattern": r"def \w+", "glob": "*.py"}, ctx)
     assert "a.py:1:def foo():" in res.content
+
+
+def test_write_file_leads_with_completeness_not_a_character_budget():
+    # Round 9 phrased the size guidance as a 6000-char cap and the weak model
+    # satisfied it by writing a 632-char stub, then cycled edit_file for 500s
+    # trying to grow it. Whatever the ceiling says, "write the whole thing" has
+    # to come first and stubs have to be named as the failure they are.
+    desc = fs.WriteFile.description
+    assert "COMPLETE" in desc
+    assert "stub" in desc and "edit_file" in desc
+    # The ceiling is still there, and still points at append_file rather than
+    # asking the model to fit the document inside it.
+    assert "append_file" in desc
+    assert desc.index("COMPLETE") < desc.index("8000")
