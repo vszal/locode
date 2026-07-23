@@ -149,6 +149,9 @@ def metrics_from_events(events: list[dict]) -> dict:
     stopped = next((e for e in events if e.get("phase") == "stopped"), None)
     turn_end = next((e for e in events if e.get("phase") == "turn_end"), None)
 
+    errored = next((e for e in events if e.get("phase") == "error"), None)
+    failure = f"infrastructure: {errored['text']}" if errored else None
+
     nudge_reasons = Counter(_nudge_bucket(e.get("reason", "")) for e in nudges)
     tool_calls = Counter(e.get("name", "?") for e in runs)
     errors = [e for e in results if e.get("error")]
@@ -161,8 +164,14 @@ def metrics_from_events(events: list[dict]) -> dict:
         "tool_error_rate": round(len(errors) / len(results), 3) if results else 0.0,
         "nudges": len(nudges),
         "nudges_by_reason": dict(nudge_reasons),
-        "stop_reason": (stopped or {}).get("reason"),
-        "clean_finish": stopped is None,
+        "stop_reason": (stopped or {}).get("reason") or failure,
+        # A turn that died on a transport error never reached a stop-detector,
+        # so `stopped is None` — and r8's two worst runs, where mlx-server
+        # dropped the connection mid-document and the turn produced nothing,
+        # carried the sweep's best clean-finish number. An infrastructure death
+        # is the least clean outcome there is; count it as one.
+        "clean_finish": stopped is None and failure is None,
+        "infra_error": failure,
         "wallclock": round(_last_stamp(events), 1),
         "model_seconds": _model_seconds(events),
         # Did the model decompose the request at all, and did it stick with it?
@@ -768,30 +777,39 @@ def cmd_rescore(args) -> int:
         old_score = raw.get("score", 0.0)
         case = cases.get(raw["case"])
         workdir = Path(raw.get("workdir", ""))
-        if case is None or not workdir.is_dir():
-            why = ("case no longer exists" if case is None
-                   else "scratch workspace is gone (run with --clean?)")
-            print(f"  !! {raw['case']} · {raw['model']} — {why}; kept as-is")
-            runs.append(RunResult(**raw))
-            continue
 
         stamp = f"{raw['case']}__{raw['model']}__r{raw['repeat']}"
         events = parse_events(results_dir / "events" / f"{stamp}.jsonl")
         out_path = results_dir / "stdout" / f"{stamp}.txt"
         stdout = out_path.read_text(errors="replace") if out_path.is_file() else ""
 
+        # Metrics are mined from the event log and NOTHING else, so they can
+        # always be recomputed — a missing scratch workspace only blocks the
+        # checker. Bundling the two meant one deleted tmp dir froze the process
+        # metrics of a whole sweep at whatever the miner said the day it ran,
+        # and a metric fix (r8: infrastructure deaths scoring as clean
+        # finishes) could never be applied backwards to the sweeps that
+        # exposed it.
         metrics = metrics_from_events(events)
         metrics["harness_timeout"] = raw.get("timed_out", False)
-        checks, err = {}, ""
-        checker = _load_checker(case)
-        if checker:
+
+        checks, err = raw.get("checks", {}), raw.get("error", "")
+        score = old_score
+        checker = _load_checker(case) if case is not None else None
+        if checker is None or not workdir.is_dir():
+            why = ("case no longer exists" if case is None
+                   else "scratch workspace is gone (run with --clean?)")
+            print(f"  !! {raw['case']} · {raw['model']} — {why}; "
+                  f"metrics rescored, checks kept as-is")
+        else:
             ctx = CheckCtx(workdir=workdir, events=events, stdout=stdout,
                            case=case)
+            checks, err = {}, ""
             try:
                 checks = dict(checker(ctx))
             except Exception as e:
                 err = f"checker raised: {type(e).__name__}: {e}"
-        score = _score(checks)
+            score = _score(checks)
 
         raw = dict(raw, score=score, checks=checks, metrics=metrics, error=err)
         runs.append(RunResult(**raw))

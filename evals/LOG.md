@@ -606,3 +606,106 @@ can never be written in one call at all.
 **Tests:** 424 → 436 green.
 
 ---
+
+## Round 8 — a bigger budget, and the tool nobody used (`r8-append`, HEAD `3f7fc05`, n=3)
+
+Two changes shipped on the D34 question: an `append_file` tool, so writing a
+document in pieces is actually possible, and `model.max_tokens` 6144 → 8192
+(~32k chars, ~440s at the measured rate — the top of what fits in a 600s turn).
+Plus local-first install steering (`tools/installhint.py`) and refusal text that
+tells a headless model a tool is gone for good.
+
+    overall score     : 0.736 -> 0.752  (+0.016)
+    clean-finish rate : 0.500 -> 0.639  (+0.139)
+    total nudges      : 78 -> 39
+    total iterations  : 496 -> 414
+    ❌ GATE FAIL: design-doc/qythos9 0.93 -> 0.38; exec-bugfix/qwencoder14 0.50 -> 0.33
+
+### The finding that reframes the round
+
+**`append_file` was called zero times across all 36 runs.** Neither model ever
+reached for it, including on the two cases whose entire failure mode is a
+document that will not fit in one call. So *every* delta in this sweep — the
+wins and the losses alike — is attributable to the `max_tokens` raise alone. The
+tool is in the catalog, in the truncation nudge, and in the allow-list of all
+six cases, and it is inert.
+
+The reason is visible in the traces: `_nudge_truncated` is the only thing that
+mentions chunking, and it fires *after* the model has already spent ~450 seconds
+generating to the cap. By then the turn is over. Advice that arrives after the
+cost has been paid is not advice. The lever has to act **before** generation
+starts — in the `write_file` description — not as a correction afterwards.
+
+### Row 1: `design-doc`/qythos9 0.93 → 0.38 — real, and caused by the cap
+
+Per-run: 0.07 / 0.07 / 1.00. The two zeros are one story:
+
+    assistant_end chars = 35,726   ->  nudge "tool call truncated"
+                                   ->  nudge "slow progress vs wallclock"
+    assistant_end chars = 0        ->  turn_end (no result)
+
+The model generates flat into the 8192-token ceiling, the `write_file` JSON is
+cut mid-string, and the next request comes back **empty** — mlx-server
+disconnecting (`Server disconnected without sending a response`). Run 3 wrote
+9,912 chars and scored 1.00. Raising the cap did not make the document fit; it
+gave a model that expands to fill its budget enough room to reach an
+infrastructure ceiling.
+
+Note what the row's *clean-finish* did: 0.00 → 1.00. That is the harness lying,
+not an improvement — see below.
+
+### Row 2: `exec-bugfix`/qwencoder14 0.50 → 0.33 — not attributable
+
+Per-run 0.5 / 0.25 / 0.25; the two 0.25s lost `kept_all_tests`. The model never
+opened a test file. What it did was leave `textkit.py` with
+
+    IndentationError: expected an indented block after 'if' statement on line 71
+
+so `test_textkit.py` could not be imported, pytest exited 2 with a **collection
+error**, and `passed + failed >= EXPECTED_TESTS` read false. Nothing was
+deleted. A weak 14B model made a syntax-breaking edit, then hit `edit_file`
+"`old` and `new` are identical" twice and was stopped by the repeat detector.
+No Round 8 code path is on that trace — no denials, no install hints, no
+truncation.
+
+There is also a confound of my own making: every qwencoder14 row ran 30–40%
+slower than baseline (32–48 ch/s vs 42–72), because I was running pytest, pty
+forks, git and a 1.2 MB log read on the same machine while it swept. That half
+of the sweep is measured under load and does not deserve to be believed.
+
+### Two measurement bugs this exposed
+
+- **`clean_finish` counts an infrastructure death as clean.** The turn ended on
+  a transport error, not a detector, so `stopped is None` and the row scores a
+  perfect 1.00 clean-finish rate on two runs that produced nothing. A turn that
+  ends with an empty reply and no result is the *least* clean outcome there is.
+- **`kept_all_tests` is a false accusation on a collection error.** "The model
+  deleted tests" and "the module no longer imports" are different failures with
+  different fixes, and the checker cannot tell them apart.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D35 | Keep `max_tokens = 8192`; do **not** revert | 6144 was already known-insufficient (R7: 19–25k documents truncated, artifact never landed). Reverting reinstates a known failure to avoid a new one that has a narrower fix. |
+| D36 | Bound the write size in the `write_file` **description**, not in a nudge | Zero `append_file` calls in 36 runs is proof the after-the-fact nudge is inert. The only instruction a model can act on before it starts generating is the one in the tool it is about to call. |
+| D37 | Accept the gate FAIL: one row attributable, one not | `design-doc`/qythos9 is real and gets the D36 fix. `exec-bugfix`/qwencoder14 is a syntax-breaking edit plus a misnamed check, measured under load I created. A red gate is a question; both questions are now answered. |
+| D38 | An empty reply / transport death must not score as a clean finish | Otherwise the metric rewards exactly the outcome it exists to detect, and the worst two runs of the sweep carried its best clean-finish number. |
+| D39 | Never run anything else on the machine during a sweep | 30–40% throughput loss is enough to change stop-detector outcomes, which are wallclock-gated. Half of this sweep is now unusable as evidence. |
+
+### Obstacles / debugging notes
+
+- **Both gate rows had to be read run-by-run to be understood, and both differed
+  from what the number said.** Fourth round running where the gate's headline
+  was not the finding.
+- `plan-doc`/qythos9 **0.36 → 0.93** (3/3, 5 iterations, ~150s) is the round's
+  real result and the case D34 was about — the bigger budget lets the document
+  land in one call. `design-doc`/qwencoder14 0.73 → 1.00 in 3.0 iterations /
+  52.8s, against 15.3 / 274s at baseline.
+- The two denied `bash` calls in the sweep (`plan-doc`/qwencoder14 r2) took the
+  new headless wording and the model moved on both times without retrying —
+  the refusal-text change works, on a sample of two.
+
+**Tests:** 436 → 469 green.
+
+---
