@@ -2,7 +2,7 @@
   "id": "exec-from-plan",
   "track": "execute",
   "description": "follow an existing PLAN.md to implement three stubbed functions",
-  "allow_tools": ["read_file", "write_file", "edit_file", "bash", "ls", "grep", "glob"],
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "bash", "ls", "grep", "glob"],
   "timeout": 900,
   "weight": 1.0
 }

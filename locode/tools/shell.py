@@ -4,6 +4,11 @@ The child runs in its own process group (start_new_session=True) so that on
 Esc/Ctrl-C we can SIGTERM the whole group — including pipelines and children —
 not just the top-level shell. Output is captured (stdout+stderr merged) and
 truncated. Permission gating happens before run() is ever called.
+
+A failed command gets one more thing: when the failure is a dependency install
+that the environment blocked, `installhint` appends the project-local command
+that would have worked, so the model has somewhere to go other than running the
+identical thing again. See locode/tools/installhint.py.
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ import os
 import signal
 
 from locode.tools.base import ToolContext, ToolResult
+from locode.tools.installhint import install_hint
 
 _MAX_OUTPUT = 64 * 1024
 _DEFAULT_TIMEOUT = 120
@@ -70,5 +76,9 @@ class Bash:
             text = text[:_MAX_OUTPUT] + "\n… (truncated)"
         rc = proc.returncode
         if rc != 0:
-            return ToolResult(f"[exit {rc}]\n{text}".rstrip(), is_error=True)
+            body = f"[exit {rc}]\n{text}".rstrip()
+            hint = install_hint(cmd, text, rc, ctx.cwd)
+            if hint:
+                body += f"\n\n{hint}"
+            return ToolResult(body, is_error=True)
         return ToolResult(text.rstrip() or "(no output)")

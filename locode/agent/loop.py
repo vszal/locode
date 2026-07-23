@@ -64,6 +64,9 @@ class AgentLoop:
         self._on_event = on_event or (lambda e: None)
         self._confirm = confirm
         self._select = select
+        # Refused tool calls this turn, reset in run(). Declared here so
+        # _run_calls never depends on run() having been entered.
+        self._denials = 0
         # interrupt: callable() -> async context manager active ONLY around the
         # streaming model call (so confirm prompts get a clean terminal).
         self._interrupt = interrupt or _null_scope
@@ -129,6 +132,7 @@ class AgentLoop:
         self._wallclock_pause = 0.0
         nudged_empty = False
         truncated_nudges = 0
+        self._denials = 0
         nudged_repeat: set = set()
         nudged_stall: set = set()
         seen_prose: list = []
@@ -471,6 +475,15 @@ class AgentLoop:
                         if path:
                             read_paths.add(os.path.basename(str(path)).lower())
                 error_sig, result_sig = await self._run_calls(calls)
+                # Headless only: an ASK tool nobody can approve is refused for
+                # the whole session, so a model still trying after this many
+                # refusals is not going to stop on its own. Interactively the
+                # same count means nothing — a user may decline several
+                # unrelated calls in a turn that is otherwise going fine.
+                if (self._confirm is None
+                        and self._denials >= self._cfg.agent.max_error_stall):
+                    return self._stop("the tools this task needs are not "
+                                      "available in this session")
                 # Same call, same answer -> the streak grows; a *changed* result
                 # means the call did something new, so it starts over.
                 repeat_streaks[batch_sig] = (
@@ -528,7 +541,8 @@ class AgentLoop:
             if decision == ASK:
                 decision = await self._ask(call)
             if decision == DENY:
-                results.append((call.name, "denied by permission policy"))
+                results.append((call.name, self._denial_text(call.name)))
+                self._denials += 1
                 self._on_event({"phase": "denied", "name": call.name})
                 continue
             self._on_event({"phase": "run", "name": call.name, "args": call.args})
@@ -544,6 +558,25 @@ class AgentLoop:
                              "kind": "tool_result"})
         result_sig = "\n".join(f"{name}: {content}" for name, content in results)
         return ("\n".join(error_parts) if error_parts else None), result_sig
+
+    def _denial_text(self, name: str) -> str:
+        """What a refused tool call tells the model.
+
+        "denied by permission policy" was true and useless: it named no reason
+        and implied nothing about whether trying again might work. A local
+        model reading that does the obvious thing and runs a variant — `npm
+        install -g x`, then without -g, then with sudo — until a stuck-detector
+        ends the turn three calls later. When the refusal is permanent, say so
+        in the words a model acts on."""
+        if self._confirm is None:
+            # Headless: nobody can ever approve this, so every retry is wasted.
+            return (f"denied: {name} is not available in this session — there "
+                    f"is no one present to approve it, so calling it again "
+                    f"will be refused every time. Do NOT retry {name}. Finish "
+                    f"with the tools you do have, or stop and state plainly "
+                    f"what you could not do without it.")
+        return (f"denied: the user refused this {name} call. Do not repeat it. "
+                f"Try a different approach, or ask what they would prefer.")
 
     async def _ask(self, call) -> str:
         if self._confirm is None:

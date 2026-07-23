@@ -2,7 +2,7 @@
   "id": "exec-stall-trap",
   "track": "execute",
   "description": "structural control-flow bug that baits naive text-swap edit loops",
-  "allow_tools": ["read_file", "write_file", "edit_file", "bash", "ls", "grep", "glob"],
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "bash", "ls", "grep", "glob"],
   "timeout": 900,
   "weight": 1.5
 }

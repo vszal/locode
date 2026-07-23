@@ -1351,3 +1351,67 @@ async def test_near_identical_truncated_reply_stops_the_turn(tmp_path):
     out = await loop.run_turn("write a DESIGN.md for the queue")
     assert "repeated the same reply" in out
     assert len([e for e in events if e.get("phase") == "nudge"]) == 1
+
+
+# --- refusals: a denial the model can act on ---------------------------------
+
+async def test_headless_denial_says_the_tool_is_gone_for_good(tmp_path):
+    # No confirm callback: nothing can ever approve write_file, so the refusal
+    # has to say so rather than leaving the model to try variants.
+    loop = make_loop(tmp_path, [
+        native_call("write_file", path="out.txt", content="x"),
+        {"role": "assistant", "content": "I cannot write files here."},
+    ])
+    out = await loop.run_turn("write out.txt")
+    assert out == "I cannot write files here."
+    fed = "\n".join(m["content"] for m in loop.history if m["role"] == "user")
+    assert "not available in this session" in fed
+    assert "Do NOT retry write_file" in fed
+
+
+async def test_user_denial_is_worded_as_a_no_for_now(tmp_path):
+    async def confirm(name, args, preview):
+        return "no"
+
+    loop = make_loop(tmp_path, [
+        native_call("write_file", path="out.txt", content="x"),
+        {"role": "assistant", "content": "Okay."},
+    ], confirm=confirm)
+    await loop.run_turn("write out.txt")
+    fed = "\n".join(m["content"] for m in loop.history if m["role"] == "user")
+    assert "the user refused" in fed
+    assert "not available in this session" not in fed
+
+
+async def test_headless_stops_after_repeated_refusals(tmp_path):
+    # The reported failure mode: the model keeps trying *variants* of an
+    # install, so no two calls match and the repeat detector never fires.
+    # Every one of them is refused, which is the signal that matters.
+    client = CyclingClient([
+        native_call("write_file", path="a.txt", content="1"),
+        native_call("write_file", path="b.txt", content="2"),
+        native_call("write_file", path="c.txt", content="3"),
+        native_call("write_file", path="d.txt", content="4"),
+    ])
+    loop = make_loop_with_client(tmp_path, client)
+    out = await loop.run_turn("write some files")
+    assert "not available in this session" in out
+    assert not any(tmp_path.glob("*.txt"))
+
+
+async def test_interactive_denials_do_not_end_the_turn(tmp_path):
+    # A user may decline several unrelated calls in a turn that is otherwise
+    # going fine — only the headless case is provably hopeless.
+    async def confirm(name, args, preview):
+        return "no" if args.get("path", "").startswith("skip") else "yes"
+
+    loop = make_loop(tmp_path, [
+        native_call("write_file", path="skip1.txt", content="1"),
+        native_call("write_file", path="skip2.txt", content="2"),
+        native_call("write_file", path="skip3.txt", content="3"),
+        native_call("write_file", path="keep.txt", content="4"),
+        {"role": "assistant", "content": "Wrote the one you allowed."},
+    ], confirm=confirm)
+    out = await loop.run_turn("write four files")
+    assert out == "Wrote the one you allowed."
+    assert (tmp_path / "keep.txt").read_text() == "4"

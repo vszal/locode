@@ -2,7 +2,7 @@
   "id": "design-doc",
   "track": "design",
   "description": "SPEC.md -> DESIGN.md: turn a high-level spec into a real design document",
-  "allow_tools": ["read_file", "write_file", "edit_file", "ls", "grep", "glob"],
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "ls", "grep", "glob"],
   "timeout": 900,
   "weight": 1.0
 }
