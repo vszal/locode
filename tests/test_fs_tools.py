@@ -225,15 +225,14 @@ async def test_grep(ctx, tmp_path):
     assert "a.py:1:def foo():" in res.content
 
 
-def test_write_file_leads_with_completeness_not_a_character_budget():
-    # Round 9 phrased the size guidance as a 6000-char cap and the weak model
-    # satisfied it by writing a 632-char stub, then cycled edit_file for 500s
-    # trying to grow it. Whatever the ceiling says, "write the whole thing" has
-    # to come first and stubs have to be named as the failure they are.
+def test_write_file_states_the_size_cap_as_a_flat_number():
+    # Measured twice, in both directions. "Keep content under about 6000
+    # characters" took design-doc/qythos9 0.38 -> 0.98. Softening it to
+    # "write COMPLETE content ... if it would run past 8000, use append_file"
+    # took the same row to 0.07, with 33-41k-char replies and not one
+    # successful write_file in three runs. The flat low number is the brake;
+    # it works by pulling the target down, not by being obeyed.
     desc = fs.WriteFile.description
-    assert "COMPLETE" in desc
-    assert "stub" in desc and "edit_file" in desc
-    # The ceiling is still there, and still points at append_file rather than
-    # asking the model to fit the document inside it.
+    assert "6000" in desc
+    assert "COMPLETE" not in desc
     assert "append_file" in desc
-    assert desc.index("COMPLETE") < desc.index("8000")

@@ -297,20 +297,26 @@ class WriteFile:
     # because by the time the nudge fires the turn is over. The instruction has
     # to be in the tool the model is about to call.
     #
-    # "Write COMPLETE content" leads for a reason. Round 9 phrased this as a
-    # 6000-character cap and the two models read it in opposite directions:
-    # qythos9 ignored the number (still ~12k) but stopped running away to 35k,
-    # design-doc 0.38 -> 0.98; qwencoder14 obeyed it too well, wrote a 632-char
-    # stub and then cycled edit_file for 500s trying to grow it, plan-doc 0.81
-    # -> 0.64. A ceiling a weak model can satisfy by writing less is a trap, so
-    # completeness is stated first and the ceiling is a branch to append_file
-    # rather than a budget to fit inside.
+    # The exact wording is load-bearing and has been measured twice. Round 9
+    # said "keep content under about 6000 characters" and scored design-doc
+    # 0.38 -> 0.98. Round 10 tried to soften the cap into a branch — "write
+    # COMPLETE content ... if the finished file would run past roughly 8000
+    # characters, use append_file" — and the same row collapsed to 0.07, with
+    # replies of 36,563 / 41,560 / 33,774 chars and not one successful
+    # write_file in three runs.
+    #
+    # So the brake is the low number stated flatly, and NOT the reasoning
+    # around it: qythos9 never obeys 6000 (it writes ~12k) and never once
+    # called append_file in 108 runs. The number works by pulling the target
+    # down, not by being followed, and the moment "COMPLETE" outranked it the
+    # model went back to emitting a whole document into the token ceiling.
+    # Do not soften this sentence again without a sweep. See LOG.md D44.
     description = (
-        "Create or overwrite a file with the given content. Write COMPLETE "
-        "content — never a placeholder, outline or stub you intend to fill in "
-        "later with edit_file. If the finished file would run past roughly "
-        "8000 characters, write its first complete sections now and add each "
-        "remaining section with a separate append_file call."
+        "Create or overwrite a file with the given content. Keep `content` "
+        "under about 6000 characters. If the document you are writing is "
+        "longer than that, write_file only its first section now and add each "
+        "remaining section with a separate append_file call — never try to "
+        "emit the whole document in one call."
     )
     permission = "ask"
     schema = {

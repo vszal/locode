@@ -793,3 +793,92 @@ The real length is recoverable from the suffix, and the numbers above use it.
 **Tests:** 473 → 480 green.
 
 ---
+
+## Round 10 — the same idea, reworded, loses half the sweep (`r10-complete`, HEAD `db87b26`, n=3)
+
+D41's change: `write_file`'s description was rewritten to lead with completeness
+("write COMPLETE content — never a placeholder or stub you intend to fill in
+later with edit_file") and to turn the character cap into a branch (6000 → 8000,
+"if the finished file would run past roughly 8000 characters, write its first
+complete sections now and add each remaining section with append_file"). The
+target was r9's one flagged row, `plan-doc`/qwencoder14, which had answered the
+old cap with a 632-char stub and an edit loop.
+
+    overall score     : 0.807 -> 0.651  (-0.156)
+    clean-finish rate : 0.667 -> 0.444  (-0.223)
+    design-doc/qythos9: 0.98 -> 0.07
+
+It fixed the row it aimed at — `plan-doc` went 0.64 → 0.86 (qwencoder14, 4.0
+iterations, 0 nudges) and 0.95 → 1.00 (qythos9) — and cost more than twice that
+everywhere else.
+
+### The mechanism, unambiguous
+
+    r9  (cap stated flatly at 6000): replies ~12k, documents 11.7k-13.6k, 3/3 landed
+    r10 (completeness first, 8000):  replies 36,563 / 41,560 / 33,774, ZERO write_file
+                                     calls in three runs, 3/3 dead on the turn budget
+
+Every run generated a whole design document into the token ceiling, had its
+`write_file` JSON cut mid-string, got the truncation nudge, and ran out of turn.
+Exactly the Round 8 failure, restored by a wording change.
+
+So the brake is **the low number stated flatly**, and not the reasoning around
+it. This is worth stating precisely because it is not what the sentence says:
+
+- qythos9 has never obeyed 6000 — under it, documents came in at 11.7k-13.6k.
+- `append_file` has now been called **zero times in 108 runs** across three
+  sweeps and two phrasings.
+
+The number works by pulling the target down, not by being followed. The moment
+"COMPLETE" outranked it in the sentence, the pull disappeared and the model went
+back to emitting everything at once. D43's bet is settled the wrong way: this is
+not a wording problem, and no further sentence is going to produce an
+`append_file` call.
+
+### A latent crash the sweep exposed
+
+`e2e-spec-to-code`/qythos9 r1 died 19 iterations in with the logged text
+`'new'`. That is `KeyError('new')` from `args["new"]` in `EditFile.run`: the
+model emitted an `edit_file` call without a `new` field, the exception escaped
+`tool.run`, escaped `_run_calls`, escaped `run_turn`, and ended the turn. Any
+tool raising anything unexpected could do this, and had nothing to do with
+Round 10 — the new `⏹ infrastructure:` label from Round 9 is what made it
+visible at all, having been an unexplained blank row before.
+
+### Unattributed movement
+
+Four execution rows moved without a mechanism I can point to:
+`exec-from-plan`/qwencoder14 1.00 → 0.50, `exec-from-plan`/qythos9 1.00 → 0.67,
+`exec-stall-trap`/qythos9 1.00 → 0.72, `exec-bugfix`/qythos9 1.00 → 0.83. These
+cases write no documents, and the only shipped change is a tool description plus
+a terminal stop message. Two of the r10 traces show the model planning and never
+executing (`exec-from-plan`/qythos9 r2: two reads, four `update_plan`, zero
+edits). The honest reading is that a tool-catalog edit reshuffles sampling for
+every case, and that three runs per row cannot separate that from variance. It
+is not evidence for the rewording; it is a reason the next sweep repeats a known
+configuration.
+
+### Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D44 | Revert to the r9 wording verbatim; do not soften it again without a sweep | It is the only version that has passed a gate, and the failure mode of the alternative is total (0/3 documents written). The comment in `fs.py` now carries the measurement so the next reader does not re-run this experiment. |
+| D45 | A tool raising must never end the turn | A missing argument is an ordinary bad call. The model recovers from a tool error; it cannot recover from the loop exiting. Caught and handed back as an error result, with `CancelledByUser` / `DeadlineExceeded` still propagating. |
+| D46 | Settle D43: stop trying to talk the model into `append_file` | 108 runs, three sweeps, two phrasings, zero calls. The next attempt must be structural — the loop continuing a truncated write itself — or the tool should be removed rather than left as inert catalog weight. |
+| D47 | The next sweep repeats a known configuration | Four rows moved with no mechanism. Re-running r9's wording measures how much of a 12-row sweep at n=3 is noise, which every verdict so far has been assuming rather than knowing. |
+
+### Obstacles / debugging notes
+
+- **This is the first round where the gate's headline WAS the finding**, and it
+  took reading three event logs to establish that the cause was the wording
+  rather than the eval. The per-run trace remains non-optional; it is what
+  separated "the model wrote a shorter document" (r9) from "the model wrote no
+  document at all" (r10).
+- The reworded stop message earned its keep immediately: `budget: the turn's
+  wallclock ran out while generating (~12,264 chars into this reply)` reads
+  correctly on rows where the old text would have claimed a single reply ate
+  the whole budget.
+
+**Tests:** 480 → 482 green.
+
+---

@@ -24,7 +24,7 @@ from locode.agent.plan import Plan
 from locode.model import toolparse
 from locode.model.profiles import profile_for
 from locode.permissions import AUTO, ASK, DENY, PermissionPolicy
-from locode.tools.base import Registry, ToolContext
+from locode.tools.base import Registry, ToolContext, ToolResult
 
 # confirm(name, args, preview) -> "yes" | "always" | "no" | "no_always"
 Confirm = Callable[[str, dict, str], Awaitable[str]]
@@ -579,8 +579,22 @@ class AgentLoop:
             # so the window is silent.
             scope = (_null_scope if getattr(tool, "prompts_user", False)
                      else self._interrupt)
-            async with scope():
-                res = await tool.run(call.args, ctx)
+            try:
+                async with scope():
+                    res = await tool.run(call.args, ctx)
+            except (CancelledByUser, DeadlineExceeded):
+                raise
+            except Exception as e:
+                # A tool raising anything unexpected used to end the TURN. A 9B
+                # model emitting `edit_file` with no `new` field is an ordinary
+                # bad call — `args["new"]` raised KeyError('new'), which escaped
+                # run_turn and killed a run 19 iterations deep with the message
+                # "'new'" and nothing else. The model can recover from a tool
+                # error; it cannot recover from the loop exiting. Name the
+                # failure and hand it back as a result like any other.
+                res = ToolResult(f"{call.name} failed: {type(e).__name__}: {e}"
+                                 f" — check the call's arguments against the "
+                                 f"tool's schema and try again.", is_error=True)
             self._on_event({"phase": "result", "name": call.name,
                             "error": res.is_error, "content": res.content,
                             "seconds": round(time.monotonic() - t0, 3)})

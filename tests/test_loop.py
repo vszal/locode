@@ -1500,3 +1500,61 @@ async def test_a_tool_that_prompts_runs_outside_the_interrupt_scope(tmp_path):
         cwd=str(tmp_path), select=select, interrupt=scope)
     await loop.run_turn("ask me")
     assert state["saw_active"] is False
+
+
+async def test_a_tool_raising_does_not_end_the_turn(tmp_path):
+    # A 9B model emitting edit_file with no `new` field made args["new"] raise
+    # KeyError('new'), which escaped run_turn and killed a run 19 iterations
+    # deep — the whole turn lost, logged as the single word "'new'". The model
+    # can recover from a tool error; it cannot recover from the loop exiting.
+    class Exploding:
+        name = "boom"
+        description = "raises"
+        permission = "auto"
+        schema = {"type": "object", "properties": {}}
+
+        async def run(self, args, ctx):
+            raise KeyError("new")
+
+    reg = Registry()
+    reg.register(Exploding())
+    cfg = Config()
+    loop = AgentLoop(
+        FakeClient([native_call("boom"),
+                    {"role": "assistant", "content": "Recovered."}]),
+        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        cwd=str(tmp_path))
+    out = await loop.run_turn("go")
+    assert out == "Recovered."
+    fed = "\n".join(m["content"] for m in loop.history if m["role"] == "user")
+    assert "boom failed: KeyError" in fed
+    assert "against the tool's schema" in fed
+
+
+async def test_cancellation_still_propagates_through_a_tool(tmp_path):
+    # The catch-all must not swallow the two exceptions that mean "stop the
+    # turn on purpose" — an interrupt would otherwise be reported back to the
+    # model as a tool error and the loop would carry on.
+    from locode.agent.cancel import CancelledByUser
+
+    class Cancelling:
+        name = "boom"
+        description = "cancels"
+        permission = "auto"
+        schema = {"type": "object", "properties": {}}
+
+        async def run(self, args, ctx):
+            raise CancelledByUser()
+
+    reg = Registry()
+    reg.register(Cancelling())
+    cfg = Config()
+    loop = AgentLoop(
+        FakeClient([native_call("boom"),
+                    {"role": "assistant", "content": "should not get here"}]),
+        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        cwd=str(tmp_path))
+    # _run_turn already turns it into the interrupted result, which is the
+    # point: it must reach that handler rather than be reported to the model as
+    # a tool error and the loop carry on.
+    assert await loop.run_turn("go") == "⛔ interrupted"
