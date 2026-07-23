@@ -77,12 +77,16 @@ class ModelConfig:
     # BETWEEN iterations (measured 2026-07-21: a design-doc run spent 860 of its
     # 900 seconds inside a single completion and produced nothing).
     #
-    # 6144 tokens is ~4 minutes of generation and still comfortably fits the
-    # largest thing the loop legitimately emits at once — a ~2500-word design
-    # document or a ~300-line module, both around 4k tokens. A model that needs
-    # more gets a truncation nudge and writes the rest in a second call, which
-    # is a far better failure mode than losing the whole turn.
-    max_tokens: int = 6144
+    # A whole write_file call — the file body included — must fit in ONE
+    # completion, and on a reasoning distill the <think> preamble eats the same
+    # budget, so this has to clear the largest document the loop legitimately
+    # emits at once. It is also a wallclock setting in disguise: at ~73 chars/s
+    # measured on an M4 Max, 8192 tokens is ~32k characters and ~440 seconds —
+    # inside max_wallclock_seconds, but only just, so a max-length reply is most
+    # of a turn. 12288 would be ~650s and could never finish one. Anything
+    # longer than this belongs in a write_file followed by append_file calls,
+    # which is what the truncation nudge now asks for.
+    max_tokens: int = 8192
     temperature: float = 0.3
 
 
@@ -155,7 +159,8 @@ class PermissionsConfig:
     # tool name -> "auto" | "ask" | "deny"
     tools: dict[str, str] = field(default_factory=lambda: {
         "read_file": "auto", "ls": "auto", "glob": "auto", "grep": "auto",
-        "write_file": "ask", "edit_file": "ask", "move_file": "ask", "bash": "ask",
+        "write_file": "ask", "append_file": "ask", "edit_file": "ask",
+        "move_file": "ask", "bash": "ask",
         "web_search": "ask", "web_fetch": "auto",
         # Bookkeeping only — update_plan touches nothing but the agent's own
         # in-memory task list, so prompting for it would be pure noise. It must

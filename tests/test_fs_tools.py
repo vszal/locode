@@ -35,6 +35,36 @@ async def test_write_then_read(ctx, tmp_path):
     assert (tmp_path / "sub" / "b.txt").read_text() == "hi\nthere"
 
 
+async def test_append_adds_to_the_end(ctx, tmp_path):
+    (tmp_path / "doc.md").write_text("# Title\n")
+    res = await fs.AppendFile().run(
+        {"path": "doc.md", "content": "## Section\nbody\n"}, ctx)
+    assert res.ok
+    assert (tmp_path / "doc.md").read_text() == "# Title\n## Section\nbody\n"
+
+
+async def test_append_chains_across_calls(ctx, tmp_path):
+    (tmp_path / "doc.md").write_text("one\n")
+    for part in ("two\n", "three\n"):
+        assert (await fs.AppendFile().run(
+            {"path": "doc.md", "content": part}, ctx)).ok
+    assert (tmp_path / "doc.md").read_text() == "one\ntwo\nthree\n"
+
+
+async def test_append_to_missing_file_errors_and_creates_nothing(ctx, tmp_path):
+    res = await fs.AppendFile().run({"path": "gone.md", "content": "x"}, ctx)
+    assert res.is_error
+    assert "write_file" in res.content
+    assert not (tmp_path / "gone.md").exists()
+
+
+async def test_append_reports_lines_added_and_total(ctx, tmp_path):
+    (tmp_path / "doc.md").write_text("a\nb\n")
+    res = await fs.AppendFile().run({"path": "doc.md", "content": "c\nd\n"}, ctx)
+    assert "2 lines" in res.content
+    assert "5 lines total" in res.content
+
+
 async def test_edit_file_unique_match(ctx, tmp_path):
     (tmp_path / "c.py").write_text("x = 1\ny = 2\n")
     res = await fs.EditFile().run(

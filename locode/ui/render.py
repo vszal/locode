@@ -201,7 +201,7 @@ class StreamSink:
 def _summarize_args(name: str, args: dict) -> str:
     if name == "bash":
         return str(args.get("cmd", ""))
-    if name in ("read_file", "write_file", "edit_file", "ls"):
+    if name in ("read_file", "write_file", "append_file", "edit_file", "ls"):
         return str(args.get("path", ""))
     if name == "glob":
         return str(args.get("pattern", ""))
@@ -270,9 +270,10 @@ def format_nudge(reason: str, *, color: bool = True) -> str:
 # --- approval diff preview ----------------------------------------------------
 def _proposed_change(name: str, args: dict, cwd: str) -> tuple[str, str, str] | None:
     """Return (path, before, after) for a mutating tool, or None if not one /
-    unreadable. write_file => existing vs new; edit_file => file vs replacement."""
+    unreadable. write_file => existing vs new; append_file => file vs file plus
+    the addition; edit_file => file vs replacement."""
     path = args.get("path")
-    if not path or name not in ("write_file", "edit_file"):
+    if not path or name not in ("write_file", "append_file", "edit_file"):
         return None
     p = Path(os.path.expanduser(path))
     if not p.is_absolute():
@@ -283,6 +284,8 @@ def _proposed_change(name: str, args: dict, cwd: str) -> tuple[str, str, str] | 
         return None
     if name == "write_file":
         return str(path), before, args.get("content", "")
+    if name == "append_file":
+        return str(path), before, before + args.get("content", "")
     # edit_file: resolve through the tool's own matcher so the previewed diff is
     # exactly what will be written (incl. whitespace-tolerant / fuzzy matches).
     from locode.tools.fs import try_edit

@@ -462,7 +462,7 @@ class AgentLoop:
                                       "without making progress")
                 consecutive_malformed = 0  # progress made
                 for c in calls:
-                    if c.name in ("write_file", "edit_file"):
+                    if c.name in ("write_file", "append_file", "edit_file"):
                         path = c.args.get("path")
                         if path:
                             attempted_paths.add(os.path.basename(str(path)).lower())
@@ -581,8 +581,9 @@ class AgentLoop:
                         "snippet that needs changing (a few lines), not the "
                         "whole file, and make several small edit_file calls "
                         "instead of one giant one. For a long document, "
-                        "write_file the first sections now and append the rest "
-                        "with follow-up calls."),
+                        "write_file the FIRST section now, then add each "
+                        "remaining section with a separate append_file call — "
+                        "do not send the whole document again."),
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "tool call truncated"})
@@ -865,6 +866,6 @@ def _render_calls_as_fenced(calls) -> str:
 def _preview(call) -> str:
     if call.name == "bash":
         return call.args.get("cmd", "")
-    if call.name in ("write_file", "edit_file"):
+    if call.name in ("write_file", "append_file", "edit_file"):
         return call.args.get("path", "")
     return ", ".join(f"{k}={v!r}" for k, v in call.args.items())[:200]

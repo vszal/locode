@@ -17,7 +17,7 @@ from pathlib import Path
 from locode.config import PermissionsConfig
 
 AUTO, ASK, DENY = "auto", "ask", "deny"
-_PATH_MUTATING = {"write_file", "edit_file", "move_file"}
+_PATH_MUTATING = {"write_file", "append_file", "edit_file", "move_file"}
 
 
 def _abspath(path: str, cwd: str) -> Path:

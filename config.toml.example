@@ -32,10 +32,13 @@ default = "qwen14"     # alias (or full "org/model" id) to load at startup
 # body included — must fit in ONE completion, and on a reasoning distill the
 # <think> preamble eats into the same budget, so keep this generous enough to
 # emit a full file in one turn. It is also a wallclock setting in disguise: at
-# the ~26 tok/s a 9B model streams on an M4 Max, 6144 tokens is ~4 minutes of
-# generation, and a 32768 ceiling would let ONE reply outrun the whole turn
-# budget below. Raise it only if you also raise max_wallclock_seconds.
-max_tokens = 6144
+# ~73 chars/s measured on an M4 Max, 8192 tokens is ~32k characters and ~440
+# seconds of generation — inside max_wallclock_seconds below, but only just, so
+# a max-length reply is most of a turn. 12288 would be ~650s and could never
+# finish one. Raise it only if you also raise max_wallclock_seconds. For
+# documents larger than this, the model should write_file then append_file
+# rather than re-emitting the whole file.
+max_tokens = 8192
 temperature = 0.3
 
 [agent]
@@ -97,6 +100,7 @@ ls         = "auto"
 glob       = "auto"
 grep       = "auto"
 write_file = "ask"
+append_file = "ask"
 edit_file  = "ask"
 move_file  = "ask"
 bash       = "ask"

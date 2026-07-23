@@ -1,5 +1,5 @@
 """Filesystem tools: read_file, ls, glob, grep (read-only) and write_file,
-edit_file (mutating). Paths resolve relative to the agent's cwd. Permission
+append_file, edit_file, move_file (mutating). Paths resolve relative to the agent's cwd. Permission
 gating and path-scope policy live in permissions.py + the agent loop; these
 tools just do the operation and report errors as ToolResults (never raise).
 """
@@ -311,6 +311,51 @@ class WriteFile:
         return ToolResult(f"wrote {p} ({n} lines)")
 
 
+class AppendFile:
+    name = "append_file"
+    description = (
+        "Append content to the END of an existing file. Use this to write a "
+        "long document in pieces: write_file the first section, then "
+        "append_file each following section. The file must already exist — "
+        "create it with write_file first."
+    )
+    permission = "ask"
+    schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string"},
+            "content": {"type": "string",
+                        "description": "Text to add at the end of the file."},
+        },
+        "required": ["path", "content"],
+    }
+
+    async def run(self, args: dict, ctx: ToolContext) -> ToolResult:
+        p = _resolve(ctx, args["path"])
+        # Deliberately NOT create-if-missing, unlike shell `>>`. A model that
+        # appends to PLAN.md having written plan.md would otherwise end up with
+        # two half-documents and no error, and the deliverable check would fail
+        # for a reason nothing in the transcript explains. Failing here names
+        # the mistake while it is still one call old.
+        if not p.exists():
+            return ToolResult(
+                f"no such file: {p} — append_file only adds to a file that "
+                "already exists. Create it with write_file first.",
+                is_error=True)
+        content = args["content"]
+        try:
+            with p.open("a", encoding="utf-8") as fh:
+                fh.write(content)
+        except OSError as e:
+            return ToolResult(f"cannot append to {p}: {e}", is_error=True)
+        added = content.count("\n") + (0 if content.endswith("\n") else 1)
+        try:
+            total = p.read_text("utf-8").count("\n") + 1
+        except OSError:
+            total = added
+        return ToolResult(f"appended {added} lines to {p} ({total} lines total)")
+
+
 class MoveFile:
     name = "move_file"
     description = "Move or rename a file from a source path to a destination path."
@@ -395,4 +440,5 @@ class EditFile:
 
 def all_tools() -> list:
     """Instances of every fs tool, read-only first."""
-    return [ReadFile(), Ls(), Glob(), Grep(), WriteFile(), EditFile(), MoveFile()]
+    return [ReadFile(), Ls(), Glob(), Grep(), WriteFile(), AppendFile(),
+            EditFile(), MoveFile()]

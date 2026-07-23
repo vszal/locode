@@ -21,6 +21,16 @@ def test_auto_allow_under_sandbox():
     assert pol.resolve("edit_file", {"path": "sandbox/x"}, "/work") == AUTO
 
 
+def test_append_file_is_path_scoped_like_the_other_mutators():
+    # append_file takes the same "path" arg as write_file, so it must land in
+    # _PATH_MUTATING or deny_paths would silently not apply to it.
+    pol = PermissionPolicy(PermissionsConfig())
+    assert pol.resolve("append_file", {"path": "~/.ssh/authorized_keys"},
+                       "/work") == DENY
+    assert pol.resolve("append_file", {"path": "sandbox/out.md"},
+                       "/work") == AUTO
+
+
 def test_deny_paths_hard_block():
     pol = PermissionPolicy(PermissionsConfig())
     d = pol.resolve("write_file", {"path": "~/.ssh/authorized_keys"}, "/work")

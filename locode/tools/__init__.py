@@ -12,7 +12,7 @@ from locode.tools.web import WebFetch, WebSearch, build_search_backends
 
 def build_registry(config=None) -> Registry:
     reg = Registry()
-    for tool in _fs_tools():      # read_file, ls, glob, grep, write_file, edit_file, move_file
+    for tool in _fs_tools():      # read/ls/glob/grep + write/append/edit/move
         reg.register(tool)
     reg.register(Bash())
     reg.register(AskUser())

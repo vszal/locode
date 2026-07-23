@@ -18,8 +18,8 @@ changes; discard errant exploration and unused logs"), mapped onto an
 agentic tool-call transcript:
   - Keep verbatim: the system prompt, every genuine user prompt (the
     goal/subgoals), a trailing window of recent messages (current work in
-    progress), and the receipt of every file change (write_file/edit_file/
-    move_file — the "uncommitted file changes" that matter most, and already
+    progress), and the receipt of every file change (write_file/append_file/
+    edit_file/move_file — the "uncommitted file changes" that matter most, and already
     short: "wrote path.py (12 lines)", not the file body).
   - Discard entirely: harness nudges once they're behind the model (pure
     process noise — "errant pathway exploration" that already resolved).
@@ -52,7 +52,8 @@ _NUDGE_MARKERS = (
 _FENCE_BLOCK_RE = re.compile(
     r"```(?:tool_call|tool|json)\b[^\n]*\n(.*?)```", re.IGNORECASE | re.DOTALL)
 _TOOL_NAME_RE = re.compile(r"^\[(\w[\w_]*)\]", re.MULTILINE)
-_FILE_CHANGE_MARKERS = ("[write_file]", "[edit_file]", "[move_file]")
+_FILE_CHANGE_MARKERS = ("[write_file]", "[append_file]", "[edit_file]",
+                        "[move_file]")
 _SHRINK_ARG_KEYS = ("content", "new", "old")
 
 # An individual JSON string arg (a write_file's full file body, an edit's
