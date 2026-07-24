@@ -281,7 +281,67 @@ def rule(width: int, *, lead: str = "─", label: str = "", color: bool = True) 
 
 
 def format_nudge(reason: str, *, color: bool = True) -> str:
-    return f"    {_wrap('… ' + _truncate(reason, 90), _DIM, color)}"
+    # A nudge means the model is drifting (looping, stalling, ignoring its plan).
+    # It reads as reassurance when it's actually a warning, so mark it with a ⟳
+    # and keep it visible rather than whisper-dim — this is a "watch it" moment.
+    return f"    {_wrap('⟳ ' + _truncate(reason, 90), _YELLOW, color)}"
+
+
+# --- live plan checklist ------------------------------------------------------
+def format_plan(plan, *, color: bool = True) -> str:
+    """Render the model's live task list as a checklist, so a turn's progress is
+    visible at a glance instead of buried in a truncated update_plan result. The
+    current task is arrowed and bold; done tasks are dimmed and struck through.
+
+    `plan` is an agent.plan.Plan (duck-typed: .tasks[].status/.text, .summary(),
+    .current). Returns "" for an empty plan (nothing worth showing)."""
+    tasks = getattr(plan, "tasks", None) or []
+    if not tasks:
+        return ""
+    current = getattr(plan, "current", None)
+    head = _wrap("▤ plan", _CYAN, color) + " " + _wrap(plan.summary(), _DIM, color)
+    lines = [f"  {head}"]
+    for t in tasks:
+        if t.status == "done":
+            box = _wrap("☑", _GREEN, color)
+            body = _wrap(t.text, _DIM + _STRIKE, color)
+        elif t is current or t.status == "doing":
+            box = _wrap("▶", _CYAN, color)
+            body = _wrap(t.text, _BOLD, color)
+        else:
+            box = _wrap("☐", _DIM, color)
+            body = _wrap(t.text, _DIM, color)
+        lines.append(f"    {box} {_truncate(body, 200)}")
+    return "\n".join(lines)
+
+
+# --- end-of-turn summary ------------------------------------------------------
+def format_turn_summary(counts: dict, *, color: bool = True) -> str:
+    """A compact "what just happened" trailer, so a long or flaily turn is
+    legible: how much effort, how many tools, what actually changed on disk, and
+    whether it had to be nudged. Answers "did it accomplish anything?" at a
+    glance. Returns "" when nothing happened (a plain chat reply)."""
+    def _plural(n: int, word: str) -> str:
+        return f"{n} {word}{'s' if n != 1 else ''}"
+
+    iters = counts.get("iterations", 0)
+    tools = counts.get("tool_calls", 0)
+    files = counts.get("files_changed", 0)
+    nudges = counts.get("nudges", 0)
+    if not (iters or tools or files or nudges):
+        return ""
+    parts = []
+    if iters:
+        parts.append(_plural(iters, "iteration"))
+    if tools:
+        parts.append(_plural(tools, "tool call"))
+    if files:
+        parts.append(_plural(files, "file") + " changed")
+    if nudges:
+        # nudges are the flailing signal — color them so a rocky turn stands out.
+        parts.append(_wrap(_plural(nudges, "nudge"), _YELLOW, color))
+    sep = _wrap(" · ", _DIM, color)
+    return "  " + _wrap("↳", _DIM, color) + " " + sep.join(parts)
 
 
 # --- approval diff preview ----------------------------------------------------

@@ -176,6 +176,81 @@ def test_format_timing():
     assert "~100 tok" in out and "2.0s" in out and "50 tok/s" in out
 
 
+# --- live plan checklist ------------------------------------------------------
+from locode.agent.plan import Plan  # noqa: E402
+
+
+def _plan(rows):
+    p = Plan()
+    p.replace(rows)
+    return p
+
+
+def test_format_plan_renders_checklist_with_current_task():
+    p = _plan(["[x] read the spec", "[>] write DESIGN.md", "[ ] write PLAN.md"])
+    out = render.format_plan(p, color=False)
+    assert "1/3 done" in out
+    assert "☑ read the spec" in out
+    assert "▶ write DESIGN.md" in out          # current task arrowed
+    assert "☐ write PLAN.md" in out
+
+
+def test_format_plan_empty_is_blank():
+    assert render.format_plan(Plan(), color=False) == ""
+
+
+def test_format_plan_current_falls_to_first_open_when_none_doing():
+    # No [>] task: current = first not-done, so it should still be arrowed.
+    p = _plan(["[x] a", "[ ] b", "[ ] c"])
+    out = render.format_plan(p, color=False)
+    assert "▶ b" in out and "☐ c" in out
+
+
+def test_format_plan_colors_the_current_task():
+    p = _plan(["[>] do it"])
+    assert "\033[" in render.format_plan(p, color=True)
+
+
+# --- end-of-turn summary ------------------------------------------------------
+def test_format_turn_summary_counts_and_pluralizes():
+    out = render.format_turn_summary(
+        {"iterations": 16, "tool_calls": 8, "files_changed": 3, "nudges": 2},
+        color=False)
+    assert "16 iterations" in out
+    assert "8 tool calls" in out
+    assert "3 files changed" in out
+    assert "2 nudges" in out
+
+
+def test_format_turn_summary_singular_forms():
+    out = render.format_turn_summary(
+        {"iterations": 1, "tool_calls": 1, "files_changed": 1, "nudges": 1},
+        color=False)
+    assert "1 iteration " in out + " "  # not "iterations"
+    assert "1 tool call " in out + " "
+    assert "1 file changed" in out
+    assert "1 nudge" in out and "nudges" not in out
+
+
+def test_format_turn_summary_empty_when_nothing_happened():
+    assert render.format_turn_summary(
+        {"iterations": 0, "tool_calls": 0, "files_changed": 0, "nudges": 0},
+        color=False) == ""
+
+
+def test_format_turn_summary_omits_zero_fields():
+    out = render.format_turn_summary(
+        {"iterations": 0, "tool_calls": 4, "files_changed": 0, "nudges": 0},
+        color=False)
+    assert "4 tool calls" in out
+    assert "iteration" not in out and "file" not in out and "nudge" not in out
+
+
+def test_format_nudge_is_a_visible_warning():
+    out = render.format_nudge("repeated the same tool call", color=False)
+    assert "⟳" in out and "repeated the same tool call" in out
+
+
 def test_should_color_respects_no_color(monkeypatch):
     class TTY(io.StringIO):
         def isatty(self):

@@ -78,6 +78,36 @@ are user-visible and waste whole generations.*
 - `[ ]` **2.3 Gate/compare ergonomics** — `compare` takes two positional
   results.json paths; document the threshold and exit codes where a user looks.
 
+## Milestone 4 — Interactive usability
+*User feedback 2026-07-24: "still very cumbersome to use locode with local
+models." The pains that bite in a live session, ranked by the user: **poor
+visibility** (can't tell what it's doing / whether it's stuck / whether the run
+accomplished anything) and **mid-task flailing**. These compound — you can't see
+the flailing to know when to step in. Eval scores are a proxy; this milestone is
+the lived experience.*
+
+- `[x]` **4.1 Live plan checklist (build 23).** The model already maintains a
+  task list (`update_plan`), but the REPL collapsed it into one truncated
+  generic tool line. Now each `update_plan` renders the live plan as a checklist
+  — done tasks dimmed + struck, the current task arrowed and bold, todos dim —
+  so a turn's progress (and where it's stuck) is visible at a glance.
+  `render.format_plan(loop.plan)`.
+- `[x]` **4.2 End-of-turn summary + louder nudges (build 23).** A turn that did
+  real work now ends with a `↳ N iterations · M tool calls · K files changed ·
+  J nudges` trailer, so a long/flaily run is legible — effort vs. what actually
+  changed on disk answers "did it accomplish anything?". Nudges (the flailing
+  signal) went from whisper-dim `…` to a visible yellow `⟳` — they read as
+  warnings now, not reassurance. `render.format_turn_summary`.
+- `[ ]` **4.3 Out-of-box model default.** The config default is qwencoder14, the
+  *weaker* editor (58% edit success vs qythos9's 84%; owned all the r12 no-op
+  dead-ends). qythos9 is slower and had e2e wallclock deaths, so it's a real
+  tradeoff — needs a decision, not a unilateral flip. `[!]`
+- `[ ]` **4.4 Convergence / clean-finish.** clean_finish is ~8% across the eval
+  suite — sessions almost never end on a clean "done", they flail and stall out.
+  The deepest usability lever, and the hardest. Diagnose whether the models
+  *could* converge with better mid-turn steering vs. a raw capability wall
+  (3.1 says the latter dominates on e2e) before building.
+
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
   rounds. **Diagnosed 2026-07-24 (r13 event logs + per-check tally).** The
@@ -130,5 +160,8 @@ are user-visible and waste whole generations.*
 - **3.1a Inline `.py` SyntaxError feedback** (build 22, 2026-07-24) — validated:
   qythos9 pytest-SyntaxError deaths 5/6 → 0/6. Kept on general merit; did NOT
   lift the e2e score (own_tests_pass 0/12 both rounds — capability-bound).
+- **4.1 + 4.2 Interactive visibility** (build 23, 2026-07-24) — live plan
+  checklist, end-of-turn summary, louder nudges. +9 tests. Directly targets the
+  user's "poor visibility" + "mid-task flailing" feedback.
 
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*

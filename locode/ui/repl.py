@@ -65,6 +65,9 @@ class Repl:
         self._last_prompt = ""
         self._server_up = False
         self._turn_chars = 0
+        self._tally = {"iterations": 0, "tool_calls": 0, "nudges": 0}
+        self._files_changed: set[str] = set()
+        self._pending_path: str | None = None
         self._loop = AgentLoop(
             client, manager, registry, self._policy, config,
             cwd=str(Path.cwd()),
@@ -115,6 +118,9 @@ class Repl:
     async def _turn(self, text: str) -> None:
         self._last_prompt = text
         self._turn_chars = 0
+        self._tally = {"iterations": 0, "tool_calls": 0, "nudges": 0}
+        self._files_changed = set()
+        self._pending_path = None
         t0 = time.monotonic()
         try:
             result = await self._loop.run_turn(text)
@@ -142,6 +148,14 @@ class Repl:
                 print(f"\n{result}")
             else:
                 print()  # finish the streamed line
+        # A "what just happened" trailer whenever the turn did real work, so a
+        # long or flaily run is legible (effort vs. what actually changed on
+        # disk) instead of ending on an unexplained scroll of tool lines.
+        summary = render.format_turn_summary(
+            {**self._tally, "files_changed": len(self._files_changed)},
+            color=self._color)
+        if summary:
+            print(summary)
         if self._cfg.ui.timing and self._turn_chars > 0:
             print(render.format_timing(self._turn_chars, elapsed, color=self._color))
 
@@ -191,12 +205,16 @@ class Repl:
         self._turn_chars += len(piece)
         self._sink.feed(piece)
 
+    _MUTATING = ("write_file", "append_file", "edit_file", "move_file")
+
     def _on_event(self, event: dict) -> None:
         phase = event.get("phase")
         if phase == "busy_start":
             self._spinner.start(event.get("text", "working…"))
         elif phase == "busy_stop":
             self._spinner.stop()
+        elif phase == "iteration":
+            self._tally["iterations"] += 1
         elif phase == "assistant_start":
             self._sink.reset()
             self._spinner.start("thinking…")
@@ -205,15 +223,30 @@ class Repl:
             self._sink.flush()
         elif phase == "run":
             self._spinner.stop()
-            print("\n" + render.format_run(event["name"], event.get("args", {}),
-                                            color=self._color))
+            self._tally["tool_calls"] += 1
+            self._pending_path = event.get("args", {}).get("path") \
+                if event["name"] in self._MUTATING else None
+            # update_plan renders as a live checklist off its result, not as a
+            # generic ⚙ line — showing the plan itself is the point.
+            if event["name"] != "update_plan":
+                print("\n" + render.format_run(event["name"], event.get("args", {}),
+                                               color=self._color))
         elif phase == "result":
-            print(render.format_result(event["name"], event.get("content", ""),
-                                        event.get("error", False), color=self._color))
+            if event["name"] == "update_plan" and not event.get("error", False):
+                plan_view = render.format_plan(self._loop.plan, color=self._color)
+                if plan_view:
+                    print("\n" + plan_view)
+            else:
+                print(render.format_result(event["name"], event.get("content", ""),
+                                            event.get("error", False), color=self._color))
+            if self._pending_path and not event.get("error", False):
+                self._files_changed.add(self._pending_path)
+            self._pending_path = None
         elif phase == "denied":
             print(render.format_denied(event["name"], event.get("reason", ""),
                                        color=self._color))
         elif phase == "nudge":
+            self._tally["nudges"] += 1
             print(render.format_nudge(event.get("reason", ""), color=self._color))
         elif phase == "info":
             print(render.format_nudge(event.get("text", ""), color=self._color))
