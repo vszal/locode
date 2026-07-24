@@ -79,7 +79,7 @@ are user-visible and waste whole generations.*
   results.json paths; document the threshold and exit codes where a user looks.
 
 ## Milestone 3 — Weakest-case quality
-- `[~]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
+- `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
   rounds. **Diagnosed 2026-07-24 (r13 event logs + per-check tally).** The
   ceiling is entirely in **stage 3 (code)**: the doc stages mostly pass, but
   `own_tests_pass` = **0/12** and `independent_spec_check` = **0/12** across
@@ -102,9 +102,22 @@ are user-visible and waste whole generations.*
     <msg>` warning to the *successful* result (advisory, never an error — a
     half-built file may not parse yet). Turns qythos9's frozen-importlib death
     into a legible, located signal one call after the mistake. +6 tests.
-    *Targets qythos9's syntax deaths only; does NOT touch qwencoder14's logic
-    gap. Expected lift is modest — needs a sweep to confirm it converts any of
-    the 3/6 syntax runs. UNMEASURED.*
+    **Measured (r14-syntax vs r13, e2e, n=6): the mechanism works but does not
+    lift the score.** qythos9 runs that reached pytest with a SyntaxError
+    dropped **5/6 → 0/6** (the inline warning fired in 3 runs; the model fixed
+    the syntax before running tests every time) — a real robustness win, worth
+    keeping. But `own_tests_pass`/`independent_spec_check` stayed **0/12**:
+    removing the syntax roadblock just exposed that the code is *also* logically
+    wrong. The wall moved from "won't parse" to "parses but wrong." The apparent
+    overall gain (0.61 → 0.69) is doc-stage variance (`plan_has_tasks` swung
+    0/6→6/6 for qwencoder14, the opposite for qythos9), NOT the lever — do not
+    credit it (see 2.1).
+- **3.1 conclusion: capability-bound; harness levers exhausted.** own_tests_pass
+  and independent_spec_check are 0/12 across both r13 and r14. The doc stages are
+  near-maxed and stage 3 is model reasoning — qwencoder14 can't compute
+  coercion/precedence, qythos9's code doesn't pass even once it parses. Further
+  e2e gains need a stronger executor model, not more harness code. Keep 3.1a on
+  its own general merit; stop spending harness effort chasing this case's score.
 
 ---
 
@@ -114,5 +127,8 @@ are user-visible and waste whole generations.*
 - **1.4 No-op `edit_file` prevention + guidance** (build 21, 2026-07-24) —
   validated: qwencoder14 unrecovered no-op dead-ends 20 → 1, edit fail rate
   41% → 20%. Task scores unmoved (capability wall → 3.1).
+- **3.1a Inline `.py` SyntaxError feedback** (build 22, 2026-07-24) — validated:
+  qythos9 pytest-SyntaxError deaths 5/6 → 0/6. Kept on general merit; did NOT
+  lift the e2e score (own_tests_pass 0/12 both rounds — capability-bound).
 
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*

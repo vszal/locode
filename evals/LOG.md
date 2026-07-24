@@ -1114,3 +1114,36 @@ with harming the good editor without a mechanism in the logs (per D50/D54).
 **Tests:** 513 green (unchanged from build 21 commit).
 
 ---
+
+## Round 14 — the syntax lever works but the ceiling is capability (`r14-syntax`, HEAD `489ea5e`, n=6)
+
+Validation of build 22 (3.1a: inline `SyntaxError at line N` on `.py` writes).
+e2e-spec-to-code only, both models, `--repeat 6`, vs the same case in r13-edithelp.
+
+**The mechanism works.** qythos9 runs that reached pytest with a SyntaxError:
+**5/6 → 0/6.** The inline warning fired in 3 runs and the model fixed the syntax
+before ever running the tests. A real, general robustness win — a malformed `.py`
+now names its own bad line one call after it lands, instead of surfacing later as
+an opaque `<frozen importlib>` pytest *collection* traceback.
+
+**But it did not lift the score.** `own_tests_pass` and `independent_spec_check`
+are **0/12 across BOTH r13 and r14.** Removing the syntax roadblock just exposed
+that the code underneath is *also* logically wrong — the wall moved from "won't
+parse" to "parses but wrong," which is exactly where qwencoder14 already sat.
+
+**The apparent overall gain is noise, not the lever.** e2e mean 0.61 → 0.69, but
+it is entirely doc-stage variance: qwencoder14's `plan_has_tasks` swung 0/6 → 6/6
+and `wrote_plan_doc` 2/6 → 6/6 (PLAN.md formatting, untouched by a syntax check),
+lifting it 0.63 → 0.80; qythos9 swung the *other* way on the same check
+(3/6 → 0/6), 0.60 → 0.58. A fake +0.17 on one row from n=6 — the cleanest
+demonstration yet of why 2.1 (variance-aware gate) matters.
+
+| # | Decision | Why |
+|---|---|---|
+| D58 | Keep 3.1a on general merit; do NOT credit it with an e2e score gain | Mechanism proven (pytest-SyntaxError 5/6→0/6) and it helps any coding task, but own_tests_pass stayed 0/12. The score move was doc-stage noise. |
+| D59 | Close 3.1: the e2e ceiling is model capability, harness levers exhausted | Two rounds, both models, own_tests_pass 0/12. Docs near-maxed; stage 3 is reasoning (coercion/precedence, correct-once-parsing). Further gains need a stronger executor, not harness code. |
+| D60 | Round 14 is the reference case for 2.1 | A +0.17 row swing from pure doc-format variance at n=6, with the mechanism under test provably not responsible. Any gate must not read this as signal. |
+
+**Tests:** 519 green.
+
+---
