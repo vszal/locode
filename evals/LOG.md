@@ -992,3 +992,83 @@ test red, and the model then re-sent it verbatim until the repeat detector fired
 **Tests:** 482 → 485 green.
 
 ---
+
+## Round 12 — salvage the truncated write; the fix lands its target (`r12-salvage`, HEAD `96fa783`, n=8)
+
+D46 asked for a structural answer to the truncated-write failure — "the loop
+continuing a truncated write itself" — instead of another sentence aimed at the
+model. This is it, and it doubles as D51's raised-n sweep (n=3 → **n=8**).
+
+**The fix.** A large document written as one `write_file` truncates at the token
+limit: the content JSON string never closes, `extract()` recovers nothing, and
+the whole partial reply evaporates — qythos9's `design-doc` "long mode writes 40k
+and lands nothing" (r11 scored 0.38, with 0.07 in long mode). Two salvage paths,
+both scoped to `write_file`/`append_file` only (a half-formed `edit_file`/`bash`
+is unsafe to run; a partial *document* is strictly better landed than lost):
+
+1. `finish_reason=length` → `toolparse.salvage_truncated_write` recovers the
+   partial (targeting the unclosed fence `_fence_blocks` deliberately skips),
+   lands it, then `_nudge_continue_salvaged` steers the model to `append_file`
+   the rest. Multi-turn completion. Bounded by `max_salvaged_writes=4`.
+2. `DeadlineExceeded` mid-write → land `e.partial` before stopping (no budget to
+   continue). This was the *actual* r11 death path: wallclock at ~24k chars.
+
+    overall score     : 0.667 -> 0.784  (+0.117)
+    clean-finish rate : 0.472 -> 0.562  (+0.090)
+    ❌ REGRESSION GATE: FAIL
+       e2e-spec-to-code::qwencoder14  0.80 -> 0.60
+       exec-bugfix::qwencoder14       0.42 -> 0.25
+       exec-from-plan::qythos9        1.00 -> 0.69
+
+**The target moved, decisively.** `design-doc`/qythos9: **0.38 → 0.98** (all 8
+runs "ok", zero STOPPED, the bimodal collapse gone). `exec-bugfix`/qythos9
+1.00, `exec-from-plan`/qwencoder14 0.17 → 1.00.
+
+**The gate FAIL is baseline noise, proven by mechanism (D50).** The salvage path
+fired in exactly **5 runs, all qythos9** — `e2e-spec-to-code` (r1/r5/r6/r7) and
+`plan-doc` (r5), traced via `continue truncated write` / `landed its partial file
+first` in the event logs. Both cases *held or improved* (e2e-qythos9 0.70 → 0.76,
+plan-doc-qythos9 0.96). **None of the three flagged rows had any salvage
+activity** — the change cannot have caused them:
+
+- `exec-bugfix`/qwencoder14 is a tiny targeted-edit case with no large write at
+  all; salvage physically cannot fire. 0.42 → 0.25 is n=3 → n=8 resampling.
+- `exec-from-plan`/qythos9's r11 1.00 was 3/3 luck (its qwencoder14 twin was 0.17
+  at n=3 and 1.00 at n=8 — n=3 is unreliable in both directions).
+- `e2e`/qwencoder14 never triggered salvage; its wallclock death at ~20,400 chars
+  was not a `write_file`.
+
+This is D49/D50/D51 vindicated in one shot: the gate ranked three noise rows a
+"regression" while the change's real effect (+0.60 on the targeted row) is
+invisible to it, and only mechanism-tracing separates the two.
+
+**Decision: do not revert; establish r12 as the n=8 baseline.** Unlike r10 (a
+real change with a total failure mode), this change is verified by tests, hits
+its target, lifts overall and clean-finish, and provably does not touch any
+flagged row.
+
+| # | Decision | Why |
+|---|---|---|
+| D52 | Salvage a truncated `write_file`/`append_file` instead of losing the partial; steer the model to `append_file` the rest | Answers D46's demand for a structural fix. A document generated to the token/wallclock limit is real work; discarding it because the JSON never closed turned a near-miss into a 0.00. |
+| D53 | Never salvage a truncated `edit_file`/`bash`/web call | A half-formed `new` corrupts a targeted edit and a half-formed command is dangerous; only a whole-file *document* is safe to land partially. |
+| D54 | A gate FAIL against an n=3 baseline is not evidence of regression; require a mechanism in the event log before crediting one | The change fired in 5 traceable runs, none of them a flagged row. Per D50, the flag is a pointer to trace, and the trace here exonerates the change on all three. |
+| D55 | r12 (n=8) is the new baseline; retire r9/r11 (n=3) as comparison points | n=8 per row is the first sweep where a per-row delta is worth reading. Future gates compare against r12, not the noisy n=3 rounds. |
+
+### Obstacles / open threads
+
+- **The large-write problem persists for EDITS.** Salvage is scoped to
+  `write_file`/`append_file` by design, so a truncated `edit_file` of a big span
+  (the e2e/qwencoder14 ~20,400-char wallclock death) still loses everything. The
+  edit path needs its own answer — likely steering big edits toward small
+  `old` snippets rather than salvaging a partial `new` (which is unsafe).
+- **The "repeated the same tool call" nudge dominates** (42 of 107). `exec-bugfix`
+  and `exec-from-plan` still show the edit-lands-one-line-off loop from r11; that
+  is the next real target, unrelated to writes.
+- The checker's 180s `pytest` timeout scoring an infra kill as 0.00 is still open
+  (c00e8a4 class).
+- Gate threshold 0.15 still below the per-row noise floor even at n=8 for the
+  high-variance cases (e2e); worth pairing with a variance-aware rule.
+
+**Tests:** 485 → 497 green.
+
+---
