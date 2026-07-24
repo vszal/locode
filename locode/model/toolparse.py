@@ -132,6 +132,72 @@ def extract(
     return out
 
 
+# Tools whose truncated `content` is worth landing anyway. Scoped on purpose: a
+# half-formed edit_file `new`, bash `command`, or web call is unsafe to run
+# partially, but a partial DOCUMENT is strictly better on disk than lost — the
+# model appends the remainder next turn. See salvage_truncated_write.
+_FILE_WRITE_TOOLS = frozenset({"write_file", "append_file"})
+# Below this many recovered characters a partial write isn't worth a disk write:
+# it's likely a fence the model opened but never filled, not a real document.
+_SALVAGE_MIN_CONTENT = 200
+
+
+def salvage_truncated_write(
+    content: str,
+    known_names: Iterable[str] | None = None,
+    known_arg_keys: Iterable[str] | None = None,
+) -> ToolCall | None:
+    """Recover a write_file/append_file whose `content` was cut off at the token
+    limit, so the partial document can be LANDED instead of lost.
+
+    This is the deliberate complement to _fence_blocks, which *skips* an unclosed
+    fence — the right call for extract(), because an incomplete tool call must not
+    be run as if complete. But a large document written in one shot truncates
+    exactly this way: the JSON string never closes, extract() returns nothing, and
+    the whole partial reply evaporates (the qythos9 design-doc "long mode writes
+    40k and nothing lands" failure). Here we target precisely that skipped body —
+    the LAST opened-but-unclosed ```tool/```json fence — and loose-parse it,
+    reusing _loose_string's run-off-the-end handling.
+
+    Returns the call ONLY when it is a write_file/append_file carrying a real
+    `path` and a substantive partial `content`; None otherwise (every fence
+    closed, the truncated call was some other tool, or too little was recovered),
+    in which case the caller falls back to the truncation nudge. The returned
+    call is tagged source='salvage-truncated' so the loop knows to steer the
+    model to APPEND the rest rather than treat the file as finished."""
+    arg_keys = set(known_arg_keys) if known_arg_keys else set(_DEFAULT_ARG_KEYS)
+    known = set(known_names) if known_names is not None else None
+    body = _last_unclosed_fence_body(content)
+    if body is None:
+        return None
+    call = _loose_tool_call(body, known, arg_keys)
+    if call is None or call.name not in _FILE_WRITE_TOOLS:
+        return None
+    text = call.args.get("content")
+    if not isinstance(text, str) or len(text) < _SALVAGE_MIN_CONTENT:
+        return None
+    if not call.args.get("path"):
+        return None
+    return ToolCall(name=call.name, args=call.args, id="",
+                    source="salvage-truncated")
+
+
+def _last_unclosed_fence_body(content: str) -> str | None:
+    """The body after the first ```tool/```json fence that is never closed — the
+    call the token limit cut off. Returns None if every fence is closed. (A
+    truncated stream can only have one unclosed fence, and it is the last thing
+    in the content, so the first unclosed one we reach is it.)"""
+    pos = 0
+    while True:
+        m = _FENCE_OPEN_RE.search(content, pos)
+        if not m:
+            return None
+        close = _closing_fence(content, m.end())
+        if close is None:
+            return content[m.end():]
+        pos = close + 3
+
+
 # --- helpers -------------------------------------------------------------
 
 def _coerce_native(tc: dict[str, Any], known: set[str] | None):

@@ -307,6 +307,50 @@ async def test_length_finish_reason_nudges_even_without_a_broken_fence(tmp_path)
                for m in loop.history if m["role"] == "user")
 
 
+async def test_truncated_write_file_is_salvaged_and_lands_on_disk(tmp_path):
+    # A big document written as one write_file cut off at the token limit: the
+    # content string never closes, extract() recovers nothing, and today the whole
+    # partial reply is lost. Salvage must LAND the partial file, then steer the
+    # model to append the rest.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    partial = "# Design\\n\\n" + "x" * 3000  # JSON-escaped newline in the wire body
+    truncated = ('```tool\n{"tool": "write_file", "path": "design.md", '
+                 '"content": "' + partial)
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "finish_reason": "length", "content": truncated},
+        {"role": "assistant", "content": "Appended the rest."},
+    ], confirm=confirm)
+    out = await loop.run_turn("write a design doc to design.md")
+    assert out == "Appended the rest."
+    # The partial content is on disk (not evaporated), with its escapes decoded.
+    written = (tmp_path / "design.md").read_text()
+    assert written.startswith("# Design\n\n")
+    assert len(written) > 3000
+    # And the model was told to CONTINUE with append_file, not re-write.
+    assert any("append_file" in m["content"] and "CUT OFF" in m["content"]
+               for m in loop.history if m["role"] == "user")
+
+
+async def test_truncated_write_salvage_is_bounded(tmp_path):
+    # A model that keeps re-writing the same doc and truncating every time must
+    # not salvage forever. After the bounded budget the turn stops rather than
+    # grinding — here the repeat detector catches the identical re-write first.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    truncated = ('```tool\n{"tool": "write_file", "path": "d.md", '
+                 '"content": "' + "y" * 2000)
+    # Same truncated reply every time (client repeats its last scripted message).
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "finish_reason": "length", "content": truncated},
+    ], confirm=confirm)
+    out = await loop.run_turn("write d.md")
+    assert out.startswith("⏹")  # stopped, did not spin the full budget
+    assert (tmp_path / "d.md").exists()
+
+
 async def test_stop_finish_reason_is_a_real_answer(tmp_path):
     # The normal case must not be dragged into the truncation path.
     loop = make_loop(tmp_path, [
@@ -1058,6 +1102,30 @@ async def test_runaway_reply_stops_at_budget_and_keeps_partial(tmp_path):
     assert "the turn's wallclock ran out" in out
     assert loop.history[-1]["content"] == "half a design doc"
     assert any(e.get("phase") == "stopped" for e in events)
+
+
+async def test_deadline_mid_write_lands_the_partial_document(tmp_path):
+    """When the turn's wallclock expires WHILE the model streams a large
+    write_file, the partial document must be landed on disk before stopping —
+    not thrown away with the rest of the reply. (The r11 design-doc deaths:
+    ~24k chars generated into one write_file, then nothing on disk.)"""
+    async def confirm(name, args, preview):
+        return "yes"
+
+    partial = ('```tool\n{"tool": "write_file", "path": "DESIGN.md", '
+               '"content": "# Design\\n\\n' + "x" * 3000)
+
+    class DeadlineMidWrite:
+        async def complete(self, messages, model, **kw):
+            raise loop_mod.DeadlineExceeded(partial)
+
+    loop = make_loop_with_client(tmp_path, DeadlineMidWrite(), confirm=confirm)
+    out = await loop.run_turn("write DESIGN.md")
+
+    assert out.startswith("⏹")
+    assert "landed its partial file first" in out
+    written = (tmp_path / "DESIGN.md").read_text()
+    assert written.startswith("# Design\n\n") and len(written) > 3000
 
 
 async def test_deadline_shrinks_as_the_turn_progresses(tmp_path):

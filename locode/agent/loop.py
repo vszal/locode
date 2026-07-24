@@ -132,6 +132,7 @@ class AgentLoop:
         self._wallclock_pause = 0.0
         nudged_empty = False
         truncated_nudges = 0
+        salvage_writes = 0
         self._denials = 0
         nudged_repeat: set = set()
         nudged_stall: set = set()
@@ -266,7 +267,26 @@ class AgentLoop:
                     gen_chars = _reply_chars(msg)
                 except DeadlineExceeded as e:
                     gen_chars = len(e.partial)
-                    if e.partial:
+                    # If the wallclock ran out MID-write — the model was streaming
+                    # a large document as one write_file and the turn's budget
+                    # expired before it closed — that partial document is real
+                    # work. Land it before stopping instead of throwing away the
+                    # whole reply. Unlike the token-limit path there is no budget
+                    # left to append the rest, so this only rescues the partial
+                    # (a half-written design doc scores far above nothing); the
+                    # finish_reason=length path is the one that completes across
+                    # turns. Recorded as the clean fenced call, not the raw
+                    # partial with its unclosed fence.
+                    salvaged = toolparse.salvage_truncated_write(
+                        e.partial, self._registry.names(),
+                        self._registry.arg_names()) if e.partial else None
+                    if salvaged is not None:
+                        self.history.append(
+                            {"role": "assistant",
+                             "content": _render_calls_as_fenced([salvaged]),
+                             "kind": "assistant"})
+                        await self._run_calls([salvaged])
+                    elif e.partial:
                         self.history.append({"role": "assistant",
                                              "content": e.partial,
                                              "kind": "assistant"})
@@ -278,9 +298,11 @@ class AgentLoop:
                     # in both cases — an eval row that had cycled edit_file for
                     # 600s read as "~0 chars generated during a single reply",
                     # which is a sentence that cannot be true.
+                    landed = (" — landed its partial file first"
+                              if salvaged is not None else "")
                     return self._stop(
                         "budget: the turn's wallclock ran out while generating "
-                        f"(~{len(e.partial):,} chars into this reply)")
+                        f"(~{len(e.partial):,} chars into this reply){landed}")
                 finally:
                     # Must fire even when the stream is cancelled mid-flight, or
                     # the UI's wait spinner is never stopped and flickers into the
@@ -298,6 +320,27 @@ class AgentLoop:
                 outcome = toolparse.extract(msg, self._registry.names(),
                                             self._registry.arg_names())
                 calls = outcome.calls
+
+                # A large document written as one write_file truncates at the
+                # token limit: the JSON string never closes, extract() recovers
+                # nothing, and the whole partial reply is lost — the qythos9
+                # "long mode writes 40k and NOTHING lands" failure. When that
+                # happens, salvage the partial content and land it, then (below,
+                # after it runs) steer the model to APPEND the rest. Bounded so a
+                # model that keeps re-writing the same doc can't loop forever; a
+                # same-content re-salvage is also caught by the repeat detector.
+                if (not calls and hit_token_limit
+                        and salvage_writes < self._cfg.agent.max_salvaged_writes):
+                    salvaged = toolparse.salvage_truncated_write(
+                        content, self._registry.names(),
+                        self._registry.arg_names())
+                    if salvaged is not None:
+                        salvage_writes += 1
+                        calls = [salvaged]
+                        # Drop the truncated prose: the clean fenced call rendered
+                        # below is the coherent record, and the raw reply carries
+                        # an unclosed fence that would poison history.
+                        content = ""
 
                 # Weak local models emit SEVERAL ```tool blocks in one turn —
                 # speculatively planning ls→read→edit before seeing any result.
@@ -514,6 +557,17 @@ class AgentLoop:
                             continue
                         return self._stop("edits kept hitting the same error "
                                           "without making progress")
+                # A salvaged truncated write just landed a PARTIAL document. The
+                # tool result reads like a normal success, so without this the
+                # model would call the file done and stop. Tell it plainly the
+                # write was cut off and hand it the tail to resume from, so it
+                # appends the rest instead of re-writing (which would truncate
+                # again) or walking away.
+                salvaged = next((c for c in calls
+                                 if c.source == "salvage-truncated"), None)
+                if salvaged is not None:
+                    self._nudge_continue_salvaged(salvaged)
+                    continue
             return self._stop("budget: max iterations reached")
         except CancelledByUser:
             self.history.append({"role": "assistant", "content": "⛔ interrupted",
@@ -660,6 +714,26 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "empty response"})
+
+    def _nudge_continue_salvaged(self, call) -> None:
+        path = call.args.get("path", "the file")
+        landed = call.args.get("content", "")
+        tail = landed[-160:]
+        self.history.append({
+            "role": "user",
+            "content": (
+                f"Your write_file was CUT OFF at the token limit — only the "
+                f"first {len(landed):,} characters of {path} were saved, so the "
+                f"file is INCOMPLETE. It currently ends with:\n\n…{tail}\n\n"
+                f"Continue it now with a SINGLE append_file call on {path} that "
+                f"adds ONLY the remaining part (everything that comes after the "
+                f"text above). Do NOT call write_file again — that erases what "
+                f"was saved. Do NOT repeat any text already shown above. Keep "
+                f"this piece short enough to finish in one reply; if the rest is "
+                f"still long, append it in several small pieces."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "continue truncated write"})
 
     def _nudge_truncated(self) -> None:
         self.history.append({

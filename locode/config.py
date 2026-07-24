@@ -107,6 +107,14 @@ class AgentConfig:
     # legitimately need two passes to fit under model.max_tokens — one-shot
     # would return the half-written second attempt as if it were the answer.
     max_truncated_retries: int = 2
+    # How many times a truncated write_file/append_file may be SALVAGED — its
+    # partial content landed on disk and the model steered to append the rest,
+    # instead of the whole document evaporating. Higher than the plain truncation
+    # cap because each salvage is real forward progress (the file grows), and a
+    # very long document legitimately lands over several append passes; a
+    # degenerate re-write-the-same-thing loop is still caught by the repeat
+    # detector, so this only needs to bound genuinely huge deliverables.
+    max_salvaged_writes: int = 4
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     # Bail if the model keeps trying to end the turn without EVER having

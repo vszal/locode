@@ -227,3 +227,78 @@ def test_interior_json_fence_inside_content_not_a_block_boundary():
     out = extract({"content": "```tool\n" + body + "\n```"}, {"write_file"})
     assert len(out.calls) == 1 and not out.malformed
     assert out.calls[0].args["content"].endswith("End.")
+
+
+# --- salvage_truncated_write: recover a write cut off at the token limit ------
+
+from locode.model.toolparse import salvage_truncated_write
+
+WRITE_KNOWN = {"write_file", "append_file", "edit_file", "read_file", "bash"}
+WRITE_ARGS = {"path", "content", "old", "new", "replace_all", "command"}
+
+
+def test_salvage_recovers_a_truncated_write_file():
+    # A big document written in one shot: the content string never closes because
+    # the token limit cut it off. extract() recovers nothing; salvage lands it.
+    body = ('Here is the design.\n```tool\n{"tool": "write_file", '
+            '"path": "design.md", "content": "# Design\\n\\n' + "x" * 3000)
+    assert extract({"content": body, "finish_reason": "length"},
+                   WRITE_KNOWN, WRITE_ARGS).calls == []
+    call = salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS)
+    assert call is not None
+    assert call.name == "write_file"
+    assert call.args["path"] == "design.md"
+    assert call.args["content"].startswith("# Design")
+    assert len(call.args["content"]) > 3000
+    assert call.source == "salvage-truncated"
+
+
+def test_salvage_recovers_a_truncated_append_file():
+    body = '```tool\n{"tool": "append_file", "path": "d.md", "content": "## S2\\n' + "y" * 500
+    call = salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS)
+    assert call is not None and call.name == "append_file"
+    assert call.args["path"] == "d.md"
+
+
+def test_salvage_ignores_a_complete_write():
+    # A CLOSED fence is a normal, complete call — extract() handles it, so salvage
+    # must not also fire (that would double-run the write).
+    body = '```tool\n{"tool": "write_file", "path": "d.md", "content": "hello"}\n```'
+    assert salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS) is None
+
+
+def test_salvage_refuses_a_truncated_edit_file():
+    # A half-formed edit_file `new` is unsafe to apply — do not salvage it.
+    body = '```tool\n{"tool": "edit_file", "path": "d.py", "old": "foo", "new": "' + "z" * 500
+    assert salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS) is None
+
+
+def test_salvage_refuses_a_truncated_bash():
+    body = '```tool\n{"tool": "bash", "command": "rm -rf ' + "a" * 500
+    assert salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS) is None
+
+
+def test_salvage_refuses_a_tiny_partial():
+    # Below the content floor: likely an opened-but-empty fence, not a document.
+    body = '```tool\n{"tool": "write_file", "path": "d.md", "content": "hi'
+    assert salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS) is None
+
+
+def test_salvage_refuses_a_write_without_a_path():
+    body = '```tool\n{"tool": "write_file", "content": "' + "q" * 500
+    assert salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS) is None
+
+
+def test_salvage_returns_none_when_no_fence_is_open():
+    assert salvage_truncated_write("just prose, no tool call at all",
+                                   WRITE_KNOWN, WRITE_ARGS) is None
+
+
+def test_salvage_targets_the_truncated_call_after_a_complete_one():
+    # A complete write in a closed fence, THEN a second write cut off. Salvage
+    # must recover the second (the unclosed one), not the first.
+    body = ('```tool\n{"tool": "write_file", "path": "a.md", "content": "done"}\n```\n'
+            'Now the big one:\n```tool\n{"tool": "write_file", "path": "b.md", '
+            '"content": "' + "w" * 800)
+    call = salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS)
+    assert call is not None and call.args["path"] == "b.md"

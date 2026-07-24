@@ -51,6 +51,12 @@ max_malformed_retries = 3       # bail if the model keeps emitting bad tool JSON
 # How many times a reply cut off at model.max_tokens may be re-nudged. >1
 # because a long deliverable can legitimately need two passes to fit.
 max_truncated_retries = 2
+# How many times a truncated write_file/append_file may be SALVAGED — its
+# partial content landed on disk and the model steered to append the rest,
+# rather than the whole document evaporating. Higher than max_truncated_retries
+# because each salvage is real progress (the file grows); a degenerate re-write
+# loop is still caught by the repeat detector.
+max_salvaged_writes = 4
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 # Bail if the model keeps trying to end the turn without EVER having attempted
