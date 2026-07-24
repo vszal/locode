@@ -238,6 +238,13 @@ def test_format_turn_summary_empty_when_nothing_happened():
         color=False) == ""
 
 
+def test_format_turn_summary_suppressed_for_plain_chat_reply():
+    # One iteration, no tools/nudges = a conversational answer; no trailer.
+    assert render.format_turn_summary(
+        {"iterations": 1, "tool_calls": 0, "files_changed": 0, "nudges": 0},
+        color=False) == ""
+
+
 def test_format_turn_summary_omits_zero_fields():
     out = render.format_turn_summary(
         {"iterations": 0, "tool_calls": 4, "files_changed": 0, "nudges": 0},

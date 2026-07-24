@@ -328,7 +328,10 @@ def format_turn_summary(counts: dict, *, color: bool = True) -> str:
     tools = counts.get("tool_calls", 0)
     files = counts.get("files_changed", 0)
     nudges = counts.get("nudges", 0)
-    if not (iters or tools or files or nudges):
+    # A plain chat reply runs one iteration with no tools — the iteration count
+    # alone is noise. Only surface the trailer once real agentic work happened
+    # (a tool ran, or the model had to be nudged).
+    if not (tools or nudges):
         return ""
     parts = []
     if iters:
