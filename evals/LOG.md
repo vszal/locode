@@ -1072,3 +1072,45 @@ flagged row.
 **Tests:** 485 → 497 green.
 
 ---
+
+## Round 13 — no-op edit_file guidance lands its target on qwencoder14 (`r13-edithelp`, HEAD `e526efe`, n=6)
+
+Targeted validation of build 21 (P0 = *editing successfully*, user, 2026-07-24).
+Two cases only (`exec-bugfix` + `e2e-spec-to-code` — where the no-op flails live),
+both models, `--repeat 6`. Compared like-for-like against the same two cases in
+r12-salvage by mining `events/*.jsonl`: pair each `run`/`result` `edit_file`,
+classify the failure on `result.content` (`error` is a bool flag, not the text),
+and mark a failure *unrecovered* if no later `edit_file` on the same path succeeds.
+
+**qwencoder14 — the model that owned the no-op problem — the fix worked:**
+
+| metric | r12 (before) | r13 (after) |
+|---|---|---|
+| edit_file calls | 116 | 106 |
+| fail rate | 41% | **20%** |
+| no-op fails | 29 | **8** |
+| **unrecovered no-op dead-ends** | **20** | **1** |
+
+The prevention text (`new` must DIFFER from `old`) + the sharper no-op message did
+exactly what they were designed to do: the dead-end that never recovered is gone.
+
+**But task scores barely moved:** exec-bugfix qwencoder14 0.25 → 0.29,
+e2e 0.60 → 0.63. Landing edits ≠ computing correct fixes. qwencoder14 stops
+burning iterations on no-ops but still can't produce the right bugfix — the
+capability wall (M3/3.1), not a loop, is what caps this case now.
+
+**qythos9 looks slightly worse and it is not explained away:** edit fail 24% → 32%,
+unrecovered no-ops 3 → 9 (spread across 3 runs, concentrated in the wallclock-death
+e2e case), exec-bugfix 1.00 → 0.92, e2e 0.76 → 0.60. n dropped 8 → 6 and the e2e
+truncations confound it, so this is *plausibly* noise — but not proven noise. Flagged
+for re-check if qythos9 edit reliability surfaces again; do not credit the new message
+with harming the good editor without a mechanism in the logs (per D50/D54).
+
+| # | Decision | Why |
+|---|---|---|
+| D56 | Credit build 21 with fixing the qwencoder14 no-op dead-end; mark 1.4 done | Measured, like-for-like, against the exact metric it targeted: unrecovered no-ops 20 → 1, fail rate halved. |
+| D57 | Do not chase the exec-bugfix score with more edit-path work | The edit-reliability lever is spent (fail 41%→20%) yet score is flat 0.25→0.29. Remaining headroom is fix *correctness* = capability (3.1), not the edit tool. |
+
+**Tests:** 513 green (unchanged from build 21 commit).
+
+---

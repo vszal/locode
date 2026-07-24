@@ -44,18 +44,22 @@ are user-visible and waste whole generations.*
   the no-op (see 1.4). Ambiguous message now lists match locations anyway — it
   saves wasted iterations (each cut truncation risk) even though it always
   eventually recovers.
-- `[~]` **1.4 No-op `edit_file` (old==new) — the real edit dead-end** —
-  *discovered 2026-07-24, user-observed; partially addressed build 21.* 38 of
-  74 edit failures; **23 never recover.** Concentrated in qwencoder14 (21% of
-  its edits vs qythos9's 8%; qythos9 edits at 84% overall). The loop already
-  stalls out cleanly (constant error text → error_streaks fires at 3, then
-  stops) — it is not a wasted-50-iterations loop, it is a capability wall:
-  qwencoder14 re-emits identical old/new and cannot compute the fix even after a
-  nudge. Build 21 attacks it two ways: **prevention** (edit_file description now
-  states `new` must DIFFER from `old`, seen at planning time) and a **sharper,
+- `[x]` **1.4 No-op `edit_file` (old==new) — the real edit dead-end** —
+  *discovered 2026-07-24, user-observed; shipped build 21; validated by
+  r13-edithelp vs r12-salvage (same two cases, exec-bugfix + e2e-spec-to-code).*
+  Build 21 attacks it two ways: **prevention** (edit_file description now states
+  `new` must DIFFER from `old`, seen at planning time) and a **sharper,
   actionable no-op message** (re-read the failure and correct `new`, or the bug
-  is elsewhere — stop editing this line). *Effectiveness UNMEASURED — needs a
-  targeted sweep on exec-bugfix/e2e vs r12 to confirm the no-op count drops.*
+  is elsewhere — stop editing this line). **Measured result on qwencoder14 (the
+  model that owned the problem): the fix worked.** Per-edit failure rate 41% →
+  20%; no-op fails 29 → 8 (25% → 8% of its edits); **unrecovered no-op dead-ends
+  20 → 1** — the target metric essentially eliminated. *Caveat: task scores
+  barely moved (exec-bugfix qwencoder14 0.25 → 0.29) — landing edits is not the
+  same as computing correct fixes; the capability wall is real (see 3.1). And
+  qythos9 looks slightly worse (edit fail 24% → 32%, unrecovered no-ops 3 → 9,
+  score 1.00 → 0.92 / e2e 0.76 → 0.60), but n=6 (was 8) and it is concentrated
+  in the wallclock-death e2e case — plausibly noise, not confirmed. Worth a
+  re-check if qythos9 edit reliability shows up again.*
 
 ## Milestone 2 — Eval-harness trustworthiness
 *The gate must catch real regressions without crying wolf on noise.*
@@ -83,5 +87,8 @@ are user-visible and waste whole generations.*
 ### Done
 - **1.1 Runaway intra-generation repetition** (build 20, 2026-07-24) — sampling
   knobs + streaming cycle-abort. +14 tests.
+- **1.4 No-op `edit_file` prevention + guidance** (build 21, 2026-07-24) —
+  validated: qwencoder14 unrecovered no-op dead-ends 20 → 1, edit fail rate
+  41% → 20%. Task scores unmoved (capability wall → 3.1).
 
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
