@@ -88,6 +88,21 @@ class ModelConfig:
     # which is what the truncation nudge now asks for.
     max_tokens: int = 8192
     temperature: float = 0.3
+    # Anti-repetition sampling. Local models occasionally fall into a degenerate
+    # loop and stream one giant reply repeating a short phrase (the "megahyper…
+    # universe" runaway). These curb it at the sampler; the streaming abort in
+    # the client (see model/repetition.py) is the deterministic backstop. Left
+    # OFF by default (0.0 / None) so ordinary code generation — which legitimately
+    # repeats tokens like indentation and braces — is not penalised; raise
+    # frequency_penalty (~0.2-0.5, OpenAI-standard) or repetition_penalty
+    # (~1.1-1.3, llama.cpp/mlx extension) per model if it degenerates. Both
+    # neutral by default: frequency_penalty 0.0 and repetition_penalty 1.0 mean
+    # "no penalty", and neither is put on the wire at its neutral value.
+    frequency_penalty: float = 0.0
+    repetition_penalty: float = 1.0
+    # Extra stop strings passed through to the server (in addition to whatever the
+    # model's chat template already stops on). Empty by default.
+    stop: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -115,6 +130,11 @@ class AgentConfig:
     # degenerate re-write-the-same-thing loop is still caught by the repeat
     # detector, so this only needs to bound genuinely huge deliverables.
     max_salvaged_writes: int = 4
+    # How many times a reply aborted for runaway repetition (the client cut a
+    # degenerate token loop off mid-stream) may be nudged before the turn stops.
+    # The garbage reply is discarded, not kept, so each retry costs only a fresh
+    # generation; a few is enough to shake most models out of the attractor.
+    max_repetition_aborts: int = 3
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     # Bail if the model keeps trying to end the turn without EVER having

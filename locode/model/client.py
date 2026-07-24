@@ -18,6 +18,7 @@ import httpx
 
 from locode.agent.cancel import (CancelToken, CancelledByUser,
                                  DeadlineExceeded)
+from locode.model import repetition
 
 OnDelta = Callable[[str], Any]
 
@@ -50,6 +51,9 @@ class ModelClient:
         tools: list[dict] | None = None,
         temperature: float = 0.3,
         max_tokens: int = 4096,
+        frequency_penalty: float = 0.0,
+        repetition_penalty: float | None = None,
+        stop: list[str] | None = None,
         cancel: CancelToken | None = None,
         on_delta: OnDelta | None = None,
         deadline: float | None = None,
@@ -75,11 +79,23 @@ class ModelClient:
         }
         if tools:
             body["tools"] = tools
+        # Anti-degeneration knobs. Sent only when set so a plain default payload
+        # is unchanged: `frequency_penalty` is OpenAI-standard, `repetition_penalty`
+        # is the llama.cpp/mlx_lm extension, and servers ignore the one they don't
+        # know. These curb — but do not reliably stop — a runaway repeat; the
+        # streaming abort below is the deterministic catch.
+        if frequency_penalty:
+            body["frequency_penalty"] = frequency_penalty
+        if repetition_penalty is not None and repetition_penalty != 1.0:
+            body["repetition_penalty"] = repetition_penalty
+        if stop:
+            body["stop"] = stop
 
         content_parts: list[str] = []
         reasoning_parts: list[str] = []
         tool_acc: dict[int, dict[str, Any]] = {}
         finish_reason: str | None = None
+        chars_since_check = 0
 
         async with self._client() as c:
             async with c.stream("POST", "/v1/chat/completions", json=body) as r:
@@ -119,6 +135,17 @@ class ModelClient:
                                 res = on_delta(piece)
                                 if hasattr(res, "__await__"):
                                     await res  # type: ignore[func-returns-value]
+                            # Cut off a degenerate repeat mid-stream rather than
+                            # paying for the rest of max_tokens. Reported as its
+                            # own finish_reason so the loop can discard the
+                            # garbage and nudge, distinct from a real length cap.
+                            chars_since_check += len(piece)
+                            if chars_since_check >= repetition.CHECK_STRIDE:
+                                chars_since_check = 0
+                                if repetition.is_runaway_repetition(
+                                        "".join(content_parts)):
+                                    finish_reason = "repetition"
+                                    break
                         rpiece = delta.get("reasoning_content") or delta.get("reasoning")
                         if rpiece:
                             reasoning_parts.append(rpiece)

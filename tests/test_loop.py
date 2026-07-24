@@ -19,7 +19,7 @@ class FakeClient:
 
     async def complete(self, messages, model, *, tools=None, temperature=0.3,
                        max_tokens=4096, cancel=None, on_delta=None,
-                       deadline=None):
+                       deadline=None, **_kw):
         msg = self.scripted[min(self.n, len(self.scripted) - 1)]
         self.n += 1
         if on_delta and msg.get("content"):
@@ -349,6 +349,38 @@ async def test_truncated_write_salvage_is_bounded(tmp_path):
     out = await loop.run_turn("write d.md")
     assert out.startswith("⏹")  # stopped, did not spin the full budget
     assert (tmp_path / "d.md").exists()
+
+
+async def test_repetition_reply_is_discarded_and_nudged(tmp_path):
+    # The client aborts a degenerate loop with finish_reason="repetition". The
+    # garbage content must NOT land in history; the model is nudged to break out
+    # and its next, clean reply is returned.
+    garbage = "megahyper" * 500
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "finish_reason": "repetition", "content": garbage},
+        {"role": "assistant", "content": "Right — here is the plan in brief."},
+    ])
+    out = await loop.run_turn("give me the plan")
+    assert out == "Right — here is the plan in brief."
+    # The looped text never entered history as an assistant turn.
+    assert not any(garbage[:50] in m.get("content", "") for m in loop.history)
+    # A repetition nudge was appended.
+    assert any("repeating the same text" in m["content"]
+               for m in loop.history if m["role"] == "user")
+
+
+async def test_repetition_aborts_are_bounded(tmp_path):
+    # A model that keeps degenerating must not spin forever: after
+    # max_repetition_aborts the turn stops instead of nudging endlessly.
+    cfg = Config()
+    cfg.agent.max_repetition_aborts = 3
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "finish_reason": "repetition",
+         "content": "loop " * 400},
+    ], cfg=cfg)
+    out = await loop.run_turn("do the thing")
+    assert out.startswith("⏹")
+    assert "repetition loop" in out
 
 
 async def test_stop_finish_reason_is_a_real_answer(tmp_path):

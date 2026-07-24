@@ -133,6 +133,7 @@ class AgentLoop:
         nudged_empty = False
         truncated_nudges = 0
         salvage_writes = 0
+        repetition_aborts = 0
         self._denials = 0
         nudged_repeat: set = set()
         nudged_stall: set = set()
@@ -254,6 +255,9 @@ class AgentLoop:
                             _wire(self.history), model_id, tools=tools,
                             temperature=self._cfg.model.temperature,
                             max_tokens=self._cfg.model.max_tokens,
+                            frequency_penalty=self._cfg.model.frequency_penalty,
+                            repetition_penalty=self._cfg.model.repetition_penalty,
+                            stop=self._cfg.model.stop,
                             cancel=self.cancel, on_delta=self._on_delta,
                             # Cut a single runaway reply off at the turn's
                             # budget. Without this the wallclock check above
@@ -317,6 +321,22 @@ class AgentLoop:
                 if hit_token_limit:
                     self._on_event({"phase": "truncated",
                                     "chars": len(content)})
+                # The client cut off a degenerate token loop mid-stream (the
+                # model was repeating a short phrase toward the token/wallclock
+                # limit and producing nothing usable). The partial reply is
+                # garbage — never record it — so discard it and nudge the model
+                # to break out, bounded so a model stuck in the attractor can't
+                # spin forever.
+                if msg.get("finish_reason") == "repetition":
+                    self._on_event({"phase": "truncated",
+                                    "chars": len(content),
+                                    "reason": "repetition"})
+                    if repetition_aborts >= self._cfg.agent.max_repetition_aborts:
+                        return self._stop("the model fell into a repetition loop "
+                                          "it could not break out of")
+                    repetition_aborts += 1
+                    self._nudge_repetition()
+                    continue
                 outcome = toolparse.extract(msg, self._registry.names(),
                                             self._registry.arg_names())
                 calls = outcome.calls
@@ -734,6 +754,18 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "continue truncated write"})
+
+    def _nudge_repetition(self) -> None:
+        self.history.append({
+            "role": "user",
+            "content": ("Your last reply got stuck repeating the same text over "
+                        "and over, so it was discarded. Stop repeating yourself. "
+                        "Take a single concrete next step: either call ONE tool "
+                        "using the ```tool format, or give a short final answer. "
+                        "Do not restate anything you have already said."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "repetition loop"})
 
     def _nudge_truncated(self) -> None:
         self.history.append({

@@ -80,6 +80,44 @@ async def test_strips_mlx_prefix(monkeypatch):
     assert captured["body"]["model"] == "mlx-community/Qwen3-14B-4bit"
 
 
+async def test_sampling_params_sent_only_when_set():
+    captured = {}
+
+    def handler(req):
+        captured["body"] = json.loads(req.content)
+        return httpx.Response(200, content=sse(delta(content="ok")))
+
+    # Defaults: none of the anti-repetition knobs ride along.
+    await make_client(handler).complete(
+        [{"role": "user", "content": "hi"}], "qwen14")
+    assert "frequency_penalty" not in captured["body"]
+    assert "repetition_penalty" not in captured["body"]
+    assert "stop" not in captured["body"]
+
+    # Set: each appears verbatim.
+    await make_client(handler).complete(
+        [{"role": "user", "content": "hi"}], "qwen14",
+        frequency_penalty=0.4, repetition_penalty=1.15, stop=["\n\n\n"])
+    assert captured["body"]["frequency_penalty"] == 0.4
+    assert captured["body"]["repetition_penalty"] == 1.15
+    assert captured["body"]["stop"] == ["\n\n\n"]
+
+
+async def test_runaway_repetition_aborts_the_stream():
+    # A degenerate loop: many repeats of a short phrase, then a marker that
+    # should never be reached because the client cuts the stream off first.
+    reps = [delta(content="megahyper") for _ in range(300)]
+    tail = delta(content="UNREACHED_MARKER")
+
+    def handler(req):
+        return httpx.Response(200, content=sse(*reps, tail))
+
+    msg = await make_client(handler).complete(
+        [{"role": "user", "content": "hi"}], "qwen14")
+    assert msg["finish_reason"] == "repetition"
+    assert "UNREACHED_MARKER" not in msg["content"]
+
+
 async def test_cancel_mid_stream_raises():
     cancel = CancelToken()
 

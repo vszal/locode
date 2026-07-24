@@ -40,6 +40,15 @@ default = "qwen14"     # alias (or full "org/model" id) to load at startup
 # rather than re-emitting the whole file.
 max_tokens = 8192
 temperature = 0.3
+# Anti-repetition sampling for models that fall into a degenerate loop (one giant
+# reply repeating a short phrase). Left off by default so ordinary code — which
+# repeats indentation/braces legitimately — is not penalised; the client's
+# streaming abort (model/repetition.py) is the deterministic backstop regardless.
+# Raise frequency_penalty (~0.2-0.5, OpenAI-standard) or set repetition_penalty
+# (~1.1-1.3, llama.cpp/mlx extension) per model if it degenerates.
+frequency_penalty = 0.0          # 0.0 = off (OpenAI-standard, additive)
+repetition_penalty = 1.0         # 1.0 = off (llama.cpp/mlx extension, multiplicative)
+stop = []                        # extra stop strings, on top of the chat template's
 
 [agent]
 # The loop executes ONE tool call per iteration for non-native (fenced
@@ -57,6 +66,10 @@ max_truncated_retries = 2
 # because each salvage is real progress (the file grows); a degenerate re-write
 # loop is still caught by the repeat detector.
 max_salvaged_writes = 4
+# How many times a reply aborted for runaway repetition (the client cut a
+# degenerate token loop off mid-stream) may be nudged before the turn stops. The
+# garbage reply is discarded, so each retry costs only a fresh generation.
+max_repetition_aborts = 3
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 # Bail if the model keeps trying to end the turn without EVER having attempted
