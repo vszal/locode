@@ -68,3 +68,61 @@ async def test_ctrl_c_during_a_turn_leaves_the_repl_alive(tmp_path, monkeypatch)
 
     monkeypatch.setattr(r._loop, "run_turn", ok)
     await r._turn("again")
+
+
+# --- M4 visibility wiring: plan checklist, tally, file-change pairing ----------
+def _fire(r, events):
+    for e in events:
+        r._on_event(e)
+
+
+def test_on_event_renders_live_plan_and_tallies(tmp_path, monkeypatch, capsys):
+    from locode.agent.plan import Plan
+    r = _repl(tmp_path, monkeypatch)
+    r._tally = {"iterations": 0, "tool_calls": 0, "nudges": 0}
+    r._files_changed = set()
+    r._pending_path = None
+
+    # The loop mutates loop.plan, then emits the update_plan result; the REPL
+    # reads the live plan off the loop to render the checklist.
+    r._loop.plan = Plan()
+    r._loop.plan.replace(["[x] read spec", "[>] write code", "[ ] run tests"])
+
+    _fire(r, [
+        {"phase": "iteration", "n": 0},
+        {"phase": "run", "name": "update_plan", "args": {"tasks": []}},
+        {"phase": "result", "name": "update_plan", "content": "Plan updated"},
+        {"phase": "iteration", "n": 1},
+        {"phase": "run", "name": "edit_file", "args": {"path": "code.py"}},
+        {"phase": "result", "name": "edit_file", "content": "edited", "error": False},
+        {"phase": "run", "name": "edit_file", "args": {"path": "broken.py"}},
+        {"phase": "result", "name": "edit_file", "content": "no-op", "error": True},
+        {"phase": "nudge", "reason": "repeated call"},
+    ])
+    out = capsys.readouterr().out
+
+    # The plan rendered as a checklist, not a truncated generic tool line.
+    assert "▶ write code" in out and "☑ read spec" in out and "☐ run tests" in out
+    assert "update_plan {" not in out  # the generic ⚙ line was suppressed
+    # Tally reflects the stream.
+    assert r._tally["iterations"] == 2
+    assert r._tally["tool_calls"] == 3   # update_plan + 2 edits
+    assert r._tally["nudges"] == 1
+    # Only the successful edit counts as a file changed.
+    assert r._files_changed == {"code.py"}
+
+
+async def test_turn_prints_summary_after_agentic_work(tmp_path, monkeypatch, capsys):
+    r = _repl(tmp_path, monkeypatch)
+
+    async def work(text):
+        r._on_event({"phase": "iteration", "n": 0})
+        r._on_event({"phase": "run", "name": "write_file", "args": {"path": "a.py"}})
+        r._on_event({"phase": "result", "name": "write_file",
+                     "content": "wrote", "error": False})
+        return ""
+
+    monkeypatch.setattr(r._loop, "run_turn", work)
+    await r._turn("build it")
+    out = capsys.readouterr().out
+    assert "↳" in out and "1 file changed" in out and "1 tool call" in out
