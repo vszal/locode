@@ -79,8 +79,32 @@ are user-visible and waste whole generations.*
   results.json paths; document the threshold and exit codes where a user looks.
 
 ## Milestone 3 — Weakest-case quality
-- `[ ]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
-  rounds. Diagnose the dominant failure mode before touching it.
+- `[~]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
+  rounds. **Diagnosed 2026-07-24 (r13 event logs + per-check tally).** The
+  ceiling is entirely in **stage 3 (code)**: the doc stages mostly pass, but
+  `own_tests_pass` = **0/12** and `independent_spec_check` = **0/12** across
+  every run and both models, and `clean_finish` = **0/12** — every run dies on a
+  stall. It is a genuine **model-capability wall**, two distinct flavours:
+  - **qwencoder14 — wrong logic.** Writes parseable code but never implements
+    type-coercion/precedence. Assertions show `{'a': '3'} == {'a': 3}` (env value
+    not coerced to the default's type) and `{'a': 1} == {'a': 2}` (precedence not
+    applied). It iterates `edit → pytest` ~5× with identical failures, then the
+    loop correctly kills it as no-progress. Nothing the harness can do — it can't
+    write the coercion for the model.
+  - **qythos9 — broken syntax / hallucinated stdlib.** 3/6 runs die on
+    `SyntaxError` (`invalid syntax`, `unexpected character after line
+    continuation`); one used `tomllib.dumps` (does not exist). The file will not
+    even import, so pytest shows an opaque *collection* traceback
+    (`<frozen importlib>`), and it edit-stalls trying to repair it.
+  - `[x]` **3.1a Inline Python syntax feedback (build 22).** The one
+    harness-actionable lever: `write_file`/`append_file`/`edit_file` now
+    `compile()` any `.py` result and append a one-line `SyntaxError at line N:
+    <msg>` warning to the *successful* result (advisory, never an error — a
+    half-built file may not parse yet). Turns qythos9's frozen-importlib death
+    into a legible, located signal one call after the mistake. +6 tests.
+    *Targets qythos9's syntax deaths only; does NOT touch qwencoder14's logic
+    gap. Expected lift is modest — needs a sweep to confirm it converts any of
+    the 3/6 syntax runs. UNMEASURED.*
 
 ---
 

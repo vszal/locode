@@ -187,6 +187,34 @@ def _not_found_help(text: str, old: str, path: Path) -> str:
             + snippet)
 
 
+def _syntax_warning(path: Path, text: str) -> str:
+    """A one-line SyntaxError note to append to a successful .py write, or "".
+
+    A model that writes malformed Python only learns of it later, as an opaque
+    pytest *collection* traceback (`<frozen importlib>` … ERROR collecting), which
+    is far harder to act on than "line 42: invalid syntax". Compiling the file the
+    instant it lands surfaces the real location while the fix is one call away.
+    Advisory only — the write already succeeded, and a partial file mid-build may
+    legitimately not parse yet, so this never turns the result into an error.
+    """
+    if path.suffix != ".py":
+        return ""
+    try:
+        compile(text, str(path), "exec")
+    except SyntaxError as e:
+        where = f"line {e.lineno}" if e.lineno else "an unknown line"
+        bad = (e.text or "").strip()
+        detail = f"\n    {bad}" if bad else ""
+        return (f"\n⚠ warning: {path.name} has a SyntaxError at {where}: "
+                f"{e.msg}.{detail}\nThe file was saved, but Python cannot import "
+                "it until this is fixed — correct this line before running tests.")
+    except ValueError:
+        # e.g. source with null bytes; compile() raises ValueError, not SyntaxError.
+        return (f"\n⚠ warning: {path.name} could not be parsed as Python. The file "
+                "was saved, but check it for stray/invalid characters.")
+    return ""
+
+
 class ReadFile:
     name = "read_file"
     description = "Read a UTF-8 text file. Returns line-numbered content."
@@ -372,7 +400,7 @@ class WriteFile:
         except OSError as e:
             return ToolResult(f"cannot write {p}: {e}", is_error=True)
         n = args["content"].count("\n") + 1
-        return ToolResult(f"wrote {p} ({n} lines)")
+        return ToolResult(f"wrote {p} ({n} lines)" + _syntax_warning(p, args["content"]))
 
 
 class AppendFile:
@@ -414,10 +442,13 @@ class AppendFile:
             return ToolResult(f"cannot append to {p}: {e}", is_error=True)
         added = content.count("\n") + (0 if content.endswith("\n") else 1)
         try:
-            total = p.read_text("utf-8").count("\n") + 1
+            full = p.read_text("utf-8")
+            total = full.count("\n") + 1
         except OSError:
-            total = added
-        return ToolResult(f"appended {added} lines to {p} ({total} lines total)")
+            full, total = "", added
+        warn = _syntax_warning(p, full) if full else ""
+        return ToolResult(
+            f"appended {added} lines to {p} ({total} lines total)" + warn)
 
 
 class MoveFile:
@@ -514,7 +545,8 @@ class EditFile:
         except OSError as e:
             return ToolResult(f"cannot write {p}: {e}", is_error=True)
         return ToolResult(
-            f"edited {p} ({count} replacement{'s' if count != 1 else ''}{note})")
+            f"edited {p} ({count} replacement{'s' if count != 1 else ''}{note})"
+            + _syntax_warning(p, updated))
 
 
 def all_tools() -> list:

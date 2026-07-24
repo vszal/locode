@@ -297,3 +297,55 @@ def test_write_file_states_the_size_cap_as_a_flat_number():
     assert "6000" in desc
     assert "COMPLETE" not in desc
     assert "append_file" in desc
+
+
+# --- inline SyntaxError feedback on .py writes (3.1: make qythos9's syntax
+# deaths legible where they happen, not later as a pytest collection traceback) ---
+
+async def test_write_py_with_syntax_error_warns_but_still_saves(ctx, tmp_path):
+    res = await fs.WriteFile().run(
+        {"path": "envcfg.py", "content": "def load(:\n    pass\n"}, ctx)
+    assert res.ok  # advisory only — the file IS written
+    assert (tmp_path / "envcfg.py").exists()
+    assert "SyntaxError" in res.content
+    assert "line 1" in res.content
+
+
+async def test_write_valid_py_has_no_warning(ctx, tmp_path):
+    res = await fs.WriteFile().run(
+        {"path": "envcfg.py", "content": "def load():\n    return {}\n"}, ctx)
+    assert res.ok
+    assert "SyntaxError" not in res.content
+
+
+async def test_write_broken_non_py_is_not_syntax_checked(ctx, tmp_path):
+    # A .md/.txt file is never Python; malformed "code" in it must not warn.
+    res = await fs.WriteFile().run(
+        {"path": "DESIGN.md", "content": "def load(:  # prose, not code\n"}, ctx)
+    assert res.ok
+    assert "SyntaxError" not in res.content
+
+
+async def test_edit_that_introduces_a_syntax_error_warns(ctx, tmp_path):
+    (tmp_path / "envcfg.py").write_text("def load():\n    return 1\n")
+    res = await fs.EditFile().run(
+        {"path": "envcfg.py", "old": "return 1", "new": "return ("}, ctx)
+    assert res.ok  # the edit applied
+    assert "edited" in res.content
+    assert "SyntaxError" in res.content
+
+
+async def test_edit_that_fixes_a_syntax_error_has_no_warning(ctx, tmp_path):
+    (tmp_path / "envcfg.py").write_text("x = (\n")
+    res = await fs.EditFile().run(
+        {"path": "envcfg.py", "old": "x = (", "new": "x = 1"}, ctx)
+    assert res.ok
+    assert "SyntaxError" not in res.content
+
+
+async def test_append_that_breaks_python_warns_on_full_file(ctx, tmp_path):
+    # The break spans the append boundary: each half is fine, the whole is not.
+    (tmp_path / "m.py").write_text("x = (1 +\n")
+    res = await fs.AppendFile().run({"path": "m.py", "content": "def bad(:\n"}, ctx)
+    assert res.ok
+    assert "SyntaxError" in res.content
