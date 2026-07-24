@@ -81,6 +81,29 @@ async def test_edit_file_ambiguous_refused(ctx, tmp_path):
     assert (tmp_path / "c.py").read_text() == "a\na\n"
 
 
+async def test_edit_file_ambiguous_lists_match_locations(ctx, tmp_path):
+    # The dominant recoverable failure: a non-unique `old`. The error must show
+    # WHERE the matches are so the model can add context to pin the right one.
+    (tmp_path / "c.py").write_text("x = 1\ny = 2\nx = 1\nz = 3\nx = 1\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
+    assert res.is_error
+    assert "line 1:" in res.content and "line 3:" in res.content and "line 5:" in res.content
+    assert (tmp_path / "c.py").read_text() == "x = 1\ny = 2\nx = 1\nz = 3\nx = 1\n"
+
+
+async def test_edit_file_noop_is_refused_with_actionable_help(ctx, tmp_path):
+    # old == new does nothing; the biggest unrecovered edit failure in eval. The
+    # message must push the model to a corrected `new` or to look elsewhere,
+    # not just restate the rejection.
+    (tmp_path / "c.py").write_text("value = compute()\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "value = compute()", "new": "value = compute()"}, ctx)
+    assert res.is_error
+    assert "identical" in res.content.lower() or "does nothing" in res.content.lower()
+    assert "different" in res.content.lower()
+    assert (tmp_path / "c.py").read_text() == "value = compute()\n"
+
+
 async def test_edit_file_replace_all(ctx, tmp_path):
     (tmp_path / "c.py").write_text("a\na\n")
     res = await fs.EditFile().run(

@@ -146,6 +146,25 @@ def try_edit(text: str, old: str, new: str, replace_all: bool):
     return None, "", "not_found", 0
 
 
+def _match_locations(text: str, old: str, limit: int = 6) -> str:
+    """List where `old` occurs, as `line N: <first line of the match>`, so a
+    model that matched several places can add context to pin the one it means.
+    Capped at `limit` so a pattern that appears everywhere can't flood the reply."""
+    first = old.split("\n", 1)[0]
+    out, start, shown = [], 0, 0
+    while shown < limit:
+        i = text.find(old, start)
+        if i < 0:
+            break
+        line_no = text.count("\n", 0, i) + 1
+        out.append(f"  line {line_no}: {first.strip()[:100]}")
+        start = i + max(1, len(old))
+        shown += 1
+    if text.count(old) > shown:
+        out.append(f"  … and {text.count(old) - shown} more")
+    return "\n".join(out)
+
+
 def _not_found_help(text: str, old: str, path: Path) -> str:
     lines = text.split("\n")
     first = next((l for l in _norm_nl(old).split("\n") if l.strip()), "")
@@ -433,11 +452,13 @@ class EditFile:
         "Replace text in a file. `old` is the exact text to replace (copy it "
         "verbatim from the file — do NOT include the line-number prefixes that "
         "read_file prints) and must match once unless replace_all is true. "
-        "Keep `old` to the SMALLEST unique snippet that needs changing (a few "
-        "lines), NOT the whole file — large blocks waste tokens and risk being "
-        "cut off; make several small edit_file calls instead of one giant one. "
-        "Indentation/whitespace differences are tolerated; the file's original "
-        "indentation is preserved."
+        "`new` is the REPLACEMENT and must DIFFER from `old` — it has to contain "
+        "your actual change; an edit whose `new` equals `old` does nothing and is "
+        "rejected. Keep `old` to the SMALLEST unique snippet that needs changing "
+        "(a few lines), NOT the whole file — large blocks waste tokens and risk "
+        "being cut off; make several small edit_file calls instead of one giant "
+        "one. Indentation/whitespace differences are tolerated; the file's "
+        "original indentation is preserved."
     )
     permission = "ask"
     schema = {
@@ -462,10 +483,14 @@ class EditFile:
             return ToolResult(f"cannot read {p}: {e}", is_error=True)
         if old == new:
             return ToolResult(
-                "`old` and `new` are identical, so this edit changes nothing. If "
-                "you meant to change the file, `new` must differ from `old`. If the "
-                "file is already correct, do NOT repeat this edit — move on (run "
-                "your test, or give your final answer).", is_error=True)
+                "This edit does NOTHING: `new` is identical to `old`. To change "
+                "the file, `new` must be DIFFERENT text — put the corrected code "
+                "there. If you are fixing a bug, re-read the exact failure (the "
+                "test or traceback names the wrong line and what is wrong with "
+                "it), then submit an edit whose `new` carries that correction. If "
+                "this line is already correct, the bug is on a DIFFERENT line — "
+                "stop editing this one and look elsewhere. Do NOT resend this "
+                "same no-op edit.", is_error=True)
         replace_all = bool(args.get("replace_all"))
 
         updated, note, status, count = try_edit(text, old, new, replace_all)
@@ -477,8 +502,11 @@ class EditFile:
                 "existing lines into `old`.", is_error=True)
         if status == "ambiguous":
             return ToolResult(
-                f"`old` appears {count} times in {p}; pass replace_all or add "
-                "more surrounding context to make it unique", is_error=True)
+                f"`old` appears {count} times in {p}, so it is not clear which "
+                "one to change. Either add more surrounding lines to `old` so it "
+                "matches exactly ONE place, or pass replace_all to change every "
+                "one. The matches are at:\n" + _match_locations(text, old),
+                is_error=True)
         if status == "not_found":
             return ToolResult(_not_found_help(text, old, p), is_error=True)
         try:
