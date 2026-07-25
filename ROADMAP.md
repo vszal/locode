@@ -98,10 +98,11 @@ the lived experience.*
   changed on disk answers "did it accomplish anything?". Nudges (the flailing
   signal) went from whisper-dim `…` to a visible yellow `⟳` — they read as
   warnings now, not reassurance. `render.format_turn_summary`.
-- `[ ]` **4.3 Out-of-box model default.** The config default is qwencoder14, the
-  *weaker* editor (58% edit success vs qythos9's 84%; owned all the r12 no-op
-  dead-ends). qythos9 is slower and had e2e wallclock deaths, so it's a real
-  tradeoff — needs a decision, not a unilateral flip. `[!]`
+- `[x]` **4.3 Out-of-box model default.** Flipped the built-in default from
+  qwen14 to **qythos9**, the reliable editor (84% edit success vs 58%; no no-op
+  dead-ends). Slower 9B that can hit the generation cap on large writes, but
+  editing reliability dominates interactive use. Landed in config.py,
+  scaffold.py, config.toml.example, test_config.py (build 26). User decision.
 - `[ ]` **4.4 Convergence / clean-finish.** clean_finish is ~8% across the eval
   suite — sessions almost never end on a clean "done", they flail and stall out.
   The deepest usability lever, and the hardest. Diagnose whether the models
