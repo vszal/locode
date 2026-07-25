@@ -253,6 +253,43 @@ def test_interior_json_fence_inside_content_not_a_block_boundary():
     assert out.calls[0].args["content"].endswith("End.")
 
 
+def test_second_call_survives_single_quoted_value_with_odd_double_quotes():
+    # Live qythos9 flailing bug: it emitted read_file AND edit_file back-to-back
+    # in one message, with the edit_file `new` a Python-style SINGLE-quoted value
+    # carrying an ODD number of interior double-quotes (triple-quote docstrings,
+    # f-strings). _closing_fence tracked only `"`, so string state desynced, the
+    # real closing ``` looked like string interior, and the edit_file block was
+    # dropped as "truncated" — the fix never ran and the loop stalled.
+    read = '{"name": "read_file", "args": {"path": "x.py"}}'
+    # single-quoted `new` with an odd count of " (three of them):
+    edit = ('{"name": "edit_file", "args": {"path": "x.py", '
+            '''"old": '    """doc""""""', "new": '    """doc"""'}}''')
+    # back-to-back fences, glued (six backticks), exactly as the model emitted:
+    content = "```tool\n" + read + "\n``````tool\n" + edit + "\n```\n"
+    out = extract({"content": content},
+                  {"read_file", "edit_file"}, {"path", "old", "new"})
+    assert not out.malformed
+    names = [c.name for c in out.calls]
+    assert names == ["read_file", "edit_file"], names
+    e = out.calls[1]
+    assert e.args["old"] == '    """doc""""""'
+    assert e.args["new"] == '    """doc"""'
+
+
+def test_closing_fence_tracks_single_quote_string_context():
+    from locode.model.toolparse import _closing_fence
+    # A ``` inside a single-quoted value with interior double-quotes is NOT a
+    # closer; the real closer sits after the value ends.
+    body = ('''{"name": "write_file", "args": {"path": "a", '''
+            '''"content": 'x = """```py"""'}}''')
+    text = body + "\n```\ntrailer"
+    idx = _closing_fence(text, 0)
+    assert idx is not None
+    assert text[idx:idx + 3] == "```"
+    # the closer is the one AFTER the value, not the interior ```py
+    assert "```py" in text[:idx]
+
+
 # --- salvage_truncated_write: recover a write cut off at the token limit ------
 
 from locode.model.toolparse import salvage_truncated_write

@@ -295,23 +295,32 @@ def _fence_blocks(content: str) -> Iterable[str]:
 
 def _closing_fence(content: str, i: int) -> int | None:
     """Index of the ``` that closes a fenced body starting at i, or None if the
-    body is never closed. A ``` is only a closer when it lies OUTSIDE the JSON
-    string context of the body, so interior code fences (inside a quoted value)
-    are ignored."""
+    body is never closed. A ``` is only a closer when it lies OUTSIDE the string
+    context of the body, so interior code fences (inside a quoted value) are
+    ignored.
+
+    String context tracks BOTH `"` and `'` delimiters: a value opened with one
+    quote keeps the other literal until its own matching close. Weak models
+    (qythos9) emit Python-style single-quoted values whenever the value contains
+    a `"`, so a value like `'x = \"\"\"doc\"\"\"'` carries an ODD number of
+    interior double-quotes. Tracking only `"` desynced on those and mistook the
+    real closing ``` for string interior — dropping the whole call. See the
+    single-quote loose-recovery path (`_loose_string`) for the sibling fix."""
     n = len(content)
-    in_str = esc = False
+    quote: str | None = None   # active string delimiter, or None outside a string
+    esc = False
     while i < n:
         c = content[i]
-        if in_str:
+        if quote is not None:
             if esc:
                 esc = False
             elif c == "\\":
                 esc = True
-            elif c == '"':
-                in_str = False
+            elif c == quote:
+                quote = None
             i += 1
-        elif c == '"':
-            in_str = True
+        elif c in ('"', "'"):
+            quote = c
             i += 1
         elif c == "`" and content.startswith("```", i):
             return i
