@@ -14,7 +14,12 @@ from __future__ import annotations
 
 import json
 
-from locode.agent.plan import MAX_TASKS, Plan, has_status_marker
+from locode.agent.plan import (
+    MAX_TASKS,
+    Plan,
+    has_status_marker,
+    strip_status_marker,
+)
 from locode.tools.base import ToolContext, ToolResult
 
 
@@ -58,6 +63,25 @@ class UpdatePlan:
         # {"tasks": X} dict to X and carry on with the value.
         if isinstance(raw, dict) and set(raw) == {"tasks"}:
             raw = raw["tasks"]
+        elif isinstance(raw, dict) and raw and all(
+            has_status_marker(str(k)) for k in raw
+        ):
+            # {task_text: status} — the model marked the keys AND repeated the
+            # status in the values. Measured 2026-07-25 (qythos9 exec-bugfix):
+            # sent {"[ ] Run tests": "done", "[>] Fix wrap": "in progress"}. The
+            # key's marker and the value disagree; the value is the live intent,
+            # so let it win — otherwise "Run tests" stays open forever and the
+            # completion gate never lets the turn finish. Gated on every key
+            # already looking like a task line, so an ordinary object can't be
+            # mistaken for a plan.
+            rebuilt = []
+            for k, v in raw.items():
+                text = strip_status_marker(str(k))
+                marker = str(v).strip() if isinstance(v, str) else ""
+                if not (marker and has_status_marker(f"[{marker}] x")):
+                    marker = " "
+                rebuilt.append(f"[{marker}] {text}")
+            raw = rebuilt
         if isinstance(raw, str):
             # Models sometimes send a newline-joined string instead of an array.
             # Recovering it costs a few lines and saves an iteration.

@@ -103,6 +103,20 @@ are user-visible and waste whole generations.*
   single-key `{"tasks": X}` wrapper, parses `{`-prefixed JSON strings and pulls
   out their inner `tasks`, and rejects an unrecoverable JSON-object string with
   the real array shape instead of false-accepting it. +4 plan tests (539 green).
+  **Validated (r16-planfix, build 29, exec-bugfix × 2 models × n=6):** qythos9
+  fully recovered to the r13 baseline — **0.75→0.92, clean-finish 0/6→5/6**, same
+  score vector as r13; the double-wrap recovery fired live in 4 runs (`0/1 → 1/1
+  done` → clean finish). qwencoder14 held at 0.46 (>> r13's 0.29; its 5/6
+  repeat-stops are the known capability wall). Regression CLOSED.
+- `[x]` **1.7b update_plan task→status dict** — *r16 surfaced a second shape:*
+  the model sent `tasks` as a dict mapping marked task text to a status word —
+  `{"[ ] Run tests": "done", "[>] Fix wrap": "in progress"}` — where the key
+  marker and the value disagree. The old code hard-rejected it. Fix (build 30):
+  when every key looks like a task line, rebuild each task with the **value's**
+  status winning (via `strip_status_marker`), so a task the model calls "done"
+  can actually complete instead of staying open and jamming the completion gate.
+  Gated on all-keys-marked so an ordinary object isn't mistaken for a plan.
+  +2 plan tests (541 green).
 
 ## Milestone 2 — Eval-harness trustworthiness
 *The gate must catch real regressions without crying wolf on noise.*

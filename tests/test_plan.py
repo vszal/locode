@@ -238,6 +238,40 @@ async def test_tool_recovers_a_well_formed_json_object_string():
     assert len(plan.tasks) == 2
 
 
+async def test_tool_recovers_a_task_to_status_dict():
+    """The r16 qythos9 shape: the model sent a dict mapping marked task text to a
+    status word — {"[ ] Run tests": "done", "[>] Fix wrap": "in progress"}. The
+    key marker and the value disagree; the value is the live intent and must win,
+    or the task stays open forever and the completion gate never lets the turn
+    finish. Recover it with the value's status applied to the key's text."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": {
+            "[ ] Run tests to see failures": "done",
+            "[>] Fix word_wrap exact fit edge case": "in progress",
+            "[ ] Fix truncate exact limit edge case": "pending",
+        }},
+        make_ctx(plan))
+    assert res.ok
+    assert len(plan.tasks) == 3
+    assert plan.tasks[0].status == DONE      # value "done" beat the "[ ]" key
+    assert plan.tasks[1].status == DOING     # value "in progress"
+    assert plan.tasks[2].status == TODO
+    assert plan.tasks[0].text == "Run tests to see failures"
+
+
+async def test_tool_does_not_mistake_an_ordinary_object_for_a_plan():
+    """The {task: status} recovery is gated on every key looking like a task
+    line. A dict whose keys are NOT marked task lines must not be silently
+    adopted — it falls through to the hard rejection."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": {"first": "do a thing", "second": "do another"}},
+        make_ctx(plan))
+    assert not res.ok
+    assert plan.tasks == []
+
+
 def test_has_status_marker_accepts_recognized_markers():
     from locode.agent.plan import has_status_marker
     assert has_status_marker("[x] done thing")

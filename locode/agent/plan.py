@@ -153,6 +153,17 @@ def has_status_marker(text: str) -> bool:
     return m.group(1).strip().lower() in _MARKERS
 
 
+def strip_status_marker(text: str) -> str:
+    """Return `text` without a recognized leading status marker.
+
+    Used when a marker has to be re-derived from elsewhere (e.g. a model that
+    sends {task: status} and puts the live status in the value, not the key)."""
+    m = _MARKER_RE.match(text)
+    if m and m.group(1).strip().lower() in _MARKERS:
+        return m.group(2).strip()
+    return text.strip()
+
+
 def _parse_task(text: str) -> Task:
     m = _MARKER_RE.match(text)
     if not m:
