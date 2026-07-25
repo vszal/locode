@@ -178,6 +178,19 @@ def _match_locations(text: str, old: str, limit: int = 6) -> str:
     return "\n".join(out)
 
 
+# When byte-exact matching is the wrong tool. edit_file can't target text a weak
+# model can't reproduce verbatim — a line with a literal backslash, stray quotes,
+# or odd whitespace (observed: a malformed docstring `""\"` made every `old`
+# collapse to `old == new`). The escape hatch is replace_lines, which needs only
+# the line NUMBER, not the bytes. Appended to the not-found / no-op errors so the
+# model switches tools instead of re-guessing the same `old`.
+_TRY_REPLACE_LINES = (
+    " If the target text is hard to reproduce EXACTLY — it has backslashes, "
+    "quotes, or unusual whitespace — stop guessing at `old`: use replace_lines "
+    "instead, giving the line NUMBER (from read_file) rather than the text."
+)
+
+
 def _not_found_help(text: str, old: str, path: Path) -> str:
     lines = text.split("\n")
     first = next((l for l in _norm_nl(old).split("\n") if l.strip()), "")
@@ -197,7 +210,7 @@ def _not_found_help(text: str, old: str, path: Path) -> str:
     return (f"`old` not found in {path} ({len(lines)} lines). Copy the target text "
             "EXACTLY as it appears in the file — do NOT include read_file's "
             "line-number prefixes — or add more surrounding context to pin it down."
-            + snippet)
+            + snippet + _TRY_REPLACE_LINES)
 
 
 def _edit_snippet(before: str, after: str, *, context: int = 3,
@@ -545,6 +558,16 @@ class EditFile:
 
     async def run(self, args: dict, ctx: ToolContext) -> ToolResult:
         p = _resolve(ctx, args["path"])
+        # A missing `old`/`new` used to raise KeyError, which the loop surfaced as
+        # the opaque "edit_file failed: KeyError: 'new'" — a call the model can't
+        # learn from. Name the missing field and what it's for so the retry is
+        # informed. (Observed: a model sending edit_file with `old` but no `new`.)
+        if "old" not in args or "new" not in args:
+            missing = "old" if "old" not in args else "new"
+            return ToolResult(
+                f"edit_file is missing the required `{missing}` field. Provide "
+                "both `old` (the exact text to replace) and `new` (the replacement "
+                "text, which must DIFFER from `old`).", is_error=True)
         old, new = args["old"], args["new"]
         try:
             text = p.read_text("utf-8")
@@ -561,7 +584,7 @@ class EditFile:
                 "it), then submit an edit whose `new` carries that correction. If "
                 "this line is already correct, the bug is on a DIFFERENT line — "
                 "stop editing this one and look elsewhere. Do NOT resend this "
-                "same no-op edit.", is_error=True)
+                "same no-op edit." + _TRY_REPLACE_LINES, is_error=True)
         replace_all = bool(args.get("replace_all"))
 
         updated, note, status, count = try_edit(text, old, new, replace_all)
@@ -590,7 +613,8 @@ class EditFile:
                 "way. To re-indent a block, rewrite it with write_file. If you "
                 "meant to change the code, make `new` differ from the file in more "
                 "than whitespace. If the line is already correct, stop editing it "
-                "and look elsewhere. Do NOT resend this same edit.", is_error=True)
+                "and look elsewhere. Do NOT resend this same edit."
+                + _TRY_REPLACE_LINES, is_error=True)
         try:
             p.write_text(updated, "utf-8")
         except OSError as e:
@@ -668,7 +692,14 @@ class ReplaceLines:
             return ToolResult(
                 "replace_lines needs integer `start` and `end` line numbers (1-based, "
                 "inclusive) copied from read_file's output.", is_error=True)
-        new = args.get("new", "")
+        # `new` is required — defaulting a missing one to "" would silently DELETE
+        # the range, which a model that merely forgot the field never intended.
+        if "new" not in args:
+            return ToolResult(
+                "replace_lines is missing the required `new` field (the replacement "
+                "text for the range; pass an empty string only if you truly mean to "
+                "DELETE those lines).", is_error=True)
+        new = args["new"]
         n = len(text.splitlines())
         updated, status = try_replace_lines(text, start, end, new)
         if status != "ok" or updated is None:

@@ -490,3 +490,36 @@ def test_try_replace_lines_bad_range_returns_none(tmp_path):
     # The ASK preview calls this directly — a bad range must yield no diff, not raise.
     updated, status = fs.try_replace_lines("a\nb\n", 9, 9, "z")
     assert status == "bad_range" and updated is None
+
+
+# --- edit_file failures steer toward replace_lines / clear missing-arg errors -
+async def test_edit_file_missing_new_gives_clear_error_not_keyerror(ctx, tmp_path):
+    # A model sending `old` but no `new` used to raise KeyError('new'), surfaced
+    # as an opaque "edit_file failed: KeyError: 'new'". Name the field instead.
+    (tmp_path / "c.py").write_text("x = 1\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1"}, ctx)
+    assert res.is_error
+    assert "KeyError" not in res.content
+    assert "`new`" in res.content and "missing" in res.content.lower()
+
+
+async def test_edit_file_not_found_points_at_replace_lines(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("hello\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "zzz", "new": "q"}, ctx)
+    assert res.is_error and "replace_lines" in res.content
+
+
+async def test_edit_file_noop_old_equals_new_points_at_replace_lines(ctx, tmp_path):
+    # The exact transcript stall: a literal backslash on the line makes the
+    # model's `old` and `new` collapse to identical. Route it to replace_lines.
+    (tmp_path / "c.py").write_text('"""doc.""\\"\n')
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": '"""doc."""', "new": '"""doc."""'}, ctx)
+    assert res.is_error and "replace_lines" in res.content
+
+
+async def test_replace_lines_missing_new_is_not_a_silent_delete(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("a\nb\nc\n")
+    res = await fs.ReplaceLines().run({"path": "c.py", "start": 2, "end": 2}, ctx)
+    assert res.is_error and "`new`" in res.content
+    assert (tmp_path / "c.py").read_text() == "a\nb\nc\n"  # untouched
