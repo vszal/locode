@@ -194,7 +194,7 @@ class PermissionsConfig:
     tools: dict[str, str] = field(default_factory=lambda: {
         "read_file": "auto", "ls": "auto", "glob": "auto", "grep": "auto",
         "write_file": "ask", "append_file": "ask", "edit_file": "ask",
-        "move_file": "ask", "bash": "ask",
+        "replace_lines": "ask", "move_file": "ask", "bash": "ask",
         "web_search": "ask", "web_fetch": "auto",
         # Bookkeeping only — update_plan touches nothing but the agent's own
         # in-memory task list, so prompting for it would be pure noise.

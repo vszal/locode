@@ -152,6 +152,24 @@ def test_format_change_none_for_readonly_tool(tmp_path):
     assert render.format_change("read_file", {"path": "x"}, str(tmp_path)) == ""
 
 
+def test_format_change_previews_replace_lines(tmp_path):
+    # The approval diff (and the auto-approve visibility echo) both go through
+    # format_change, so a line-number edit must render as a real -/+ diff.
+    (tmp_path / "c.py").write_text("a = 1\nb = 2\nc = 3\n")
+    out = render.format_change("replace_lines",
+                               {"path": "c.py", "start": 2, "end": 2, "new": "b = 22"},
+                               str(tmp_path), color=False)
+    assert "-b = 2" in out and "+b = 22" in out
+
+
+def test_format_change_replace_lines_bad_range_is_blank(tmp_path):
+    (tmp_path / "c.py").write_text("a\nb\n")
+    out = render.format_change("replace_lines",
+                               {"path": "c.py", "start": 9, "end": 9, "new": "z"},
+                               str(tmp_path), color=False)
+    assert out == ""
+
+
 def test_format_change_previews_tolerant_edit(tmp_path):
     # The approval diff must reflect a whitespace-tolerant edit (not just exact),
     # so the user approves the real change.

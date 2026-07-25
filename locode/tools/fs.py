@@ -602,7 +602,100 @@ class EditFile:
         return ToolResult(body + _syntax_warning(p, updated))
 
 
+def try_replace_lines(text: str, start, end, new: str):
+    """Replace 1-based lines [start, end] (inclusive) with `new`, returning
+    (updated_text|None, status) with status in {"ok", "bad_range"}.
+
+    The line numbers are read_file's — the counterpart to edit_file's exact-text
+    match, for the case a model can SEE the target line but cannot reproduce its
+    exact bytes (a malformed/odd-whitespace line). `new` == "" deletes the range;
+    otherwise its lines are inserted verbatim. A trailing newline is preserved.
+    Factored out so the approval-diff preview computes the same result the tool
+    will write. `start`/`end` are coerced from str for tolerance."""
+    try:
+        start, end = int(start), int(end)
+    except (TypeError, ValueError):
+        return None, "bad_range"
+    lines = text.splitlines()
+    n = len(lines)
+    if start < 1 or start > n or end < start:
+        return None, "bad_range"
+    end = min(end, n)
+    new_lines = new.split("\n") if new != "" else []
+    result = lines[: start - 1] + new_lines + lines[end:]
+    out = "\n".join(result)
+    if text.endswith("\n") and out:
+        out += "\n"
+    return out, "ok"
+
+
+class ReplaceLines:
+    name = "replace_lines"
+    description = (
+        "Replace a RANGE OF LINES in a file by their line numbers — the fallback "
+        "for when edit_file cannot match the text (a malformed line, odd "
+        "whitespace, or bytes you cannot reproduce exactly). `start` and `end` "
+        "are 1-based inclusive line numbers exactly as read_file prints them (do "
+        "NOT include the number prefixes in `new`). `new` is the replacement text "
+        "for that whole range; pass an empty string to DELETE the lines. Re-read "
+        "the file first to get current line numbers — a prior edit shifts every "
+        "line below it, so stale numbers hit the wrong place. Do NOT put a "
+        "trailing newline in `new` unless you mean to add a blank line."
+    )
+    permission = "ask"
+    schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string"},
+            "start": {"type": "integer", "description": "1-based first line to replace."},
+            "end": {"type": "integer", "description": "1-based last line, inclusive."},
+            "new": {"type": "string", "description": "Replacement text ('' deletes)."},
+        },
+        "required": ["path", "start", "end", "new"],
+    }
+
+    async def run(self, args: dict, ctx: ToolContext) -> ToolResult:
+        p = _resolve(ctx, args["path"])
+        try:
+            text = p.read_text("utf-8")
+        except FileNotFoundError:
+            return ToolResult(f"no such file: {p}", is_error=True)
+        except OSError as e:
+            return ToolResult(f"cannot read {p}: {e}", is_error=True)
+        try:
+            start, end = int(args["start"]), int(args["end"])
+        except (KeyError, TypeError, ValueError):
+            return ToolResult(
+                "replace_lines needs integer `start` and `end` line numbers (1-based, "
+                "inclusive) copied from read_file's output.", is_error=True)
+        new = args.get("new", "")
+        n = len(text.splitlines())
+        updated, status = try_replace_lines(text, start, end, new)
+        if status != "ok" or updated is None:
+            return ToolResult(
+                f"can't replace lines {start}–{end}: {p} has {n} line"
+                f"{'s' if n != 1 else ''}. `start` and `end` are 1-based inclusive "
+                f"line numbers from read_file, needing 1 ≤ start ≤ end and start ≤ "
+                f"{n}. Re-read the file to get current line numbers (a prior edit "
+                "may have shifted them).", is_error=True)
+        if updated == text:
+            return ToolResult(
+                "This edit changed NOTHING: the replacement is identical to what is "
+                "already on those lines. If you are fixing a bug, put the corrected "
+                "code in `new`; if the lines are already correct, the problem is "
+                "elsewhere — do NOT resend this same replacement.", is_error=True)
+        try:
+            p.write_text(updated, "utf-8")
+        except OSError as e:
+            return ToolResult(f"cannot write {p}: {e}", is_error=True)
+        snippet = _edit_snippet(text, updated)
+        body = f"replaced lines {start}–{min(end, n)} in {p}"
+        if snippet:
+            body += "\nThe file now reads (changed region):\n" + snippet
+        return ToolResult(body + _syntax_warning(p, updated))
+
+
 def all_tools() -> list:
     """Instances of every fs tool, read-only first."""
     return [ReadFile(), Ls(), Glob(), Grep(), WriteFile(), AppendFile(),
-            EditFile(), MoveFile()]
+            EditFile(), ReplaceLines(), MoveFile()]

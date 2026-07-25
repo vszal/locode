@@ -68,6 +68,12 @@ class Repl:
         self._tally = {"iterations": 0, "tool_calls": 0, "nudges": 0}
         self._files_changed: set[str] = set()
         self._pending_path: str | None = None
+        # A mutating tool's diff, captured at `run` (file still pristine) and
+        # printed at `result`, so the auto-approve path SHOWS the edit instead of
+        # a bare "✓ edited …". `_diff_shown` suppresses it when the ASK prompt
+        # already displayed the same diff pre-approval.
+        self._pending_diff: str | None = None
+        self._diff_shown = False
         self._loop = AgentLoop(
             client, manager, registry, self._policy, config,
             cwd=str(Path.cwd()),
@@ -205,7 +211,8 @@ class Repl:
         self._turn_chars += len(piece)
         self._sink.feed(piece)
 
-    _MUTATING = ("write_file", "append_file", "edit_file", "move_file")
+    _MUTATING = ("write_file", "append_file", "edit_file", "replace_lines",
+                 "move_file")
 
     def _on_event(self, event: dict) -> None:
         phase = event.get("phase")
@@ -224,8 +231,18 @@ class Repl:
         elif phase == "run":
             self._spinner.stop()
             self._tally["tool_calls"] += 1
-            self._pending_path = event.get("args", {}).get("path") \
-                if event["name"] in self._MUTATING else None
+            is_mut = event["name"] in self._MUTATING
+            self._pending_path = event.get("args", {}).get("path") if is_mut else None
+            # Capture the diff NOW — the file is still in its pre-edit state here
+            # (execution happens between this event and `result`). The ASK path
+            # already showed it at the approval prompt (`_diff_shown`), so only
+            # the auto-approve path needs it.
+            self._pending_diff = None
+            if is_mut and not self._diff_shown:
+                diff = render.format_change(event["name"], event.get("args", {}),
+                                            self._loop._cwd, color=self._color)
+                self._pending_diff = diff or None
+            self._diff_shown = False
             # update_plan renders as a live checklist off its result, not as a
             # generic ⚙ line — showing the plan itself is the point.
             if event["name"] != "update_plan":
@@ -239,10 +256,14 @@ class Repl:
             else:
                 print(render.format_result(event["name"], event.get("content", ""),
                                             event.get("error", False), color=self._color))
+                if self._pending_diff and not event.get("error", False):
+                    print(self._pending_diff)  # show WHAT changed, not just "✓ edited"
             if self._pending_path and not event.get("error", False):
                 self._files_changed.add(self._pending_path)
             self._pending_path = None
+            self._pending_diff = None
         elif phase == "denied":
+            self._diff_shown = False  # never fired a `run`; don't leak into the next tool
             print(render.format_denied(event["name"], event.get("reason", ""),
                                        color=self._color))
         elif phase == "nudge":
@@ -255,6 +276,7 @@ class Repl:
         change = render.format_change(name, args, self._loop._cwd, color=self._color)
         if change:
             print(change)   # show the actual diff before asking to approve it
+            self._diff_shown = True  # don't re-print it at `result`
         q = f"Allow {name}?  {preview}"
         opts = ["yes (once)", "always (session)", "no", "no (always)"]
         ans = await choice.select(q, opts)

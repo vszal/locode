@@ -400,3 +400,93 @@ async def test_append_that_breaks_python_warns_on_full_file(ctx, tmp_path):
     res = await fs.AppendFile().run({"path": "m.py", "content": "def bad(:\n"}, ctx)
     assert res.ok
     assert "SyntaxError" in res.content
+
+
+# --- replace_lines: line-number editing (edit_file's byte-match fallback) -----
+async def test_replace_lines_swaps_a_single_line(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("a = 1\nb = 2\nc = 3\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": 2, "end": 2, "new": "b = 22"}, ctx)
+    assert res.ok
+    assert (tmp_path / "c.py").read_text() == "a = 1\nb = 22\nc = 3\n"
+    assert "2\tb = 22" in res.content  # echoes the changed region, line-numbered
+
+
+async def test_replace_lines_fixes_a_malformed_line_edit_cant_match(ctx, tmp_path):
+    # The transcript case: a docstring line ends in a stray ' instead of \"\"\".
+    # The model can SEE line 2 but can't reproduce its exact bytes for edit_file.
+    q3 = '"' * 3
+    (tmp_path / "s.py").write_text(f"def main():\n    {q3}Run it.'\n    pass\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "s.py", "start": 2, "end": 2, "new": f"    {q3}Run it.{q3}"}, ctx)
+    assert res.ok
+    assert (tmp_path / "s.py").read_text() == f"def main():\n    {q3}Run it.{q3}\n    pass\n"
+
+
+async def test_replace_lines_spanning_range(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("a\nb\nc\nd\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": 2, "end": 3, "new": "X\nY\nZ"}, ctx)
+    assert res.ok
+    assert (tmp_path / "c.py").read_text() == "a\nX\nY\nZ\nd\n"
+
+
+async def test_replace_lines_empty_new_deletes(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("a\nb\nc\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": 2, "end": 2, "new": ""}, ctx)
+    assert res.ok
+    assert (tmp_path / "c.py").read_text() == "a\nc\n"
+
+
+async def test_replace_lines_preserves_missing_final_newline(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("a\nb")  # no trailing newline
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": 2, "end": 2, "new": "B"}, ctx)
+    assert res.ok
+    assert (tmp_path / "c.py").read_text() == "a\nB"
+
+
+async def test_replace_lines_out_of_range_errors_and_leaves_file(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("a\nb\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": 5, "end": 5, "new": "z"}, ctx)
+    assert res.is_error
+    assert "2 lines" in res.content and "re-read" in res.content.lower()
+    assert (tmp_path / "c.py").read_text() == "a\nb\n"
+
+
+async def test_replace_lines_identical_is_a_noop_error(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("a\nb\nc\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": 2, "end": 2, "new": "b"}, ctx)
+    assert res.is_error and "nothing" in res.content.lower()
+    assert (tmp_path / "c.py").read_text() == "a\nb\nc\n"
+
+
+async def test_replace_lines_coerces_string_line_numbers(ctx, tmp_path):
+    # Weak models often send "2" rather than 2.
+    (tmp_path / "c.py").write_text("a\nb\nc\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": "2", "end": "2", "new": "B"}, ctx)
+    assert res.ok
+    assert (tmp_path / "c.py").read_text() == "a\nB\nc\n"
+
+
+async def test_replace_lines_missing_file_errors(ctx):
+    res = await fs.ReplaceLines().run(
+        {"path": "nope.py", "start": 1, "end": 1, "new": "x"}, ctx)
+    assert res.is_error and "no such file" in res.content
+
+
+async def test_replace_lines_syntax_warning_on_bad_python(ctx, tmp_path):
+    (tmp_path / "m.py").write_text("x = 1\ny = 2\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 1, "end": 1, "new": "x = ("}, ctx)
+    assert res.ok and "SyntaxError" in res.content
+
+
+def test_try_replace_lines_bad_range_returns_none(tmp_path):
+    # The ASK preview calls this directly — a bad range must yield no diff, not raise.
+    updated, status = fs.try_replace_lines("a\nb\n", 9, 9, "z")
+    assert status == "bad_range" and updated is None

@@ -121,6 +121,7 @@ grep       = "auto"
 write_file = "ask"
 append_file = "ask"
 edit_file  = "ask"
+replace_lines = "ask"           # line-number edit; fallback when edit_file can't match
 move_file  = "ask"
 bash       = "ask"
 web_search = "ask"

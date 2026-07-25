@@ -353,7 +353,8 @@ def _proposed_change(name: str, args: dict, cwd: str) -> tuple[str, str, str] | 
     unreadable. write_file => existing vs new; append_file => file vs file plus
     the addition; edit_file => file vs replacement."""
     path = args.get("path")
-    if not path or name not in ("write_file", "append_file", "edit_file"):
+    if not path or name not in ("write_file", "append_file", "edit_file",
+                                "replace_lines"):
         return None
     p = Path(os.path.expanduser(path))
     if not p.is_absolute():
@@ -366,6 +367,14 @@ def _proposed_change(name: str, args: dict, cwd: str) -> tuple[str, str, str] | 
         return str(path), before, args.get("content", "")
     if name == "append_file":
         return str(path), before, before + args.get("content", "")
+    if name == "replace_lines":
+        # Resolve through the tool's own transform so the preview is exact.
+        from locode.tools.fs import try_replace_lines
+        after, status = try_replace_lines(
+            before, args.get("start"), args.get("end"), args.get("new", ""))
+        if status != "ok" or after is None:
+            return None
+        return str(path), before, after
     # edit_file: resolve through the tool's own matcher so the previewed diff is
     # exactly what will be written (incl. whitespace-tolerant / fuzzy matches).
     from locode.tools.fs import try_edit
