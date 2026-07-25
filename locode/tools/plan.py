@@ -50,29 +50,47 @@ class UpdatePlan:
             return ToolResult("no plan is available in this context",
                               is_error=True)
         raw = args.get("tasks")
+        # Double-wrap: some models nest the whole call shape inside the argument
+        # and send {"tasks": {"tasks": [...]}} (or with a string inside).
+        # Measured 2026-07-25 (qythos9 exec-bugfix) — the nested dict was
+        # hard-rejected, the model resent the identical shape, and the run
+        # stall-died *after already solving the task*. Unwrap a single-key
+        # {"tasks": X} dict to X and carry on with the value.
+        if isinstance(raw, dict) and set(raw) == {"tasks"}:
+            raw = raw["tasks"]
         if isinstance(raw, str):
             # Models sometimes send a newline-joined string instead of an array.
-            # Recovering it costs three lines and saves an iteration.
+            # Recovering it costs a few lines and saves an iteration.
             #
-            # But a string that OPENS like a JSON array is a different animal: it
-            # is a mangled array, not prose, and adopting it whole is worse than
-            # rejecting it. Measured 2026-07-22 — a model sent the truncated
+            # But a string that OPENS like JSON is a different animal: it is a
+            # mangled array/object, not prose, and adopting it whole is worse
+            # than rejecting it. Measured 2026-07-22 — a model sent the truncated
             # fragment `["[>] Write DESIGN.md — the approach` and the old code
             # took it as a single task. It had no status marker, so it parsed as
             # open, could never be marked done, and the loop's completion gate
             # then refused every final answer for the rest of the turn. The run
-            # produced nothing and scored 0.00. A bad plan that
-            # cannot be completed is a turn-killer, so fail loudly and let the
-            # model retry with a real array.
+            # produced nothing and scored 0.00. Same failure mode measured
+            # 2026-07-25 with the object form `{"tasks": "[ ] run tests"` (the
+            # inner half of a double-wrap the model then truncated): it fell
+            # through to the newline split and became one bogus task. A plan that
+            # cannot be completed is a turn-killer, so recover what parses and
+            # fail loudly on the rest.
             text = raw.strip()
             parsed = None
-            if text.startswith("["):
+            if text[:1] in "[{":
                 try:
                     parsed = json.loads(text)
                 except ValueError:
                     parsed = None
+            # A parsed object is the double-wrap again, one layer down as a
+            # string: {"tasks": [...]} or {"tasks": "..."}. Pull the value out.
+            if isinstance(parsed, dict) and "tasks" in parsed:
+                parsed = parsed["tasks"]
             if isinstance(parsed, list):
                 raw = parsed
+            elif isinstance(parsed, str):
+                raw = [p for p in parsed.replace("\r", "").split("\n")
+                       if p.strip()]
             elif text.startswith("[") and not has_status_marker(text):
                 # Opens like a JSON array, didn't parse as one, and isn't a task
                 # line either. `has_status_marker` rather than the marker regex:
@@ -83,6 +101,15 @@ class UpdatePlan:
                     "`tasks` looks like a JSON array but did not parse — it may "
                     "have been cut off. Send it as a real array of strings, each "
                     "starting with [x], [>] or [ ].", is_error=True)
+            elif text.startswith("{"):
+                # Opens like a JSON object but we couldn't recover a task list
+                # from it. Don't adopt the raw JSON as a single bogus task (that
+                # poisons the completion gate); tell the model the real shape.
+                return ToolResult(
+                    "`tasks` looks like a JSON object, but it must be a plain "
+                    "array of task strings — e.g. [\"[>] first task\", "
+                    "\"[ ] second task\"]. Do not wrap it in another object.",
+                    is_error=True)
             else:
                 raw = [p for p in text.replace("\r", "").split("\n") if p.strip()]
         if not isinstance(raw, list) or not raw:

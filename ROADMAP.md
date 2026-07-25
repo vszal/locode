@@ -79,8 +79,30 @@ are user-visible and waste whole generations.*
   now echoes the **changed region back, line-numbered exactly like read_file**
   (`_edit_snippet`, ±3 context lines, capped at 24 lines). The tolerant tier
   already strips copied line-number prefixes, so echoing them back is safe.
-  +2 fs tests (535 green). *Not yet sweep-validated on a live model — the unit
-  mechanism is proven; confirm it reduces not-found/no-op loops in a round.*
+  +2 fs tests (535 green). *Sweep-validated in r15-editecho (see below).*
+- `[x]` **1.5/1.6 sweep validation (r15-editecho vs r13-edithelp)** — same 2
+  edit-heavy cases × qwencoder14+qythos9 × n=6, build 28. **Mechanisms confirmed
+  live:** the build-28 echo fired on 100% of successful edits (108/108); the
+  build-27 `noop` status caught 14 silent indent-only no-ops on qwencoder14 (0 on
+  qythos9, which doesn't do them). **Scores: 3 of 4 cells improved** — the target
+  cell most: exec-bugfix qwencoder14 **0.29→0.50, clean-finish 1/6→3/6**;
+  e2e-spec-to-code +0.07 (qwen) / +0.13 (qythos). **1 cell regressed:**
+  exec-bugfix qythos9 0.92→0.75, clean 5/6→0/6 — but *every* run repeat-stopped
+  and **3 scored 1.00 (solved) then got killed post-solve**, via two pre-existing
+  loop pathologies (not the echo/noop mechanisms): see 1.7. Attribution: the
+  regression is variance surfacing old fragilities at n=6, not the 27/28
+  mechanisms, which fired correctly.
+- `[x]` **1.7 update_plan double-wrap kills solved runs** — *found 2026-07-25 in
+  the r15 qythos9 exec-bugfix regression.* The model, having already made pytest
+  green, tried to mark its plan done but sent the whole call shape nested inside
+  the argument: `{"tasks": {"tasks": [...]}}` (dict) or its truncated string half
+  `{"tasks": "[ ] run tests"`. The dict form was **hard-rejected** (model resent
+  it → stall); the string form **fell through the newline split and was adopted
+  as one bogus task**, poisoning the completion gate. Either way an
+  already-solved run stall-died. Fix (build 29): `update_plan` unwraps a
+  single-key `{"tasks": X}` wrapper, parses `{`-prefixed JSON strings and pulls
+  out their inner `tasks`, and rejects an unrecoverable JSON-object string with
+  the real array shape instead of false-accepting it. +4 plan tests (539 green).
 
 ## Milestone 2 — Eval-harness trustworthiness
 *The gate must catch real regressions without crying wolf on noise.*

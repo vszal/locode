@@ -190,6 +190,54 @@ async def test_a_plain_task_starting_with_a_bracket_still_splits_by_line():
     assert len(plan.tasks) == 2
 
 
+async def test_tool_unwraps_a_double_wrapped_dict_argument():
+    """The r15 qythos9 exec-bugfix stall: the model sent the whole call shape
+    nested inside the argument — {"tasks": {"tasks": [...]}}. The old code
+    hard-rejected the dict, the model resent the identical shape, and the run
+    stall-died AFTER already solving the task. Unwrap the single-key wrapper."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": {"tasks": ["[x] a", "[ ] b"]}}, make_ctx(plan))
+    assert res.ok
+    assert len(plan.tasks) == 2
+
+
+async def test_tool_unwraps_a_double_wrapped_dict_with_a_string_inside():
+    """Same double-wrap, but the inner value is a single task string, not an
+    array (also seen in the r15 run). Recover it as a one-task plan."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": {"tasks": "[x] run tests to see failures"}}, make_ctx(plan))
+    assert res.ok
+    assert len(plan.tasks) == 1
+    assert plan.tasks[0].status == DONE
+
+
+async def test_tool_rejects_a_truncated_json_object_string():
+    """The other half of the r15 stall: the model sent the inner fragment of a
+    double-wrap as a string — `{"tasks": "[ ] run tests to see failures"` — which
+    does not close. The old code fell through to the newline split and adopted
+    the raw JSON as ONE bogus task, poisoning the completion gate. Reject it with
+    the real shape instead of silently accepting garbage."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": '{"tasks": "[ ] run tests to see failures"'}, make_ctx(plan))
+    assert not res.ok
+    assert "array" in res.content
+    assert plan.tasks == []
+
+
+async def test_tool_recovers_a_well_formed_json_object_string():
+    """A model that JSON-encodes the double-wrap correctly as a string —
+    '{"tasks": ["[x] a", "[ ] b"]}' — should have the inner array pulled out and
+    adopted, not rejected."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": '{"tasks": ["[x] a", "[ ] b"]}'}, make_ctx(plan))
+    assert res.ok
+    assert len(plan.tasks) == 2
+
+
 def test_has_status_marker_accepts_recognized_markers():
     from locode.agent.plan import has_status_marker
     assert has_status_marker("[x] done thing")
