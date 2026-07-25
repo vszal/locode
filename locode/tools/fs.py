@@ -200,6 +200,33 @@ def _not_found_help(text: str, old: str, path: Path) -> str:
             + snippet)
 
 
+def _edit_snippet(before: str, after: str, *, context: int = 3,
+                  max_lines: int = 24) -> str:
+    """A line-numbered view of the region an edit changed, in read_file's format.
+
+    A model that only hears "edited (1 replacement)" is blind to the file's new
+    state: on its next turn it re-targets text that has already changed (a
+    not-found loop) or believes its edit was a no-op (observed in eval). Echoing
+    the changed lines back — numbered exactly like read_file — lets it build an
+    accurate follow-up `old` from what is actually on disk. Capped so a large
+    edit can't flood the reply."""
+    b, a = before.split("\n"), after.split("\n")
+    ops = difflib.SequenceMatcher(None, b, a, autojunk=False).get_opcodes()
+    changed = [(j1, j2) for tag, _i1, _i2, j1, j2 in ops if tag != "equal"]
+    if not changed:
+        return ""
+    lo = max(0, changed[0][0] - context)
+    hi = min(len(a), changed[-1][1] + context)
+    window = a[lo:hi]
+    out = []
+    for i, ln in enumerate(window):
+        if len(out) >= max_lines:
+            out.append(f"       … ({len(window) - i} more lines)")
+            break
+        out.append(f"{lo + i + 1:>6}\t{ln}")
+    return "\n".join(out)
+
+
 def _syntax_warning(path: Path, text: str) -> str:
     """A one-line SyntaxError note to append to a successful .py write, or "".
 
@@ -568,9 +595,11 @@ class EditFile:
             p.write_text(updated, "utf-8")
         except OSError as e:
             return ToolResult(f"cannot write {p}: {e}", is_error=True)
-        return ToolResult(
-            f"edited {p} ({count} replacement{'s' if count != 1 else ''}{note})"
-            + _syntax_warning(p, updated))
+        snippet = _edit_snippet(text, updated)
+        body = f"edited {p} ({count} replacement{'s' if count != 1 else ''}{note})"
+        if snippet:
+            body += "\nThe file now reads (changed region):\n" + snippet
+        return ToolResult(body + _syntax_warning(p, updated))
 
 
 def all_tools() -> list:

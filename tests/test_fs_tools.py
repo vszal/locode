@@ -131,6 +131,30 @@ async def test_edit_file_tolerant_content_change_still_succeeds(ctx, tmp_path):
     assert (tmp_path / "c.py").read_text() == "class A:\n    x = 99\n    y = 2\n"
 
 
+async def test_edit_file_success_echoes_changed_region(ctx, tmp_path):
+    # A successful edit echoes the new state of the changed region, numbered like
+    # read_file, so the model isn't blind to what landed and can build an accurate
+    # follow-up `old`. The NEW content must appear; a couple context lines too.
+    (tmp_path / "c.py").write_text("a = 1\nb = 2\nc = 3\nd = 4\ne = 5\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "c = 3", "new": "c = 30"}, ctx)
+    assert res.ok
+    assert "c = 30" in res.content            # the new content is shown
+    assert "\t" in res.content and "3\tc = 30" in res.content  # line-numbered (line 3)
+    assert "b = 2" in res.content             # a context line above
+    assert (tmp_path / "c.py").read_text() == "a = 1\nb = 2\nc = 30\nd = 4\ne = 5\n"
+
+
+async def test_edit_snippet_caps_large_changes(ctx, tmp_path):
+    # A big edit must not flood the reply: the echoed region is capped.
+    (tmp_path / "c.py").write_text("x = 0\n")
+    big_new = "\n".join(f"line{i}" for i in range(100))
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 0", "new": big_new}, ctx)
+    assert res.ok
+    assert "more lines)" in res.content       # truncation marker present
+    assert res.content.count("\n") < 40       # not the whole 100-line body
+
+
 async def test_edit_file_replace_all(ctx, tmp_path):
     (tmp_path / "c.py").write_text("a\na\n")
     res = await fs.EditFile().run(

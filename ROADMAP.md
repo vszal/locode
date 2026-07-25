@@ -70,9 +70,17 @@ are user-visible and waste whole generations.*
   won. Fix (build 27): `try_edit` now returns a `noop` status when
   `updated == text`, and `edit_file` surfaces it as an error explaining the
   indent-preservation rule and pointing to write_file. +2 fs tests (533 green).
-  *Related but unfixed: a model can also be blind to a SUCCESSFUL edit and
-  misdiagnose it as a no-op (seen in the gemmacoder12 fizzbuzz run) — that's
-  model-state-tracking, a candidate for richer edit success feedback.*
+- `[x]` **1.6 Model blind to its own successful edits** — *the 1.5 sibling;
+  seen in the gemmacoder12 fizzbuzz run where a SUCCESSFUL edit was misdiagnosed
+  as a no-op and the model then re-targeted already-removed text (not-found
+  loop → stop).* Root cause: the success message was just
+  `edited (1 replacement)` — the model never saw the file's new state, so it
+  built the next `old` from a stale mental model. Fix (build 28): `edit_file`
+  now echoes the **changed region back, line-numbered exactly like read_file**
+  (`_edit_snippet`, ±3 context lines, capped at 24 lines). The tolerant tier
+  already strips copied line-number prefixes, so echoing them back is safe.
+  +2 fs tests (535 green). *Not yet sweep-validated on a live model — the unit
+  mechanism is proven; confirm it reduces not-found/no-op loops in a round.*
 
 ## Milestone 2 — Eval-harness trustworthiness
 *The gate must catch real regressions without crying wolf on noise.*
