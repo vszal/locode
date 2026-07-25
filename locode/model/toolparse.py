@@ -371,8 +371,14 @@ def _loose_value(text: str, i: int, arg_keys: set[str]):
         i += 1
     if i >= n:
         return _MISSING, i
-    if text[i] == '"':
-        return _loose_string(text, i + 1, arg_keys)
+    if text[i] in ("'", '"'):
+        # A single-quote delimiter is a weak model reaching for Python/JS string
+        # syntax (qythos9 switches to it whenever the value itself contains "),
+        # so the body follows string-escape rules — `\n` MEANS a newline. Left as
+        # a bare token it fed a literal `'…\n…'` into write_file/edit_file and
+        # corrupted every multi-line arg. Parse it like a double-quoted string,
+        # using its own quote as the terminator.
+        return _loose_string(text, i + 1, arg_keys, quote=text[i])
     # bool / null / number: read to the next structural delimiter.
     j = i
     while j < n and text[j] not in ",}\n":
@@ -389,11 +395,13 @@ def _loose_value(text: str, i: int, arg_keys: set[str]):
         return (token, j) if token else (_MISSING, j)
 
 
-def _loose_string(text: str, i: int, arg_keys: set[str]):
-    """Read a string body from i (just past the opening quote) to its real close,
-    treating a quote as the terminator only when what follows is a structural
-    boundary (a comma+known-key, or a closing brace) — so interior unescaped
-    quotes in code are kept literal. Returns (string, end_index)."""
+def _loose_string(text: str, i: int, arg_keys: set[str], quote: str = '"'):
+    """Read a string body from i (just past the opening `quote`) to its real
+    close, treating `quote` as the terminator only when what follows is a
+    structural boundary (a comma+known-key, or a closing brace) — so interior
+    unescaped quotes in code are kept literal. `quote` is '"' for JSON strings
+    and "'" for the Python-style single-quoted values weak models emit; either
+    way `\\`-escapes are decoded. Returns (string, end_index)."""
     n = len(text)
     buf: list[str] = []
     while i < n:
@@ -402,10 +410,10 @@ def _loose_string(text: str, i: int, arg_keys: set[str]):
             buf.append(_UNESCAPE.get(text[i + 1], text[i + 1]))
             i += 2
             continue
-        if c == '"':
+        if c == quote:
             if _is_value_end(text, i + 1, arg_keys):
                 return "".join(buf), i + 1
-            buf.append('"')      # interior unescaped quote — part of the value
+            buf.append(quote)    # interior unescaped quote — part of the value
             i += 1
             continue
         buf.append(c)

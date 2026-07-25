@@ -182,6 +182,30 @@ def test_recovers_multiple_interior_quotes_and_escaped_newlines():
         '    self.turn = "O" if self.turn == "X" else "X"\n    return True')
 
 
+def test_single_quoted_value_decodes_escapes():
+    # qythos9 switches to Python-style single quotes whenever the value contains
+    # a " (so it can avoid escaping) — and then its \n are ESCAPES meaning
+    # newlines. Left as a bare token they landed as a literal '…\n…' string and
+    # corrupted every multi-line write. Recovery must strip the ' delimiters and
+    # decode the escapes to real newlines.
+    body = ("{\"name\": \"edit_file\", \"args\": {\"path\": \"s.py\", "
+            "\"old\": \"x = 1\", "
+            "\"new\": '    \"\"\"Run it.\"\"\"\\n    print(\"hi\")'}}")
+    out = extract({"content": "```tool\n" + body + "\n```"}, KNOWN)
+    assert len(out.calls) == 1 and not out.malformed
+    assert out.calls[0].args["new"] == '    """Run it."""\n    print("hi")'
+
+
+def test_single_quoted_value_keeps_interior_apostrophe_literal():
+    # An interior ' that is NOT a structural boundary must stay part of the value
+    # (mirrors the double-quote handling), so contractions/possessives survive.
+    body = ("{\"name\": \"edit_file\", \"args\": {\"path\": \"s.py\", "
+            "\"old\": \"a\", \"new\": 'it' + 's fine'}}")
+    out = extract({"content": "```tool\n" + body + "\n```"}, KNOWN)
+    assert len(out.calls) == 1 and not out.malformed
+    assert out.calls[0].args["new"] == "it' + 's fine"
+
+
 def test_recovery_requires_a_known_tool_name():
     # Mis-escaped JSON naming an unknown tool must NOT be conjured into a call.
     body = '{"name": "frobnicate", "args": {"x": "a "b" c"}}'
