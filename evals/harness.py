@@ -99,6 +99,7 @@ class Case:
             prompt=(path / "prompt.md").read_text().strip(),
             allow_tools=meta.get("allow_tools", ["read_file", "write_file",
                                                  "append_file", "edit_file",
+                                                 "replace_lines",
                                                  "bash", "ls", "grep",
                                                  "glob"]),
             timeout=meta.get("timeout", 900),
