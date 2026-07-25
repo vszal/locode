@@ -598,20 +598,20 @@ async def test_repeated_call_nudged_before_bailing(tmp_path):
 
 async def test_error_stall_nudged_then_recovers(tmp_path):
     # The subtler stuck signature: the model VARIES its edits every turn (so the
-    # identical-call detector never fires) yet keeps hitting the same error. The
-    # no-op "old == new" error text is constant regardless of the values, so each
-    # call is a distinct signature with an identical error — exactly the case.
+    # identical-call detector never fires) yet keeps hitting the same error. Each
+    # edit targets a nonexistent file, so every call is a distinct signature with
+    # an identical "no such file" error — exactly the case. (A no-op old==new edit
+    # would take the separate no-change path, not this one.)
     async def confirm(name, args, preview):
         return "yes"
 
-    (tmp_path / "a.txt").write_text("hello")
     cfg = Config()
     cfg.agent.max_error_stall = 3
     cfg.agent.max_repeat_calls = 99  # ensure the *repeat* path can't fire here
     loop = make_loop(tmp_path, [
-        native_call("edit_file", path="a.txt", old="a", new="a"),
-        native_call("edit_file", path="a.txt", old="b", new="b"),
-        native_call("edit_file", path="a.txt", old="c", new="c"),
+        native_call("edit_file", path="ghost.txt", old="a", new="b"),
+        native_call("edit_file", path="ghost.txt", old="c", new="d"),
+        native_call("edit_file", path="ghost.txt", old="e", new="f"),
         {"role": "assistant", "content": "Right — this needs a rewrite, not a swap."},
     ], confirm=confirm, cfg=cfg)
     out = await loop.run_turn("fix it")
@@ -627,12 +627,83 @@ async def test_error_stall_bails_when_ignored(tmp_path):
     async def confirm(name, args, preview):
         return "yes"
 
-    (tmp_path / "a.txt").write_text("hello")
     cfg = Config()
     cfg.agent.max_error_stall = 3
     cfg.agent.max_repeat_calls = 99
     cfg.agent.max_iterations = 25
     # Varying, always-erroring edits forever (FakeClient repeats the last).
+    loop = make_loop(tmp_path, [
+        native_call("edit_file", path="ghost.txt", old="a", new="b"),
+        native_call("edit_file", path="ghost.txt", old="c", new="d"),
+        native_call("edit_file", path="ghost.txt", old="e", new="f"),
+        native_call("edit_file", path="ghost.txt", old="g", new="h"),
+    ], confirm=confirm, cfg=cfg)
+    out = await loop.run_turn("fix it")
+    assert "stopped" in out and "same error" in out
+    runs = sum(1 for m in loop.history
+               if m["role"] == "user" and "Tool results" in m["content"])
+    assert runs < cfg.agent.max_iterations  # bailed early, not at the budget
+
+
+async def test_nochange_edit_nudged_then_recovers(tmp_path):
+    # A no-op edit (old==new) is the model editing blind — usually at a line the
+    # error names but that is actually fine. The FIRST one is tolerated (models
+    # often self-correct); a SECOND consecutive one earns a specific redirect
+    # ("editing... NOTHING"), after which the model recovers.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_nochange_edits = 2
+    cfg.agent.max_repeat_calls = 99   # isolate the no-change path
+    loop = make_loop(tmp_path, [
+        native_call("edit_file", path="a.txt", old="a", new="a"),
+        native_call("edit_file", path="a.txt", old="b", new="b"),
+        {"role": "assistant", "content": "Let me run the compiler to find the real line."},
+    ], confirm=confirm, cfg=cfg)
+    out = await loop.run_turn("fix the syntax error")
+    assert out == "Let me run the compiler to find the real line."  # recovered
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "changing the file NOTHING" in m["content"]]
+    assert len(nudges) == 1
+    # A single no-op earlier must NOT have tripped the same-error stall.
+    assert not any("identical each time" in m.get("content", "")
+                   for m in loop.history)
+
+
+async def test_single_nochange_edit_is_tolerated(tmp_path):
+    # One no-op then a real edit: no redirect at all — the first blind guess is
+    # free, and the streak resets the moment real work happens.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_nochange_edits = 2
+    loop = make_loop(tmp_path, [
+        native_call("edit_file", path="a.txt", old="x", new="x"),   # no-op
+        native_call("edit_file", path="a.txt", old="hello", new="world"),  # real
+        {"role": "assistant", "content": "done"},
+    ], confirm=confirm, cfg=cfg)
+    out = await loop.run_turn("fix it")
+    assert out == "done"
+    assert (tmp_path / "a.txt").read_text() == "world"
+    assert not any("changing the file NOTHING" in m.get("content", "")
+                   for m in loop.history)
+
+
+async def test_nochange_edit_bails_when_ignored(tmp_path):
+    # If the model ignores the redirect and keeps submitting no-op edits, the turn
+    # ends cleanly instead of grinding out zero-change edits to the budget.
+    async def confirm(name, args, preview):
+        return "yes"
+
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_nochange_edits = 2
+    cfg.agent.max_repeat_calls = 99
+    cfg.agent.max_iterations = 25
     loop = make_loop(tmp_path, [
         native_call("edit_file", path="a.txt", old="a", new="a"),
         native_call("edit_file", path="a.txt", old="b", new="b"),
@@ -640,7 +711,7 @@ async def test_error_stall_bails_when_ignored(tmp_path):
         native_call("edit_file", path="a.txt", old="d", new="d"),
     ], confirm=confirm, cfg=cfg)
     out = await loop.run_turn("fix it")
-    assert "stopped" in out and "same error" in out
+    assert "stopped" in out and "change nothing" in out
     runs = sum(1 for m in loop.history
                if m["role"] == "user" and "Tool results" in m["content"])
     assert runs < cfg.agent.max_iterations  # bailed early, not at the budget

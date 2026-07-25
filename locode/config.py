@@ -143,6 +143,7 @@ class AgentConfig:
     max_repetition_aborts: int = 3
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
+    max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing
     # Bail if the model keeps trying to end the turn without EVER having
     # attempted a write_file/edit_file call for a deliverable it was explicitly
     # asked to produce (e.g. "writing a PLAN.md") — as opposed to having tried

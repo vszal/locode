@@ -584,7 +584,8 @@ class EditFile:
                 "it), then submit an edit whose `new` carries that correction. If "
                 "this line is already correct, the bug is on a DIFFERENT line — "
                 "stop editing this one and look elsewhere. Do NOT resend this "
-                "same no-op edit." + _TRY_REPLACE_LINES, is_error=True)
+                "same no-op edit." + _TRY_REPLACE_LINES,
+                is_error=True, no_change=True)
         replace_all = bool(args.get("replace_all"))
 
         updated, note, status, count = try_edit(text, old, new, replace_all)
@@ -614,7 +615,7 @@ class EditFile:
                 "meant to change the code, make `new` differ from the file in more "
                 "than whitespace. If the line is already correct, stop editing it "
                 "and look elsewhere. Do NOT resend this same edit."
-                + _TRY_REPLACE_LINES, is_error=True)
+                + _TRY_REPLACE_LINES, is_error=True, no_change=True)
         try:
             p.write_text(updated, "utf-8")
         except OSError as e:
@@ -714,7 +715,8 @@ class ReplaceLines:
                 "This edit changed NOTHING: the replacement is identical to what is "
                 "already on those lines. If you are fixing a bug, put the corrected "
                 "code in `new`; if the lines are already correct, the problem is "
-                "elsewhere — do NOT resend this same replacement.", is_error=True)
+                "elsewhere — do NOT resend this same replacement.",
+                is_error=True, no_change=True)
         try:
             p.write_text(updated, "utf-8")
         except OSError as e:

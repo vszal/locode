@@ -169,6 +169,14 @@ class AgentLoop:
         # test command between three different edits is progress, not a stall.
         repeat_streaks: dict[tuple, tuple[str, int]] = {}
         error_streaks: dict[str, int] = {}
+        # Consecutive iterations whose edit batch changed the file NOTHING (a
+        # blind guess — usually at a line the error names but that is actually
+        # fine, since tracebacks/compilers misreport the location). The first is
+        # tolerated (the model often self-corrects); a second in a row earns a
+        # specific redirect (confirm the real failure before editing again); a
+        # third stops the turn. Reset the moment any batch does real work.
+        nochange_streak = 0
+        nudged_nochange = False
         # Filenames the user asked to be WRITTEN this turn (e.g. "writing a
         # PLAN.md") — tracked against write_file/edit_file calls actually
         # attempted, to catch a model that reads around and then narrates a
@@ -545,7 +553,7 @@ class AgentLoop:
                         path = c.args.get("path")
                         if path:
                             read_paths.add(os.path.basename(str(path)).lower())
-                error_sig, result_sig = await self._run_calls(calls)
+                error_sig, result_sig, no_change = await self._run_calls(calls)
                 # Headless only: an ASK tool nobody can approve is refused for
                 # the whole session, so a model still trying after this many
                 # refusals is not going to stop on its own. Interactively the
@@ -577,6 +585,24 @@ class AgentLoop:
                             continue
                         return self._stop("edits kept hitting the same error "
                                           "without making progress")
+                # A no-change edit (old==new, indent-only, identical replace) is
+                # the model editing blind — almost always the reported error line
+                # is fine and the real fault is elsewhere. Distinct from the
+                # same-error stall above: nothing was even changed. One is
+                # tolerated (self-correction is common); a second consecutive one
+                # earns a redirect toward CONFIRMING the fault first; a third ends
+                # the turn rather than letting it grind out no-op edits.
+                if no_change:
+                    nochange_streak += 1
+                    if nochange_streak >= self._cfg.agent.max_nochange_edits:
+                        if not nudged_nochange:
+                            nudged_nochange = True
+                            self._nudge_nochange()
+                            continue
+                        return self._stop("the model kept submitting edits that "
+                                          "change nothing")
+                else:
+                    nochange_streak = 0
                 # A salvaged truncated write just landed a PARTIAL document. The
                 # tool result reads like a normal success, so without this the
                 # model would call the file done and stop. Tell it plainly the
@@ -595,25 +621,32 @@ class AgentLoop:
             return "⛔ interrupted"
 
     # --- internals -------------------------------------------------------
-    async def _run_calls(self, calls) -> tuple[str | None, str]:
-        """Run the batch, feed the results back, and return two signatures.
+    async def _run_calls(self, calls) -> tuple[str | None, str, bool]:
+        """Run the batch, feed the results back, and return two signatures plus a
+        no-change flag.
 
         The first is the ERROR signature — the joined content of any is_error
         results, keyed by tool name, or None if nothing errored — which the loop
         uses to detect edits that keep hitting the same failure. Denials and
         unknown-tool aren't model-fixable code errors, so they don't count
-        toward the stall signal.
+        toward the stall signal. A no-change edit is an error the model must see
+        but is ALSO excluded here: "no edit happened" is a different failure
+        from "the edit hit a code error", tracked on its own faster streak so it
+        doesn't inflate the same-error stall or drown out a real recurring error.
 
         The second is the FULL result signature, errors and successes alike. It
         answers a different question: "did this exact call actually do anything
         different this time?" A repeated call whose output changes is working;
         one whose output is identical cannot make progress no matter how often
-        it is retried."""
+        it is retried.
+
+        The third is True when any call in the batch was a no-change edit."""
         ctx = ToolContext(cwd=self._cwd, cancel=self.cancel,
                           confirm=self._confirm, select=self._select,
                           plan=self.plan)
         results: list[tuple[str, str]] = []
         error_parts: list[str] = []
+        no_change = False
         for call in calls:
             tool = self._registry.get(call.name)
             if tool is None:
@@ -673,12 +706,18 @@ class AgentLoop:
                             "error": res.is_error, "content": res.content,
                             "seconds": round(time.monotonic() - t0, 3)})
             results.append((call.name, res.content))
-            if res.is_error:
+            if getattr(res, "no_change", False):
+                # A no-change edit is a real error to the model but not a
+                # "same recurring code error" — keep it out of the error-stall
+                # signal; the no-change streak handles it (sooner, and with the
+                # right redirect).
+                no_change = True
+            elif res.is_error:
                 error_parts.append(f"{call.name}: {res.content}")
         self.history.append({"role": "user", "content": tool_results_block(results),
                              "kind": "tool_result"})
         result_sig = "\n".join(f"{name}: {content}" for name, content in results)
-        return ("\n".join(error_parts) if error_parts else None), result_sig
+        return ("\n".join(error_parts) if error_parts else None), result_sig, no_change
 
     def _denial_text(self, name: str, reason: str = "user declined") -> str:
         """What a refused tool call tells the model.
@@ -812,6 +851,23 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "repeated call"})
+
+    def _nudge_nochange(self) -> None:
+        self.history.append({
+            "role": "user",
+            "content": ("Your edits are changing the file NOTHING — the `new` you "
+                        "submit equals what is already there, so you are editing a "
+                        "line you have not confirmed is actually wrong. Error "
+                        "locations are frequently MISREPORTED: the tool that failed "
+                        "often points at a line that is fine while the real fault is "
+                        "elsewhere. Before editing again, get the current ground "
+                        "truth — re-run the exact command that produced the error to "
+                        "see its real location and message, or re-read the "
+                        "surrounding code. Only edit once you know the exact text "
+                        "that is wrong and what it should become."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "edit changed nothing"})
 
     def _nudge_stall(self) -> None:
         self.history.append({

@@ -26,6 +26,14 @@ class ToolResult:
     is_error: bool = False
     # Optional richer display for the UI (e.g. a diff); falls back to content.
     display: str | None = None
+    # An edit that ran but left the file byte-for-byte unchanged (old==new, an
+    # indent-only match, an identical replace_lines). It IS an error the model
+    # must react to, but a *distinct kind*: not "the edit hit a code error" —
+    # "no edit happened at all". The loop tracks these on their own fast streak
+    # (a blind guess at a line that's actually fine) rather than lumping them
+    # into the same-error stall, so the redirect comes sooner and says the right
+    # thing. See loop.py's no-change handling.
+    no_change: bool = False
 
     @property
     def ok(self) -> bool:
