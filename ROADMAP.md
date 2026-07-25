@@ -186,6 +186,25 @@ the lived experience.*
   capability-bound** (3.1) or upstream plan quality — pushing the loop guards
   harder trades false-positives against legitimate work. Revisit if a stronger
   base model changes the capability picture.
+  - **Update 2026-07-25 (build 37, `r20-replacelines-live`): one silent
+    edit-drop closed, one new alternation-stall opened.** A convergence win: the
+    default model (qythos9) was failing a trivial raw-error bugfix **6/6**
+    because its correct `edit_file` call, emitted as single-quoted JSON with a
+    dropped closing `'`, left a trailing `}}` whose unterminated string swallowed
+    the closing tool fence — `_closing_fence` dropped the whole call and the turn
+    ended with the fix unexecuted. Build 37's parser recovery (`_closing_fence`
+    EOF-in-string + `_strip_structural_tail`) took the blindprobe **6/6 BROKEN →
+    6/6 OK** and lifted exec-bugfix qythos9 0.92 → **1.00**. Separately, the eval
+    had never auto-approved `replace_lines` (build 34's `edit_file` fallback);
+    fixing that (default + all six pinned case allowlists) lifted exec-bugfix
+    qwencoder14 0.50 → **0.92** — but surfaced a **new, harness-fixable stall**:
+    on exec-stall-trap qwencoder14 (0.92 → 0.44) the model alternates
+    `edit_file` ↔ `replace_lines` on the same target without converging. The
+    repeat guard keys off an identical *call* and the no-change guard off
+    `edit_file` results, so **cross-tool edit alternation slips both** — the tool
+    name differs each iteration. **Next lever (open): treat successive mutating
+    edits to the same path that leave the file unchanged as one no-progress
+    signature, regardless of which edit tool made them.** (D64.)
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+

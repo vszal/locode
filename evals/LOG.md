@@ -1147,3 +1147,72 @@ demonstration yet of why 2.1 (variance-aware gate) matters.
 **Tests:** 519 green.
 
 ---
+
+## Round 15 — the qythos9 edit-drop, and the tool the eval forgot to allow (`r20-replacelines-live`, HEAD `4635030`, n=6)
+
+Builds 23–36 landed through commits (salvage, single-quote recovery, the
+replace_lines fallback, the no-change fast-stall path) without full narrative
+rounds; this round picks the thread back up at **build 37** and folds in a set
+of this-session diagnostic sweeps (`r17-lookfirst-before` … `r19`) that were
+superseded by the clean `r20` baseline below.
+
+**The lever the feedback asked for did not reproduce.** The opening ask was to
+"trim the opening noop guess" — the model blind-editing before gathering ground
+truth. Measured on build 36 it is a **non-problem: 0/24** blind opens across the
+baseline, **0/12** on a purpose-built raw-error probe. Builds 34–36 had already
+closed it. Per D58/D59 discipline — no lever without a measured problem — no
+prompt line was shipped. (D61.)
+
+**Measuring that non-problem surfaced the real one.** The probe hands the model
+a *misreported* `SyntaxError` (Python blames line 29/32; the true fault is a
+six-quote docstring on line 24) with no "read first" steering. qythos9 failed
+it **6/6** — but not by blind-editing (0/12). Its *correct* `edit_file` call was
+emitted as Python single-quoted JSON that **dropped the closing `'`**, leaving a
+trailing `}}`; the unterminated string ran to EOF and **swallowed the closing
+`` ``` `` fence**, so `_closing_fence` found no closer and the whole call was
+silently discarded. The turn ended with the fix never executed — the exact
+"repeated edit attempts, turn fails without moving past the edit" flailing.
+
+**Build 37 fixes it in the parser, only on the already-broken path.**
+`_closing_fence` now remembers the first `` ``` `` seen inside an unterminated
+string and returns it at EOF; `_loose_string`'s run-off-end return strips leaked
+structural closers (`f"…"}}` → `f"…"`) via a new `_strip_structural_tail` (which
+leaves truncated partials untouched, so `salvage_truncated_write` is unaffected).
+Clean calls never reach these branches — proof: **qythos9 harness rows are
+pixel-identical to baseline**, and the blindprobe went **6/6 BROKEN → 6/6 OK**
+with *genuine* fixes (all functions intact, not hollow-outs). +4 tests.
+
+**The r18 gate "FAIL" was an eval-infra bug, not a regression.** exec-bugfix
+qwencoder14 dropped 0.50 → 0.29, dead-ending on "the tools this task needs are
+not available in this session." Root cause: the harness never auto-approved
+`replace_lines` (added build 34) — every case pins its own `allow_tools` and
+all six omitted it — so build 34's own `edit_file → replace_lines` steering sent
+the model into an un-approvable dead-end. Fixed across the default list **and**
+all six pinned cases. qythos9 was untouched throughout (0.92 / 1.00 in every
+sweep), proving the parser change was never implicated.
+
+**The clean r20 baseline (replace_lines now live) — a real win and a real new
+flail:**
+
+| row | r17 base | r20 | reading |
+|---|---|---|---|
+| exec-bugfix::qythos9 | 0.92 | **1.00** | build 37 net-positive; the dropped edit now lands |
+| exec-stall-trap::qythos9 | 1.00 | **1.00** | stable |
+| exec-bugfix::qwencoder14 | 0.50 | **0.92** | `replace_lines` finally usable — the eval was denying a real product tool |
+| exec-stall-trap::qwencoder14 | 0.92 | 0.44 | **new flailing mode:** weak model alternates `edit_file`↔`replace_lines` without converging |
+
+The stall-trap drop is **faithful, not a regression to hide**: the product *does*
+offer `replace_lines`, and a case built to trap stalls correctly caught that
+handing a weak model the fallback creates a fresh non-converging loop. That is a
+north-star signal (mid-task flailing), logged for a follow-up on loop detection.
+
+| # | Decision | Why |
+|---|---|---|
+| D61 | Do NOT ship a "look before you edit" prompt lever | The opening-noop it targets is 0/24 on build 36 — already closed by builds 34–36. No lever without a measured problem (D58/D59). |
+| D62 | Build 37 (`_closing_fence` EOF recovery + `_strip_structural_tail`) is correct and neutral | Fires only on malformed input; qythos9 rows pixel-identical to baseline; blindprobe 6/6 BROKEN→OK with genuine fixes. |
+| D63 | `replace_lines` must be auto-approved wherever `edit_file` is | It is `_PATH_MUTATING` like the other editors and the loop actively steers toward it; denying it in eval both dead-ends runs and measures a product the user never sees. |
+| D64 | The exec-stall-trap qwencoder14 0.92→0.44 drop is a signal to KEEP, not suppress | It is the faithful consequence of D63 — `edit_file`↔`replace_lines` alternation is real flailing the stall-trap case is designed to expose. Next lever: teach loop detection to treat cross-tool edit alternation as one no-progress signature. |
+
+**Tests:** 572 green (+4 toolparse regression tests for the build-37 fix).
+
+---
