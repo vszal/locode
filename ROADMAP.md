@@ -160,11 +160,32 @@ the lived experience.*
   dead-ends). Slower 9B that can hit the generation cap on large writes, but
   editing reliability dominates interactive use. Landed in config.py,
   scaffold.py, config.toml.example, test_config.py (build 26). User decision.
-- `[ ]` **4.4 Convergence / clean-finish.** clean_finish is ~8% across the eval
-  suite — sessions almost never end on a clean "done", they flail and stall out.
-  The deepest usability lever, and the hardest. Diagnose whether the models
-  *could* converge with better mid-turn steering vs. a raw capability wall
-  (3.1 says the latter dominates on e2e) before building.
+- `[~]` **4.4 Convergence / clean-finish.** clean_finish is low suite-wide —
+  sessions rarely end on a clean "done", they flail and stall. The deepest, and
+  hardest, usability lever. **Per-case flailing map (r12-salvage, all 6 cases ×
+  2 models × n=8, cross-referenced with r15/r16):**
+  - `design-doc` 16/16 clean, `plan-doc` 15/16 — doc stages are at ceiling.
+  - `exec-bugfix` — **update_plan malformation was the dominant harness-fixable
+    stall** (11/31 update_plan calls errored in r12). Fixed by 1.7/1.7b; r16
+    confirmed the fix eliminates the "solved-but-churns-past-the-win" pattern:
+    every run that reached pytest-green now clean-finishes (r15 2/4 churned →
+    r16 0/5). Residual = capability wall (wrong-fix iteration; old==new on an
+    already-correct line).
+  - `exec-from-plan` 11/16 clean (best hard case). Residual stall = the model
+    finishes the real work but leaves a **non-actionable meta-task** open
+    ("[ ] Read PLAN.md and understand…" — the exact vagueness the tool
+    description warns against), then re-sends the *identical* plan. The
+    anti-revision nudge fires and the repeat guard kills it correctly — it is
+    already handled; a new lever would fire only 1–2 iters sooner at real
+    false-positive risk. Upstream plan-quality issue, not a loop bug.
+  - `e2e-spec-to-code` 0/16 — the 3.1 capability wall (wrong logic / broken
+    syntax). Harness levers exhausted.
+  - `exec-stall-trap` 7/16 — designed to bait stalling; mixed.
+  **Assessment: the harness-fixable convergence levers are now captured (1.5/1.6
+  edit-path, 1.7/1.7b update_plan shapes). The remaining non-convergence is
+  capability-bound** (3.1) or upstream plan quality — pushing the loop guards
+  harder trades false-positives against legitimate work. Revisit if a stronger
+  base model changes the capability picture.
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
