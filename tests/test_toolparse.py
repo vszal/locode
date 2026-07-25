@@ -290,6 +290,52 @@ def test_closing_fence_tracks_single_quote_string_context():
     assert "```py" in text[:idx]
 
 
+def test_closing_fence_recovers_when_unterminated_string_swallows_it():
+    # Build 37 root cause: qythos9's single-quoted `new` DROPPED its closing '
+    # entirely, leaving trailing `}}`. The unterminated string then ran to EOF
+    # and swallowed the real ``` fence, so the whole edit_file call vanished and
+    # the turn ended with the fix unexecuted. _closing_fence must remember the
+    # first ``` seen inside an unterminated string and hand it back at EOF.
+    from locode.model.toolparse import _closing_fence
+    body = ('{"name": "edit_file", "args": {"path": "w.py", '
+            # note: `new` opens ' but never closes it — the } } that follow are
+            # literal, and the ``` below sits INSIDE the still-open string.
+            '''"new": 'return f"{a}x{b}"}}''')
+    text = body + "\n```\ntrailer"
+    idx = _closing_fence(text, 0)
+    assert idx is not None
+    assert text[idx:idx + 3] == "```"
+
+
+def test_unterminated_single_quote_edit_recovers_clean_call():
+    # End-to-end of the above: the exact failure shape (single-quoted `new`
+    # missing its closing ', trailing }}) must recover a usable edit_file whose
+    # `new` is the code WITHOUT the leaked structural }} tail.
+    edit = ('{"name": "edit_file", "args": {"path": "w.py", '
+            '''"old": 'def describe(w):\\n    """doc""""""', '''
+            '''"new": 'def describe(w):\\n    """doc"""\\n    return w.name}}''')
+    content = "```tool\n" + edit + "\n```\n"
+    out = extract({"content": content},
+                  {"edit_file"}, {"path", "old", "new"})
+    assert not out.malformed
+    assert [c.name for c in out.calls] == ["edit_file"]
+    new = out.calls[0].args["new"]
+    assert not new.endswith("}}")
+    assert new == 'def describe(w):\n    """doc"""\n    return w.name'
+
+
+def test_strip_structural_tail():
+    from locode.model.toolparse import _strip_structural_tail
+    # leaked closers that unbalance the value's OWN brackets are trimmed...
+    assert _strip_structural_tail('return f"{a}x{b}"}}') == 'return f"{a}x{b}"'
+    assert _strip_structural_tail('return {"a": 1}}}') == 'return {"a": 1}'
+    assert _strip_structural_tail('items = [1, 2]]') == 'items = [1, 2]'
+    # ...but balanced content and truncated-open partials are left untouched
+    # (the latter matters so salvage_truncated_write still fires on them).
+    assert _strip_structural_tail('x = {"a": 1}') == 'x = {"a": 1}'
+    assert _strip_structural_tail('def f():\n    x = {') == 'def f():\n    x = {'
+
+
 # --- salvage_truncated_write: recover a write cut off at the token limit ------
 
 from locode.model.toolparse import salvage_truncated_write

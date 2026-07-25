@@ -305,10 +305,22 @@ def _closing_fence(content: str, i: int) -> int | None:
     a `"`, so a value like `'x = \"\"\"doc\"\"\"'` carries an ODD number of
     interior double-quotes. Tracking only `"` desynced on those and mistook the
     real closing ``` for string interior — dropping the whole call. See the
-    single-quote loose-recovery path (`_loose_string`) for the sibling fix."""
+    single-quote loose-recovery path (`_loose_string`) for the sibling fix.
+
+    Resilience to an UNTERMINATED string: a weak model sometimes drops the
+    closing quote of the last value (e.g. `"new": 'code…"}}` with no closing
+    `'`). Tracking string state then runs to EOF still "inside" that string and
+    swallows the real closing ``` — the whole call vanishes silently (neither a
+    call nor a malformed retry, so the loop reads it as a finished answer). We
+    guard that by remembering the first ``` seen inside the currently-open
+    string; if we reach EOF still in a string, that string never closed and the
+    remembered ``` was really the fence. A properly closed string clears the
+    memo on close and never reaches EOF still-quoted; a genuinely truncated
+    stream (no interior ```) leaves it None and we still report None."""
     n = len(content)
     quote: str | None = None   # active string delimiter, or None outside a string
     esc = False
+    fence_in_string: int | None = None  # first ``` inside the current open string
     while i < n:
         c = content[i]
         if quote is not None:
@@ -318,6 +330,10 @@ def _closing_fence(content: str, i: int) -> int | None:
                 esc = True
             elif c == quote:
                 quote = None
+                fence_in_string = None   # closed cleanly — forget its interior ```
+            elif (fence_in_string is None and c == "`"
+                  and content.startswith("```", i)):
+                fence_in_string = i      # remember, but keep scanning the string
             i += 1
         elif c in ('"', "'"):
             quote = c
@@ -326,6 +342,8 @@ def _closing_fence(content: str, i: int) -> int | None:
             return i
         else:
             i += 1
+    if quote is not None and fence_in_string is not None:
+        return fence_in_string           # unterminated string swallowed the fence
     return None
 
 
@@ -427,7 +445,38 @@ def _loose_string(text: str, i: int, arg_keys: set[str], quote: str = '"'):
             continue
         buf.append(c)
         i += 1
-    return "".join(buf), n       # ran off the end (truncated) — return what we got
+    # Ran off the end without the closing quote. Two cases share this exit: a
+    # stream truncated mid-value (salvage keeps the partial as-is) and a value
+    # whose closing quote the model simply dropped, leaving the JSON's own
+    # closers glued on (`f"…{h}"}}`). Trim only a trailing run of closers that
+    # unbalances the value's OWN brackets — that is leaked structure, never the
+    # string's content. A truncated partial has no such trailing unmatched
+    # closers, so it is returned untouched.
+    return _strip_structural_tail("".join(buf)), n
+
+
+def _strip_structural_tail(s: str) -> str:
+    """Remove trailing closing brackets that leaked from the enclosing JSON into
+    an unterminated string value. `d` = the value's net bracket balance; if it is
+    negative the last `-d` closers (and any whitespace among/after them) are the
+    args/object closers the missing quote let through — strip exactly those,
+    leaving balanced interior brackets (f-string `{h}`, dict/list literals)
+    intact. `f"…{h}"}}` -> `f"…{h}"`; `return {"a": 1}}}` -> `return {"a": 1}`."""
+    depth = s.count("{") + s.count("[") - s.count("}") - s.count("]")
+    if depth >= 0:
+        return s
+    remove = -depth
+    i = len(s)
+    while i > 0 and remove > 0:
+        c = s[i - 1]
+        if c in "}]":
+            remove -= 1
+            i -= 1
+        elif c in " \t\r\n":
+            i -= 1
+        else:
+            break
+    return s[:i].rstrip()
 
 
 def _is_value_end(text: str, i: int, arg_keys: set[str]) -> bool:
