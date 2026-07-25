@@ -27,7 +27,7 @@ mlx_bin = ""            # path to mlx_lm.server; auto-detected if empty
 memory_reserve_gb = 5.0
 
 [model]
-default = "qwen14"     # alias (or full "org/model" id) to load at startup
+default = "qythos9"    # alias (or full "org/model" id) to load at startup
 # Per-turn generation ceiling. A whole write_file/edit_file call — the file
 # body included — must fit in ONE completion, and on a reasoning distill the
 # <think> preamble eats into the same budget, so keep this generous enough to
@@ -163,8 +163,10 @@ timing   = true            # per-turn "~tok · Ns · tok/s" trailer
 [aliases]
 # Short names for full Hugging Face model ids; a full "org/model" id always
 # works with no alias defined. No table is shipped in code — the starter
-# config (locode/scaffold.py) seeds a few real 4-bit MLX examples on first run.
-# qwen14 = "mlx-community/Qwen3-14B-4bit"
+# config (locode/scaffold.py) seeds a few real 4-bit MLX examples on first run,
+# including the default:
+# qythos9 = "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx"
+# qwen14  = "mlx-community/Qwen3-14B-4bit"
 
 [thinking]
 # Per-model reasoning override: alias or model-id substring -> "on" | "off" |

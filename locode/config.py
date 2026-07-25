@@ -64,7 +64,13 @@ class ServerConfig:
 
 @dataclass
 class ModelConfig:
-    default: str = "qwen14"
+    # qythos9 is the out-of-box default because it is the reliable editor: across
+    # the eval rounds it landed edits at ~84% vs the alternatives' ~58%, and it
+    # owned none of the no-op edit dead-ends that stall a turn. It is a smaller,
+    # slower 9B and can hit the generation cap on very large single-file writes,
+    # but for an interactive coding tool, edits that actually apply matter more
+    # than raw speed. Override per-run with -m or per-machine in config.toml.
+    default: str = "qythos9"
     # Per-turn generation ceiling. A whole write_file/edit_file call — the file
     # body included — must fit in ONE completion, and on a reasoning distill the
     # <think> preamble eats into the same budget, so a tight cap truncates the

@@ -21,10 +21,11 @@ STARTER_CONFIG = """\
 # entirely and pass a full "org/model" id (with -m or /model).
 
 [model]
-default = "qwen14"          # which alias to load at startup
+default = "qythos9"         # which alias to load at startup (the reliable editor)
 
 [aliases]
 # alias       = "huggingface-org/model-id"
+qythos9     = "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx"
 gemma12     = "rajaschitnis/gemma-4-12b-it-text-only-4bit-mlx"
 qwen14      = "mlx-community/Qwen3-14B-4bit"
 qwencoder14 = "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"

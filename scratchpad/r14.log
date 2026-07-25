@@ -1,0 +1,42 @@
+[1/12] e2e-spec-to-code · qwencoder14 · run 1…
+        score=0.80 iters=17 nudges=1 202.8s STOPPED
+[2/12] e2e-spec-to-code · qwencoder14 · run 2…
+        score=0.80 iters=25 nudges=2 226.1s STOPPED
+[3/12] e2e-spec-to-code · qwencoder14 · run 3…
+        score=0.80 iters=18 nudges=2 234.1s STOPPED
+[4/12] e2e-spec-to-code · qwencoder14 · run 4…
+        score=0.80 iters=23 nudges=2 270.9s STOPPED
+[5/12] e2e-spec-to-code · qwencoder14 · run 5…
+        score=0.80 iters=14 nudges=1 171.8s STOPPED
+[6/12] e2e-spec-to-code · qwencoder14 · run 6…
+        score=0.80 iters=17 nudges=1 167.3s STOPPED
+[7/12] e2e-spec-to-code · qythos9 · run 1…
+        score=0.70 iters=39 nudges=3 747.3s STOPPED
+[8/12] e2e-spec-to-code · qythos9 · run 2…
+        score=0.70 iters=19 nudges=3 773.2s STOPPED
+[9/12] e2e-spec-to-code · qythos9 · run 3…
+        score=0.70 iters=34 nudges=3 920.6s ok
+[10/12] e2e-spec-to-code · qythos9 · run 4…
+        score=0.70 iters=70 nudges=0 436.6s STOPPED
+[11/12] e2e-spec-to-code · qythos9 · run 5…
+        score=0.00 iters=9 nudges=1 43.9s STOPPED
+[12/12] e2e-spec-to-code · qythos9 · run 6…
+        score=0.70 iters=13 nudges=4 1200.2s STOPPED
+
+=== RESULTS · r14-syntax ===
+overall score      : 0.692
+clean-finish rate  : 0.083
+total iterations   : 298
+total nudges       : 23  {'repeated call': 13, 'unchanged': 2, 'truncated': 5, 'slow progress': 2, 'missing deliverable': 1}
+generation rate    : 75.7 chars/s
+
+case                      model          n  score  iter  nudge  clean    secs    ch/s
+-------------------------------------------------------------------------------------
+e2e-spec-to-code          qwencoder14    6   0.80  19.0    1.5   0.00   212.2      56
+    ⏹ the model repeated the same tool call without making progress
+e2e-spec-to-code          qythos9        6   0.58  30.7    2.3   0.17   687.0      82
+    ⏹ the model repeated the same tool call without making progress
+    ⏹ budget: max iterations reached
+    ⏹ budget: the turn's wallclock ran out while generating (~0 chars into this reply)
+
+wrote /Users/vszalvay/Code/locode/evals/results/r14-syntax/results.json
