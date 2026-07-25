@@ -104,6 +104,33 @@ async def test_edit_file_noop_is_refused_with_actionable_help(ctx, tmp_path):
     assert (tmp_path / "c.py").read_text() == "value = compute()\n"
 
 
+async def test_edit_file_indent_only_change_is_reported_as_noop(ctx, tmp_path):
+    # old != new as strings (they differ only in leading indentation), so the
+    # exact `old == new` guard does NOT fire. `old` lacks the file's indent so the
+    # exact tier misses; the whitespace-tolerant tier matches but STRIPS new's
+    # first-line indent and preserves the file's original -> the result is
+    # byte-for-byte identical. This must be an error, not a false "edited"
+    # success, or a model trying to fix indentation loops forever thinking it won.
+    (tmp_path / "c.py").write_text("class A:\n    x = 1\n    y = 2\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "x = 1\ny = 2", "new": "x = 1\n    y = 2"}, ctx)
+    assert res.is_error
+    assert "nothing" in res.content.lower() or "identical" in res.content.lower()
+    assert "indent" in res.content.lower()
+    assert (tmp_path / "c.py").read_text() == "class A:\n    x = 1\n    y = 2\n"
+
+
+async def test_edit_file_tolerant_content_change_still_succeeds(ctx, tmp_path):
+    # Guard the fix's blast radius: a whitespace-tolerant match that DOES change
+    # content (not just indent) must still report success and write. `old` lacks
+    # the file's indentation so it misses the exact tier and lands in tier 2.
+    (tmp_path / "c.py").write_text("class A:\n    x = 1\n    y = 2\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "x = 1\ny = 2", "new": "x = 99\n    y = 2"}, ctx)
+    assert res.ok and "whitespace-tolerant" in res.content
+    assert (tmp_path / "c.py").read_text() == "class A:\n    x = 99\n    y = 2\n"
+
+
 async def test_edit_file_replace_all(ctx, tmp_path):
     (tmp_path / "c.py").write_text("a\na\n")
     res = await fs.EditFile().run(

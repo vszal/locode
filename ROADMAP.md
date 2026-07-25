@@ -60,6 +60,19 @@ are user-visible and waste whole generations.*
   score 1.00 → 0.92 / e2e 0.76 → 0.60), but n=6 (was 8) and it is concentrated
   in the wallclock-death e2e case — plausibly noise, not confirmed. Worth a
   re-check if qythos9 edit reliability shows up again.*
+- `[x]` **1.5 Silent false-success no-op edits** — *found 2026-07-24 while
+  trying gemmacoder12; user-reported "old==new, same as every model".* Distinct
+  from 1.4's exact `old==new` (already caught): the **whitespace-tolerant** (and
+  fuzzy) match tier strips `new`'s leading indent and preserves the file's
+  original, so an **indent-only "fix" produces a byte-identical file** — yet
+  `run()` reported it as `edited (1 replacement, whitespace-tolerant)`. Every
+  model that tries to fix indentation via edit_file loops forever thinking it
+  won. Fix (build 27): `try_edit` now returns a `noop` status when
+  `updated == text`, and `edit_file` surfaces it as an error explaining the
+  indent-preservation rule and pointing to write_file. +2 fs tests (533 green).
+  *Related but unfixed: a model can also be blind to a SUCCESSFUL edit and
+  misdiagnose it as a no-op (seen in the gemmacoder12 fizzbuzz run) — that's
+  model-state-tracking, a candidate for richer edit success feedback.*
 
 ## Milestone 2 — Eval-harness trustworthiness
 *The gate must catch real regressions without crying wolf on noise.*

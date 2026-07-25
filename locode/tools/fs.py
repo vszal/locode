@@ -115,8 +115,14 @@ def _fuzzy_span(text: str, old: str, threshold: float = 0.8):
 def try_edit(text: str, old: str, new: str, replace_all: bool):
     """Resolve an edit across all matching tiers. Returns
     (updated_text|None, note, status, count) with status in
-    {'ok', 'ambiguous', 'not_found', 'empty_old'}. Shared by edit_file and its
-    diff preview so the approved diff is exactly what gets written."""
+    {'ok', 'ambiguous', 'not_found', 'empty_old', 'noop'}. Shared by edit_file and
+    its diff preview so the approved diff is exactly what gets written.
+
+    'noop' means a tier matched but the replacement leaves the file byte-for-byte
+    unchanged — the usual cause is `old`/`new` differing ONLY in leading
+    indentation, which the whitespace-tolerant tier strips (it preserves each
+    matched line's original indent). Reporting that as success makes a model
+    believe it fixed something and loop; surfacing it lets the caller steer."""
     if old == "":
         # `"".count` is len(text)+1 and `text.replace("", new)` inserts `new`
         # between EVERY character — a ~len(new)x blowup per call. A model that
@@ -137,12 +143,19 @@ def try_edit(text: str, old: str, new: str, replace_all: bool):
         updated = text
         for a, b in sorted(spans, reverse=True):
             updated = updated[:a] + new_ins + updated[b:]
-        return updated, ", whitespace-tolerant", "ok", len(spans)
+        note = ", whitespace-tolerant"
+        if updated == text:                           # indent-only "change" -> no change
+            return None, note, "noop", len(spans)
+        return updated, note, "ok", len(spans)
     if not replace_all:                               # tier 3: fuzzy (human-gated)
         fz = _fuzzy_span(text, old)
         if fz is not None:
             a, b, ratio = fz
-            return text[:a] + new_ins + text[b:], f", fuzzy ~{round(ratio * 100)}%", "ok", 1
+            updated = text[:a] + new_ins + text[b:]
+            note = f", fuzzy ~{round(ratio * 100)}%"
+            if updated == text:
+                return None, note, "noop", 1
+            return updated, note, "ok", 1
     return None, "", "not_found", 0
 
 
@@ -540,6 +553,17 @@ class EditFile:
                 is_error=True)
         if status == "not_found":
             return ToolResult(_not_found_help(text, old, p), is_error=True)
+        if status == "noop":
+            return ToolResult(
+                "This edit changed NOTHING: `old` matched, but after "
+                "whitespace-tolerant matching the file is byte-for-byte identical "
+                "to before. Almost always `old` and `new` differ ONLY in leading "
+                "indentation — and edit_file preserves each matched line's "
+                "ORIGINAL indentation, so an indent-only change can't be made this "
+                "way. To re-indent a block, rewrite it with write_file. If you "
+                "meant to change the code, make `new` differ from the file in more "
+                "than whitespace. If the line is already correct, stop editing it "
+                "and look elsewhere. Do NOT resend this same edit.", is_error=True)
         try:
             p.write_text(updated, "utf-8")
         except OSError as e:
