@@ -456,6 +456,10 @@ def summarize(runs: list[RunResult]) -> dict:
         # Aggregated over the whole sweep rather than averaged per row, so one
         # short case can't outvote a long one on what the box was doing.
         "gen_rate": _mean_rate(runs),
+        # Total chars generated across the sweep — lets the throttle check tell a
+        # slow box (lots of chars, low rate) from short no-op runs (few chars,
+        # latency-dominated rate) via _rate_is_trustworthy.
+        "gen_chars": sum(r.metrics.get("gen_chars", 0) or 0 for r in runs),
         "rows": rows,
         "_weights": weights,
     }
@@ -500,6 +504,27 @@ def print_report(summary: dict, title: str = "") -> None:
 # catch ran at ~11 chars/s, an order of magnitude down, when a draining battery
 # put the host into Low Power Mode overnight.
 MIN_GEN_RATE = 30.0
+
+# The absolute rate floor only means "throttled box" once the sweep has
+# generated enough text that its chars/s reflects sustained decoding rather than
+# fixed time-to-first-token. A sweep of short no-op runs — a model that announces
+# intent and quits in ~15s — generates a couple hundred chars whose "rate" is
+# dominated by prompt-processing latency and reads as ~12 chars/s on a perfectly
+# healthy box (r23 stall: 205 chars/run → 13.6 ch/s, while the concurrent r22
+# e2e sweep on the SAME box clocked 45.8). Gate the warning on a minimum average
+# generation per run so it stops crying wolf on legitimately terse runs.
+MIN_GEN_CHARS_PER_RUN = 800.0
+
+
+def _rate_is_trustworthy(summary: dict) -> bool:
+    """Whether the sweep generated enough text for its chars/s to signal a
+    throttled box rather than just short, latency-dominated runs. A genuine
+    throttle (the 2026-07-22 memory-pressure sweep) still fires: it did real
+    work over long generations, so its per-run char count clears the floor;
+    only the low RATE was the problem."""
+    chars = summary.get("gen_chars") or 0
+    n = sum(row.get("n", 0) for row in summary.get("rows", {}).values())
+    return n > 0 and (chars / n) >= MIN_GEN_CHARS_PER_RUN
 
 
 def _power_state() -> tuple[bool | None, str]:
@@ -557,7 +582,7 @@ def _validity_warnings(baseline: dict, candidate: dict) -> list[str]:
             f"candidate generated at {cr:.1f} chars/s vs the baseline's "
             f"{br:.1f} ({cr / br:.0%}) — the box was slower, and every budget "
             "in the loop is a wallclock budget")
-    elif cr and cr < MIN_GEN_RATE:
+    elif cr and cr < MIN_GEN_RATE and _rate_is_trustworthy(candidate):
         # The relative check above needs a baseline that recorded throughput,
         # and no sweep before 2026-07-22 did — so against every existing
         # baseline it silently skips. An absolute floor needs nothing to compare
@@ -859,7 +884,7 @@ def cmd_run(args) -> int:
     # someone tries to compare it. The rate is the sweep's own number, so this
     # needs no baseline to fire.
     rate = summary.get("gen_rate")
-    if rate and rate < MIN_GEN_RATE:
+    if rate and rate < MIN_GEN_RATE and _rate_is_trustworthy(summary):
         print(f"\n!! generated at {rate:.1f} chars/s, below the "
               f"{MIN_GEN_RATE:.0f} floor — the box was throttled or contended. "
               "Every budget in the loop is a wallclock budget, so these scores "

@@ -87,8 +87,12 @@ def test_mean_rate_none_when_nothing_recorded():
 
 
 # --- _validity_warnings ---------------------------------------------------
-def _summary(rows, rate=None):
-    return {"rows": {k: {} for k in rows}, "gen_rate": rate}
+def _summary(rows, rate=None, gen_chars=100_000):
+    # gen_chars defaults high so the throughput floor (which now also requires
+    # enough generation to trust the rate) isn't suppressed by these fixtures;
+    # the short-no-op case sets it low explicitly.
+    return {"rows": {k: {"n": 1} for k in rows}, "gen_rate": rate,
+            "gen_chars": gen_chars}
 
 
 def test_partial_sweep_is_flagged():
@@ -403,3 +407,35 @@ def test_a_detector_stop_still_wins_the_stop_reason():
     ])
     assert m["clean_finish"] is False
     assert m["stop_reason"] == "the model repeated the same tool call"
+
+
+# --- throttle floor only fires on trustworthy generation ------------------
+def test_rate_is_trustworthy_true_for_sustained_generation():
+    s = _summary(["a::m", "b::m"], rate=45.8, gen_chars=34_000)  # ~17k/run
+    assert harness._rate_is_trustworthy(s) is True
+
+
+def test_rate_is_trustworthy_false_for_short_noop_runs():
+    # r23 stall: 6 runs, ~205 chars each — the rate is latency-dominated, not a
+    # throttled box (the concurrent e2e sweep hit 45.8 ch/s on the same box).
+    s = {"rows": {"exec-stall-trap::devstral24": {"n": 6}},
+         "gen_rate": 13.6, "gen_chars": 1230}
+    assert harness._rate_is_trustworthy(s) is False
+
+
+def test_absolute_floor_suppressed_for_short_noop_candidate():
+    # Low rate but almost nothing generated: do not cry "throttled box".
+    base = _summary(["a::m"], rate=None)
+    cand = _summary(["a::m"], rate=12.0, gen_chars=205)
+    assert harness._validity_warnings(base, cand) == []
+    # Same low rate, but with real generation behind it -> still flagged.
+    cand_real = _summary(["a::m"], rate=12.0, gen_chars=50_000)
+    warns = harness._validity_warnings(base, cand_real)
+    assert len(warns) == 1 and "floor" in warns[0]
+
+
+def test_summarize_records_total_gen_chars():
+    runs = [_run(gen_chars=1000, gen_seconds=10.0),
+            _run(gen_chars=2000, gen_seconds=20.0)]
+    s = harness.summarize(runs)
+    assert s["gen_chars"] == 3000

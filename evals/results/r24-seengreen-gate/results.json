@@ -1,0 +1,227 @@
+{
+  "label": "r24-seengreen-gate",
+  "created": "2026-07-25 20:15:04",
+  "git_head": "f8a99d8",
+  "git_dirty": true,
+  "runs": [
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": false,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 1
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.667,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 67.9,
+        "model_seconds": 67.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 32.7,
+        "gen_chars": 340,
+        "gen_chars_per_sec": 10.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 68.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__qwencoder14__r1-gzzaqyfu",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "score": 0.667,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": true,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 1
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.667,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 50.3,
+        "model_seconds": 49.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 49.6,
+        "gen_chars": 2280,
+        "gen_chars_per_sec": 46.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 50.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__qwencoder14__r2-smaan4xh",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 3,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": false,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 1
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.667,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 31.5,
+        "model_seconds": 30.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 30.7,
+        "gen_chars": 340,
+        "gen_chars_per_sec": 11.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 31.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__qwencoder14__r3-u61td9_7",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 4,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": false,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 1
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.667,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 31.3,
+        "model_seconds": 30.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 30.6,
+        "gen_chars": 340,
+        "gen_chars_per_sec": 11.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 31.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__qwencoder14__r4-lopq_5ky",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.542,
+    "clean_finish_rate": 0.25,
+    "total_nudges": 4,
+    "total_iterations": 20,
+    "nudge_histogram": {
+      "repeated call": 4
+    },
+    "gen_rate": 23.0,
+    "rows": {
+      "exec-stall-trap::qwencoder14": {
+        "case": "exec-stall-trap",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 4,
+        "score_mean": 0.542,
+        "score_min": 0.5,
+        "scores": [
+          0.5,
+          0.667,
+          0.5,
+          0.5
+        ],
+        "iterations_mean": 5,
+        "nudges_mean": 1,
+        "clean_finish_rate": 0.25,
+        "seconds_mean": 45.4,
+        "gen_rate_mean": 23.0,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "exec-stall-trap": 1.0
+    }
+  }
+}
