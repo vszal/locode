@@ -1191,27 +1191,45 @@ the model into an un-approvable dead-end. Fixed across the default list **and**
 all six pinned cases. qythos9 was untouched throughout (0.92 / 1.00 in every
 sweep), proving the parser change was never implicated.
 
-**The clean r20 baseline (replace_lines now live) — a real win and a real new
-flail:**
+**The numbers — read across all four sweeps, because two of the four rows are
+pure n=6 variance and one row is the only deterministic signal.** RL = whether
+`replace_lines` was actually approvable for the case (r19's fix only touched the
+unused *default* list; the pinned case lists still denied it, so only r20 had it
+live):
 
-| row | r17 base | r20 | reading |
-|---|---|---|---|
-| exec-bugfix::qythos9 | 0.92 | **1.00** | build 37 net-positive; the dropped edit now lands |
-| exec-stall-trap::qythos9 | 1.00 | **1.00** | stable |
-| exec-bugfix::qwencoder14 | 0.50 | **0.92** | `replace_lines` finally usable — the eval was denying a real product tool |
-| exec-stall-trap::qwencoder14 | 0.92 | 0.44 | **new flailing mode:** weak model alternates `edit_file`↔`replace_lines` without converging |
+| row | r17 (b36,no RL) | r18 (b37,no RL) | r19 (b37,no RL) | r20 (b37,RL) | reading |
+|---|---|---|---|---|---|
+| exec-bugfix::qythos9 | 0.92 | 0.92 | 0.92 | **1.00** | **deterministic** — the previously-dropped edit now lands; consistent across every sweep |
+| exec-stall-trap::qythos9 | 1.00 | 1.00 | 1.00 | 1.00 | stable — flat everywhere |
+| exec-bugfix::qwencoder14 | 0.50 | 0.29 | 0.46 | **0.92** | RL-consistent gain (0.92 vs ~0.4 without it), but n=6 — **suggestive, not credited** |
+| exec-stall-trap::qwencoder14 | 0.92 | 0.72 | 0.33 | 0.44 | **n=6 variance** — every b37 draw is 0.33–0.72 regardless of RL; the 0.92 was a lucky baseline |
 
-The stall-trap drop is **faithful, not a regression to hide**: the product *does*
-offer `replace_lines`, and a case built to trap stalls correctly caught that
-handing a weak model the fallback creates a fresh non-converging loop. That is a
-north-star signal (mid-task flailing), logged for a follow-up on loop detection.
+**The only clean signal is build 37 on qythos9's edit-bugfix (0.92 → 1.00,
+consistent), plus the deterministic blindprobe (6/6 BROKEN → 6/6 OK).** The two
+qwencoder rows must be read with the D60 discipline, and one of them nearly
+tricked this very writeup (see the correction below).
+
+**Self-correction — the "new flailing mode" first logged here was a D60 error.**
+The first draft of this round credited the exec-stall-trap qwencoder14 drop
+(0.92 → 0.44) to `replace_lines`: "handing a weak model the fallback creates a
+fresh `edit_file`↔`replace_lines` non-converging loop." **Refuted by the fuller
+table:** r19, with `replace_lines` *not* approvable, scored **0.33 — lower than
+r20 with it (0.44)**. RL availability cannot explain a drop that is deeper
+without it. Inspecting the r20 event logs confirmed the mechanism was misread:
+4/6 runs terminate by the model **declaring "All tasks are completed" on a wrong
+fix** (a capability/false-completion failure, 3.1-class), and the 2/6 that loop
+are **caught correctly by the existing repeat guard**. The no-change guard keys
+off a generic `res.no_change` (not the tool name) and resets on the
+`read_file`/`update_plan` calls the model interleaves — so it is working as
+designed, not slipping. There is no confirmed cross-tool guard gap; the drop is
+variance over a capability wall. The lever is retracted (D64 below).
 
 | # | Decision | Why |
 |---|---|---|
 | D61 | Do NOT ship a "look before you edit" prompt lever | The opening-noop it targets is 0/24 on build 36 — already closed by builds 34–36. No lever without a measured problem (D58/D59). |
-| D62 | Build 37 (`_closing_fence` EOF recovery + `_strip_structural_tail`) is correct and neutral | Fires only on malformed input; qythos9 rows pixel-identical to baseline; blindprobe 6/6 BROKEN→OK with genuine fixes. |
-| D63 | `replace_lines` must be auto-approved wherever `edit_file` is | It is `_PATH_MUTATING` like the other editors and the loop actively steers toward it; denying it in eval both dead-ends runs and measures a product the user never sees. |
-| D64 | The exec-stall-trap qwencoder14 0.92→0.44 drop is a signal to KEEP, not suppress | It is the faithful consequence of D63 — `edit_file`↔`replace_lines` alternation is real flailing the stall-trap case is designed to expose. Next lever: teach loop detection to treat cross-tool edit alternation as one no-progress signature. |
+| D62 | Build 37 (`_closing_fence` EOF recovery + `_strip_structural_tail`) is correct and the round's one deterministic win | Fires only on malformed input; qythos9 rows pixel-identical to baseline on the clean path; blindprobe 6/6 BROKEN→OK with genuine fixes; exec-bugfix qythos9 0.92→1.00 consistently. |
+| D63 | `replace_lines` must be auto-approved wherever `edit_file` is — **on principle, not for a score** | It is `_PATH_MUTATING` like the other editors and the loop actively steers toward it; denying it in eval dead-ends runs and hides a real product tool. The exec-bugfix qwencoder gain is RL-consistent but n=6 — do NOT credit a score delta. |
+| D64 | **RETRACTED** (superseded self-correction): the exec-stall-trap qwencoder14 0.92→0.44 move is n=6 variance over a capability wall, NOT a replace_lines flailing mode | r19 (no RL) scored 0.33 < r20 (RL) 0.44, so RL cannot be the cause; event logs show correct guard behavior + wrong-fix false-completion. A textbook D60 trap — caught in review, not shipped as a lever. |
 
 **Tests:** 572 green (+4 toolparse regression tests for the build-37 fix).
 

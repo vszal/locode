@@ -186,25 +186,28 @@ the lived experience.*
   capability-bound** (3.1) or upstream plan quality — pushing the loop guards
   harder trades false-positives against legitimate work. Revisit if a stronger
   base model changes the capability picture.
-  - **Update 2026-07-25 (build 37, `r20-replacelines-live`): one silent
-    edit-drop closed, one new alternation-stall opened.** A convergence win: the
-    default model (qythos9) was failing a trivial raw-error bugfix **6/6**
-    because its correct `edit_file` call, emitted as single-quoted JSON with a
-    dropped closing `'`, left a trailing `}}` whose unterminated string swallowed
-    the closing tool fence — `_closing_fence` dropped the whole call and the turn
-    ended with the fix unexecuted. Build 37's parser recovery (`_closing_fence`
-    EOF-in-string + `_strip_structural_tail`) took the blindprobe **6/6 BROKEN →
-    6/6 OK** and lifted exec-bugfix qythos9 0.92 → **1.00**. Separately, the eval
-    had never auto-approved `replace_lines` (build 34's `edit_file` fallback);
-    fixing that (default + all six pinned case allowlists) lifted exec-bugfix
-    qwencoder14 0.50 → **0.92** — but surfaced a **new, harness-fixable stall**:
-    on exec-stall-trap qwencoder14 (0.92 → 0.44) the model alternates
-    `edit_file` ↔ `replace_lines` on the same target without converging. The
-    repeat guard keys off an identical *call* and the no-change guard off
-    `edit_file` results, so **cross-tool edit alternation slips both** — the tool
-    name differs each iteration. **Next lever (open): treat successive mutating
-    edits to the same path that leave the file unchanged as one no-progress
-    signature, regardless of which edit tool made them.** (D64.)
+  - **Update 2026-07-25 (build 37, `r20-replacelines-live`): one deterministic
+    convergence win; no new harness lever.** The default model (qythos9) was
+    failing a trivial raw-error bugfix **6/6** because its correct `edit_file`
+    call, emitted as single-quoted JSON with a dropped closing `'`, left a
+    trailing `}}` whose unterminated string swallowed the closing tool fence —
+    `_closing_fence` dropped the whole call and the turn ended with the fix
+    unexecuted. Build 37's parser recovery (`_closing_fence` EOF-in-string +
+    `_strip_structural_tail`) took the blindprobe **6/6 BROKEN → 6/6 OK** and
+    lifted exec-bugfix qythos9 0.92 → **1.00** (consistent across every sweep —
+    a real, deterministic fix). Separately, the eval had never auto-approved
+    `replace_lines` (build 34's `edit_file` fallback); fixed on principle across
+    the default list + all six pinned case allowlists (a real product tool the
+    eval was wrongly denying), though its exec-bugfix qwencoder14 gain is
+    n=6-suggestive, not credited.
+    **A first-draft "new harness-fixable alternation stall" claim here was
+    RETRACTED as a D60 error:** the exec-stall-trap qwencoder14 move (0.92→0.44)
+    was NOT caused by `replace_lines` — r19 *without* it scored 0.33, lower than
+    r20 *with* it (0.44), so RL cannot be the cause. Event logs show the loop
+    guards behaving correctly (repeat guard catches the loopers; the generic
+    `res.no_change` guard resets on interleaved reads, as designed); the drop is
+    n=6 variance over the 3.1 capability wall (wrong fix + premature "all tasks
+    completed"). **No new lever — the 4.4 assessment above stands unchanged.**
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
