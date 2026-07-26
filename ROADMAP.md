@@ -210,6 +210,27 @@ the lived experience.*
   a smaller step" message. Scoped to the broken-fence case only; a prose reply
   cut mid-sentence stays readable and still falls through. Pure visibility lever.
   LOG Round 20.
+- `[x]` **4.9 Repeated mutating edit that "succeeds" but never converges
+  (build 42).** *User-reported 2026-07-26, gemmacoder12:* the model re-issued a
+  byte-**identical** `replace_lines(start=136, end=137, new=…)` five-plus times,
+  each "✓ replaced" with a diff that marched down the file (`@@ -144 → -146 →
+  -148…`) — the edit kept **duplicating** the `clone_repo(...)` lines because the
+  fixed line numbers pointed at ever-shifting content, and the model declared
+  "now parses correctly" every time. The repeat guard missed it: it only grows
+  the streak when the **result is unchanged**, and this edit's success echo
+  changed every call, so the streak reset to 1 forever and the corrupting edit
+  ran without bound. Fix: a byte-identical call to a content-mutating tool
+  (`_MUTATING_EDIT_TOOLS` = write/append/edit_file/replace_lines) now counts
+  toward the repeat streak **regardless of the shifting echo** — re-applying the
+  same edit is never progress. When the trip is a *varying-result* edit (the true
+  duplicating signature, tracked in `repeat_varied`), a tailored nudge fires:
+  "the file has already changed, you may be DUPLICATING content / your line
+  numbers have SHIFTED — STOP, re-read the file, make one corrected edit." A
+  plain no-op repeat keeps the existing generic message. Both pains: it converges
+  (stops after `max_repeat_calls-1` applications instead of looping) and the stop
+  is legible. +1 loop test (597 green). LOG Round 22. *This corrects the Round 20
+  claim that residual edit-flailing was all capability-bound — I had only mined
+  FAILED edits; this is a SUCCEEDING-but-non-converging loop, a real harness gap.*
 - `[x]` **4.8 Turn-ending legibility is data-confirmed closed (2026-07-25).**
   Categorized all 147 recent turn-endings by what the *user actually sees*: 46%
   prose answer, 36% clean-stop with a legible reason, 15% short claim ("All tests

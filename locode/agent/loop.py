@@ -38,6 +38,15 @@ OnEvent = Callable[[dict], Any]
 # terse answer, well below a document.
 PROSE_REPEAT_MIN_CHARS = 2000
 
+# Content-mutating edit tools. A byte-identical call to one of these is a loop
+# even when its result echo differs run-to-run: re-applying the same edit either
+# no-ops or, for a line-number edit (replace_lines) against a file that has
+# shifted under it, silently DUPLICATES content. So the repeat detector must not
+# let their changing diff/snippet echo reset the streak (see the repeat_streaks
+# update). move_file is excluded — a repeated rename just errors "not found".
+_MUTATING_EDIT_TOOLS = frozenset(
+    {"write_file", "append_file", "edit_file", "replace_lines"})
+
 # How much of a reply's opening identifies it. Long enough that two unrelated
 # replies don't collide, short enough to sit well inside the region a
 # regenerated document reproduces verbatim.
@@ -173,6 +182,11 @@ class AgentLoop:
         # interleaving-immunity would misfire on ordinary work: running the same
         # test command between three different edits is progress, not a stall.
         repeat_streaks: dict[tuple, tuple[str, int]] = {}
+        # Did a given signature's result CHANGE while it was being repeated? True
+        # only for the duplicating-edit case (identical replace_lines "succeeding"
+        # with a new diff each time) — not a plain no-op repeat (constant result).
+        # Lets the repeat nudge pick the accurate message.
+        repeat_varied: dict[tuple, bool] = {}
         error_streaks: dict[str, int] = {}
         # Consecutive iterations whose edit batch changed the file NOTHING (a
         # blind guess — usually at a line the error names but that is actually
@@ -572,7 +586,11 @@ class AgentLoop:
                         # touched yet, name them: a concrete next action is far
                         # more likely to break the loop than a generic prod.
                         unread = mentioned_files - read_paths - expected_artifacts
-                        self._nudge_repeat(calls, unread)
+                        if repeat_varied.get(batch_sig) and all(
+                                c.name in _MUTATING_EDIT_TOOLS for c in calls):
+                            self._nudge_repeat_edit(calls)
+                        else:
+                            self._nudge_repeat(calls, unread)
                         continue
                     return self._stop("the model repeated the same tool call "
                                       "without making progress")
@@ -597,10 +615,21 @@ class AgentLoop:
                     return self._stop("the tools this task needs are not "
                                       "available in this session")
                 # Same call, same answer -> the streak grows; a *changed* result
-                # means the call did something new, so it starts over.
+                # means the call did something new, so it starts over. EXCEPTION:
+                # a byte-identical mutating edit (same batch_sig seen before, all
+                # calls in _MUTATING_EDIT_TOOLS) is a loop even when its echo
+                # differs — re-issuing the same replace_lines against a file that
+                # keeps growing under it "succeeds" with a new diff each time
+                # while duplicating content (the gemmacoder12 report). Don't let
+                # that shifting echo reset the streak.
+                same_result = result_sig == seen_result
+                repeated_edit = seen_streak >= 1 and all(
+                    c.name in _MUTATING_EDIT_TOOLS for c in calls)
+                if seen_streak >= 1 and not same_result:
+                    repeat_varied[batch_sig] = True  # results shifting under a repeat
                 repeat_streaks[batch_sig] = (
                     result_sig,
-                    seen_streak + 1 if result_sig == seen_result else 1)
+                    seen_streak + 1 if (same_result or repeated_edit) else 1)
                 # A subtler stuck signature than an identical *call*: the model
                 # varies its edits each turn (so the repeat detector never fires)
                 # yet the resulting ERROR is byte-for-byte the same every time —
@@ -890,6 +919,24 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "repeated call"})
+
+    def _nudge_repeat_edit(self, calls) -> None:
+        names = ", ".join(dict.fromkeys(c.name for c in calls))
+        self.history.append({
+            "role": "user",
+            "content": (f"You have applied the same {names} edit repeatedly. "
+                        "Re-issuing a mutating edit with the SAME arguments does "
+                        "not converge: it either changes nothing, or — for a "
+                        "line-number edit like replace_lines — the target lines "
+                        "SHIFT after each change, so the same start/end now lands "
+                        "on different text and DUPLICATES content. The file has "
+                        "already been modified. STOP editing, RE-READ the file to "
+                        "see its current contents, and only then make a single "
+                        "corrected edit. If it already looks right, give your "
+                        "final answer in plain text now — do not repeat the edit."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "repeated edit"})
 
     def _nudge_nochange(self) -> None:
         self.history.append({

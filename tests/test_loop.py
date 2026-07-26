@@ -1865,3 +1865,52 @@ def test_test_claim_matches_pass_assertions_not_doc_language():
     assert not m("The design document is complete.")
     assert not m("I passed the file path to the function.")
     assert not m("The plan is written.")
+
+
+# --- repeated mutating edit (gemmacoder12 duplicating-replace loop) -----------
+async def test_repeated_mutating_edit_stops_despite_varying_echo(tmp_path):
+    # gemmacoder12, user-reported: the model re-issues a byte-IDENTICAL
+    # replace_lines every turn. Each "succeeds" with a DIFFERENT echo — the diff
+    # marches down the file (@@ -144 → -146 → -148…) as the edit keeps DUPLICATING
+    # content and the file grows. The result-changed reset would hold the repeat
+    # streak at 1 forever, so the corrupting edit ran without bound while the
+    # model declared false success. A repeated mutating edit must trip the repeat
+    # guard on its call signature alone, regardless of the shifting result echo.
+    class VaryingEdit:
+        name = "replace_lines"
+        description = "replace a line range"
+        permission = "auto"
+        schema = {"type": "object", "properties": {
+            "path": {"type": "string"}, "start": {"type": "integer"},
+            "end": {"type": "integer"}, "new": {"type": "string"}}}
+
+        def __init__(self):
+            self.calls = 0
+
+        async def run(self, args, ctx):
+            from locode.tools.base import ToolResult
+            self.calls += 1
+            # A new diff offset every call -> result_sig differs each time.
+            return ToolResult(f"replaced lines 136-137 (diff @@ -{144 + 2 * self.calls})")
+
+    edit = VaryingEdit()
+    reg = Registry()
+    reg.register(edit)
+    cfg = Config()
+    cfg.permissions.tools["replace_lines"] = "auto"  # run headless, no approver
+    call = native_call("replace_lines", path="./f.py", start=136, end=137,
+                       new="    with tempfile.TemporaryDirectory() as tmp:")
+    loop = AgentLoop(CyclingClient([call]), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path))
+    out = await loop.run_turn("fix the empty with-block")
+
+    assert out.startswith("⏹ stopped")
+    assert "repeated the same tool call" in out
+    # Bounded: the corrupting edit runs at most until the guard trips, NOT forever.
+    assert edit.calls == cfg.agent.max_repeat_calls - 1
+    # The edit-specific nudge fired (tells it to re-read), not the generic one
+    # that would falsely claim "it returned the same result each time".
+    nudges = [m["content"] for m in loop.history
+              if m["role"] == "user" and m.get("kind") == "nudge"]
+    assert any("RE-READ" in n for n in nudges)
+    assert not any("returned the same result each time" in n for n in nudges)

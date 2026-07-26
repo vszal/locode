@@ -1524,3 +1524,45 @@ repeat-stopped.
 | D75 | A historical cross-session score is NOT a valid baseline for a sweep run today | Same code (build 30) scores 0.62 today vs 0.92 in its origin session. Only a **same-session** A/B (or interleaved paired runs) controls for model drift. Reinforces the queued paired-runs item. |
 
 ---
+
+## Round 22 — the succeeding-but-non-converging edit loop (build 42)
+
+**User-reported, gemmacoder12 (2026-07-26):** "models tend to loop on the same
+edit like they don't realize the work is done." The trace: the model re-issued a
+byte-**identical** `replace_lines(start=136, end=137, new='    with tempfile…')`
+five-plus times. Each returned `✓ replaced lines 136–137`, but the diff marched
+down the file — `@@ -144 → -146 → -148 → -150` — because the edit kept
+**duplicating** the `source_path = …` / `clone_repo(...)` lines: the fixed line
+numbers 136–137 pointed at ever-shifting content as the file grew 2 lines per
+pass. The model announced "the file now parses correctly" every single time.
+
+**Why the repeat guard missed it.** `repeat_streaks` only grows a signature's
+streak when the **result echo is unchanged** (so that re-running a test between
+edits, or a fresh read, counts as progress, not a stall). Here the call args were
+byte-identical every iteration but the *success echo* changed each time (a new
+diff offset), so the streak reset to 1 forever — the guard never tripped and the
+corrupting edit ran unbounded.
+
+**The correction to Round 20.** Round 20's edit-failure mining concluded residual
+edit-flailing was capability-bound. That was incomplete: it only examined
+**failed** edits (old==new, ambiguous, not-found). This is a **succeeding**
+edit that never converges — a genuine harness gap the failed-edit lens couldn't
+see. A user watching a live session caught what the offline metric missed.
+
+**Fix (loop.py, build 42).** A byte-identical call to a content-mutating tool
+(`_MUTATING_EDIT_TOOLS` = write_file/append_file/edit_file/replace_lines) now
+counts toward the repeat streak **regardless of the shifting echo**. It stops
+after `max_repeat_calls-1` applications (2 by default) instead of looping. When
+the tripped repeat is a *varying-result* mutating edit (tracked in
+`repeat_varied` — the true duplicating signature, distinct from a constant-result
+no-op), a tailored `_nudge_repeat_edit` fires: the file has already changed, you
+may be duplicating content or your line numbers shifted — stop, re-read, make one
+corrected edit. A plain no-op repeat keeps the existing generic message. +1 loop
+test (`test_repeated_mutating_edit_stops_despite_varying_echo`); 597 green.
+
+| # | Decision | Why |
+|---|---|---|
+| D76 | A repeated byte-identical mutating edit is a loop even when its result echo differs | Re-applying the same replace_lines/edit_file is never progress; on a line-number edit against a shifted file it silently duplicates content (gemmacoder12). The result-unchanged reset is correct only for re-run tests/reads. |
+| D77 | Live user observation outranks offline metric conclusions | Round 20 called residual edit-flailing capability-bound from FAILED-edit mining; this SUCCEEDING-edit loop was invisible to that lens and only surfaced in a real session. Watch live runs, not just scores. |
+
+---
