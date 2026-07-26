@@ -1336,3 +1336,48 @@ failing-command marker flips, traceback exception surfaced, plain output
 unchanged).
 
 ---
+
+## Round 18 — gate "done" on a green test the model actually saw (build 40)
+
+**North star.** MID-TASK FLAILING's ugliest tail is a *false* finish: the model
+edits, never runs the suite to green (or runs it and it's red), then ends the
+turn asserting "the tests should now pass." The run declares done while
+`checks['tests_pass']` is False — the single largest source of a self-declared
+completion that is actually wrong.
+
+**Measurement first (Option C).** Before adding any gate, measured the proposed
+signal against ground truth on every self-declared-done exec/e2e run in the
+results corpus. An **ever-saw-green** gate — did a green pytest tally appear in a
+bash result this turn? — has *perfect discrimination* on the 89 such runs:
+
+- Catches **4/4** false-completions (all `exec-stall-trap::qwencoder14`, each
+  saying "tests…should now pass" without ever seeing green).
+- Blocks **0/85** legitimate completions (no false nudge on a run that really
+  finished).
+
+The signal is safe to gate on: it never fired on a run that had genuinely
+converged.
+
+**Fix (build 40, `loop.py`).** Track a per-turn `_saw_green_test`, set the moment
+a **bash** result matches a pytest pass tally (`\d+ passed`) with no failure/
+error/traceback token. In the finish cascade — after the open-plan-tasks nudge,
+before announced-intent — a new branch fires **once** when the final content
+makes a test-specific pass claim (`_TEST_CLAIM_RE`: "tests …pass/passing/green/
+succeed") AND no green was seen this turn: nudge to run the suite to green, then
+carry on. Scoped tightly so a design-doc/plan task that never runs tests can't
+trip it (the claim regex requires the word "tests" near a pass verb; "I passed
+the path to the function" and "the design document is complete" do not match).
+The gate keys on bash alone, so a `read_file` of a fixture that contains
+"5 passed" can't spoof green.
+
+| # | Decision | Why |
+|---|---|---|
+| D69 | Gate a "tests pass" finish on the model having SEEN a green pytest result this turn; nudge once if it asserts pass blind | Measured perfect discrimination (4/4 caught, 0/85 false) — the largest false-completion source, and the signal never fired on a converged run. |
+| D70 | Restrict the claim trigger to test-specific language and the green signal to bash results | Keeps doc/plan tasks (which never run tests) and fixture reads that merely contain "N passed" from tripping the gate. |
+
+**Tests:** 591 green (+9 loop tests: unverified claim nudged once, green-seen
+claim trusted, non-test finish never gated, gate fires only once, plus
+`_looks_green_test` / `_TEST_CLAIM_RE` unit coverage). Interactive and headless
+share the loop, so this gate applies to both.
+
+---

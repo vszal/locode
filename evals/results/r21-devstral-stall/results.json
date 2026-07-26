@@ -1,0 +1,297 @@
+{
+  "label": "r21-devstral-stall",
+  "created": "2026-07-25 19:20:08",
+  "git_head": "e998c20",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "devstral24",
+      "repeat": 1,
+      "score": 0.667,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": true,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 2,
+        "tool_calls": 0,
+        "tool_calls_by_name": {},
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "announced intent": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 53.4,
+        "model_seconds": 53.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 18.9,
+        "gen_chars": 195,
+        "gen_chars_per_sec": 10.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 53.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__devstral24__r1-s490zsw5",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "devstral24",
+      "repeat": 2,
+      "score": 0.667,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": true,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 2,
+        "tool_calls": 0,
+        "tool_calls_by_name": {},
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "announced intent": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 14.0,
+        "model_seconds": 14.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 14.0,
+        "gen_chars": 164,
+        "gen_chars_per_sec": 11.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 14.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__devstral24__r2-58p1kb3n",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "devstral24",
+      "repeat": 3,
+      "score": 0.667,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": true,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 2,
+        "tool_calls": 0,
+        "tool_calls_by_name": {},
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "announced intent": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 14.2,
+        "model_seconds": 14.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 14.2,
+        "gen_chars": 191,
+        "gen_chars_per_sec": 13.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 14.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__devstral24__r3-nbxjna_m",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "devstral24",
+      "repeat": 4,
+      "score": 0.667,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": true,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 2,
+        "tool_calls": 0,
+        "tool_calls_by_name": {},
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "announced intent": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 14.1,
+        "model_seconds": 14.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 14.1,
+        "gen_chars": 195,
+        "gen_chars_per_sec": 13.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 14.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__devstral24__r4-okenm1yy",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "devstral24",
+      "repeat": 5,
+      "score": 0.667,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": true,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 2,
+        "tool_calls": 0,
+        "tool_calls_by_name": {},
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "announced intent": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 14.2,
+        "model_seconds": 14.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 14.2,
+        "gen_chars": 195,
+        "gen_chars_per_sec": 13.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 14.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__devstral24__r5-wiggzllh",
+      "error": ""
+    },
+    {
+      "case": "exec-stall-trap",
+      "track": "execute",
+      "model": "devstral24",
+      "repeat": 6,
+      "score": 0.667,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false,
+        "finished_without_budget_stop": true,
+        "escaped_without_grinding": true
+      },
+      "metrics": {
+        "iterations": 2,
+        "tool_calls": 0,
+        "tool_calls_by_name": {},
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "announced intent": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 14.3,
+        "model_seconds": 14.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 14.3,
+        "gen_chars": 205,
+        "gen_chars_per_sec": 14.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 14.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__devstral24__r6-llzwpsqw",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.667,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 6,
+    "total_iterations": 12,
+    "nudge_histogram": {
+      "announced intent": 6
+    },
+    "gen_rate": 12.8,
+    "rows": {
+      "exec-stall-trap::devstral24": {
+        "case": "exec-stall-trap",
+        "track": "execute",
+        "model": "devstral24",
+        "n": 6,
+        "score_mean": 0.667,
+        "score_min": 0.667,
+        "scores": [
+          0.667,
+          0.667,
+          0.667,
+          0.667,
+          0.667,
+          0.667
+        ],
+        "iterations_mean": 2,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 20.8,
+        "gen_rate_mean": 12.8,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "exec-stall-trap": 1.0
+    }
+  }
+}

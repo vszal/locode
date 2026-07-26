@@ -140,6 +140,11 @@ class AgentLoop:
         seen_prose: list = []
         nudged_slow = False
         nudged_intent = False
+        nudged_unverified_tests = False
+        # Reset per turn: set True the moment a bash result shows a genuinely
+        # green pytest tally, so a "the tests pass" final answer can be gated on
+        # the model having actually SEEN green rather than asserting it blind.
+        self._saw_green_test = False
         open_task_nudges = 0
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
@@ -512,6 +517,22 @@ class AgentLoop:
                         nudged_intent = True
                         self._nudge_announced_intent()
                         continue
+                    # The model is ending the turn ASSERTING the tests pass, but
+                    # no green pytest result ever appeared this turn — the
+                    # "tests should now pass" false-completion, which in the eval
+                    # data is the single largest source of a run declaring done
+                    # while checks['tests_pass'] is False. Measured across 89
+                    # self-declared-done exec/e2e runs, an ever-saw-green gate
+                    # caught 4/4 of these and blocked 0/85 legitimate
+                    # completions (perfect discrimination). Nudge once to run the
+                    # suite to green; scoped to test-specific claims so a
+                    # design/plan task that never runs tests can't trip it.
+                    if (not nudged_unverified_tests
+                            and not self._saw_green_test
+                            and _TEST_CLAIM_RE.search(content)):
+                        nudged_unverified_tests = True
+                        self._nudge_unverified_tests()
+                        continue
                     return content  # final answer
                 if trimmed:
                     self._on_event({"phase": "info",
@@ -706,6 +727,12 @@ class AgentLoop:
                             "error": res.is_error, "content": res.content,
                             "seconds": round(time.monotonic() - t0, 3)})
             results.append((call.name, res.content))
+            if call.name == "bash" and _looks_green_test(res.content):
+                # A genuinely green test run appeared this turn. Restricted to
+                # bash (the only tool that runs tests) so a read_file of a file
+                # that happens to contain "5 passed" can't spoof it. Gates the
+                # unverified-tests finish nudge in run_turn.
+                self._saw_green_test = True
             if getattr(res, "no_change", False):
                 # A no-change edit is a real error to the model but not a
                 # "same recurring code error" — keep it out of the error-stall
@@ -940,6 +967,20 @@ class AgentLoop:
         })
         self._on_event({"phase": "nudge", "reason": "announced intent, no action"})
 
+    def _nudge_unverified_tests(self) -> None:
+        self.history.append({
+            "role": "user",
+            "content": ("You're ending the turn on the tests passing, but no "
+                        "passing test result actually appeared this turn — you "
+                        "asserted it without running the suite to a green "
+                        "result. Run the tests now with a bash tool call and let "
+                        "the output show them passing before you stop. If they "
+                        "don't pass, keep fixing until they do."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge",
+                        "reason": "tests claimed passing but never seen green"})
+
     def _nudge_slow(self) -> None:
         self.history.append({
             "role": "user",
@@ -1053,6 +1094,37 @@ def _announces_next_action(content: str) -> bool:
     if not 3 < len(last_line) <= 200:
         return False
     return bool(_ANNOUNCED_INTENT_RE.search(last_line))
+
+
+# A tool result showing a genuinely green test run: pytest's own tally line
+# ("5 passed", "5 passed in 0.12s"), with no failure/error count alongside it.
+_TEST_GREEN_RE = re.compile(r"\b\d+\s+passed\b", re.IGNORECASE)
+_TEST_FAIL_RE = re.compile(
+    r"\b\d+\s+(?:failed|error(?:s|ed)?)\b"
+    r"|={2,}\s*(?:FAILURES|ERRORS)\s*={2,}"
+    r"|\bFAILED\b|\bTraceback\b",
+    re.IGNORECASE)
+
+
+def _looks_green_test(content: str) -> bool:
+    """True if a tool result reports a passing test run with no failures.
+
+    Pytest prints a tally line — "5 passed in 0.12s" — on success; a mixed run
+    prints "3 passed, 1 failed". Requiring a passed-count AND the absence of any
+    failure/error token keeps a partial run from reading as green."""
+    if not content or not _TEST_GREEN_RE.search(content):
+        return False
+    return not _TEST_FAIL_RE.search(content)
+
+
+# A final answer that CLAIMS the tests pass. Deliberately test-specific — "tests"
+# within a short window of a pass verb — so a design-doc or plan task, which
+# never runs tests, cannot trip the seen-green finish gate; it fires only on
+# language asserting a passing test outcome.
+_TEST_CLAIM_RE = re.compile(
+    r"\b(?:all\s+)?(?:the\s+)?tests?(?:\s+suite)?\b[^.\n]{0,40}?\b"
+    r"(?:pass(?:es|ed|ing)?|are\s+passing|succeed(?:s|ed)?|green)\b",
+    re.IGNORECASE)
 
 
 def _prose_sig(content: str) -> tuple[int, str]:

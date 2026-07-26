@@ -1729,3 +1729,121 @@ async def test_cancellation_still_propagates_through_a_tool(tmp_path):
     # point: it must reach that handler rather than be reported to the model as
     # a tool error and the loop carry on.
     assert await loop.run_turn("go") == "⛔ interrupted"
+
+
+# --- seen-green test gate (Option C) -----------------------------------------
+class FakeBash:
+    """A stand-in for the bash tool that returns scripted output, so the
+    seen-green gate can be exercised without running a real subprocess. Name is
+    "bash" because the gate keys on that (the only tool that runs tests)."""
+    name = "bash"
+    description = "run a shell command"
+    permission = "auto"
+    schema = {"type": "object",
+              "properties": {"cmd": {"type": "string"}}}
+
+    def __init__(self, output: str, is_error: bool = False):
+        self.output = output
+        self.is_error = is_error
+
+    async def run(self, args, ctx):
+        from locode.tools.base import ToolResult
+        return ToolResult(self.output, is_error=self.is_error)
+
+
+def make_loop_with_bash(tmp_path, scripted, bash: FakeBash, cfg=None):
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    reg.register(UpdatePlan())
+    reg.register(bash)
+    cfg = cfg or Config()
+    cfg.permissions.tools["bash"] = "auto"  # run it headless without an approver
+    return AgentLoop(FakeClient(scripted), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg,
+                     cwd=str(tmp_path))
+
+
+async def test_claims_tests_pass_without_seeing_green_is_nudged(tmp_path):
+    # The "should now pass" false-completion: the model runs the suite, it is
+    # NOT green, yet it ends the turn asserting the tests pass. Gate nudges once,
+    # then the model recovers with a plain answer that is returned.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="pytest -q"),
+         {"role": "assistant", "content": "The tests should now pass."},
+         {"role": "assistant", "content": "Corrected the off-by-one."}],
+        FakeBash("1 failed, 2 passed in 0.10s", is_error=True))
+    out = await loop.run_turn("fix the failing test")
+    assert out == "Corrected the off-by-one."
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "passing test result" in m["content"]]
+    assert len(nudges) == 1
+
+
+async def test_claims_tests_pass_after_green_is_trusted(tmp_path):
+    # A green pytest tally DID appear this turn, so the same "tests pass" claim
+    # is a verified finish — no nudge, returned directly.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="pytest -q"),
+         {"role": "assistant", "content": "All tests pass."}],
+        FakeBash("3 passed in 0.05s"))
+    out = await loop.run_turn("fix the failing test")
+    assert out == "All tests pass."
+    assert not [m for m in loop.history if m["role"] == "user"
+                and "passing test result" in m["content"]]
+
+
+async def test_non_test_final_answer_is_not_gated(tmp_path):
+    # A finish with no claim about tests — a design/plan task — never trips the
+    # gate even though no green result was seen this turn.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="ls"),
+         {"role": "assistant", "content": "The design document is complete."}],
+        FakeBash("cart.py  test_cart.py"))
+    out = await loop.run_turn("write the design doc")
+    assert out == "The design document is complete."
+    assert not [m for m in loop.history if m["role"] == "user"
+                and "passing test result" in m["content"]]
+
+
+async def test_unverified_tests_gate_fires_only_once(tmp_path):
+    # If the model repeats the unverified claim after the nudge instead of
+    # actually running the suite, the second claim is returned — the gate fires
+    # once and does not grind.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="pytest -q"),
+         {"role": "assistant", "content": "The tests should pass now."},
+         {"role": "assistant", "content": "Tests pass."}],
+        FakeBash("1 failed in 0.10s", is_error=True))
+    out = await loop.run_turn("fix the failing test")
+    assert out == "Tests pass."
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "passing test result" in m["content"]]
+    assert len(nudges) == 1
+
+
+def test_looks_green_test_recognizes_pytest_tally():
+    assert loop_mod._looks_green_test("5 passed in 0.12s")
+    assert loop_mod._looks_green_test("collected 5 items\n\n5 passed")
+    # A partial run is not green.
+    assert not loop_mod._looks_green_test("3 passed, 1 failed in 0.2s")
+    assert not loop_mod._looks_green_test("2 passed\n1 error")
+    assert not loop_mod._looks_green_test("no tests ran")
+    # A traceback alongside a passed count is not green either.
+    assert not loop_mod._looks_green_test("1 passed\nTraceback (most recent call last):")
+
+
+def test_test_claim_matches_pass_assertions_not_doc_language():
+    m = loop_mod._TEST_CLAIM_RE.search
+    assert m("The tests should now pass.")
+    assert m("All tests pass.")
+    assert m("the test suite passes")
+    assert m("the tests are passing")
+    # Non-test finishes must not match.
+    assert not m("The design document is complete.")
+    assert not m("I passed the file path to the function.")
+    assert not m("The plan is written.")

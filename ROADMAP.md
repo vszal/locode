@@ -170,6 +170,17 @@ the lived experience.*
   the verdict is legible at a glance (visibility), and a looping model now shows
   `✗ 1 failed` each retry — visibly stuck — instead of an identical banner
   (flailing). `render._salient`. LOG Round 17, D68.
+- `[x]` **4.6 Gate a "tests pass" finish on a green the model saw (build 40).**
+  The worst flailing tail is a *false* finish: the model asserts "the tests
+  should now pass" having never run the suite to green — the largest source of a
+  run declaring done while `tests_pass` is False. Measured the signal first: an
+  ever-saw-green gate has perfect discrimination on 89 self-declared-done runs
+  (catches 4/4 false-completions, blocks 0/85 legitimate ones). Now `loop.py`
+  tracks a per-turn `_saw_green_test` (bash result with a pytest pass tally, no
+  failure token) and, in the finish cascade, nudges once when the final content
+  makes a test-specific pass claim without having seen green. Scoped so
+  doc/plan tasks and fixture reads containing "N passed" can't trip it. LOG
+  Round 18, D69/D70.
 - `[~]` **4.4 Convergence / clean-finish.** clean_finish is low suite-wide —
   sessions rarely end on a clean "done", they flail and stall. The deepest, and
   hardest, usability lever. **Per-case flailing map (r12-salvage, all 6 cases ×

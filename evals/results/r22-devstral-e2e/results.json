@@ -1,0 +1,94 @@
+{
+  "label": "r22-devstral-e2e",
+  "created": "2026-07-25 19:26:23",
+  "git_head": "e998c20",
+  "git_dirty": true,
+  "runs": [
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "devstral24",
+      "repeat": 1,
+      "score": 0.8,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": true,
+        "plan_has_milestones": true,
+        "plan_has_tasks": true,
+        "wrote_module": true,
+        "wrote_tests": true,
+        "own_tests_pass": false,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 4,
+          "bash": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "truncated": 2,
+          "slow progress": 1,
+          "missing deliverable": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 375.0,
+        "model_seconds": 374.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 374.4,
+        "gen_chars": 17155,
+        "gen_chars_per_sec": 45.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 375.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__devstral24__r1-kpnqm6_6",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.8,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 4,
+    "total_iterations": 10,
+    "nudge_histogram": {
+      "truncated": 2,
+      "slow progress": 1,
+      "missing deliverable": 1
+    },
+    "gen_rate": 45.8,
+    "rows": {
+      "e2e-spec-to-code::devstral24": {
+        "case": "e2e-spec-to-code",
+        "track": "e2e",
+        "model": "devstral24",
+        "n": 1,
+        "score_mean": 0.8,
+        "score_min": 0.8,
+        "scores": [
+          0.8
+        ],
+        "iterations_mean": 10,
+        "nudges_mean": 4,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 375.1,
+        "gen_rate_mean": 45.8,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "e2e-spec-to-code": 1.0
+    }
+  }
+}
