@@ -1452,3 +1452,33 @@ devstral24 as *insurance for larger tasks* stands, but it is not a capability
 upgrade on the cases that actually fail.
 
 ---
+
+## Round 20 — a truncated tool block was being surfaced as the final answer (build 41)
+
+Not a score run — a **visibility defect found by watching r22 devstral24 e2e
+logs.** Read `turn_end.result` (the actual final answer; `assistant_end` only
+carries `chars`) across the 6 e2e runs: **5/6 ended with the "answer" being a
+raw, unclosed ` ```tool ` JSON fence.** devstral24's edits are long; they hit
+`max_tokens` mid-call, so the reply ends inside an opened-but-never-closed tool
+fence. The parser recovers nothing from it, the truncation nudge fires up to
+`max_truncated_retries`, and then the loop **fell through to `return content`** —
+handing the user a half-written JSON blob as the final result. The single worst
+visibility failure mode: not a stall you can see, but garbage dressed as an
+answer.
+
+**Fix (loop.py, build 41).** After the truncation-nudge branch, once the retry
+budget is spent and `_looks_truncated(content)` is *still* true, stop cleanly via
+`_stop("… kept getting cut off mid tool call — try a smaller step or writing less
+at once")` instead of returning the block. Scoped to the broken-fence case only —
+a prose reply cut mid-sentence (no dangling fence) is at least readable, so it
+keeps falling through. Ordering is deliberate: the prose-repeat guard (fires only
+on a *repeated* reply) sits ahead of it, so distinct truncated replies reach the
+new stop. Test `test_exhausted_truncation_stops_cleanly_not_raw_block` scripts 3
+distinct truncated ` ```tool ` replies and asserts the turn returns a `⏹ stopped`
+message with no raw fence. Full suite 596 green.
+
+| # | Decision | Why |
+|---|---|---|
+| D73 | A truncation-exhausted turn stops cleanly rather than returning the raw block | Falling through to `return content` surfaced an unclosed ` ```tool ` fence as the final answer on 5/6 devstral24 e2e runs — the worst invisible failure. Directly serves the POOR-VISIBILITY pain. ROADMAP 4.7. |
+
+---

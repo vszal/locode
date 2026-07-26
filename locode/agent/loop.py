@@ -476,6 +476,18 @@ class AgentLoop:
                         truncated_nudges += 1
                         self._nudge_truncated()
                         continue
+                    # Retry budget spent and the reply STILL ends inside an
+                    # unclosed ```tool fence — the parser recovers nothing from
+                    # it, so falling through to `return content` would hand the
+                    # user a raw, half-written JSON block as the "final answer".
+                    # Observed on devstral24 e2e runs: 5/6 ended mid-edit exactly
+                    # this way. Stop cleanly instead. Scoped to the broken-fence
+                    # case only — a prose reply cut mid-sentence (no dangling
+                    # fence) is at least readable, so it keeps falling through.
+                    if _looks_truncated(content):
+                        return self._stop(
+                            "the model's reply kept getting cut off mid tool "
+                            "call — try a smaller step or writing less at once")
                     # The model is about to stop with prose instead of the file(s)
                     # it was explicitly asked to write — the "reads everything,
                     # then just describes a plan" dead-end. Nudge for it to

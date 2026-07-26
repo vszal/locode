@@ -181,6 +181,18 @@ the lived experience.*
   makes a test-specific pass claim without having seen green. Scoped so
   doc/plan tasks and fixture reads containing "N passed" can't trip it. LOG
   Round 18, D69/D70.
+- `[x]` **4.7 Stop cleanly instead of surfacing a half-written tool block
+  (build 41).** Found by *watching* r22 devstral24 e2e runs: `turn_end.result`
+  showed **5/6** ended with the "final answer" being a raw, unclosed ` ```tool `
+  JSON fence. devstral24's long edits hit `max_tokens` mid-call; the truncation
+  nudge fires up to `max_truncated_retries`, then the loop fell through to
+  `return content` and handed the user the half-written block — the worst kind of
+  invisible failure (a garbage blob masquerading as the answer). Now, once the
+  retry budget is spent and the reply *still* ends inside an open ` ```tool `
+  fence, `loop.py` stops with a legible "kept getting cut off mid tool call — try
+  a smaller step" message. Scoped to the broken-fence case only; a prose reply
+  cut mid-sentence stays readable and still falls through. Pure visibility lever.
+  LOG Round 20.
 - `[~]` **4.4 Convergence / clean-finish.** clean_finish is low suite-wide —
   sessions rarely end on a clean "done", they flail and stall. The deepest, and
   hardest, usability lever. **Per-case flailing map (r12-salvage, all 6 cases ×

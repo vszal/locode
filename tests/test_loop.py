@@ -291,6 +291,24 @@ async def test_truncated_tool_call_nudges_not_dead_ends(tmp_path):
                for m in loop.history if m["role"] == "user")
 
 
+async def test_exhausted_truncation_stops_cleanly_not_raw_block(tmp_path):
+    # A model that keeps emitting DIFFERENT unclosed ```tool fences (so the
+    # repeat guard never fires) exhausts the truncation-retry budget. Rather than
+    # falling through to return the raw half-written JSON as the final answer —
+    # what devstral24 e2e runs did, 5/6 ending mid-edit — the loop stops cleanly.
+    def cut(tag, path):
+        return {"role": "assistant",
+                "content": f"Fix {tag}:\n```tool\n{{\"name\": \"edit_file\", "
+                           f"\"args\": {{\"path\": \"{path}\", \"old\": \"a long "
+                           f"block for {tag} that got cut o"}
+    loop = make_loop(tmp_path, [cut("one", "a.txt"), cut("two", "b.txt"),
+                                cut("three", "c.txt")])
+    out = await loop.run_turn("fix it")
+    assert out.startswith("⏹ stopped")
+    assert "cut off" in out
+    assert "```tool" not in out   # the raw block is NOT surfaced as the answer
+
+
 async def test_length_finish_reason_nudges_even_without_a_broken_fence(tmp_path):
     # Prose cut off mid-sentence at max_tokens has no unclosed fence for the
     # heuristic to see, so it used to be returned as a confident final answer —
