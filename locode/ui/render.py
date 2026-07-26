@@ -221,14 +221,47 @@ def _truncate(s: str, n: int) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def _result_summary(content: str) -> str:
+# The verdict of a command/test/build run — the one line the user needs — lands
+# at the END of the output, under a banner. A first-line summary of `pytest`
+# shows "==== test session starts ====" and buries "3 passed" / "2 failed" in
+# "(+N more lines)". These patterns pull the conclusion forward instead. Watched
+# a weak model fix a bug live (2026-07-25) and could not tell pass from fail from
+# the rendered line — this is the fix.
+_VERDICT_RE = re.compile(
+    r"\b\d+\s+(passed|failed|errors?|skipped|warnings?|deselected)\b"  # pytest tally
+    r"|\b(FAILED|PASSED|ERROR)\b"                                      # per-test / generic
+    r"|\b\w*(Error|Exception)\b"                                       # Python exceptions
+    r"|\bTraceback\b|\bfatal:|\bpanic:",
+    re.IGNORECASE)
+
+# A subset of the verdicts that specifically mean the command reported failure —
+# used to flip the ✓ marker when a tool returns cleanly but its *output* is a
+# failure (pytest exiting nonzero as data). A nonzero count guards against
+# matching a passing run.
+_FAIL_RE = re.compile(
+    r"\b[1-9]\d*\s+(failed|errors?)\b"
+    r"|\b(FAILED|ERROR)\b"
+    r"|\b\w*(Error|Exception)\b"
+    r"|\bTraceback\b|\bfatal:|\bpanic:",
+    re.IGNORECASE)
+
+
+def _salient(content: str) -> tuple[str, bool]:
+    """(summary line, looks_failed) for a tool result. Surfaces the conclusion
+    line (scanning from the end, where verdicts live) rather than the banner."""
     text = (content or "").strip()
     if not text:
-        return "(no output)"
-    lines = text.splitlines()
+        return "(no output)", False
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return "(no output)", False
     if len(lines) == 1:
-        return _truncate(lines[0], 80)
-    return f"{_truncate(lines[0], 56)}  (+{len(lines) - 1} more lines)"
+        return _truncate(lines[0], 80), bool(_FAIL_RE.search(lines[0]))
+    for ln in reversed(lines):
+        if _VERDICT_RE.search(ln):
+            return (f"{_truncate(ln, 56)}  (+{len(lines) - 1} more lines)",
+                    bool(_FAIL_RE.search(ln)))
+    return f"{_truncate(lines[0], 56)}  (+{len(lines) - 1} more lines)", False
 
 
 def format_run(name: str, args: dict, *, color: bool = True) -> str:
@@ -240,9 +273,14 @@ def format_run(name: str, args: dict, *, color: bool = True) -> str:
 
 
 def format_result(name: str, content: str, is_error: bool, *, color: bool = True) -> str:
-    summ = _result_summary(content)
+    summ, failed = _salient(content)
     if is_error:
         return f"    {_wrap('✗', _RED, color)} {_wrap(summ, _RED, color)}"
+    if failed:
+        # The tool ran, but its output reports a failure (e.g. pytest exiting
+        # nonzero as data). A green ✓ next to "1 failed" reads as success — mark
+        # it so the user sees the outcome, not just that a tool completed.
+        return f"    {_wrap('✗', _YELLOW, color)} {_wrap(summ, _YELLOW, color)}"
     return f"    {_wrap('✓', _GREEN, color)} {_wrap(summ, _DIM, color)}"
 
 

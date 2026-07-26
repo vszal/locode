@@ -69,6 +69,46 @@ def test_format_result_error_marker():
     assert "✗" in out and "boom" in out
 
 
+def test_format_result_surfaces_pytest_verdict_not_the_banner():
+    """The verdict lives at the end under a banner; a first-line summary would
+    show 'test session starts' and bury the outcome. Regression guard for the
+    2026-07-25 'can't tell pass from fail' finding."""
+    out = render.format_result(
+        "bash",
+        "===== test session starts =====\ncollected 3 items\n\n"
+        "test_cart.py ...\n\n===== 3 passed in 0.00s =====",
+        is_error=False, color=False)
+    assert "3 passed" in out and "session starts" not in out
+    assert "✓" in out and "✗" not in out
+
+
+def test_format_result_marks_a_failing_command_even_when_the_tool_ran():
+    """pytest can exit nonzero as data (is_error False). A green ✓ next to
+    '1 failed' reads as success — the marker must flip."""
+    out = render.format_result(
+        "bash",
+        "===== test session starts =====\ntest_cart.py F..\n\n"
+        "FAILED test_cart.py::test_plain\n===== 1 failed, 2 passed in 0.01s =====",
+        is_error=False, color=False)
+    assert "1 failed" in out and "✗" in out
+
+
+def test_format_result_surfaces_exception_from_a_traceback():
+    out = render.format_result(
+        "bash",
+        "Traceback (most recent call last):\n  File \"x.py\", line 3\n"
+        "    foo()\nValueError: bad thing",
+        is_error=False, color=False)
+    assert "ValueError: bad thing" in out and "✗" in out
+
+
+def test_format_result_leaves_plain_output_on_the_first_line():
+    """No verdict pattern → unchanged behaviour: first line, green ✓."""
+    out = render.format_result("ls", "cart.py\ntest_cart.py\nutil.py",
+                               is_error=False, color=False)
+    assert out.strip().startswith("✓") and "cart.py" in out and "+2 more lines" in out
+
+
 # --- markdown streaming -------------------------------------------------------
 def test_markdown_styles_code_heading_and_inline():
     out = []
