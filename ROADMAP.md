@@ -134,6 +134,23 @@ are user-visible and waste whole generations.*
   failure (same class as fixed in c00e8a4).
 - `[ ]` **2.3 Gate/compare ergonomics** — `compare` takes two positional
   results.json paths; document the threshold and exit codes where a user looks.
+- `[!]` **2.4 Same-session paired A/B for regression checks** — *evidence
+  hardened 2026-07-25 (Round 21, D75).* A historical score from another session
+  is **not a valid baseline** for a sweep run today: build 30 scored 0.62 on
+  exec-bugfix qythos9 in the r26 session vs 0.92 in its own r13/r16/r19 sessions —
+  pure model non-stationarity, same code. So a single sweep vs a saved baseline
+  cannot distinguish a real regression from session drift (exactly the two sweeps
+  Round 21 spent proving a "0.92→0.50 regression" was noise). The fix is to run
+  **candidate and baseline interleaved, run-by-run, against the same loaded
+  server**, so drift cancels in the paired delta. **Interim manual recipe (proven
+  in Round 21):** commit the candidate, `git checkout <pre-change-ref>`, run the
+  case n≥4 with one `--label`, `git checkout main`, run the same case+n with
+  another `--label`, compare the two same-session means — never a historical
+  results.json. **Design tension (why this is `[!]` not `[ ]`):** automating it
+  means the harness git-checkouts between runs (fragile if interrupted, and the
+  working tree must be clean), *or* it shells two worktrees, *or* runs pin a seed
+  (Metal non-determinism makes seed-pinning only partial). Needs a decision on
+  which before building.
 
 ## Milestone 4 — Interactive usability
 *User feedback 2026-07-24: "still very cumbersome to use locode with local
@@ -193,6 +210,18 @@ the lived experience.*
   a smaller step" message. Scoped to the broken-fence case only; a prose reply
   cut mid-sentence stays readable and still falls through. Pure visibility lever.
   LOG Round 20.
+- `[x]` **4.8 Turn-ending legibility is data-confirmed closed (2026-07-25).**
+  Categorized all 147 recent turn-endings by what the *user actually sees*: 46%
+  prose answer, 36% clean-stop with a legible reason, 15% short claim ("All tests
+  pass."), and **only 3.4% (5 runs) a raw tool/json garbage block — all of them
+  pre-build-41 logs, i.e. exactly the case 4.7 now converts to a clean stop.**
+  With 4.5 (legible verdict), 4.6 (seen-green gate), and 4.7 (truncation-stop)
+  shipped, the identifiable *turn-ending* visibility defects are covered. What
+  remains in the non-clean endings is **capability-bound** — plausible-but-wrong
+  code, the `new==old` "highlighting" dead-end (Round 20 edit-failure mining) —
+  which no harness lever fixes; Option D (r19) already showed a 24B local model
+  doesn't clear those walls either. Further visibility gains, if any, are in
+  *during-turn* (real-time progress) not turn-endings. LOG Round 21.
 - `[~]` **4.4 Convergence / clean-finish.** clean_finish is low suite-wide —
   sessions rarely end on a clean "done", they flail and stall. The deepest, and
   hardest, usability lever. **Per-case flailing map (r12-salvage, all 6 cases ×
