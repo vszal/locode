@@ -1380,6 +1380,23 @@ claim trusted, non-test finish never gated, gate fires only once, plus
 `_looks_green_test` / `_TEST_CLAIM_RE` unit coverage). Interactive and headless
 share the loop, so this gate applies to both.
 
+**Live validation (r24-seengreen-gate, exec-stall-trap qwencoder14 n=6, build
+40).** Ran the exact case the historical false-completions came from, now with
+the gate live. Result: **0 seen-green nudges fired — and correctly so.** None of
+the 6 runs reached a finish falsely claiming tests pass: five were stopped by the
+**repeated-call** stall guard first (it fired 7×), and the one clean finish (run
+2) had just seen a *failing* suite (`....FF`) and made no pass claim, so there was
+nothing to gate. This confirms the **safety property live** (no false nudge on
+any of 6 real runs) but did not reproduce the target false-completion — a
+consequence of the non-stationarity documented in Round 16: this n=6 draw fell
+into the repeated-call-stall path rather than the false-"tests pass"-finish path.
+Net: the gate is validated by a three-way triangle — unit tests (fires once,
+correctly), offline discrimination (4/4 real historical catches, 0/85 false), and
+live safety (0/6 false) — and sits as a **low-frequency backstop** for the
+residual false-completions that slip past the upstream stall guards. Not worth
+burning more GPU to catch a probabilistic live firing; the offline catches are
+the proof the residual is real.
+
 ---
 
 ## Round 19 — devstral24 is not a capability lever on the hard cases (r22/r23)
