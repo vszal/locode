@@ -283,6 +283,18 @@ the lived experience.*
   coercion/precedence, qythos9's code doesn't pass even once it parses. Further
   e2e gains need a stronger executor model, not more harness code. Keep 3.1a on
   its own general merit; stop spending harness effort chasing this case's score.
+  - **Update 2026-07-25 (build 40, r22/r23): a bigger LOCAL model does NOT clear
+    the wall.** Tested the "stronger executor" claim directly with devstral24
+    (Mistral-Small 24B) n=6 on both hard cases. e2e: mean 0.74 (right in the
+    incumbent band), and `own_tests_pass` = **0/5**, `independent_spec_check` =
+    **0/5** — the identical failure to qwencoder14/qythos9 (both 0/6 on every
+    recent e2e sweep). The wall is **model-size-invariant across the local
+    pool**: all three write plausible code with wrong logic. exec-stall-trap:
+    devstral24 no-ops (0 tool calls, 0/6 pass) and is strictly worse than
+    qythos9, which already solves that case (≈0.98, 8/8). Closes the "just run a
+    bigger local model" hypothesis — the payoff is in harness levers
+    (visibility 4.5, seen-green gate 4.6), not model-swapping. LOG Round 19,
+    D71/D72.
 
 ---
 

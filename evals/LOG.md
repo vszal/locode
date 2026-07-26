@@ -1381,3 +1381,57 @@ claim trusted, non-test finish never gated, gate fires only once, plus
 share the loop, so this gate applies to both.
 
 ---
+
+## Round 19 — devstral24 is not a capability lever on the hard cases (r22/r23)
+
+**Option D question.** The two hardest cases sit at the 3.1 capability wall on
+the 9–14B incumbents. Does the heavier local executor, **devstral24** (Mistral-
+Small 24B), clear either? Ran it n=6 on both: `r22-devstral-e2e`
+(e2e-spec-to-code) and `r23-devstral-stall` (exec-stall-trap). Answer on both:
+**no.**
+
+**e2e-spec-to-code — same wall, same failure mode (n=5; a 6th was cut when the
+chained sweep was stopped).** devstral24 mean **0.74**, squarely in the incumbent
+band:
+
+| model | e2e mean (recent) | own_tests_pass |
+|---|---|---|
+| devstral24 | 0.74 (r22, n=5) | **0/5** |
+| qwencoder14 | 0.71 (r13–15) | **0/6** each sweep |
+| qythos9 | 0.64 (r13–15) | **0/6** each sweep |
+
+On all 5 runs devstral24 wrote every artifact (design doc, plan, module, tests)
+but **`own_tests_pass=false` and `independent_spec_check=false` — 0/5 on both.**
+The entire 0.74 is scaffolding credit; both correctness checks are zero. This is
+the *identical* failure to the incumbents (0/6 own-tests-pass across every recent
+e2e sweep): all three local models write plausible code whose logic is wrong.
+The wall is universal, not model-size-bound.
+
+**exec-stall-trap — devstral24 no-ops; qythos9 already solves it.** mean **0.67**,
+tests_pass **0/6**, and the telling metric: **0 tool calls per run.** devstral24
+announces intent, eats the one announced-intent nudge, and escapes clean in ~17s
+without ever attempting the fix. It out-scores qwencoder14 (0.33, which gets
+*baited into grinding* — the case's purpose — 3–50 tool calls, 0/8 pass) only by
+refusing to engage, banking the "escaped-without-grinding / suite-intact" credit.
+But the config default **qythos9 already solves this case outright** (≈0.98,
+tests_pass 8/8, ~4 tool calls). devstral24 is strictly *worse* than the model
+we'd actually reach for.
+
+**A harness observation.** Both stall sweeps tripped the "gen ≤30 ch/s → box
+throttled, don't use as baseline" guard — a **misfire**. The concurrent e2e runs
+on the same box clocked **45.8 ch/s**, so the box was healthy; the low rate is
+run-*length*: a 2-iteration, 205-char, 17s no-op is dominated by fixed prompt-
+processing overhead. The floor should be gated on `gen_seconds` (only flag *long*
+runs that are slow), or the warning will keep crying wolf on legitimately short
+runs. Minor; noted for a later harness tweak.
+
+| # | Decision | Why |
+|---|---|---|
+| D71 | Do **not** adopt devstral24 as a hard-case lever | e2e: 0.74, own_tests_pass 0/5 — same wall as the 9–14B models. stall: 0 tool calls, 0/6 pass — worse than qythos9, which already solves it. The 24B capacity buys no correctness on the hard cases. |
+| D72 | The e2e capability wall is model-size-invariant across the local pool | All three local models get own_tests_pass 0/6(5) on e2e — plausible code, wrong logic. Confirms 3.1 is capability-bound; the payoff is in harness levers (visibility, seen-green gate), not model-swapping. |
+
+**Closes the "just run a bigger local model" hypothesis.** CLAUDE.md's framing of
+devstral24 as *insurance for larger tasks* stands, but it is not a capability
+upgrade on the cases that actually fail.
+
+---

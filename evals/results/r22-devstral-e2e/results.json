@@ -1,7 +1,7 @@
 {
   "label": "r22-devstral-e2e",
-  "created": "2026-07-25 19:26:23",
-  "git_head": "e998c20",
+  "created": "2026-07-25 19:55:49",
+  "git_head": "b2f4c62",
   "git_dirty": true,
   "runs": [
     {
@@ -55,36 +55,247 @@
       "seconds": 375.1,
       "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__devstral24__r1-kpnqm6_6",
       "error": ""
+    },
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "devstral24",
+      "repeat": 2,
+      "score": 0.7,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": true,
+        "plan_has_milestones": true,
+        "plan_has_tasks": true,
+        "wrote_module": false,
+        "wrote_tests": true,
+        "own_tests_pass": false,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 3,
+          "bash": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 5,
+        "nudges_by_reason": {
+          "truncated": 2,
+          "slow progress": 1,
+          "missing deliverable": 2
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 495.2,
+        "model_seconds": 494.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 494.6,
+        "gen_chars": 26821,
+        "gen_chars_per_sec": 54.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 495.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__devstral24__r2-ixwz42q_",
+      "error": ""
+    },
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "devstral24",
+      "repeat": 3,
+      "score": 0.7,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": true,
+        "plan_has_milestones": true,
+        "plan_has_tasks": true,
+        "wrote_module": true,
+        "wrote_tests": false,
+        "own_tests_pass": false,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 3
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "slow progress": 1,
+          "truncated": 2
+        },
+        "stop_reason": "the model repeated the same reply without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 538.4,
+        "model_seconds": 538.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 538.3,
+        "gen_chars": 25579,
+        "gen_chars_per_sec": 47.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 538.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__devstral24__r3-guxyfabo",
+      "error": ""
+    },
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "devstral24",
+      "repeat": 4,
+      "score": 0.7,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": true,
+        "plan_has_milestones": true,
+        "plan_has_tasks": false,
+        "wrote_module": true,
+        "wrote_tests": true,
+        "own_tests_pass": false,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 9,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 4,
+          "bash": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "slow progress": 1,
+          "truncated": 2
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 391.1,
+        "model_seconds": 390.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 390.5,
+        "gen_chars": 18147,
+        "gen_chars_per_sec": 46.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 391.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__devstral24__r4-me3p44ki",
+      "error": ""
+    },
+    {
+      "case": "e2e-spec-to-code",
+      "track": "e2e",
+      "model": "devstral24",
+      "repeat": 5,
+      "score": 0.8,
+      "checks": {
+        "wrote_design_doc": true,
+        "design_covers_precedence": true,
+        "design_covers_coercion": true,
+        "wrote_plan_doc": true,
+        "plan_has_milestones": true,
+        "plan_has_tasks": true,
+        "wrote_module": true,
+        "wrote_tests": true,
+        "own_tests_pass": false,
+        "independent_spec_check": false
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 4,
+          "bash": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.143,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "slow progress": 1,
+          "truncated": 2
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 338.6,
+        "model_seconds": 338.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 338.2,
+        "gen_chars": 16190,
+        "gen_chars_per_sec": 47.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 338.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__devstral24__r5-k73qwpj2",
+      "error": ""
     }
   ],
   "summary": {
-    "overall_score": 0.8,
-    "clean_finish_rate": 1.0,
-    "total_nudges": 4,
-    "total_iterations": 10,
+    "overall_score": 0.74,
+    "clean_finish_rate": 0.8,
+    "total_nudges": 18,
+    "total_iterations": 46,
     "nudge_histogram": {
-      "truncated": 2,
-      "slow progress": 1,
-      "missing deliverable": 1
+      "truncated": 10,
+      "slow progress": 5,
+      "missing deliverable": 3
     },
-    "gen_rate": 45.8,
+    "gen_rate": 48.6,
     "rows": {
       "e2e-spec-to-code::devstral24": {
         "case": "e2e-spec-to-code",
         "track": "e2e",
         "model": "devstral24",
-        "n": 1,
-        "score_mean": 0.8,
-        "score_min": 0.8,
+        "n": 5,
+        "score_mean": 0.74,
+        "score_min": 0.7,
         "scores": [
+          0.8,
+          0.7,
+          0.7,
+          0.7,
           0.8
         ],
-        "iterations_mean": 10,
-        "nudges_mean": 4,
-        "clean_finish_rate": 1.0,
-        "seconds_mean": 375.1,
-        "gen_rate_mean": 45.8,
-        "stop_reasons": []
+        "iterations_mean": 9.2,
+        "nudges_mean": 3.6,
+        "clean_finish_rate": 0.8,
+        "seconds_mean": 427.8,
+        "gen_rate_mean": 48.6,
+        "stop_reasons": [
+          "the model repeated the same reply without making progress"
+        ]
       }
     },
     "_weights": {
