@@ -208,6 +208,19 @@ the lived experience.*
     `res.no_change` guard resets on interleaved reads, as designed); the drop is
     n=6 variance over the 3.1 capability wall (wrong fix + premature "all tasks
     completed"). **No new lever — the 4.4 assessment above stands unchanged.**
+  - **Update 2026-07-25 (build 38): the gate now encodes the n=6 non-stationarity
+    that the round-15 retraction had to reason through by hand.** Proven finding:
+    two *build-identical* sweeps (r18/r19) differ at p=0.030 on the exact
+    exec-stall-trap qwencoder row above — a single n=6 sweep is non-stationary, so
+    no single-sweep statistic can auto-FAIL a noisy row. `compare` now keeps
+    per-run scores and classifies each row `ok`/`noise`/`review`/`regression`,
+    hard-failing only rows that are internally consistent in *both* sweeps (or a
+    broad slide across the trusted pool) and routing per-sweep drift to an
+    advisory **REVIEW**. Validated: every same-code pair now PASSes; the real
+    build-37 gains still show; the noisy stall-trap drop is REVIEWed, not FAILed.
+    **The real fix for noisy-row *attribution* (crediting vs rejecting a REVIEW
+    row) is interleaved paired runs at higher n — queued, see Milestone 4 next
+    steps.** (LOG Round 16, D65–D67.)
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+

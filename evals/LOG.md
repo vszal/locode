@@ -1234,3 +1234,60 @@ variance over a capability wall. The lever is retracted (D64 below).
 **Tests:** 572 green (+4 toolparse regression tests for the build-37 fix).
 
 ---
+
+## Round 16 — the gate learns that a sweep is non-stationary (build 38, HEAD `ce31637`+)
+
+Round 15 spent four sweeps untangling one number by hand, because the gate
+false-FAILed on r18 and the row that moved was pure variance. This round makes
+that reasoning the gate's own, after first proving the problem is real.
+
+**The finding: a single n=6 sweep of these models is non-stationary.** Two
+build-identical sweeps — r18 and r19, both build 37, same code — produce a
+"significant" per-row drop on exec-stall-trap qwencoder14 (**0.72 → 0.33**), and
+a one-sided permutation test over the real per-run scores calls it **p=0.030**.
+Nothing changed but the RNG. That row's per-sweep mean wanders 0.33–0.72 across
+draws; its within-sweep spread does *not* predict the wander (r19 was
+`[0.333]×6`, std 0, yet drifts to r18's 0.72). So **no single-sweep statistic —
+threshold, CI, or permutation p — can be trusted to auto-FAIL a noisy row**, and
+a naive permutation gate is *more* trigger-happy, not less: it fired on the
+same-code pair.
+
+**The gate the finding demands (build 38).** `summarize()` now keeps each row's
+per-run `scores`, and `compare()` classifies every row against its baseline:
+- `ok` — no material drop (< 0.10).
+- `noise` — dropped, but the candidate's 90% bootstrap CI still overlaps the
+  baseline's. Within the band; nothing to act on.
+- `regression` (**hard FAIL**) — CIs separated **and both sweeps are internally
+  consistent** (per-run std < 0.10 each). A clean drop between two tight sweeps
+  is the only per-row shape that can auto-fail.
+- `review` (**advisory, never fails**) — CIs separated but at least one sweep is
+  internally noisy. Could be a regression, could be drift; a human (or the queued
+  interleaved runs) decides.
+
+An overall backstop pools **only the trusted (non-review) rows** and hard-fails a
+*broad* slide — ≥2 stable rows sliding together past a low 0.05 floor — so a
+harness change that mildly hurts everything is still caught, while a single noisy
+row can never manufacture a FAIL. Legacy result files (no per-run scores) fall
+back to the old fixed 0.15/0.05 thresholds; `compare` re-summarizes from the
+stored `runs` so pre-build-38 sweeps get the new path for free.
+
+**Validated against the real sweeps.** Every same-code pair (r18↔r19↔r20) now
+returns **PASS (with REVIEW)** — the non-stationarity can no longer trip the hard
+gate. The genuine build-37 improvement (r17→r20) also PASSes, with its two real
+gains shown (`exec-bugfix` qwencoder +0.42, qythos9 +0.08) and the noisy
+stall-trap drop flagged REVIEW rather than FAILed. Synthetic clean regressions
+(`[1.0]×6 → [0.5]×6`) still hard-FAIL; a broad 3-row 0.07 stable slide FAILs via
+the backstop; a lone deterministic 0.05 drop does not.
+
+| # | Decision | Why |
+|---|---|---|
+| D65 | Treat a single n=6 sweep as non-stationary; the gate must tolerate per-sweep drift up to ~0.4 on noisy rows | Two same-code sweeps (r18/r19) differ at p=0.030 on exec-stall-trap qwencoder. Proven, not assumed — measured on the real per-run scores. |
+| D66 | Ship the variance-aware gate (per-run scores + bootstrap CIs + advisory permutation p): hard-fail only internally-consistent rows and broad trusted-pool slides; route noisy drops to REVIEW | Makes Round 15's four-sweep hand-analysis the gate's default. The visibility half (per-row CI table) is the "poor visibility" fix; the advisory half stops the false FAILs. |
+| D67 | Queue interleaved paired runs + larger n as the real fix for noisy-row *attribution* | The gate can only *tolerate* single-sweep noise, not resolve it. To actually credit/reject a REVIEW row, run baseline and candidate interleaved (shared RNG conditions) at higher n. Next step, not this round. |
+
+**Tests:** 581 green (+9 harness tests for the variance-aware path: clean
+stable-drop FAILs, noisy-drop REVIEWs+PASSes, same-code noise does not fail,
+improvement/tiny-drop pass, broad backstop fails, review-row excluded from
+backstop, plus bootstrap/permutation unit checks).
+
+---

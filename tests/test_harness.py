@@ -187,6 +187,109 @@ def test_compare_is_inconclusive_when_the_box_was_slow(capsys):
     assert "INCONCLUSIVE" in capsys.readouterr().out
 
 
+# --- variance-aware gate (per-run scores present) -------------------------
+def _scored(rows, rate=100.0):
+    """Like _full but each row carries per-run `scores`; overall is the pooled
+    mean of every run, matching what summarize() emits."""
+    allscores = [s for v in rows.values() for s in v]
+    overall = round(sum(allscores) / len(allscores), 3)
+    return {
+        "overall_score": overall,
+        "clean_finish_rate": 1.0,
+        "total_nudges": 0, "total_iterations": 10, "nudge_histogram": {},
+        "gen_rate": rate,
+        "rows": {k: {"case": k.split("::")[0], "track": "t",
+                     "model": k.split("::")[1], "n": len(v),
+                     "score_mean": round(sum(v) / len(v), 3),
+                     "score_min": min(v), "scores": v,
+                     "iterations_mean": 1.0, "nudges_mean": 0.0,
+                     "clean_finish_rate": 1.0, "seconds_mean": 1.0,
+                     "gen_rate_mean": rate, "stop_reasons": []}
+                 for k, v in rows.items()},
+    }
+
+
+def test_variance_gate_hard_fails_a_clean_stable_drop(capsys):
+    """Both sweeps internally consistent, CIs separated: a real regression."""
+    base = _scored({"a::m": [1.0] * 6})
+    cand = _scored({"a::m": [0.5] * 6})
+    assert harness.compare(base, cand) == 1
+    out = capsys.readouterr().out
+    assert "FAIL" in out
+    assert "internally consistent" in out
+
+
+def test_variance_gate_reviews_but_passes_a_noisy_drop(capsys):
+    """The real r17->r20 shape: base mostly-1.0 with a blip, candidate a tight
+    low band. Separated CIs but a noisy baseline — advisory REVIEW, PASS(0),
+    because per-sweep drift up to ~0.4 happens under identical code."""
+    base = _scored({"a::m": [1.0, 1.0, 1.0, 1.0, 0.5, 1.0]})
+    cand = _scored({"a::m": [0.5, 0.333, 0.5, 0.5, 0.333, 0.5]})
+    assert harness.compare(base, cand) == 0
+    out = capsys.readouterr().out
+    assert "REVIEW" in out
+    assert "sampling drift" in out
+
+
+def test_variance_gate_does_not_flag_same_code_noise(capsys):
+    """The r18-vs-r19 same-code pair (0.72 -> 0.33) must NOT hard-fail — that is
+    exactly the non-stationarity this gate exists to tolerate."""
+    base = _scored({"a::m": [1.0, 0.167, 1.0, 0.167, 1.0, 1.0]})
+    cand = _scored({"a::m": [0.333] * 6})
+    assert harness.compare(base, cand) == 0
+    assert "FAIL" not in capsys.readouterr().out
+
+
+def test_variance_gate_passes_an_improvement(capsys):
+    base = _scored({"a::m": [1.0, 1.0, 1.0, 1.0, 1.0, 0.5]})
+    cand = _scored({"a::m": [1.0] * 6})
+    assert harness.compare(base, cand) == 0
+    out = capsys.readouterr().out
+    assert "REVIEW" not in out
+    assert "PASS" in out
+
+
+def test_variance_gate_ignores_a_tiny_drop(capsys):
+    base = _scored({"a::m": [1.0] * 6})
+    cand = _scored({"a::m": [0.95] * 6})
+    assert harness.compare(base, cand) == 0
+    assert "FAIL" not in capsys.readouterr().out
+
+
+def test_variance_gate_overall_backstop_fails_a_broad_stable_drop(capsys):
+    """No single row crosses the per-row floor (each drops 0.07 < 0.10), but all
+    three stable rows slide together and the pooled permutation clears the 0.05
+    overall floor — the broad-mild-degradation the backstop exists to catch."""
+    base = _scored({"a::m": [1.0] * 6, "b::m": [1.0] * 6, "c::m": [1.0] * 6})
+    cand = _scored({"a::m": [0.93] * 6, "b::m": [0.93] * 6, "c::m": [0.93] * 6})
+    assert harness.compare(base, cand) == 1
+    out = capsys.readouterr().out
+    assert "pooled drop" in out
+    # and no per-row line was itself called a regression
+    assert "internally consistent" not in out
+
+
+def test_variance_gate_overall_backstop_excludes_review_rows(capsys):
+    """A single wildly-noisy REVIEW row must not drive a hard overall FAIL on its
+    own — it is excluded from the pool, so the verdict is PASS-with-REVIEW."""
+    base = _scored({"a::m": [1.0, 1.0, 1.0, 1.0, 0.5, 1.0]})
+    cand = _scored({"a::m": [0.4, 0.3, 0.4, 0.3, 0.4, 0.3]})
+    assert harness.compare(base, cand) == 0
+    out = capsys.readouterr().out
+    assert "REVIEW" in out
+    assert "pooled drop" not in out
+
+
+def test_bootstrap_ci_is_degenerate_on_constant_input():
+    assert harness._bootstrap_ci([0.5] * 6) == (0.5, 0.5)
+
+
+def test_permutation_p_is_one_when_candidate_did_not_drop():
+    p, drop = harness._permutation_drop_p([0.5] * 6, [0.9] * 6)
+    assert p == 1.0
+    assert drop < 0
+
+
 # --- absolute throughput floor --------------------------------------------
 def test_absolute_floor_fires_without_a_comparable_baseline():
     """The relative check needs a baseline that recorded throughput, and no

@@ -51,6 +51,7 @@ import argparse
 import importlib.util
 import json
 import os
+import random
 import shutil
 import signal
 import statistics
@@ -423,6 +424,11 @@ def summarize(runs: list[RunResult]) -> dict:
             "n": len(group),
             "score_mean": round(statistics.mean(scores), 3),
             "score_min": round(min(scores), 3),
+            # Per-run scores, kept so the regression gate can reason about a
+            # row's *variance*, not just its mean. At n=6 these models drift up
+            # to ~0.4 in per-sweep mean under identical code (r18 vs r19), so a
+            # bare mean delta cannot tell a real regression from sampling noise.
+            "scores": [round(s, 3) for s in scores],
             "iterations_mean": round(statistics.mean(
                 [r.metrics.get("iterations", 0) for r in group]), 1),
             "nudges_mean": round(statistics.mean(
@@ -564,6 +570,101 @@ def _validity_warnings(baseline: dict, candidate: dict) -> list[str]:
     return warnings
 
 
+# --------------------------------------------------------------------------
+# variance-aware regression gate
+# --------------------------------------------------------------------------
+# The central finding these constants encode (measured 2026-07-25): a single
+# n=6 sweep of these models is NON-STATIONARY. Two build-identical sweeps (r18
+# vs r19) produced a "significant" per-row drop (exec-stall-trap qwencoder,
+# 0.72 -> 0.33, p=0.030) purely from sampling — no code changed. So no
+# single-sweep statistic can be trusted to AUTO-FAIL a noisy row. The gate
+# therefore hard-fails only rows that are internally consistent in BOTH sweeps
+# (where a mean drop cannot be explained by within-sweep spread), and routes
+# every noisier drop to an advisory REVIEW that a human — or the queued
+# interleaved paired runs — must adjudicate.
+_GATE_ALPHA = 0.05           # permutation significance for the reported p-value
+_GATE_ROW_FLOOR = 0.10       # a mean drop below this is never worth flagging
+_GATE_STABLE_STD = 0.10      # a row may HARD-fail only when BOTH sweeps' per-run
+                             # scores are at least this internally consistent;
+                             # noisier rows can only REVIEW (see r18-vs-r19)
+_GATE_OVERALL_FLOOR = 0.05   # pooled-overall hard-fail needs at least this drop.
+                             # Lower than the per-row floor on purpose: the pool
+                             # excludes REVIEW rows, so what's left is the stable
+                             # rows, where a *broad* 0.05 slide across them is a
+                             # real signal (a harness change that mildly hurts
+                             # everything) — and where same-code drift is ~0.
+_GATE_BOOT_ITERS = 20000
+_GATE_PERM_ITERS = 20000
+
+
+def _bootstrap_ci(scores: list[float], pct: float = 90.0,
+                  iters: int = _GATE_BOOT_ITERS, seed: int = 0) -> tuple[float, float]:
+    """Percentile-bootstrap CI for the mean. Degenerate input (n<2 or all-equal)
+    returns a zero-width interval at the point itself — the honest CI when there
+    is nothing to resample."""
+    n = len(scores)
+    if n == 0:
+        return (0.0, 0.0)
+    if n == 1 or len(set(scores)) == 1:
+        return (scores[0], scores[0])
+    rng = random.Random(seed)
+    means = sorted(sum(rng.choice(scores) for _ in range(n)) / n for _ in range(iters))
+    lo = (100.0 - pct) / 2.0 / 100.0
+    return (means[int(lo * iters)], means[int((1.0 - lo) * iters) - 1])
+
+
+def _permutation_drop_p(base: list[float], cand: list[float],
+                        iters: int = _GATE_PERM_ITERS, seed: int = 0) -> tuple[float, float]:
+    """One-sided permutation test that candidate's mean sits BELOW baseline's.
+
+    Returns (p, observed_drop). No drop short-circuits to p=1.0. +1 smoothing so
+    p is never exactly 0. This p-value is *advisory* — reported for visibility,
+    never the sole basis for a hard FAIL, because it fires on same-code sweeps
+    (it correctly detects that two draws differ; it cannot know code is why)."""
+    obs = statistics.mean(base) - statistics.mean(cand)
+    if obs <= 0:
+        return (1.0, obs)
+    pool = list(base) + list(cand)
+    nb, nc = len(base), len(cand)
+    rng = random.Random(seed)
+    ge = 0
+    for _ in range(iters):
+        rng.shuffle(pool)
+        d = sum(pool[:nb]) / nb - sum(pool[nb:]) / nc
+        if d >= obs:
+            ge += 1
+    return ((ge + 1) / (iters + 1), obs)
+
+
+def _classify_row(base: list[float], cand: list[float]) -> dict:
+    """Classify a candidate row against its baseline into ok / noise / review /
+    regression. Only `regression` counts toward a hard FAIL; `review` is
+    advisory. See the module constants above for why noisy rows can't hard-fail."""
+    bm, cm = statistics.mean(base), statistics.mean(cand)
+    drop = bm - cm
+    blo, bhi = _bootstrap_ci(base)
+    clo, chi = _bootstrap_ci(cand)
+    p, _ = _permutation_drop_p(base, cand)
+    info = {"base_mean": bm, "cand_mean": cm, "drop": drop, "p": p,
+            "base_ci": (blo, bhi), "cand_ci": (clo, chi)}
+    if drop < _GATE_ROW_FLOOR:
+        info["status"] = "ok"
+    elif chi >= blo:
+        # Candidate's CI still overlaps the baseline's: the drop is inside the
+        # noise band, nothing to act on.
+        info["status"] = "noise"
+    elif (statistics.pstdev(base) < _GATE_STABLE_STD
+          and statistics.pstdev(cand) < _GATE_STABLE_STD):
+        # Both sweeps are internally consistent and their CIs are separated —
+        # a mean drop this clean is a real regression.
+        info["status"] = "regression"
+    else:
+        # Separated CIs but at least one sweep is internally noisy: could be a
+        # regression, could be per-sweep drift. A human decides.
+        info["status"] = "review"
+    return info
+
+
 def compare(baseline: dict, candidate: dict) -> int:
     """Regression gate. Exit code: 0 = pass, 1 = regression, 2 = inconclusive."""
     print_report(baseline, "BASELINE")
@@ -579,17 +680,64 @@ def compare(baseline: dict, candidate: dict) -> int:
     print(f"total iterations  : {baseline['total_iterations']} -> "
           f"{candidate['total_iterations']}")
 
-    regressions = []
+    regressions: list[str] = []   # hard — each one FAILs the gate
+    reviews: list[str] = []       # advisory — flagged for a human, never FAILs
+    row_infos: dict[str, dict] = {}
+    pooled_base: list[float] = []
+    pooled_cand: list[float] = []
+    pooled_drop_rows = 0          # trusted rows that actually slid — the backstop
+                                  # needs breadth, not one row moving the pool
     for key, brow in baseline["rows"].items():
         crow = candidate["rows"].get(key)
         if crow is None:
             continue
-        # Per-case tolerance: a single flaky repeat shouldn't fail the gate, but
-        # a case that drops more than one full check is a real regression.
-        if crow["score_mean"] < brow["score_mean"] - 0.15:
-            regressions.append(
-                f"{key}: score {brow['score_mean']:.2f} -> {crow['score_mean']:.2f}")
-    if c < b - 0.05:
+        bscores, cscores = brow.get("scores"), crow.get("scores")
+        if bscores and cscores:
+            info = _classify_row(bscores, cscores)
+            row_infos[key] = info
+            # Pool only the rows we trust at n=6 — the internally-consistent
+            # ones. REVIEW rows are noisy/drifting by definition; letting their
+            # drop drive a hard overall FAIL would re-import the very
+            # non-stationarity the per-row logic just set aside.
+            if info["status"] != "review":
+                pooled_base += bscores
+                pooled_cand += cscores
+                if info["drop"] > 0:
+                    pooled_drop_rows += 1
+            if info["status"] == "regression":
+                regressions.append(
+                    f"{key}: {info['base_mean']:.2f} -> {info['cand_mean']:.2f} "
+                    f"(drop {info['drop']:.2f}; both sweeps internally consistent)")
+            elif info["status"] == "review":
+                blo, bhi = info["base_ci"]
+                reviews.append(
+                    f"{key}: {info['base_mean']:.2f} -> {info['cand_mean']:.2f} "
+                    f"(drop {info['drop']:.2f}, p={info['p']:.3f}; high per-sweep "
+                    f"noise — could be sampling drift, base CI [{blo:.2f},{bhi:.2f}])")
+        else:
+            # Legacy summary without per-run scores (old baseline, or a synthetic
+            # summary): fall back to the fixed per-case tolerance. A single flaky
+            # repeat shouldn't fail, but a drop past one full check is real.
+            if crow["score_mean"] < brow["score_mean"] - 0.15:
+                regressions.append(
+                    f"{key}: score {brow['score_mean']:.2f} -> {crow['score_mean']:.2f}")
+
+    # Overall verdict backstop. With per-run scores, pool every scored run and
+    # permutation-test the aggregate (steadier than any single row); hard-fail
+    # only a drop that is both significant AND materially large. Without scores,
+    # keep the legacy fixed overall threshold.
+    scored = any(brow.get("scores") and candidate["rows"].get(key, {}).get("scores")
+                 for key, brow in baseline["rows"].items())
+    if scored:
+        # Pool may be empty if every scored row was REVIEW-excluded; then there
+        # is deliberately no overall backstop (we don't hard-fail on noise).
+        if pooled_base and pooled_cand and pooled_drop_rows >= 2:
+            op, odrop = _permutation_drop_p(pooled_base, pooled_cand)
+            if op < _GATE_ALPHA and odrop >= _GATE_OVERALL_FLOOR:
+                regressions.append(f"overall score {b:.3f} -> {c:.3f} "
+                                   f"(pooled drop {odrop:.2f}, p={op:.3f})")
+    elif c < b - 0.05:
+        # Legacy summary with no per-run scores anywhere: fixed overall threshold.
         regressions.append(f"overall score {b:.3f} -> {c:.3f}")
 
     invalid = _validity_warnings(baseline, candidate)
@@ -600,21 +748,58 @@ def compare(baseline: dict, candidate: dict) -> int:
               "comparison")
         for w in invalid:
             print("   - " + w)
-        if regressions:
+        flagged = regressions + reviews
+        if flagged:
             print("   deltas below are reported for inspection, NOT as a verdict:")
-            for r in regressions:
+            for r in flagged:
                 print("     · " + r)
         print("   re-run the sweep to completion on an unloaded box before "
               "acting on these numbers.")
         return 2
 
+    _print_variance_table(row_infos)
+
     if regressions:
         print("\n❌ REGRESSION GATE: FAIL")
         for r in regressions:
             print("   - " + r)
+        if reviews:
+            print("   advisory REVIEW rows (not counted toward this FAIL):")
+            for r in reviews:
+                print("     · " + r)
         return 1
+    if reviews:
+        print("\n⚠️  REGRESSION GATE: PASS (with REVIEW) — no hard regression, but "
+              "noisy rows dropped and need a human eye:")
+        for r in reviews:
+            print("   - " + r)
+        print("   these rows are too noisy at n=6 to auto-gate — per-sweep drift "
+              "up to ~0.4 occurs under identical code. Confirm with interleaved "
+              "paired runs before acting.")
+        return 0
     print("\n✅ REGRESSION GATE: PASS")
     return 0
+
+
+def _print_variance_table(row_infos: dict[str, dict]) -> None:
+    """Per-row mean, bootstrap CI, and status — the visibility half of the gate.
+    Silent when no row carried per-run scores (legacy summaries)."""
+    if not row_infos:
+        return
+    print("\n=== PER-ROW (variance-aware) ===")
+    hdr = f"{'row':<30}{'mean':>6} {'90% CI':>14}  status  vs base"
+    print(hdr)
+    print("-" * len(hdr))
+    for key, info in row_infos.items():
+        clo, chi = info["cand_ci"]
+        blo, bhi = info["base_ci"]
+        ci = f"[{clo:.2f},{chi:.2f}]"
+        status = info["status"].upper() if info["status"] in ("regression", "review") \
+            else info["status"]
+        vs = (f"+{-info['drop']:.2f}" if info["drop"] < 0
+              else f"-{info['drop']:.2f}  base {info['base_mean']:.2f} "
+                   f"[{blo:.2f},{bhi:.2f}] p={info['p']:.3f}")
+        print(f"{key:<30}{info['cand_mean']:>6.2f} {ci:>14}  {status:<11} {vs}")
 
 
 # --------------------------------------------------------------------------
@@ -741,16 +926,27 @@ def _load_results(path: str) -> dict:
     return json.loads(p.read_text())
 
 
+def _summary_of(data: dict) -> dict:
+    """The summary to report on. Re-summarize from the raw `runs` when they are
+    present so results.json written before a summary-schema change (e.g. the
+    per-run `scores` the variance-aware gate needs) still get the current
+    fields. Fall back to the stored summary for files that carry no runs."""
+    runs = data.get("runs")
+    if runs:
+        return summarize([RunResult(**r) for r in runs])
+    return data["summary"]
+
+
 def cmd_report(args) -> int:
     data = _load_results(args.results)
-    print_report(data["summary"], f"{data['label']} @ {data.get('git_head', '?')}")
+    print_report(_summary_of(data), f"{data['label']} @ {data.get('git_head', '?')}")
     return 0
 
 
 def cmd_compare(args) -> int:
     b = _load_results(args.baseline)
     c = _load_results(args.candidate)
-    return compare(b["summary"], c["summary"])
+    return compare(_summary_of(b), _summary_of(c))
 
 
 def cmd_rescore(args) -> int:
