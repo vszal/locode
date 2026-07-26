@@ -1,0 +1,223 @@
+{
+  "label": "r26-pre40-control",
+  "created": "2026-07-25 22:15:18",
+  "git_head": "ce31637",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 13,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 2,
+          "update_plan": 1,
+          "edit_file": 6
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.364,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 94.2,
+        "model_seconds": 93.5,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 93.4,
+        "gen_chars": 5480,
+        "gen_chars_per_sec": 58.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 94.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-85r7tzw5",
+      "error": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 14,
+        "tool_calls": 12,
+        "tool_calls_by_name": {
+          "bash": 4,
+          "read_file": 1,
+          "update_plan": 2,
+          "edit_file": 5
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.25,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 70.9,
+        "model_seconds": 69.5,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 69.5,
+        "gen_chars": 3917,
+        "gen_chars_per_sec": 56.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 71.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r2-_h25iv2t",
+      "error": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 13,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 2,
+          "update_plan": 1,
+          "edit_file": 6
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.364,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 94.2,
+        "model_seconds": 93.6,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 93.5,
+        "gen_chars": 5480,
+        "gen_chars_per_sec": 58.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 94.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-zt3m0k2p",
+      "error": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 4,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 18,
+        "tool_calls": 16,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "read_file": 3,
+          "ls": 1,
+          "update_plan": 7,
+          "edit_file": 3
+        },
+        "tool_errors": 5,
+        "tool_error_rate": 0.312,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 81.1,
+        "model_seconds": 80.4,
+        "plan_updates": 7,
+        "truncations": 0,
+        "gen_seconds": 80.4,
+        "gen_chars": 4894,
+        "gen_chars_per_sec": 60.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 81.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r4-nw7v7ei1",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.625,
+    "clean_finish_rate": 0.25,
+    "total_nudges": 4,
+    "total_iterations": 58,
+    "nudge_histogram": {
+      "repeated call": 3,
+      "open plan tasks": 1
+    },
+    "gen_rate": 58.7,
+    "rows": {
+      "exec-bugfix::qythos9": {
+        "case": "exec-bugfix",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 4,
+        "score_mean": 0.625,
+        "score_min": 0.5,
+        "iterations_mean": 14.5,
+        "nudges_mean": 1,
+        "clean_finish_rate": 0.25,
+        "seconds_mean": 85.2,
+        "gen_rate_mean": 58.7,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "exec-bugfix": 1.0
+    }
+  }
+}

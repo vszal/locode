@@ -1482,3 +1482,45 @@ message with no raw fence. Full suite 596 green.
 | D73 | A truncation-exhausted turn stops cleanly rather than returning the raw block | Falling through to `return content` surfaced an unclosed ` ```tool ` fence as the final answer on 5/6 devstral24 e2e runs — the worst invisible failure. Directly serves the POOR-VISIBILITY pain. ROADMAP 4.7. |
 
 ---
+
+## Round 21 — build-41 regression check + a non-stationarity control (2026-07-25)
+
+Goal: confirm the two new finish-cascade nudges (4.6 seen-green gate, 4.7
+truncation-stop) don't **misfire** on the loaded workhorse. Ran qythos9 on the
+test-claiming cases — exec-bugfix, exec-from-plan, e2e-spec-to-code — at n=4
+(r25-build41-regress).
+
+**Misfire check: clean pass.** Across all 12 runs the seen-green nudge ("tests
+claimed passing but never seen green") fired **0 times**, and no run surfaced a
+raw ` ```tool ` block or a truncation stop. The tell: the two exec-from-plan runs
+that *did* reach green ended with an "All tasks completed" claim and the gate
+correctly **trusted** them (scored 1.00) rather than nagging. Builds 40/41
+introduce no spurious nudges.
+
+**A scare that became a control.** exec-bugfix scored **0.50 on all four** runs
+(each repeat-stopped), against a historical qythos9 baseline of 0.92 (r13/r16/r19).
+That looked like a regression — until noting the new nudges never fired here, so
+40/41 *couldn't* be the cause. Confirmed it with a same-session A/B: checked out
+the pre-build-40 commit (ce31637, build 30 — has the plan fixes, lacks 40/41) and
+re-ran exec-bugfix qythos9 n=4 (r26-pre40-control) against the *same* loaded
+server. Result: **0.50 / 1.00 / 0.50 / 0.50 = 0.625** — the same depressed range.
+
+| build | exec-bugfix qythos9 n=4 | vs historical |
+|---|---|---|
+| 41 (candidate, r25) | 0.50 0.50 0.50 0.50 → **0.50** | 0.92 (r13/r16/r19) |
+| 30 (pre-40 control, r26) | 0.50 1.00 0.50 0.50 → **0.625** | same session as r25 |
+
+The pre-40 code scores the *same* range as build 41 today; the gap to 0.92 is
+**model non-stationarity** (the documented r18-vs-r19, p=0.03-on-identical-code
+phenomenon), not my changes. The 0.625-vs-0.50 delta is one run flipping — n=4
+noise. In every run the loop behaved correctly: the model fixed 2 of ~4 bugs,
+then stalled submitting `new==old` on the rest (the capability-bound
+"highlighting" dead-end from Round 20's edit-failure mining) and was cleanly
+repeat-stopped.
+
+| # | Decision | Why |
+|---|---|---|
+| D74 | Builds 40/41 ship — no misfire, no regression | 0/12 spurious new-nudge firings; the exec-bugfix dip reproduces identically on pre-40 code in the same session. |
+| D75 | A historical cross-session score is NOT a valid baseline for a sweep run today | Same code (build 30) scores 0.62 today vs 0.92 in its origin session. Only a **same-session** A/B (or interleaved paired runs) controls for model drift. Reinforces the queued paired-runs item. |
+
+---
