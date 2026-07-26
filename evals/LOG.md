@@ -1291,3 +1291,48 @@ improvement/tiny-drop pass, broad backstop fails, review-row excluded from
 backstop, plus bootstrap/permutation unit checks).
 
 ---
+
+## Round 17 — watching a real run finds the verdict was invisible (build 39)
+
+Stepped out of the eval numbers and drove a weak model (qwencoder14) through a
+real bug-fix in a scratch workspace — the north star is the *lived* experience,
+and the gate is only a proxy for it. The model converged cleanly (correct edit,
+`pytest` green), so the flailing pain didn't surface — but the **visibility**
+pain did, sharply.
+
+**What the user actually sees.** `format_result` summarized a multi-line tool
+result by its **first line**. For the one result that decides everything —
+`pytest` — the first line is the banner, so the render was:
+
+```
+  ⚙ bash pytest test_cart.py
+    ✓ ===== test session starts =====…  (+9 more lines)
+```
+
+The `3 passed` / `2 failed` verdict is buried in "(+9 more lines)", and the green
+✓ means only "the tool ran," not "tests passed." Reproduced by feeding the run's
+own telemetry back through the real renderer — a user watching this could not
+tell success from failure.
+
+**Fix (build 39, `format_result`/`_salient`).** Surface the *conclusion* line —
+scan from the end for a verdict/error pattern (pytest tally, FAILED/PASSED/ERROR,
+Python exceptions, Traceback, `fatal:`) — and flip the ✓ marker to ✗ when the
+output reports failure even though the tool itself returned cleanly (pytest
+exiting nonzero as data). Output with no recognizable verdict (`ls`, etc.) is
+unchanged: first line, green ✓. Interactive path only; headless `-p` never
+rendered these lines.
+
+This lands on **both** north-star pains. Visibility: the verdict is legible at a
+glance. Flailing: a looping model now renders `✗ 1 failed` on each identical
+retry — visibly stuck — where before it showed the same "test session starts"
+banner every time, indistinguishable from progress.
+
+| # | Decision | Why |
+|---|---|---|
+| D68 | Render the tool-result **conclusion**, not its first line; make the ✓/✗ marker reflect the command's reported outcome | The single most decision-relevant result (test/build verdict) lands last, under a banner; a first-line summary hid it and a tool-ran ✓ contradicted a failing run. Found by live observation, the thing the eval score can't show. |
+
+**Tests:** 585 green (+4 render tests: pytest verdict surfaced not the banner,
+failing-command marker flips, traceback exception surfaced, plain output
+unchanged).
+
+---

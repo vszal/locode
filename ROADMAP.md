@@ -160,6 +160,16 @@ the lived experience.*
   dead-ends). Slower 9B that can hit the generation cap on large writes, but
   editing reliability dominates interactive use. Landed in config.py,
   scaffold.py, config.toml.example, test_config.py (build 26). User decision.
+- `[x]` **4.5 Tool-result verdict is legible (build 39).** Found by *watching* a
+  weak model fix a real bug (not from a score): `format_result` summarized a
+  multi-line result by its first line, so a `pytest` result rendered as
+  "✓ ===== test session starts =====  (+9 more lines)" — the `3 passed`/`2 failed`
+  verdict buried, the green ✓ meaning only "the tool ran." Now it surfaces the
+  conclusion line (verdict/error patterns, scanned from the end) and flips ✓→✗
+  when the output reports failure even on a clean tool exit. Helps both pains:
+  the verdict is legible at a glance (visibility), and a looping model now shows
+  `✗ 1 failed` each retry — visibly stuck — instead of an identical banner
+  (flailing). `render._salient`. LOG Round 17, D68.
 - `[~]` **4.4 Convergence / clean-finish.** clean_finish is low suite-wide —
   sessions rarely end on a clean "done", they flail and stall. The deepest, and
   hardest, usability lever. **Per-case flailing map (r12-salvage, all 6 cases ×
