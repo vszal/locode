@@ -243,6 +243,49 @@ def _case_fix_traceback():
     return files, prompt, check
 
 
+def _case_even_median():
+    # A WRONG-OUTPUT bug with no traceback: the model must reason about the
+    # even/odd median edge case, not just make a crash go away. Stresses
+    # correctness reasoning (the workhorse-stressing dimension).
+    files = {"stats.py": (
+        "def median(nums):\n"
+        "    s = sorted(nums)\n"
+        "    return s[len(s) // 2]\n")}
+    prompt = ("stats.py has a median function that is wrong for even-length lists: "
+              "the median of [1, 2, 3, 4] should be 2.5 (the average of the two "
+              "middle values) but it returns 3. Fix median so it averages the two "
+              "middle values when the length is even, and still returns the single "
+              "middle value when it is odd. Verify with python3 -c \"import stats; "
+              "print(stats.median([1,2,3,4]), stats.median([1,2,3]))\" — the median "
+              "of [1,2,3,4] should be 2.5 and of [1,2,3] should be 2.")
+    def check(w):
+        rc, out = _run_py(w, "import stats;"
+                             "a=stats.median([1,2,3,4]);b=stats.median([1,2,3]);"
+                             "print(abs(a-2.5)<1e-9 and abs(b-2)<1e-9)")
+        return (rc == 0 and out.strip() == "True", f"ok={out.strip()!r}")
+    return files, prompt, check
+
+
+def _case_dedup_order():
+    # Another wrong-output reasoning bug: dedup that loses order. The model must
+    # know set()+sorted drops first-seen order and implement an order-preserving
+    # dedup — no error guides it.
+    files = {"util.py": (
+        "def dedup(items):\n"
+        "    return sorted(set(items))\n")}
+    prompt = ("util.py has a dedup function meant to remove duplicates while "
+              "keeping first-seen order, but it uses set and sorting, which loses "
+              "the original order: dedup([3, 1, 3, 2, 1]) should return [3, 1, 2] "
+              "but returns [1, 2, 3]. Fix dedup to remove duplicates and preserve "
+              "the order in which each value first appears. Verify with python3 -c "
+              "\"import util; print(util.dedup([3,1,3,2,1]))\" which should print "
+              "[3, 1, 2].")
+    def check(w):
+        rc, out = _run_py(w, "import util; print(util.dedup([3,1,3,2,1]))")
+        return (rc == 0 and out.strip() == "[3, 1, 2]", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
 CASES = {
     "logic-bug": _case_logic_bug,
     "indent-bug": _case_indent_bug,
@@ -255,6 +298,8 @@ CASES = {
     "read-before-edit": _case_read_before_edit,
     "rename-across-files": _case_rename_across_files,
     "fix-traceback": _case_fix_traceback,
+    "even-median": _case_even_median,
+    "dedup-order": _case_dedup_order,
 }
 
 

@@ -2065,3 +2065,44 @@ the model re-issued the identical truncated call → repeat-stop. This is the
 malformed/truncated tool-JSON class (already has recovery paths the model just
 couldn't act on), adjacent to D84 capability. Not fixed now; noted for a future
 loop — a possible lever is nudging toward a SHORTER plan when update_plan truncates.
+
+---
+
+## Round 32 — reasoning-case variety: workhorse clean, gemma indentation-strategy split (D84)
+
+Committed 2 wrong-output REASONING cases (harness-only, no build bump): `even-median`
+(median wrong for even-length lists — must average two middle values; no traceback
+guides it) and `dedup-order` (set()+sorted drops first-seen order — must implement
+order-preserving dedup). Both stress correctness reasoning, not crash-suppression.
+
+### Results (pass7, 4 reps each)
+- **even-median:** qythos9 4/4 done=Y, gemma 4/4 done=Y. Clean for both.
+- **dedup-order:** qythos9 4/4 done=Y clean. **gemma 0/2 done=N** (both reps PROBLEM,
+  output still the broken `[1, 2, 3]`) — the first genuine done=N (not lands-anyway)
+  in a while.
+
+### dedup-order gemma failure — DIAGNOSED (D87 transcript + raw event)
+Not missing newlines (the replay preview collapsing `\n`→space was a display artifact;
+raw `args.new` had proper newlines). The real split is **how each model FRAMES the edit**:
+- **qythos9 (wins):** `old = "def dedup(items):\n    return sorted(set(items))"` — anchors
+  on the **function header** — and `new` re-writes the body with **every line indented 4
+  spaces**. Compiles.
+- **gemma (fails):** `old = "return sorted(set(items))"` — anchors on the **bare inner
+  statement** — and `new` is a **column-0** block. edit_file replaces the substring, so the
+  line's leading 4 spaces survive on line 1 only; lines 2+ land at col 0 → IndentationError.
+  Syntax-guard (build 47) correctly REFUSES the corruption; gemma re-emits identically → stall.
+
+Verdict: **model-strategy/capability split (D84), NOT a new harness defect.** The guard did
+its job (file left intact, not corrupted — done=N-intact beats done=Y-corrupt). qythos9, the
+workhorse, is robust here; the answer remains "use qythos9."
+
+### Deferred harness candidate (specified, NOT implemented unsupervised)
+`edit_file` could **auto-reindent a multi-line `new` to the match line's leading
+indentation**: when the matched `old` is preceded on its line only by whitespace W, prepend
+(W − new's-first-line-indent) to every line of `new`, preserving relative structure. That
+would rescue gemma's col-0 block → valid, and no-op when the model already indented (new's
+first line already at W). BUT it's Opus-tier fs.py surgery with real regression risk against
+the existing D81 indent-preservation / indent-only-noop logic, and it helps only gemma here
+(qythos9 already robust) — so D84-lower value. Deferred to a SUPERVISED session, not cut into
+the edit-semantics core overnight. This is a structural-family lever (fixes without needing
+the weak model to read text), which is why it's worth recording rather than discarding.
