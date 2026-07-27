@@ -377,13 +377,15 @@ async def test_write_broken_non_py_is_not_syntax_checked(ctx, tmp_path):
     assert "SyntaxError" not in res.content
 
 
-async def test_edit_that_introduces_a_syntax_error_warns(ctx, tmp_path):
+async def test_edit_that_introduces_a_syntax_error_is_rejected(ctx, tmp_path):
+    # build 47: was warn-and-apply; now a valid→invalid .py edit is REFUSED so
+    # the corruption never lands and the file stays in its last-good state.
     (tmp_path / "envcfg.py").write_text("def load():\n    return 1\n")
     res = await fs.EditFile().run(
         {"path": "envcfg.py", "old": "return 1", "new": "return ("}, ctx)
-    assert res.ok  # the edit applied
-    assert "edited" in res.content
+    assert res.is_error and "NOT applied" in res.content
     assert "SyntaxError" in res.content
+    assert (tmp_path / "envcfg.py").read_text() == "def load():\n    return 1\n"
 
 
 async def test_edit_that_fixes_a_syntax_error_has_no_warning(ctx, tmp_path):
@@ -479,11 +481,13 @@ async def test_replace_lines_missing_file_errors(ctx):
     assert res.is_error and "no such file" in res.content
 
 
-async def test_replace_lines_syntax_warning_on_bad_python(ctx, tmp_path):
+async def test_replace_lines_that_breaks_valid_python_is_rejected(ctx, tmp_path):
+    # build 47: a valid→invalid replace_lines is refused, same as edit_file.
     (tmp_path / "m.py").write_text("x = 1\ny = 2\n")
     res = await fs.ReplaceLines().run(
         {"path": "m.py", "start": 1, "end": 1, "new": "x = ("}, ctx)
-    assert res.ok and "SyntaxError" in res.content
+    assert res.is_error and "NOT applied" in res.content
+    assert (tmp_path / "m.py").read_text() == "x = 1\ny = 2\n"
 
 
 def test_try_replace_lines_bad_range_returns_none(tmp_path):
@@ -544,3 +548,55 @@ def test_replace_lines_description_is_the_tool_for_indent_and_warns_on_stale():
     desc = fs.ReplaceLines.description
     assert "indentation" in desc
     assert "STALE" in desc and "DUPLICATE" in desc
+
+
+async def test_edit_file_rejects_edit_that_introduces_syntax_error(ctx, tmp_path):
+    # build 47: an edit that turns PARSEABLE .py into a SyntaxError (here an
+    # unclosed paren) must NOT land — a warned-but-applied corrupt edit is what
+    # sent gemmacoder12 into an unrecoverable flail (2026-07-26).
+    (tmp_path / "c.py").write_text("x = (1 + 2)\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "x = (1 + 2)", "new": "x = (1 + 2"}, ctx)
+    assert res.is_error and "NOT applied" in res.content
+    assert "SyntaxError" in res.content
+    # File left in the last-good state the model already read.
+    assert (tmp_path / "c.py").read_text() == "x = (1 + 2)\n"
+
+
+async def test_edit_file_allows_fixing_an_already_broken_file(ctx, tmp_path):
+    # The guard must never block a model FIXING syntax: if the file didn't parse
+    # before, any edit is allowed (even one that leaves it still broken).
+    (tmp_path / "c.py").write_text("x = (1 + 2\n")  # already broken
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "x = (1 + 2", "new": "x = (1 + 2)"}, ctx)
+    assert res.ok
+    assert (tmp_path / "c.py").read_text() == "x = (1 + 2)\n"
+
+
+async def test_edit_file_normal_valid_change_still_lands(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("x = 1\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 2"}, ctx)
+    assert res.ok and (tmp_path / "c.py").read_text() == "x = 2\n"
+
+
+async def test_edit_file_syntax_guard_ignores_non_python(ctx, tmp_path):
+    (tmp_path / "c.txt").write_text("x = (1 + 2)\n")
+    res = await fs.EditFile().run(
+        {"path": "c.txt", "old": "x = (1 + 2)", "new": "x = (1 + 2"}, ctx)
+    assert res.ok and (tmp_path / "c.txt").read_text() == "x = (1 + 2\n"
+
+
+async def test_replace_lines_rejects_edit_that_breaks_syntax(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("x = (1)\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": 1, "end": 1, "new": "x = (1"}, ctx)
+    assert res.is_error and "NOT applied" in res.content
+    assert (tmp_path / "c.py").read_text() == "x = (1)\n"
+
+
+async def test_replace_lines_still_fixes_a_broken_file(ctx, tmp_path):
+    # The empty-with-block class: file doesn't parse; replace_lines fixes it.
+    (tmp_path / "c.py").write_text("def f():\n    x=(\n")  # broken before
+    res = await fs.ReplaceLines().run(
+        {"path": "c.py", "start": 2, "end": 2, "new": "    x = 1"}, ctx)
+    assert res.ok and (tmp_path / "c.py").read_text() == "def f():\n    x = 1\n"

@@ -268,6 +268,47 @@ def _syntax_warning(path: Path, text: str) -> str:
     return ""
 
 
+def _parses_py(text: str, path: Path) -> bool:
+    try:
+        compile(text, str(path), "exec")
+        return True
+    except (SyntaxError, ValueError):
+        return False
+
+
+def _syntax_reject(path: Path, before: str, after: str) -> str | None:
+    """A rejection message if this edit would turn PARSEABLE Python into a
+    SyntaxError, else None. The guard behind it: a malformed edit (unmatched
+    bracket, stray paren, bad indent) that merely *warned* and still landed
+    corrupted the file, and weak models then spent the whole turn fighting a
+    broken file they couldn't dig out of (gemmacoder12, 2026-07-26). Refusing to
+    apply it keeps the file in the last-good state the model already read.
+
+    Scoped tight so it never blocks legitimate work: only .py files, and only the
+    valid→invalid transition. If the file did NOT parse *before* the edit, the
+    model is presumably fixing a syntax error (the empty-with-block case), so any
+    edit is allowed through — the advisory `_syntax_warning` covers that path.
+    """
+    if path.suffix != ".py":
+        return None
+    if not _parses_py(before, path) or _parses_py(after, path):
+        return None
+    try:
+        compile(after, str(path), "exec")
+    except SyntaxError as e:
+        where = f"line {e.lineno}" if e.lineno else "an unknown line"
+        bad = (e.text or "").strip()
+        detail = f"\n    {bad}" if bad else ""
+        msg = e.msg
+    except ValueError:
+        where, detail, msg = "an unknown line", "", "invalid characters"
+    return (f"NOT applied — this edit would introduce a SyntaxError at {where}: "
+            f"{msg}.{detail}\nThe file is UNCHANGED (still the version you read). "
+            "Your `new` text is malformed — most often an unmatched bracket or "
+            "paren, or a broken indent. Re-read the file, correct `new`, and try "
+            "one more time. Do NOT resend the same broken edit.")
+
+
 class ReadFile:
     name = "read_file"
     description = "Read a UTF-8 text file. Returns line-numbered content."
@@ -617,11 +658,15 @@ class EditFile:
                 "to before. Almost always `old` and `new` differ ONLY in leading "
                 "indentation — and edit_file preserves each matched line's "
                 "ORIGINAL indentation, so an indent-only change can't be made this "
-                "way. To re-indent a block, rewrite it with write_file. If you "
+                "way. To re-indent a block, use replace_lines (give the line "
+                "numbers from read_file). If you "
                 "meant to change the code, make `new` differ from the file in more "
                 "than whitespace. If the line is already correct, stop editing it "
                 "and look elsewhere. Do NOT resend this same edit."
                 + _TRY_REPLACE_LINES, is_error=True, no_change=True)
+        broke = _syntax_reject(p, text, updated)
+        if broke:
+            return ToolResult(broke, is_error=True)
         try:
             p.write_text(updated, "utf-8")
         except OSError as e:
@@ -726,6 +771,9 @@ class ReplaceLines:
                 "code in `new`; if the lines are already correct, the problem is "
                 "elsewhere — do NOT resend this same replacement.",
                 is_error=True, no_change=True)
+        broke = _syntax_reject(p, text, updated)
+        if broke:
+            return ToolResult(broke, is_error=True)
         try:
             p.write_text(updated, "utf-8")
         except OSError as e:
