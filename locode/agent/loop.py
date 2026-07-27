@@ -205,6 +205,16 @@ class AgentLoop:
         # nudge gate clears on the same reset, so genuine compliance re-arms it.
         unverified_edits: dict[str, int] = {}
         nudged_verify: set[str] = set()
+        # Episodic action-ledger (Lever 3): cumulative-for-the-turn tallies that,
+        # unlike unverified_edits, are never reset. When a cycling nudge fires
+        # (repeat-edit or verify-gate) it prepends a terse "so far this turn you
+        # have: edited f.py 3×, run a check 2× (still not green)" so a model that
+        # has lost the thread is reminded what it already tried. Selective by
+        # construction — only attached at those already-gated moments, never every
+        # turn — so it does not bloat the context or corrupt tool-call JSON.
+        edit_tally: dict[str, int] = {}
+        read_tally: dict[str, int] = {}
+        run_count = 0
         # Filenames the user asked to be WRITTEN this turn (e.g. "writing a
         # PLAN.md") — tracked against write_file/edit_file calls actually
         # attempted, to catch a model that reads around and then narrates a
@@ -597,7 +607,10 @@ class AgentLoop:
                         unread = mentioned_files - read_paths - expected_artifacts
                         if repeat_varied.get(batch_sig) and all(
                                 c.name in _MUTATING_EDIT_TOOLS for c in calls):
-                            self._nudge_repeat_edit(calls)
+                            self._nudge_repeat_edit(
+                                calls,
+                                _ledger_line(edit_tally, read_tally, run_count,
+                                             self._saw_green_test))
                         else:
                             self._nudge_repeat(calls, unread)
                         continue
@@ -619,14 +632,18 @@ class AgentLoop:
                     if c.name == "bash" and _is_verify_bash(c.args.get("cmd", "")):
                         unverified_edits.clear()
                         nudged_verify.clear()
+                        run_count += 1
                     elif c.name == "read_file":
                         base = os.path.basename(str(c.args.get("path") or "")).lower()
                         unverified_edits.pop(base, None)
                         nudged_verify.discard(base)
+                        if base:
+                            read_tally[base] = read_tally.get(base, 0) + 1
                     elif c.name in _MUTATING_EDIT_TOOLS:
                         base = os.path.basename(str(c.args.get("path") or "")).lower()
                         if base:
                             unverified_edits[base] = unverified_edits.get(base, 0) + 1
+                            edit_tally[base] = edit_tally.get(base, 0) + 1
                 error_sig, result_sig, no_change = await self._run_calls(calls)
                 # Headless only: an ASK tool nobody can approve is refused for
                 # the whole session, so a model still trying after this many
@@ -701,7 +718,10 @@ class AgentLoop:
                                  if n >= gate and f not in nudged_verify), None)
                     if over is not None:
                         nudged_verify.add(over)
-                        self._nudge_verify(over, unverified_edits[over])
+                        self._nudge_verify(
+                            over, unverified_edits[over],
+                            _ledger_line(edit_tally, read_tally, run_count,
+                                         self._saw_green_test))
                         continue
                 # A salvaged truncated write just landed a PARTIAL document. The
                 # tool result reads like a normal success, so without this the
@@ -958,11 +978,12 @@ class AgentLoop:
         })
         self._on_event({"phase": "nudge", "reason": "repeated call"})
 
-    def _nudge_repeat_edit(self, calls) -> None:
+    def _nudge_repeat_edit(self, calls, ledger: str = "") -> None:
         names = ", ".join(dict.fromkeys(c.name for c in calls))
         self.history.append({
             "role": "user",
-            "content": (f"You have applied the same {names} edit repeatedly. "
+            "content": (ledger
+                        + f"You have applied the same {names} edit repeatedly. "
                         "Re-issuing a mutating edit with the SAME arguments does "
                         "not converge: it either changes nothing, or — for a "
                         "line-number edit like replace_lines — the target lines "
@@ -976,10 +997,11 @@ class AgentLoop:
         })
         self._on_event({"phase": "nudge", "reason": "repeated edit"})
 
-    def _nudge_verify(self, filename: str, count: int) -> None:
+    def _nudge_verify(self, filename: str, count: int, ledger: str = "") -> None:
         self.history.append({
             "role": "user",
-            "content": (f"You have edited {filename} {count} times in a row "
+            "content": (ledger
+                        + f"You have edited {filename} {count} times in a row "
                         "without running anything or re-reading it. You cannot "
                         "tell whether those edits are correct — or whether they "
                         "duplicated or broke something — until you look at the "
@@ -1297,6 +1319,26 @@ def _render_calls_as_fenced(calls) -> str:
         payload = json.dumps({"name": c.name, "args": c.args}, ensure_ascii=False)
         blocks.append(f"```tool\n{payload}\n```")
     return "\n".join(blocks)
+
+
+def _ledger_line(edit_tally: dict, read_tally: dict, run_count: int,
+                 saw_green: bool) -> str:
+    """A terse one-line recap of what this turn has done so far — attached to a
+    cycling nudge so a model that has lost track is reminded of its own history.
+    Returns "" when there is nothing worth reciting (a single edit, no runs)."""
+    items: list[str] = []
+    for f, n in edit_tally.items():
+        if n >= 2:
+            items.append(f"edited {f} {n}×")
+    for f, n in read_tally.items():
+        if n >= 2:
+            items.append(f"re-read {f} {n}×")
+    if run_count >= 1:
+        note = "" if saw_green else " (still not green)"
+        items.append(f"run a check {run_count}×{note}")
+    if not items:
+        return ""
+    return "So far this turn you have: " + ", ".join(items) + ". "
 
 
 def _is_verify_bash(cmd: str) -> bool:

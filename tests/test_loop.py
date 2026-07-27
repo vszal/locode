@@ -2000,3 +2000,38 @@ async def test_non_verify_bash_does_not_reset_the_gate(tmp_path):
     nudges = [m["content"] for m in loop.history
               if m["role"] == "user" and m.get("kind") == "nudge"]
     assert any("re-read" in n and "f.py" in n for n in nudges)
+
+
+async def test_verify_nudge_carries_an_episodic_ledger(tmp_path):
+    # Lever 3 (action-ledger): the verify-gate nudge prepends a terse recap of
+    # what the turn has already done — edits per file and checks run (with a
+    # not-green note) — so a model that has lost the thread sees its own history.
+    cfg = Config()
+    cfg.permissions.tools["write_file"] = "auto"
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("write_file", path="./f.py", content="one\n"),
+         native_call("write_file", path="./f.py", content="two\n"),
+         native_call("bash", cmd="pytest -q"),
+         native_call("write_file", path="./f.py", content="three\n"),
+         native_call("write_file", path="./f.py", content="four\n"),
+         native_call("write_file", path="./f.py", content="five\n"),
+         {"role": "assistant", "content": "Done."}],
+        FakeBash("1 failed, 0 passed in 0.10s", is_error=True), cfg=cfg)
+    out = await loop.run_turn("keep fixing f.py")
+    assert out == "Done."
+    nudge = next(m["content"] for m in loop.history
+                 if m.get("kind") == "nudge" and "re-read" in m["content"])
+    assert nudge.startswith("So far this turn you have:")
+    assert "edited f.py 5×" in nudge
+    assert "run a check 1× (still not green)" in nudge
+
+
+def test_ledger_line_is_empty_when_nothing_worth_reciting():
+    from locode.agent.loop import _ledger_line
+    # A single edit and no runs isn't worth a recap.
+    assert _ledger_line({"f.py": 1}, {}, 0, False) == ""
+    # A green check is noted without the not-green tag.
+    line = _ledger_line({"f.py": 2}, {}, 1, True)
+    assert "edited f.py 2×" in line and "run a check 1×" in line
+    assert "not green" not in line
