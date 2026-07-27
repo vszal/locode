@@ -2151,3 +2151,36 @@ clean fix: with no plan there's no completion signal locode can trust, and a rep
 passing bash is ambiguous (benign re-verify vs genuinely stuck). The deeper root is
 that gemma sometimes skips planning entirely, leaving locode blind to completion.
 Deferred for a supervised session; qythos9 (the workhorse) plans and finishes cleanly.
+
+---
+
+## Round 34 — pass9 full-battery landscape (build 54 regression-clean; workhorse nudge observation)
+
+Ran all 14 cases × {qythos9, gemmacoder12} × 1 rep (pass9) as a build-54 regression
+sweep + fresh landscape read.
+
+### Build 54 regression: CLEAN
+No case finished early from the lowered plan-finish threshold. Every multi-step case
+completed with correct check values — rename-across-files (both done=Y, show(3)=30,
+gemma now r0), add-test (green both), read-before-edit (correct url both), fix-traceback
+(RC 0, 12). qythos9 13/14 clean r0. gemma lands every case (done=Y) EXCEPT the known
+dedup-order indent-strategy failure (done=N, D84, diagnosed R32) — no new gemma regression.
+
+### NEW workhorse observation (deferred): open-tasks nudge induces a redundant re-verify
+dedup-order qythos9 done=Y but r1 (PROBLEM) — got the right answer ([3, 1, 2]) but
+flagged a repeat, where pass7 had it 4/4 clean (non-stationary). Transcript: qythos9
+fixed dedup (edit_file), marked plan 1/2, ran the verify bash (→ [3,1,2] ✓), but its
+plan's "Verify" task was still [ ] open. The `_nudge_open_tasks` nudge then fired with
+"Continue with: Verify fix with python3 -c ..." — i.e. it named the just-completed task
+as the next action — so the model RE-RAN the identical verify (🔁 repeat) instead of
+marking it done, got nudged again, then finally marked 2/2 and self-terminated.
+
+Root: the open-tasks nudge tells the model to DO its next open task even when the model
+just performed exactly that action but hasn't updated the plan yet — the plan-bookkeeping
+lags the work, and the nudge re-prods the work rather than the mark-done. Candidate fix is
+a nudge-TEXT tweak ("if you already did an open task's work, e.g. just ran the verify,
+mark it done rather than repeating it") — but that's the D84 clearer-text family (historically
+unreliable), and a structural auto-mark-done is too magic (harness can't know a bash output
+satisfies a free-text task). Mild + non-stationary + correct outcome → deferred to a
+supervised session, alongside the R32 auto-reindent and R33 bash-rerun candidates. No code
+change this round.
