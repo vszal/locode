@@ -286,6 +286,30 @@ def _case_dedup_order():
     return files, prompt, check
 
 
+def _case_already_correct():
+    # The "nothing to fix" path — every other case ships a real bug; this one
+    # does NOT. The code is already correct. A good model verifies and finishes
+    # cleanly WITHOUT editing; a flailing one over-edits working code (repeats /
+    # no-ops / a syntax-guard save). Directly probes the finish/flail dimension.
+    files = {"palindrome.py": (
+        "def is_palindrome(s):\n"
+        "    s = s.lower()\n"
+        "    cleaned = [c for c in s if c.isalnum()]\n"
+        "    return cleaned == cleaned[::-1]\n")}
+    prompt = ("palindrome.py has an is_palindrome function that should ignore case, "
+              "spaces, and punctuation. Verify it correctly returns True for "
+              "\"A man, a plan, a canal: Panama\" and False for \"hello\", and fix "
+              "it only if it is actually wrong. Check with python3 -c \"import "
+              "palindrome as p; print(p.is_palindrome('A man, a plan, a canal: "
+              "Panama'), p.is_palindrome('hello'))\" which should print True False.")
+    def check(w):
+        rc, out = _run_py(w, "import palindrome as p;"
+                             "print(p.is_palindrome('A man, a plan, a canal: Panama'),"
+                             "p.is_palindrome('hello'))")
+        return (rc == 0 and out.strip() == "True False", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
 CASES = {
     "logic-bug": _case_logic_bug,
     "indent-bug": _case_indent_bug,
@@ -300,6 +324,7 @@ CASES = {
     "fix-traceback": _case_fix_traceback,
     "even-median": _case_even_median,
     "dedup-order": _case_dedup_order,
+    "already-correct": _case_already_correct,
 }
 
 
