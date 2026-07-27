@@ -1959,6 +1959,62 @@ def test_is_verify_bash_tolerates_non_string_cmd():
     assert not loop_mod._is_verify_bash("")
 
 
+# --- verify-task crediting (qythos9 add-test open-plan re-do loop) -------------
+def test_is_verify_task_matches_run_verify_tests_only():
+    from locode.agent.plan import Task
+    m = lambda s: loop_mod._is_verify_task(Task(text=s))
+    # run/verify a test suite — these ARE completed by a green run
+    assert m("Run pytest and verify all tests pass")
+    assert m("run the tests")
+    assert m("make test_stats.py pass")
+    assert m("Confirm the test suite is green")
+    assert m("execute the tests and ensure they pass")
+    # a test FILE to write, or unrelated work — must NOT match (no run/verify verb)
+    assert not m("Create test_primes.py with pytest tests")
+    assert not m("Write the is_prime function")
+    assert not m("Write DESIGN.md")
+    assert not loop_mod._is_verify_task(None)
+
+
+async def test_green_test_credits_forgotten_verify_task_and_finishes(tmp_path):
+    # qythos9 add-test, measured 2026-07-27: the model wrote the code, ran the
+    # suite to green, but ended narrating "All tests pass" WITHOUT marking its
+    # own "run the tests" task done. The plan stayed open, the open-tasks nudge
+    # fired, and the model re-ran the passing tests to a repeat-stop. A green
+    # result IS that task's completion, so the loop credits it and finishes.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("update_plan", tasks=["[x] Write test_primes.py",
+                                            "[>] Run pytest and verify all tests pass"]),
+         native_call("bash", cmd="pytest -q"),
+         {"role": "assistant", "content": "All tests pass."}],
+        FakeBash("4 passed in 0.01s"))
+    out = await loop.run_turn("add tests for is_prime")
+    assert out == "All tests pass."
+    assert loop.plan.complete
+    assert loop.plan.summary() == "2/2 done"
+    # the re-do driver — the open-tasks nudge — must NOT have fired
+    assert not [m for m in loop.history if m["role"] == "user"
+                and "task(s) open" in m["content"]]
+
+
+async def test_open_verify_task_without_green_is_not_credited(tmp_path):
+    # The credit is double-locked: with no green result this turn, the verify
+    # task stays open and the ordinary open-tasks nudge still fires — a failing
+    # or un-run suite can't be credited as a pass.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("update_plan", tasks=["[x] Write test_primes.py",
+                                            "[>] Run pytest and verify all tests pass"]),
+         native_call("bash", cmd="pytest -q"),
+         {"role": "assistant", "content": "Still working on it."}],
+        FakeBash("1 failed in 0.10s", is_error=True))
+    await loop.run_turn("add tests for is_prime")
+    assert not loop.plan.complete
+    assert [m for m in loop.history if m["role"] == "user"
+            and "task(s) open" in m["content"]]
+
+
 # --- repeated mutating edit (gemmacoder12 duplicating-replace loop) -----------
 async def test_repeated_mutating_edit_stops_despite_varying_echo(tmp_path):
     # gemmacoder12, user-reported: the model re-issues a byte-IDENTICAL

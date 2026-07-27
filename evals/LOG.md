@@ -1901,3 +1901,44 @@ nudge-wording per D84. Needs its own reproduce→design→A/B.
 |---|---|---|
 | D88 | **A "done" counter stuck at zero is a loop bug, not a cosmetic one.** A plan that can never reach complete turns the "open tasks" nudge into a perpetual-motion machine on already-finished work. | Two distinct plan miscounts (the r22 truncated-array, now the r28 word-value reset) both produced infinite re-do loops. Any recovery path that can't preserve a *done* status is a turn-killer — treat the plan's done-count as correctness-critical, not advisory. |
 | D89 | **A neutral A/B (dormant code path) is not a failed A/B — verify the path was exercised before reading the aggregate.** | Build-51's A/B looked negative until the transcripts showed neither arm hit the changed code. Non-stationary triggers mean the pathology you're fixing may simply not recur that session; the aggregate then measures only noise. Confirm the fixed path fired (here: grep the plan values) before crediting *or* faulting the numbers. |
+
+## Round 29 (2026-07-27) — credit the "run the tests" task a green suite already satisfied
+
+### Second root cause of the same open-plan re-do loop
+Round 28's fix (build 51) addressed the *dict-shape 0/N miscount* path to the
+"open plan tasks" loop. Reading the build-51 A/B transcripts surfaced a **second,
+independent path to the identical symptom** on clean-array plans (ab_plandict
+rT2/rC2, qythos9): the model decomposes into e.g. `[x] write code`, `[x] write
+tests`, `[>] run pytest and verify all tests pass`, runs the suite to green — then
+**narrates "All tests pass" in prose without calling update_plan to mark the final
+task `[x]`**. Plan stays `2/3`, the open-tasks nudge fires, and its escape hatch
+("if a task is unnecessary/impossible, mark it done") doesn't match an
+*already-completed* task, so the model **re-runs the passing tests** to a
+repeat-stop.
+
+### Fix (build 52): the loop credits what the model proved
+Before the open-tasks nudge fires, if a green pytest tally already appeared this
+turn (`_saw_green_test`) AND the current open task is run/verify-tests-shaped
+(`_VERIFY_TASK_RE` — a run/verify/confirm/make verb near a test noun, OR a
+"…tests pass" phrasing; the verb requirement keeps "Create test_primes.py" out),
+mark that task done (`Plan.complete_current()`, which does not bump `revisions`)
+and emit a `verify task credited` event. If it was the last open task the plan
+completes and the model finishes; if others remain, the loop advances to them.
+The worst-case misfire is provably benign — it fires only on a real green result +
+a run-the-tests task, and marking *that* done is correct by construction; it can
+never manufacture a false-done (correctness is checked independently by the
+battery). +5 tests (exact reproduction + negative discrimination on
+create-a-test-file and prose), suite 646 green.
+
+### A/B: dormant again (non-stationary trigger), no regression (D89)
+Paired A/B (`--fix-file locode/agent/loop.py,locode/agent/plan.py`, `--marker
+"verify task credited"`, add-test × 2 × 3). This session was **wall-budget-
+dominated** (mlx server slow — most runs hit the 180s wall at 2–5 iters), and the
+multi-task-verify shape didn't recur: the open-tasks nudge fired in just 1/12 runs
+and the credit path fired 0 times (the one nudged run, rT3, used a single combined
+task and self-recovered in one nudge — `_is_verify_task` correctly declined it).
+Aggregate: done 6=6, repeat-stops **1→0**, repeats 1=1, iters 4.3→4.2 — no
+regression, weakly positive. The fix is grounded in the directly-observed
+ab_plandict transcript + tests, not this A/B's numbers. Same lesson as D89: a
+dormant-path A/B is neutral; verify whether the fixed path fired before crediting
+*or* faulting the aggregate.

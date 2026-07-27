@@ -98,6 +98,17 @@ class Plan:
         self.tasks = []
         self.revisions = 0
 
+    def complete_current(self) -> Task | None:
+        """Mark the current task done — used when the LOOP can prove a task is
+        finished and the model forgot to check it off (e.g. a green test result
+        satisfies a "run the tests" task). Returns the task, or None if nothing
+        was open. Deliberately does NOT bump `revisions`: this is the loop
+        crediting real evidence, not the model rewriting its plan."""
+        t = self.current
+        if t is not None:
+            t.status = DONE
+        return t
+
     # --- queries ----------------------------------------------------------
     @property
     def done(self) -> list[Task]:

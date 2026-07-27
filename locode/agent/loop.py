@@ -544,6 +544,26 @@ class AgentLoop:
                         return self._stop(
                             "the model never produced "
                             + ", ".join(sorted(missing)))
+                    # The model ran the suite to green but never checked off its
+                    # own "run the tests" task, so the plan still shows it open.
+                    # The open-tasks nudge below would then tell the model to "do
+                    # the work" — i.e. re-run the tests it already passed. Measured
+                    # live (qythos9 add-test, 2026-07-27): green suite, plan stuck
+                    # at 2/3, the model re-ran pytest every turn to a repeat-stop
+                    # on a task it had finished. A green test IS that task's
+                    # completion, so credit it here. Double-scoped — a green result
+                    # actually appeared this turn AND the current task is
+                    # run/verify-tests-shaped — so ordinary work the model merely
+                    # claimed can't be completed out from under it. One-shot per
+                    # task (it's DONE afterward), and it only fires on real green.
+                    if (self.plan.open and self._saw_green_test
+                            and _is_verify_task(self.plan.current)):
+                        credited = self.plan.complete_current()
+                        self._on_event({
+                            "phase": "nudge",
+                            "reason": "verify task credited (tests already green)",
+                            "task": credited.text if credited else "",
+                            "plan": self.plan.summary()})
                     # The model is stopping with tasks IT declared unfinished.
                     # Its own plan is the strongest available evidence that the
                     # turn isn't over — stronger than any heuristic below, and
@@ -1333,6 +1353,26 @@ _VERIFY_CLAIM_RE = re.compile(
     r"\b(?:without\s+(?:error|issue|problem)s?|clean(?:ly)?|success(?:fully)?)\b"
     r")",
     re.IGNORECASE)
+
+
+# A plan task that a passing test run SATISFIES — the "run the suite and verify
+# it's green" kind of task. Requires an action verb (run/verify/confirm/…) near a
+# test noun, OR a "…tests pass" phrasing. The verb is what keeps "Create
+# test_primes.py with pytest tests" (a test FILE to write, not a run) from
+# matching: it has the test noun but no run/verify verb. Used only to credit such
+# a task as done when a green pytest result already appeared this turn, so the
+# scoping mirrors _saw_green_test — nothing here completes non-test work.
+_VERIFY_TASK_RE = re.compile(
+    r"\b(?:run|runn|verif|confirm|ensur|check|execut|make)\w*\b[^\n]*?"
+    r"\b(?:test\w*|pytest|suite|spec\w*)\b"
+    r"|\b(?:test\w*|pytest|suite)\b[^\n]*?"
+    r"\b(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed)?)\b",
+    re.IGNORECASE)
+
+
+def _is_verify_task(task) -> bool:
+    """Whether `task` is a run/verify-the-tests task a green suite completes."""
+    return task is not None and bool(_VERIFY_TASK_RE.search(task.text))
 
 
 def _prose_sig(content: str) -> tuple[int, str]:

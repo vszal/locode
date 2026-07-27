@@ -311,6 +311,22 @@ async def test_tool_value_still_wins_over_key_when_recognized():
     assert [t.status for t in plan.tasks] == [DONE, DOING]
 
 
+def test_complete_current_marks_current_done_without_a_revision():
+    p = Plan()
+    p.replace(["[x] write the module", "[>] run the tests", "[ ] clean up"])
+    revs_before = p.revisions
+    t = p.complete_current()          # current == the [>] task
+    assert t.text == "run the tests"
+    assert t.status == DONE
+    assert p.summary() == "2/3 done"
+    assert p.revisions == revs_before  # loop crediting is not a model revision
+
+
+def test_complete_current_on_empty_plan_is_a_noop():
+    p = Plan()
+    assert p.complete_current() is None
+
+
 def test_status_marker_for_maps_words_and_chars():
     from locode.agent.plan import status_marker_for
     assert status_marker_for("finished") == "x"
