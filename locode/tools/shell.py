@@ -81,4 +81,11 @@ class Bash:
             if hint:
                 body += f"\n\n{hint}"
             return ToolResult(body, is_error=True)
-        return ToolResult(text.rstrip() or "(no output)")
+        # A silent success (rc 0, no output) is the common shape of a passing
+        # verify — `py_compile`, a quiet formatter, a test runner with -q that
+        # printed nothing. Returning a bare "(no output)" reads as ambiguous, so
+        # a weak model re-runs the identical command hoping for confirmation and
+        # trips the repeat-stop on a task that was ALREADY done (observed on
+        # indent-bug: file fixed, py_compile green, model re-ran to a repeat-stop).
+        # An explicit positive signal lets it recognize completion and finish.
+        return ToolResult(text.rstrip() or "(exit 0 — command succeeded, no output)")
