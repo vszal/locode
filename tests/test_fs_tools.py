@@ -525,16 +525,22 @@ async def test_replace_lines_missing_new_is_not_a_silent_delete(ctx, tmp_path):
     assert (tmp_path / "c.py").read_text() == "a\nb\nc\n"  # untouched
 
 
-def test_edit_file_is_advertised_as_preferred_content_anchored():
-    # Lever 1 (steer off line-numbers): weak local models pick tools by their
-    # descriptions, so edit_file must read as the default choice.
+def test_edit_file_description_routes_indent_fixes_to_replace_lines():
+    # Lever 1, corrected (build 46): weak models pick tools by their
+    # descriptions. edit_file is content-anchored but CANNOT do an indent-only
+    # change (it preserves indentation → no-op), so its description must say so
+    # and point indentation fixes at replace_lines — the b45 sweep showed the
+    # old "PREFER edit_file / LAST-RESORT" steering drove the model off the tool
+    # an indentation bug actually needs, and it fixed 0/5 vs 5/5 on control.
     desc = fs.EditFile.description
-    assert "PREFERRED" in desc and "content-anchored" in desc
+    assert "ontent-anchored" in desc
+    assert "indentation-only" in desc and "replace_lines" in desc
 
 
-def test_replace_lines_warns_about_stale_line_numbers():
-    # replace_lines must read as the last resort and warn that repeating it
-    # duplicates content — the exact failure the build-42 loop guard caught.
+def test_replace_lines_description_is_the_tool_for_indent_and_warns_on_stale():
+    # replace_lines must read as the RIGHT tool for an indentation/whitespace fix
+    # (not a demoted last resort) AND still warn that a stale re-issue duplicates
+    # content — the failure the build-42 loop guard caught.
     desc = fs.ReplaceLines.description
-    assert "PREFER edit_file" in desc
-    assert "STALE" in desc and "DUPLICATES" in desc
+    assert "indentation" in desc
+    assert "STALE" in desc and "DUPLICATE" in desc
