@@ -2015,3 +2015,53 @@ between" is. Any repeat/loop detector must gate on intervening forward progress 
 it cries wolf on the correct reproduce→fix→verify pattern — the exact arc a good
 agent runs on a runtime bug. locode's loop already does this (result-gate); the
 replay tool now does too (mutation-gate).
+
+---
+
+## Round 31 — build 53: clean finish on a redundant complete-plan re-state
+
+### Finding (pass6 rename-across-files gemmacoder12, directly observed)
+The model did the whole task correctly — renamed get_user→fetch_user across
+models.py + views.py (self-recovering from a wrong-signature guess and a `)))`
+typo), verified `show(3)==30`, marked its plan **3/3 done** — then re-emitted the
+**identical, successful** 3/3 update_plan instead of stopping, and hit the repeat-
+stop: "the model repeated the same tool call without making progress." A SUCCESS
+that reads as a FAILURE. Same shape ended all 4 gemma PROBLEM rows in pass6: work
+lands, then the model keeps poking (redundant no-op update_plan / no-op edit /
+identical replace_lines) until the repeat-detector stops it. qythos9 (workhorse)
+never does this — it stops cleanly. This is the *structural finish-detection*
+family (build-52 class, validated live), NOT the *clearer-text* family (D84).
+
+### Fix (build 53, loop.py)
+At the repeat-detection threshold, before the failure-toned nudge/stop: if the
+repeated batch is exclusively `update_plan` AND `self.plan.complete` (all tasks
+done), finish cleanly — emit an info event and return "All planned tasks are
+complete." + the plan render. Gated on a genuine repeat so the FIRST update_plan
+that completes the plan still passes through (a real summary may follow). The gate
+is so tight (redundant update_plan on a fully-done plan) that a false early-finish
+is essentially impossible — the model's own plan says everything is done. +2 tests
+(positive clean-finish; negative: an OPEN plan re-stated does NOT early-finish),
+suite 651 green.
+
+### A/B: DORMANT for this fix (D89) — aggregate NOT creditable
+ab_planfinish (gemma × rename-across-files × 4 reps, paired stash-toggle of
+loop.py, marker "re-stated its finished plan"). Aggregate looked like a win —
+repeat-stops **1→0**, repeats 4→2, done 4=4, iters 11.0→10.5 — BUT grep confirmed
+the fixed path fired in **0/4** treatment runs. Reading transcripts (D87/D89): the
+treatment arm's gemma stopped cleanly on its own after 3/3 (non-stationarity — the
+re-state variant didn't recur this session), and the single control repeat-stop
+(rC1) was a DIFFERENT pathology — a **truncated** update_plan (`tasks='["[x]…"'`,
+"did not parse — may have been cut off") re-emitted identically; its plan never
+completed, so `plan.complete` would correctly decline it anyway. So the aggregate
+is non-stationarity + an unrelated truncation stop, NOT my code. Committed on the
+directly-observed pass6 transcript + units + no-regression, same discipline as
+builds 51/52. Same D89 lesson: confirm the fixed path FIRED before crediting an
+A/B aggregate — here it plainly did not.
+
+### Observation (deferred): truncated update_plan re-emit → repeat-stop
+rC1 surfaced a distinct weak-model failure: gemma emitted an update_plan whose
+`tasks` JSON array was cut off mid-token, the tool rejected it as unparseable, and
+the model re-issued the identical truncated call → repeat-stop. This is the
+malformed/truncated tool-JSON class (already has recovery paths the model just
+couldn't act on), adjacent to D84 capability. Not fixed now; noted for a future
+loop — a possible lever is nudging toward a SHORTER plan when update_plan truncates.

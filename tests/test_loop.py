@@ -2015,6 +2015,35 @@ async def test_open_verify_task_without_green_is_not_credited(tmp_path):
             and "task(s) open" in m["content"]]
 
 
+async def test_completed_plan_restated_finishes_cleanly(tmp_path):
+    # gemmacoder12 rename-across-files, measured 2026-07-27: the model finished
+    # all the work, marked its plan 3/3 done, then re-emitted the identical
+    # finished plan instead of stopping — and hit a repeat-stop whose message
+    # ("repeated the same tool call without making progress") reads as a FAILURE
+    # on work that in fact landed. A redundant update_plan on an already-complete
+    # plan is the model signalling completion the only way it knows; finish
+    # cleanly with a success-toned answer, not the failure-toned repeat-stop.
+    done = ["[x] Rename in models.py", "[x] Rename in views.py", "[x] Verify"]
+    loop = make_loop(tmp_path, [native_call("update_plan", tasks=done)])
+    out = await loop.run_turn("rename get_user to fetch_user")
+    assert loop.plan.complete
+    assert "All planned tasks are complete" in out
+    assert "without making progress" not in out
+
+
+async def test_incomplete_plan_restated_does_not_early_finish(tmp_path):
+    # The completion gate is real: an OPEN plan re-stated is not a finish signal —
+    # the model still has declared work to do, so the clean-finish path must NOT
+    # fire (it falls through to ordinary repeat handling instead).
+    loop = make_loop(
+        tmp_path,
+        [native_call("update_plan", tasks=["[x] Rename in models.py",
+                                           "[ ] Rename in views.py"])])
+    out = await loop.run_turn("rename get_user to fetch_user")
+    assert not loop.plan.complete
+    assert "All planned tasks are complete" not in out
+
+
 # --- repeated mutating edit (gemmacoder12 duplicating-replace loop) -----------
 async def test_repeated_mutating_edit_stops_despite_varying_echo(tmp_path):
     # gemmacoder12, user-reported: the model re-issues a byte-IDENTICAL
