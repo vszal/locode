@@ -26,6 +26,32 @@ To read what actually happened inside a run:
 tail -f evals/results/<label>/stdout/<case>__<model>__r1.txt
 ```
 
+### Seeing a session as the user sees it
+
+Headless `locode -p` only *streams the model's prose* to stdout — every tool
+call, result, and nudge goes to the `--log-events` JSONL and is otherwise
+invisible. Scraping that log into "compile=PASS" throws away the turn-by-turn
+detail where repeats and failed edits live. `replay.py` closes that gap: it
+feeds a recorded event log back through the *same* `locode.ui.render` formatters
+the interactive REPL uses, so you read what the user read on screen — then
+overlays pathology flags (🔁 repeat call, ∅ no-op, ✗ failed edit, 🛡 syntax-guard
+save) and a loud VERDICT header.
+
+```
+.venv/bin/python evals/replay.py <events.jsonl | dir>   # verdict + transcript
+.venv/bin/python evals/replay.py <events.jsonl> --quiet # verdict only
+```
+
+`watch.sh` is the one-command "observe a fresh session": run a task headless,
+then replay it.
+
+```
+evals/watch.sh "<task prompt>" [model] [workdir]
+```
+
+(The model's own narration is streamed, never logged, so it isn't reconstructed —
+but every tool call with its args, result, and nudge is.)
+
 ## Comparing two versions of the harness honestly
 
 Every case spawns a **fresh `locode` process**, which imports the working tree
