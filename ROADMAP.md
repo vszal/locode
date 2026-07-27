@@ -235,6 +235,25 @@ the lived experience.*
   is legible. +1 loop test (597 green). LOG Round 22. *This corrects the Round 20
   claim that residual edit-flailing was all capability-bound — I had only mined
   FAILED edits; this is a SUCCEEDING-but-non-converging loop, a real harness gap.*
+- `[x]` **4.11 Refuse edits that turn parseable Python into a SyntaxError
+  (build 47, 2026-07-26, live-A/B validated).** Follows the user's build-46
+  trace ("still seeing failed edits and repeating"): the first `edit_file` added
+  an unclosed paren + a triplicated block, and because the syntax check was only
+  *advisory* (`_syntax_warning`), the corrupted file **landed** — after which the
+  weak model spent the whole turn fighting a broken file it couldn't dig out of.
+  New `_syntax_reject` (fs.py) refuses to apply an edit that flips a .py file
+  valid→invalid, returning it to the last-good state the model already read, with
+  a targeted retry message. Scoped tight so it never blocks real work: only .py,
+  only the valid→invalid transition — an already-broken file is presumed under
+  repair and any edit passes (the advisory warning still covers that). Wired into
+  both `edit_file` and `replace_lines` before their writes. +6 fs tests, 2 old
+  warn-and-apply tests rewritten to expect rejection; suite 611 green.
+  **Live A/B (LOG Round 25, gemmacoder12, logging-injection fixture, n=4/arm):**
+  b47 flailed *less* — 0 terminal repeat-stops vs 2/4 on b46 warn-and-apply, and
+  fewer iters/nudges — with **no false-positive reject-loop** (the Lever-1 risk,
+  cleared). Neither arm reproduced actual corruption on this fixture, so the
+  guard's corruption-prevention is proven by the units + the user's real trace;
+  the A/B's contribution is confirming no regression and a directional win.
 - `[x]` **4.10 Three anti-cycling levers on top of 4.9 (builds 43-46,
   2026-07-26, live-A/B validated).** 4.9 catches the loop *after* it starts;
   these attack the causes. User asked "why do these models repeat and cycle — can

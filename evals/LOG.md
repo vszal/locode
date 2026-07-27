@@ -1660,3 +1660,57 @@ build-42 guard is the backstop for when it does). And note all three arms
 | D81 | edit_file cannot fix indentation — route indent/whitespace fixes to replace_lines, never away from it | edit_file preserves existing indentation by design (1.5/1.6), so an indent-only edit is always a no-op. Steering weak models off replace_lines for these is actively harmful; the description must send them TO it. |
 
 ---
+
+## Round 25 — syntax-reject guard: corruption never lands (build 47)
+
+The user pasted a **build-46 trace** ("still seeing failed edits and repeating,"
+gemmacoder12). Diagnosis: the very first `edit_file` produced an unclosed paren
+(`dest_files.add(str(rel / f)`) plus a triplicated print/if block, and it
+**landed** — the syntax check was only advisory (`_syntax_warning` appends a note
+but still writes). From then on the model was fighting a file it had itself
+broken, cycling on old==new no-op edits until the repeat-stop fired (10 iters, 3
+nudges, nothing accomplished). The anti-cycling levers (23/24) all *fired* in
+that trace — verify-gate prompted a re-read, the repeat guard eventually stopped
+it — but they can only react to the flail; nothing prevented the corruption that
+*caused* it.
+
+**Build 47 (`_syntax_reject`, fs.py).** Refuse to apply an edit that flips a .py
+file **valid→invalid**: recompile the post-edit text and, if it now raises a
+SyntaxError where the pre-edit text parsed, return `is_error` with the file
+UNCHANGED (last-good, already-read state) and a targeted retry message. Scoped
+tight so it never blocks legitimate repair: only `.py`, and only the
+valid→invalid transition — if the file did **not** parse before the edit (the
+empty-with-block / broken-file case), any edit passes through (the advisory
+warning still covers it). Wired into both `edit_file` and `replace_lines` before
+their writes. +6 fs tests (reject on break, allow fixing a broken file, normal
+change still lands, non-.py ignored, both tools); 2 old warn-and-apply tests
+rewritten to expect rejection. Suite **611 green**.
+
+**Live paired A/B (gemmacoder12, logging-injection fixture, n=4/arm).** A valid
+`sync_classes.py` whose `get_changed_files` references undefined vars; task = "make
+it verbose, keep it valid Python." `git checkout HEAD~1 -- locode/tools/fs.py`
+swapped in the build-46 warn-and-apply fs.py for the control arm (same session,
+same loaded model — D75).
+
+| arm | build | compile | iters | outcome | flail |
+|---|---|---|---|---|---|
+| REJECT | 47 | 4/4 PASS | 3,4,1,4 | 3 answered, 1 wallclock timeout | mild (≤2 nudges) |
+| WARN | 46 | 4/4 PASS | 4,4,**6,11** | 2 answered, **2 terminal repeat-stops** | heavy — "edit changed nothing", "unverified edits", 6 nudge types |
+
+b47 flailed **less**: fewer iterations, and **0 terminal repeat-stops vs 2/4** on
+b46 (b46 r3 reproduced the exact "repeated the same tool call without making
+progress" stop from the user's report). Critically, **no false-positive
+reject-loop** appeared in any b47 run — the risk that Lever 1 (Round 24)
+materialized as a regression. Caveat: *neither* arm happened to emit a
+corrupting edit that landed, so both were all-PASS and the guard's
+corruption-prevention couldn't be demonstrated *directly* here — that mechanism
+is proven by the units + the user's real trace. The A/B's contribution is
+narrower but exactly what D80 demands: the behavior change causes **no
+regression** and is a **directional win** on the live model.
+
+| # | Decision | Why |
+|---|---|---|
+| D82 | A guard that *prevents bad state from landing* is worth more than one that reacts to the flail it causes | Rounds 22-24 all react *after* a corrupting/no-op edit lands; the user's build-46 trace shows the model can't recover from a file it broke on step one. Refusing the valid→invalid write keeps the file in a state the model can still reason about. Prevention > detection for weak models. |
+| D83 | Scope a content guard to the *transition*, not the *state* — reject valid→invalid, never invalid→anything | A guard keyed on "output is invalid" would block the model from fixing an already-broken file (the empty-with-block case), re-introducing a Lever-1-style regression. Keying on the transition (parsed before, doesn't parse after) refuses only genuine corruption and always lets repair through. |
+
+---
