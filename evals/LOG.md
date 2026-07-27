@@ -2184,3 +2184,34 @@ unreliable), and a structural auto-mark-done is too magic (harness can't know a 
 satisfies a free-text task). Mild + non-stationary + correct outcome → deferred to a
 supervised session, alongside the R32 auto-reindent and R33 bash-rerun candidates. No code
 change this round.
+
+## Round 35 — pass12 autonomous observation sweep (already-applied pathology reinforced)
+
+Woke on timer with the already-applied fs.py fix gated on the user; ran a lean
+observation battery (diff-report, emits-nothing, dedup-order, indent-bug,
+undefined-vars × {qythos9, gemmacoder12} × 2 reps, pass12) to keep the overnight
+loop observing rather than idling. Goal: watch for any NEW failure shape not
+already gated behind the pending fix.
+
+### No new shape; the known picture, worse aggregate
+qythos9 10/10 clean r0 across all five cases. gemma flails on the established
+shapes only: diff-report 2/2 done=N (was 1/3 in pass11 — pure non-stationarity,
+landing worse), dedup-order 2/2 done=N (D84 col-0 reindent, R32), indent-bug 2/2
+PROBLEM but done=Y (repeat), undefined-vars 2/2 PROBLEM done=Y (heavy flail
+f5 n2 r2 but lands), emits-nothing 2/2 clean this run.
+
+### diff-report gemma: a CLEANER instance of the already-applied revert
+r1 tool sequence (confirmed from events): read → edit_file(fix) LANDS →
+bash python3 changes.py VERIFIES RC 0 correct → edit_file(same) "old not found"
+(already applied) → replace_lines(6,9) redundant re-edit DESTROYS the verified-good
+file (RC 1, empty) → replace_lines(6,9) changed-nothing → repeat-stop → done=N.
+
+Sharper than pass11 r1 (which reverted with stale content): here the fix was
+VERIFIED WORKING and then demolished purely because the "old not found" framing on
+the already-applied re-edit read as a fixable error and drove the model to
+replace_lines. The already-applied short-circuit (edit_file: old-absent +
+new-already-present → non-error "already applied, nothing to do") would fire at
+step 4 and leave the verified-good file intact → done=Y. Fix value reinforced;
+recommendation unchanged; still gated on user go/no-go (core edit-result semantics).
+
+No code change this round (harness-only run + this log).
