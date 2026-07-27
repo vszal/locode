@@ -235,6 +235,31 @@ the lived experience.*
   is legible. +1 loop test (597 green). LOG Round 22. *This corrects the Round 20
   claim that residual edit-flailing was all capability-bound — I had only mined
   FAILED edits; this is a SUCCEEDING-but-non-converging loop, a real harness gap.*
+- `[x]` **4.12 Session observability: see a run as the user sees it on screen
+  (2026-07-26).** Prompted by the user: "I'm unclear what you can *see* of locode
+  as a CLI tool ... I'm seeing a lot of repeats and failed tool calls and I'm
+  concerned you aren't noticing." Root cause: headless `locode -p` streams only
+  the model's prose to stdout; every tool call/result/nudge went solely to the
+  `--log-events` JSONL, which the eval sweeps scraped into "compile=PASS
+  finish=STOPPED" — discarding the turn-by-turn detail where repeats and failed
+  edits live. Two complementary pieces, both reusing `locode/ui/render.py` (the
+  REPL's own formatters) so there's a single source of on-screen truth:
+  - **`evals/replay.py` + `evals/watch.sh` (eval harness, no build bump).**
+    replay feeds a recorded event log back through render.py, reconstructing the
+    on-screen transcript with pathology flags (🔁 repeat call, ∅ no-op, ✗ failed
+    edit, 🛡 build-47 syntax-guard save, ✓ green test) and a loud VERDICT header
+    (iters/wall/tools, fails/no-ops/repeats, nudges, stop reason). watch.sh runs
+    a task headless and replays it in one command. +12 tests. Verified on the
+    build-46 flail log: surfaces all 5 failed edits, 3 no-ops, the repeat, and
+    the root cause (model re-edited `sync()` while never touching the broken
+    `get_changed_files`).
+  - **`--show-events` on headless `-p` (build 48).** Renders the on-screen
+    transcript — prose interleaved with clean ⚙/✓✗/⟳ lines and edit diffs — to
+    stdout in one capturable stream, so a captured run reads like the interactive
+    one (and the repeating prose the user flagged is finally visible). New
+    `locode/ui/headless.py` (HeadlessView) reuses render.py + StreamSink (```tool
+    fence suppressed → clean tool line). Flag-gated: default `-p` unchanged, so
+    the harness's stdout parsing is untouched. +7 tests. Suite 630 green.
 - `[x]` **4.11 Refuse edits that turn parseable Python into a SyntaxError
   (build 47, 2026-07-26, live-A/B validated).** Follows the user's build-46
   trace ("still seeing failed edits and repeating"): the first `edit_file` added
