@@ -1942,3 +1942,16 @@ regression, weakly positive. The fix is grounded in the directly-observed
 ab_plandict transcript + tests, not this A/B's numbers. Same lesson as D89: a
 dormant-path A/B is neutral; verify whether the fixed path fired before crediting
 *or* faulting the aggregate.
+
+### pass4 (build 52 full battery, --max-wall 300) — LIVE confirmation
+What the two dormant A/Bs couldn't give, a fresh battery did: the pass3 shape
+recurred and the fix engaged. **add-test qythos9: `7it green, answered, done=Y`
+— the pass3 `16it r5 repeat-stop` loop is GONE.** The transcript shows it firing:
+plan `2/3` with `▶ Run pytest and ensure all tests pass` current, `pytest → 11
+passed`, then `⟳ verify task credited (tests already green)` (1 credit, **0**
+open-plan nudges) → clean finish. Whole battery: **16/16 done=Y, zero
+false-completions, every case lands correct output.** The 6 PROBLEM rows are all
+gemmacoder12 capability flail (repeat-stops that still LAND — D84; gemma is not
+the workhorse); qythos9 near-spotless (only undefined-vars mild: 6it f1 r1). Net:
+builds 51+52 confirmed working live, no regression, and the "flailer=gemma,
+qythos9=clean" split from Round 27 holds.
