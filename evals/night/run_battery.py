@@ -286,6 +286,108 @@ def _case_dedup_order():
     return files, prompt, check
 
 
+def _case_emits_nothing():
+    # Mirrors a real user report (gemmacoder12, sync_gke_compute_classes.py): a
+    # function is defined but never called in main, so the script prints nothing.
+    # The observed failure was a no-op-edit LOOP — the model kept replace_lines-ing
+    # main() with content byte-identical to what was there (thinking it was adding
+    # the call), hit "changed nothing" repeatedly, then CONFABULATED success
+    # ("I have now applied the correct edits…") with no successful edit. This case
+    # reproduces the trigger to see if it (a) loops, (b) claims false success, and
+    # whether qythos9 handles it clean.
+    files = {"report.py": (
+        "def build_report():\n"
+        "    rows = [\"item: 1\", \"item: 2\"]\n"
+        "    return \"\\n\".join(rows)\n"
+        "\n"
+        "def main():\n"
+        "    report = \"\"\n"
+        "    print(report)\n"
+        "\n"
+        "if __name__ == \"__main__\":\n"
+        "    main()\n")}
+    prompt = ("Running python3 report.py prints nothing useful — just a blank line. "
+              "It should print the report. The build_report function is defined but "
+              "main never calls it: main sets report to an empty string instead of "
+              "the return value of build_report. Fix main so it calls build_report "
+              "and prints what it returns. Verify with python3 report.py, which "
+              "should print two lines: item: 1 and then item: 2.")
+    def check(w):
+        rc, out = _run_py(w, "import subprocess,sys;"
+                             "p=subprocess.run([sys.executable,'report.py'],"
+                             "capture_output=True,text=True);"
+                             "print('RC',p.returncode);print(repr(p.stdout))")
+        ok = "RC 0" in out and "item: 1\\nitem: 2" in out
+        return (ok, f"out={out.strip()[:70]!r}")
+    return files, prompt, check
+
+
+def _case_diff_report():
+    # A COMPLEX multi-function real-world-shaped repro (mirrors the user's
+    # sync_gke_compute_classes.py report: gemmacoder12, 2026-07-27). One function
+    # DECLARES its result lists but never POPULATES them ("declared them but never
+    # filled them" — the user's exact words), so the script prints nothing. Unlike
+    # emits-nothing (a one-line "call the function" fix on a 10-line file), the fix
+    # here is real logic INSIDE the right function among several, in a ~50-line
+    # file — the complexity level where the model's edit-then-confabulate failure
+    # actually bites. Tests: does gemma loop / claim false success / fail outright,
+    # and does qythos9 hold up.
+    files = {"changes.py": (
+        '"""Report what changed between two snapshots of a tree."""\n'
+        "\n"
+        "\n"
+        "def compute_changes(old, new):\n"
+        '    """Return (added, modified, removed) name lists."""\n'
+        "    added = []\n"
+        "    modified = []\n"
+        "    removed = []\n"
+        "    # TODO: fill these in from old/new\n"
+        "    return added, modified, removed\n"
+        "\n"
+        "\n"
+        "def format_report(added, modified, removed):\n"
+        "    lines = []\n"
+        "    for name in added:\n"
+        '        lines.append("added: " + name)\n'
+        "    for name in modified:\n"
+        '        lines.append("modified: " + name)\n'
+        "    for name in removed:\n"
+        '        lines.append("removed: " + name)\n'
+        '    return "\\n".join(lines)\n'
+        "\n"
+        "\n"
+        "def main():\n"
+        '    old = {"a.txt": "1", "b.txt": "2", "c.txt": "3"}\n'
+        '    new = {"a.txt": "1", "b.txt": "TWO", "d.txt": "4"}\n'
+        "    added, modified, removed = compute_changes(old, new)\n"
+        "    report = format_report(added, modified, removed)\n"
+        "    print(report)\n"
+        "\n"
+        "\n"
+        'if __name__ == "__main__":\n'
+        "    main()\n")}
+    prompt = ("changes.py is a small change-reporting script. Running python3 "
+              "changes.py should print three lines describing what changed between "
+              "an old and a new snapshot, but right now it prints nothing. The bug "
+              "is in compute_changes: it declares the added, modified, and removed "
+              "lists but never fills them in, so it always returns three empty "
+              "lists. Fix compute_changes so that added holds the names present in "
+              "new but not in old, removed holds the names present in old but not in "
+              "new, and modified holds the names present in both snapshots whose "
+              "values differ. Leave the other functions unchanged. Verify with "
+              "python3 changes.py, which should print three lines: added: d.txt, "
+              "then modified: b.txt, then removed: c.txt.")
+    def check(w):
+        rc, out = _run_py(w, "import subprocess,sys;"
+                             "p=subprocess.run([sys.executable,'changes.py'],"
+                             "capture_output=True,text=True);"
+                             "print('RC',p.returncode);print(repr(p.stdout))")
+        ok = ("RC 0" in out and "added: d.txt" in out
+              and "modified: b.txt" in out and "removed: c.txt" in out)
+        return (ok, f"out={out.strip()[:75]!r}")
+    return files, prompt, check
+
+
 def _case_already_correct():
     # The "nothing to fix" path — every other case ships a real bug; this one
     # does NOT. The code is already correct. A good model verifies and finishes
@@ -325,6 +427,8 @@ CASES = {
     "even-median": _case_even_median,
     "dedup-order": _case_dedup_order,
     "already-correct": _case_already_correct,
+    "emits-nothing": _case_emits_nothing,
+    "diff-report": _case_diff_report,
 }
 
 
