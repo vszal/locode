@@ -144,6 +144,12 @@ class AgentConfig:
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing
+    # Nudge if the model edits the SAME file this many times in a row without
+    # ever running anything (py_compile/pytest/python) or re-reading it to see
+    # the result — the open-loop editing that lets a weak model "fix" a file
+    # into a duplicated mess without noticing (the gemmacoder12 loop). A verify
+    # bash run or a re-read of that file re-arms the gate. 0 disables.
+    max_unverified_edits: int = 3
     # Bail if the model keeps trying to end the turn without EVER having
     # attempted a write_file/edit_file call for a deliverable it was explicitly
     # asked to produce (e.g. "writing a PLAN.md") — as opposed to having tried

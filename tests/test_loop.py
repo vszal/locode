@@ -1914,3 +1914,89 @@ async def test_repeated_mutating_edit_stops_despite_varying_echo(tmp_path):
               if m["role"] == "user" and m.get("kind") == "nudge"]
     assert any("RE-READ" in n for n in nudges)
     assert not any("returned the same result each time" in n for n in nudges)
+
+
+async def test_unverified_edits_nudges_after_repeated_blind_edits(tmp_path):
+    # Lever 2 (verify-gate): three edits to the same file in a row with no run
+    # and no re-read between them earns a one-time nudge to look at ground truth
+    # before editing again — the open loop behind the duplicated-mess failure.
+    cfg = Config()
+    cfg.permissions.tools["write_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("write_file", path="./f.py", content="one\n"),
+         native_call("write_file", path="./f.py", content="two\n"),
+         native_call("write_file", path="./f.py", content="three\n"),
+         {"role": "assistant", "content": "Done."}],
+        cfg=cfg)
+    out = await loop.run_turn("keep fixing f.py")
+    assert out == "Done."
+    nudges = [m["content"] for m in loop.history
+              if m["role"] == "user" and m.get("kind") == "nudge"]
+    assert any("re-read" in n and "f.py" in n for n in nudges)
+    # The nudge landed AFTER the third edit; the model then answered, so no
+    # fourth write happened.
+    assert (tmp_path / "f.py").read_text() == "three\n"
+
+
+async def test_verify_bash_run_resets_the_verify_gate(tmp_path):
+    # A py_compile/pytest/python run between edits closes the loop, so the gate
+    # must credit it and NOT nudge — here two edits, a verify run, two more.
+    cfg = Config()
+    cfg.permissions.tools["write_file"] = "auto"
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("write_file", path="./f.py", content="one\n"),
+         native_call("write_file", path="./f.py", content="two\n"),
+         native_call("bash", cmd="python -m py_compile f.py"),
+         native_call("write_file", path="./f.py", content="three\n"),
+         native_call("write_file", path="./f.py", content="four\n"),
+         {"role": "assistant", "content": "Done."}],
+        FakeBash("OK"), cfg=cfg)
+    out = await loop.run_turn("keep fixing f.py")
+    assert out == "Done."
+    assert not any(m.get("kind") == "nudge"
+                   and "re-read" in m.get("content", "")
+                   for m in loop.history)
+
+
+async def test_reread_resets_the_verify_gate(tmp_path):
+    # Re-reading the file is also looking at ground truth, so it must reset the
+    # gate the same way a verify run does.
+    cfg = Config()
+    cfg.permissions.tools["write_file"] = "auto"
+    cfg.permissions.tools["read_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("write_file", path="./f.py", content="one\n"),
+         native_call("write_file", path="./f.py", content="two\n"),
+         native_call("read_file", path="./f.py"),
+         native_call("write_file", path="./f.py", content="three\n"),
+         native_call("write_file", path="./f.py", content="four\n"),
+         {"role": "assistant", "content": "Done."}],
+        cfg=cfg)
+    out = await loop.run_turn("keep fixing f.py")
+    assert out == "Done."
+    assert not any(m.get("kind") == "nudge"
+                   and "re-read" in m.get("content", "")
+                   for m in loop.history)
+
+
+async def test_non_verify_bash_does_not_reset_the_gate(tmp_path):
+    # A poke-around command (ls) sees text, not behavior — it must NOT count as
+    # verification, so the gate still fires on the third blind edit.
+    cfg = Config()
+    cfg.permissions.tools["write_file"] = "auto"
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("write_file", path="./f.py", content="one\n"),
+         native_call("write_file", path="./f.py", content="two\n"),
+         native_call("bash", cmd="ls -la"),
+         native_call("write_file", path="./f.py", content="three\n"),
+         {"role": "assistant", "content": "Done."}],
+        FakeBash("f.py"), cfg=cfg)
+    out = await loop.run_turn("keep fixing f.py")
+    assert out == "Done."
+    nudges = [m["content"] for m in loop.history
+              if m["role"] == "user" and m.get("kind") == "nudge"]
+    assert any("re-read" in n and "f.py" in n for n in nudges)

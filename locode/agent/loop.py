@@ -196,6 +196,15 @@ class AgentLoop:
         # third stops the turn. Reset the moment any batch does real work.
         nochange_streak = 0
         nudged_nochange = False
+        # Verify-gate: consecutive mutating edits to a file (by basename) with no
+        # intervening look at ground truth. A verify bash run (py_compile/pytest/
+        # python) resets ALL counters; re-reading a file resets that file's. When
+        # a file crosses max_unverified_edits it earns a one-time nudge to run or
+        # re-read before editing again — closing the open loop that lets a weak
+        # model edit a file into a duplicated mess without ever checking. The
+        # nudge gate clears on the same reset, so genuine compliance re-arms it.
+        unverified_edits: dict[str, int] = {}
+        nudged_verify: set[str] = set()
         # Filenames the user asked to be WRITTEN this turn (e.g. "writing a
         # PLAN.md") — tracked against write_file/edit_file calls actually
         # attempted, to catch a model that reads around and then narrates a
@@ -604,6 +613,20 @@ class AgentLoop:
                         path = c.args.get("path")
                         if path:
                             read_paths.add(os.path.basename(str(path)).lower())
+                    # Verify-gate bookkeeping (see unverified_edits init). A verify
+                    # bash run clears every file's streak and re-arms all nudges; a
+                    # re-read clears just that file's; a mutating edit grows it.
+                    if c.name == "bash" and _is_verify_bash(c.args.get("cmd", "")):
+                        unverified_edits.clear()
+                        nudged_verify.clear()
+                    elif c.name == "read_file":
+                        base = os.path.basename(str(c.args.get("path") or "")).lower()
+                        unverified_edits.pop(base, None)
+                        nudged_verify.discard(base)
+                    elif c.name in _MUTATING_EDIT_TOOLS:
+                        base = os.path.basename(str(c.args.get("path") or "")).lower()
+                        if base:
+                            unverified_edits[base] = unverified_edits.get(base, 0) + 1
                 error_sig, result_sig, no_change = await self._run_calls(calls)
                 # Headless only: an ASK tool nobody can approve is refused for
                 # the whole session, so a model still trying after this many
@@ -665,6 +688,21 @@ class AgentLoop:
                                           "change nothing")
                 else:
                     nochange_streak = 0
+                # Verify-gate: a file has been edited max_unverified_edits times
+                # in a row with no py_compile/pytest/python run and no re-read
+                # between them. The edits DID land (this runs after _run_calls) —
+                # the risk is the model can't see whether they were right and
+                # keeps piling on more, the open loop behind the duplicated-mess
+                # failure. Nudge once per file to look before editing again; the
+                # gate re-arms as soon as it complies (bash/read clears the count).
+                gate = self._cfg.agent.max_unverified_edits
+                if gate > 0:
+                    over = next((f for f, n in unverified_edits.items()
+                                 if n >= gate and f not in nudged_verify), None)
+                    if over is not None:
+                        nudged_verify.add(over)
+                        self._nudge_verify(over, unverified_edits[over])
+                        continue
                 # A salvaged truncated write just landed a PARTIAL document. The
                 # tool result reads like a normal success, so without this the
                 # model would call the file done and stop. Tell it plainly the
@@ -937,6 +975,22 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "repeated edit"})
+
+    def _nudge_verify(self, filename: str, count: int) -> None:
+        self.history.append({
+            "role": "user",
+            "content": (f"You have edited {filename} {count} times in a row "
+                        "without running anything or re-reading it. You cannot "
+                        "tell whether those edits are correct — or whether they "
+                        "duplicated or broke something — until you look at the "
+                        "CURRENT state of the file. Before editing it again, "
+                        f"either run it (py_compile, the test, or python {filename}) "
+                        f"or re-read {filename}, then decide from what you see. "
+                        "If it already does what was asked, give your final answer "
+                        "in plain text instead of editing again."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "unverified edits"})
 
     def _nudge_nochange(self) -> None:
         self.history.append({
@@ -1243,6 +1297,19 @@ def _render_calls_as_fenced(calls) -> str:
         payload = json.dumps({"name": c.name, "args": c.args}, ensure_ascii=False)
         blocks.append(f"```tool\n{payload}\n```")
     return "\n".join(blocks)
+
+
+def _is_verify_bash(cmd: str) -> bool:
+    """Does this bash command look like it CHECKS the code (runs/compiles/tests)
+    rather than just poking around? Used by the verify-gate to credit the model
+    with having closed the loop. Deliberately generous — a false positive only
+    delays a nudge, while requiring an exact command would miss legitimate ways
+    to verify. Excludes pure inspection (ls/cat/grep) which sees text, not
+    behavior."""
+    c = (cmd or "").lower()
+    return any(tok in c for tok in (
+        "pytest", "py_compile", "unittest", "python", "python3",
+        "ruff", "mypy", "pyflakes", "pylint", "compileall", "-m compile"))
 
 
 def _preview(call) -> str:
