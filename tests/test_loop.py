@@ -1867,6 +1867,98 @@ def test_test_claim_matches_pass_assertions_not_doc_language():
     assert not m("The plan is written.")
 
 
+# --- unverified compile/run claim (hallucinated-verify false-completion) ------
+async def test_claims_compiles_without_running_check_is_nudged(tmp_path):
+    # The reproduced gemmacoder12 syntax-fix false-completion: the model reads a
+    # broken file, asserts it "compiles" and is "syntactically correct", and
+    # tries to finish WITHOUT ever running py_compile. No pathology counter sees
+    # it (no repeat, no fail); only this gate does. Nudge once, then the model
+    # recovers with a plain answer that is returned.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("read_file", path="parser.py"),
+         {"role": "assistant",
+          "content": "The file is syntactically correct and already compiles."},
+         {"role": "assistant", "content": "Fixed the missing colon."}],
+        FakeBash("unused"))
+    (tmp_path / "parser.py").write_text("def parse(line)\n    return line\n")
+    out = await loop.run_turn("fix the syntax error so py_compile succeeds")
+    assert out == "Fixed the missing colon."
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "compiles / runs cleanly" in m["content"]]
+    assert len(nudges) == 1
+
+
+async def test_claims_compiles_after_clean_check_is_trusted(tmp_path):
+    # A verify command (py_compile) ran and exited cleanly this turn, so the
+    # same "compiles" claim is a verified finish — returned directly, no nudge.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="python3 -m py_compile parser.py"),
+         {"role": "assistant", "content": "The file compiles cleanly now."}],
+        FakeBash("(exit 0 — command succeeded, no output)"))
+    out = await loop.run_turn("fix the syntax error")
+    assert out == "The file compiles cleanly now."
+    assert not [m for m in loop.history if m["role"] == "user"
+                and "compiles / runs cleanly" in m["content"]]
+
+
+async def test_failing_compile_does_not_credit_verify_ok(tmp_path):
+    # py_compile ran but FAILED (is_error) — the model must not be credited with
+    # a clean check, so a subsequent "it compiles" claim is still gated.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="python3 -m py_compile parser.py"),
+         {"role": "assistant", "content": "It compiles fine now."},
+         {"role": "assistant", "content": "Done."}],
+        FakeBash("SyntaxError: expected ':'", is_error=True))
+    out = await loop.run_turn("fix the syntax error")
+    assert out == "Done."
+    nudges = [m for m in loop.history if m["role"] == "user"
+              and "compiles / runs cleanly" in m["content"]]
+    assert len(nudges) == 1
+
+
+async def test_non_verify_final_answer_is_not_gated_by_compile_gate(tmp_path):
+    # A finish that makes no compile/run claim never trips the gate, even with no
+    # clean check this turn.
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("read_file", path="notes.md"),
+         {"role": "assistant", "content": "Here is a summary of the module."}],
+        FakeBash("unused"))
+    (tmp_path / "notes.md").write_text("hello\n")
+    out = await loop.run_turn("summarize the module")
+    assert out == "Here is a summary of the module."
+    assert not [m for m in loop.history if m["role"] == "user"
+                and "compiles / runs cleanly" in m["content"]]
+
+
+def test_verify_claim_matches_compile_run_language_not_prose():
+    m = loop_mod._VERIFY_CLAIM_RE.search
+    assert m("The file is syntactically correct and already compiles.")
+    assert m("py_compile succeeds")
+    assert m("It compiles cleanly now.")
+    assert m("no syntax errors")
+    assert m("the script runs without error")
+    assert m("it imports cleanly")
+    # Ordinary prose must not match.
+    assert not m("This function computes the running total.")
+    assert not m("I will run the tests next.")
+    assert not m("The plan is complete.")
+
+
+def test_is_verify_bash_tolerates_non_string_cmd():
+    # A weak model sometimes emits cmd as a LIST of argv tokens; the check runs
+    # before the tool executes and must not crash on `.lower()` (regression:
+    # 'list' object has no attribute 'lower' killed a live run).
+    assert loop_mod._is_verify_bash(["python3", "-m", "py_compile", "x.py"])
+    assert loop_mod._is_verify_bash("python3 -m py_compile x.py")
+    assert not loop_mod._is_verify_bash(["ls", "-la"])
+    assert not loop_mod._is_verify_bash(None)
+    assert not loop_mod._is_verify_bash("")
+
+
 # --- repeated mutating edit (gemmacoder12 duplicating-replace loop) -----------
 async def test_repeated_mutating_edit_stops_despite_varying_echo(tmp_path):
     # gemmacoder12, user-reported: the model re-issues a byte-IDENTICAL

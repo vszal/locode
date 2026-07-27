@@ -235,10 +235,11 @@ the lived experience.*
   is legible. +1 loop test (597 green). LOG Round 22. *This corrects the Round 20
   claim that residual edit-flailing was all capability-bound — I had only mined
   FAILED edits; this is a SUCCEEDING-but-non-converging loop, a real harness gap.*
-- `[~]` **4.13 Overnight prompt-battery round — two flail fixes rejected, one
-  new issue found (2026-07-27).** First round driven by the 4.12 observability
-  suite + a new varied-task battery (`evals/night/run_battery.py`, 8 cases). Full
-  method + tables in LOG Round 26. Outcomes:
+- `[x]` **4.13 Overnight prompt-battery round — two flail fixes rejected, then a
+  distinct false-completion pathology found + fixed (2026-07-27).** Driven by the
+  4.12 observability suite + a new varied-task battery
+  (`evals/night/run_battery.py`, 8 cases). Full method + tables in LOG Rounds
+  26–27. Outcomes:
   - **build 49 (kept):** bash silent success `(no output)` → `(exit 0 — command
     succeeded, no output)`. Paired A/B (stash-toggle, both models × 3 reps):
     flail-**neutral**. Kept as a **visibility** win (pain #1 — `(no output)` is
@@ -251,18 +252,35 @@ the lived experience.*
     tool-result text** — it's a stopping-behavior problem; spend the clarity lever
     on human visibility, not the model. **D85: the pass-1 baseline is not a valid
     control** — only a same-session stash-toggle A/B is (non-stationarity, D75).
-  - `[ ]` **OPEN — plan false-completion (NEEDS DESIGN / user input).** syntax-fix
-    on gemmacoder12: the model `read_file`'d the broken file, then `update_plan`
-    marked **both** "find" and "fix" `[x]` done **without ever editing**, and the
-    plan tool replied *"All tasks are done. Give your final answer now."* — a
-    confident false success (worst case for pain #1: user is told "done", file
-    still broken). Root cause: `locode/tools/plan.py:156` trusts the `[x]` self-
-    report; the plan tool has no view of whether real work happened. A robust gate
-    ("don't bless completion when zero mutating edits / no verify occurred this
-    turn") needs **loop state** and touches two hard correctness cores (plan tool
-    + loop), and a naive gate risks blocking legitimate fast completions — so it
-    needs a paired A/B and a design decision, not a blind ship. Not attempted.
-    Reproducible via the battery's `syntax-fix` case.
+  - **build 50 (shipped) — hallucinated-verify false-completion gate (Round 27).**
+    The `syntax-fix` false-completion first read as a *plan* defect (the model
+    `update_plan`-marked "fix" `[x]` done without editing, and plan.py:156 replied
+    *"All tasks are done. Give your final answer now."*). Reading the transcript
+    corrected the diagnosis: the model had **hallucinated** — it read
+    `def parse(line)` (missing colon) and asserted *"the file is syntactically
+    correct and already compiles"* **without ever running py_compile**, so the
+    plan mark was downstream of a bad verify, not the cause. This is a **distinct
+    third pathology** — confident *premature/false completion*, invisible to every
+    flail counter (zero repeats/fails/no-ops, a clean "answered" stop); only the
+    battery's real `check()` catches it. Fix = extend build-40's seen-green (test)
+    gate to the **compile/run/import** class (`locode/agent/loop.py`): a
+    `_saw_verify_ok` flag (set when an `_is_verify_bash` command exits clean), a
+    `_VERIFY_CLAIM_RE` (compiles / py_compile succeeds / syntactically correct /
+    no syntax error / runs-without-error), and a finish-cascade nudge that fires
+    **once** when the reply claims a check passed but none ran clean this turn.
+    Double-gated (claim AND `not _saw_verify_ok`) → a real verify or a no-shell
+    task can't trip it. Also **fixed a latent crash** the gate surfaced:
+    `_is_verify_bash` did `(cmd or "").lower()` and died with `'list' object has
+    no attribute 'lower'` when a model emitted `cmd` as an argv list — now
+    coerced. Paired A/B (stash-toggle, crash-free re-run, syntax-fix+logic-bug ×
+    2 models × 5 reps): **target case gemmacoder12 syntax-fix 0/5 → 4/5 done**;
+    qythos9 **5/5 both arms** (zero false-fire); logic-bug unaffected. Extra iters
+    (4.0→5.1) are the gate making the model *work* instead of falsely quitting in
+    2 iterations; the 2 treatment repeat-stops are one benign post-fix re-verify +
+    one run that also failed in control (not gate-induced). +6 tests, suite 637.
+    Left plan.py:156 **unchanged** — it was not the lever; the plan mark honestly
+    reflected the model's (wrong) belief, which the verify gate now corrects at
+    source. LOG Round 27.
 - `[x]` **4.12 Session observability: see a run as the user sees it on screen
   (2026-07-26).** Prompted by the user: "I'm unclear what you can *see* of locode
   as a CLI tool ... I'm seeing a lot of repeats and failed tool calls and I'm

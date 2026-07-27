@@ -1765,3 +1765,78 @@ stubborn.
 |---|---|---|
 | D84 | Weak-model mid-task **flail does not yield to clearer tool-result text** — route flail fixes elsewhere | Two paired A/Bs (b49 neutral, b50 negative) on "signal success more clearly" failed to help and one hurt. The models re-run/re-edit after a success regardless of how legibly it's signaled: this is a planning/**stopping-behavior** problem, not a tool-result information deficit. Additive result/nudge text is spent budget. Future flail work → loop mechanics (already well-tuned) or accept it's capability-bound; spend the "clearer output" lever on **human visibility** instead, where it demonstrably pays (b49). |
 | D85 | The **pass-1 baseline is not a valid control** — only a same-session stash-toggle A/B is | indent-bug flailed to a repeat-stop in pass-1 but ran clean as the A/B control arm minutes later (same code). Non-stationarity (D75) dominates the flail metric across sessions; cross-session before/after "improvements" are noise. |
+
+---
+
+## Round 27 — overnight battery cont'd: hallucinated-verify false-completion, gated (2026-07-27)
+
+Continuation of the overnight loop (Round 26). After D84 closed "clearer tool-
+result text" as a flail lever, the battery surfaced a **distinct third
+pathology** — not flail, not invisibility, but **confident premature/false
+completion.** (Build-number note: the Round-26 "build 50" parse-note change was
+reverted *before* it ever landed, so the last committed build was 49; **build 50
+on `main` is this verify-gate.**)
+
+### The reproduction (battery `syntax-fix`, gemmacoder12, reps=3+5)
+Given `parser.py` = `def parse(line)` (missing colon) and "fix it so
+`py_compile` succeeds", gemmacoder12 reliably (`0/5` control done):
+
+```
+  ⚙ read_file parser.py
+The file parser.py is syntactically correct and already compiles with
+python3 -m py_compile parser.py. There is no syntax error to fix.
+  ▤ plan 2/2 done
+```
+
+It **hallucinated** — read the broken line and asserted it compiles **without
+running py_compile** — then marked the plan done and self-terminated. The file
+was left broken. Crucially this is **invisible to every pathology counter**:
+`done=N`, but `f0 n0 r0`, stop reason a clean "answered". Only the battery's real
+per-case `check()` (does the file actually compile) catches it. First read as a
+*plan* defect (plan.py:156 replies "All tasks are done. Give your final answer
+now."), but the transcript shows the plan mark is **downstream** of the bad
+verify — the model believed the file was fine. So the lever is *forcing
+verification*, not editing the plan message. plan.py left unchanged.
+
+### The fix (build 50) — extend the seen-green gate to compile/run/import
+Exact sibling of build-40's test gate (which caught "tests pass" false-
+completions with perfect discrimination). In `locode/agent/loop.py`:
+- `self._saw_verify_ok` — set True when a bash call that `_is_verify_bash`
+  (py_compile / python / ruff / pytest / …) exits **clean** (`is_error` False;
+  a failing py_compile correctly leaves it False).
+- `_VERIFY_CLAIM_RE` — matches the compile/run class: *compiles [cleanly]*,
+  *py_compile succeeds*, *syntactically correct*, *no syntax error*,
+  *runs/imports without error*. Deliberately not test claims (those go through
+  `_TEST_CLAIM_RE`).
+- Finish-cascade gate (sibling of the test gate): if the reply claims a check
+  passed **and** `not _saw_verify_ok`, nudge **once** to actually run it, then
+  return whatever the model says next. Double-gated → a run that really verified,
+  or a task needing no shell check, can't trip it.
+
+**Latent crash found + fixed (the gate surfaced it):** `_is_verify_bash` did
+`(cmd or "").lower()` and raised `'list' object has no attribute 'lower'` when a
+model emitted `cmd` as an argv **list** (["python3","-m","py_compile","x.py"]) —
+which the nudge to "run py_compile" prompted. Pre-existing (the verify-gate
+bookkeeping call had it too); now coerces list→string. This crash **corrupted
+the first A/B** (one treatment run died), so it was re-run clean.
+
+### Two paired A/Bs (stash-toggle `--marker _saw_verify_ok`, D80/D85)
+
+| A/B | cases × models × reps | target: syntax-fix gemma | qythos9 (regression) | note |
+|---|---|---|---|---|
+| #1 (pre-crash-fix) | 4 × 2 × 3 | 0/3 → **1/3** | 3/3 both arms | 1 treatment run killed by the list-cmd crash → understated |
+| #2 (crash-fixed) | syntax-fix+logic-bug × 2 × 5 | **0/5 → 4/5** | 5/5 both arms | clean |
+
+A/B #2 aggregate: done 15→19 (**all +4 from syntax-fix gemma**), repeat-stops
+0→2, repeats 2→8, iters 4.0→5.1. The extra iters/repeats are the gate making the
+model **work** (control falsely quits in 2 iters; treatment runs py_compile, sees
+the real SyntaxError, edits, re-verifies — proven in the rT3 transcript). Of the
+2 treatment repeat-stops: one is a **succeeded** run redundantly re-running
+py_compile (cosmetic), one is a run that **also failed in control** (not gate-
+induced). **Zero false-fire on qythos9** in 20 runs. +6 tests, suite 637 green.
+
+### Decisions
+| # | Decision | Why |
+|---|---|---|
+| D86 | **Confident false-completion is a third pathology, orthogonal to flail** — and it's caught by *forcing verification*, not by clearer text or plan-message edits. | The `syntax-fix` false-completion has zero flail signature (clean "answered", `f0 n0 r0`); only the real check sees it. Unlike D84's flail (which ignores clearer text), this DOES yield to a structural gate that makes the model run the check it claimed — the model, once it *sees* the SyntaxError, fixes it 4/5. The gate is prevention-class (D82): it stops a confidently-wrong final answer, the worst outcome for pain #1. |
+| D87 | **Read the transcript before naming the root cause.** | The false-completion looked like a plan-tool defect (plan.py:156 "give your final answer now") from the counters alone; the transcript showed the model had hallucinated the verify — a completely different lever. Had I "fixed" plan.py I'd have shipped to the wrong module. Same lesson that a corrupting A/B data point (the list-cmd crash) was only caught by reading the run, not the aggregate. |

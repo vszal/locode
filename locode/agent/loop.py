@@ -150,10 +150,16 @@ class AgentLoop:
         nudged_slow = False
         nudged_intent = False
         nudged_unverified_tests = False
+        nudged_unverified_verify = False
         # Reset per turn: set True the moment a bash result shows a genuinely
         # green pytest tally, so a "the tests pass" final answer can be gated on
         # the model having actually SEEN green rather than asserting it blind.
         self._saw_green_test = False
+        # Sibling flag for the non-test verify class (compile/run/import): set
+        # True the moment a code-CHECKING bash command (py_compile, python, ruff,
+        # ...) exits cleanly, so a "the file compiles / runs fine" final answer
+        # can be gated on the model having actually watched it pass.
+        self._saw_verify_ok = False
         open_task_nudges = 0
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
@@ -578,6 +584,28 @@ class AgentLoop:
                         nudged_unverified_tests = True
                         self._nudge_unverified_tests()
                         continue
+                    # Sibling of the test gate above, for the compile/run/import
+                    # class of check. The model ends the turn ASSERTING a named
+                    # verification succeeded — "compiles cleanly", "py_compile
+                    # succeeds", "syntactically correct", "runs without error" —
+                    # but no code-checking command ever exited cleanly this turn.
+                    # This is the hallucinated-verify false-completion: measured
+                    # live (gemmacoder12 syntax-fix, 2026-07-27) the model read
+                    # `def parse(line)` — a missing colon — declared "the file is
+                    # syntactically correct and already compiles", marked its plan
+                    # done, and self-terminated WITHOUT running py_compile, leaving
+                    # the file broken. No pathology counter sees this: zero
+                    # repeats, zero fails, a clean "answered" stop — only actually
+                    # running the check catches it. Nudge once to run the
+                    # verification the claim names. Double-gated (claim AND never
+                    # saw a clean check) so a run that really did verify, or a
+                    # task needing no shell check, can't trip it.
+                    if (not nudged_unverified_verify
+                            and not self._saw_verify_ok
+                            and _VERIFY_CLAIM_RE.search(content)):
+                        nudged_unverified_verify = True
+                        self._nudge_unverified_verify()
+                        continue
                     return content  # final answer
                 if trimmed:
                     self._on_event({"phase": "info",
@@ -832,6 +860,15 @@ class AgentLoop:
                 # that happens to contain "5 passed" can't spoof it. Gates the
                 # unverified-tests finish nudge in run_turn.
                 self._saw_green_test = True
+            if (call.name == "bash" and not res.is_error
+                    and _is_verify_bash(call.args.get("cmd", ""))):
+                # A code-CHECKING command (py_compile / python / ruff / ...) ran
+                # and exited cleanly this turn — the model has actually watched
+                # the code pass a check, not merely asserted it. Sibling of the
+                # green-test flag above; gates the unverified-compile finish
+                # nudge. is_error is the shell's rc!=0 signal, so a failing
+                # py_compile (SyntaxError) correctly leaves this False.
+                self._saw_verify_ok = True
             if getattr(res, "no_change", False):
                 # A no-change edit is a real error to the model but not a
                 # "same recurring code error" — keep it out of the error-stall
@@ -1116,6 +1153,21 @@ class AgentLoop:
         self._on_event({"phase": "nudge",
                         "reason": "tests claimed passing but never seen green"})
 
+    def _nudge_unverified_verify(self) -> None:
+        self.history.append({
+            "role": "user",
+            "content": ("You're ending the turn asserting the code compiles / "
+                        "runs cleanly, but you never actually ran that check "
+                        "this turn — you claimed it without watching it pass. "
+                        "Run the exact verification now with a bash tool call "
+                        "(the py_compile / python command the task named) and "
+                        "read its output. If it reports an error, fix it and "
+                        "re-run until the output is clean before you stop."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge",
+                        "reason": "compile/run claimed ok but never verified"})
+
     def _nudge_slow(self) -> None:
         self.history.append({
             "role": "user",
@@ -1262,6 +1314,27 @@ _TEST_CLAIM_RE = re.compile(
     re.IGNORECASE)
 
 
+# A final answer that CLAIMS a NON-test code check succeeded (test claims go
+# through _TEST_CLAIM_RE above). Covers the compile/run/import class:
+# "compiles cleanly", "py_compile succeeds", "syntactically correct", "no
+# syntax error", "runs/imports without error". The precision here matters less
+# than for the test regex because the gate is double-locked: it fires only when
+# _saw_verify_ok is ALSO False, i.e. the model asserted the check passed having
+# never watched any code-checking command exit cleanly this turn — the
+# hallucinated-verify signature. A run that actually verified can't trip it
+# however it phrases the result.
+_VERIFY_CLAIM_RE = re.compile(
+    r"(?:"
+    r"\bcompiles?\b(?:\s+(?:clean(?:ly)?|success(?:fully)?|correctly|fine|now|ok))?"
+    r"|\bpy_?compile\b[^.\n]{0,30}?(?:succe|pass|clean|work|ok)\w*"
+    r"|\bsyntactically\s+(?:correct|valid)\b"
+    r"|\bno\s+syntax\s+errors?\b"
+    r"|\b(?:runs?|imports?|executes?)\b[^.\n]{0,20}?"
+    r"\b(?:without\s+(?:error|issue|problem)s?|clean(?:ly)?|success(?:fully)?)\b"
+    r")",
+    re.IGNORECASE)
+
+
 def _prose_sig(content: str) -> tuple[int, str]:
     """Signature for spotting a reply the model has essentially re-emitted.
 
@@ -1341,14 +1414,24 @@ def _ledger_line(edit_tally: dict, read_tally: dict, run_count: int,
     return "So far this turn you have: " + ", ".join(items) + ". "
 
 
-def _is_verify_bash(cmd: str) -> bool:
+def _is_verify_bash(cmd) -> bool:
     """Does this bash command look like it CHECKS the code (runs/compiles/tests)
     rather than just poking around? Used by the verify-gate to credit the model
     with having closed the loop. Deliberately generous — a false positive only
     delays a nudge, while requiring an exact command would miss legitimate ways
     to verify. Excludes pure inspection (ls/cat/grep) which sees text, not
-    behavior."""
-    c = (cmd or "").lower()
+    behavior.
+
+    `cmd` is normally a string, but a weak model sometimes emits it as a LIST of
+    argv tokens (["python3", "-m", "py_compile", "x.py"]) — join those rather
+    than crashing on `.lower()`. Measured live (gemmacoder12, verify-gate A/B,
+    2026-07-27): the nudge to run py_compile prompted a list-form bash call and
+    the bare `.lower()` raised `'list' object has no attribute 'lower'`, killing
+    the run. This runs before the tool executes, so it must tolerate whatever the
+    parser handed through."""
+    if isinstance(cmd, (list, tuple)):
+        cmd = " ".join(str(x) for x in cmd)
+    c = str(cmd or "").lower()
     return any(tok in c for tok in (
         "pytest", "py_compile", "unittest", "python", "python3",
         "ruff", "mypy", "pyflakes", "pylint", "compileall", "-m compile"))
