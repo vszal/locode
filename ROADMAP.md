@@ -235,6 +235,34 @@ the lived experience.*
   is legible. +1 loop test (597 green). LOG Round 22. *This corrects the Round 20
   claim that residual edit-flailing was all capability-bound — I had only mined
   FAILED edits; this is a SUCCEEDING-but-non-converging loop, a real harness gap.*
+- `[~]` **4.13 Overnight prompt-battery round — two flail fixes rejected, one
+  new issue found (2026-07-27).** First round driven by the 4.12 observability
+  suite + a new varied-task battery (`evals/night/run_battery.py`, 8 cases). Full
+  method + tables in LOG Round 26. Outcomes:
+  - **build 49 (kept):** bash silent success `(no output)` → `(exit 0 — command
+    succeeded, no output)`. Paired A/B (stash-toggle, both models × 3 reps):
+    flail-**neutral**. Kept as a **visibility** win (pain #1 — `(no output)` is
+    ambiguous to a human reading `--show-events` too), explicitly **not** claimed
+    as a flail fix.
+  - **build 50 (reverted):** edit "✓ now parses cleanly" on invalid→valid .py +
+    a reject-message "already parses as-is" hint. Paired A/B: flail-**negative**
+    (repeat-stops 1→5; the *target* case gemma went all-done → 2 stops + 1 fail).
+    Rejected per D80. → **D84: weak-model flail does not yield to clearer
+    tool-result text** — it's a stopping-behavior problem; spend the clarity lever
+    on human visibility, not the model. **D85: the pass-1 baseline is not a valid
+    control** — only a same-session stash-toggle A/B is (non-stationarity, D75).
+  - `[ ]` **OPEN — plan false-completion (NEEDS DESIGN / user input).** syntax-fix
+    on gemmacoder12: the model `read_file`'d the broken file, then `update_plan`
+    marked **both** "find" and "fix" `[x]` done **without ever editing**, and the
+    plan tool replied *"All tasks are done. Give your final answer now."* — a
+    confident false success (worst case for pain #1: user is told "done", file
+    still broken). Root cause: `locode/tools/plan.py:156` trusts the `[x]` self-
+    report; the plan tool has no view of whether real work happened. A robust gate
+    ("don't bless completion when zero mutating edits / no verify occurred this
+    turn") needs **loop state** and touches two hard correctness cores (plan tool
+    + loop), and a naive gate risks blocking legitimate fast completions — so it
+    needs a paired A/B and a design decision, not a blind ship. Not attempted.
+    Reproducible via the battery's `syntax-fix` case.
 - `[x]` **4.12 Session observability: see a run as the user sees it on screen
   (2026-07-26).** Prompted by the user: "I'm unclear what you can *see* of locode
   as a CLI tool ... I'm seeing a lot of repeats and failed tool calls and I'm
