@@ -231,6 +231,28 @@ the lived experience.*
   is legible. +1 loop test (597 green). LOG Round 22. *This corrects the Round 20
   claim that residual edit-flailing was all capability-bound — I had only mined
   FAILED edits; this is a SUCCEEDING-but-non-converging loop, a real harness gap.*
+- `[x]` **4.10 Three anti-cycling levers on top of 4.9 (builds 43-45,
+  2026-07-26).** 4.9 catches the loop *after* it starts; these attack the causes.
+  User asked "why do these models repeat and cycle — can we add nudges to
+  remember what it did after each edit," then approved all three:
+  - **Steer off line-numbers (build 43).** Weak models pick their editor from the
+    tool descriptions. `edit_file` (content-anchored, can't drift) now reads as
+    "the PREFERRED editor"; `replace_lines` reads as "LAST-RESORT — PREFER
+    edit_file", spelling out that line numbers go STALE and a repeat DUPLICATES
+    content. Prevents the 4.9 loop up front instead of catching it. +2 guard tests.
+  - **Verify-gate (build 44).** The deeper fault is *open-loop editing*: edit,
+    never run or re-read, edit again, never learn if it worked. New per-file gate
+    (`agent.max_unverified_edits`, default 3) counts consecutive mutating edits
+    with no look at ground truth; a verify bash run (py_compile/pytest/python/…)
+    or a re-read re-arms it, then a one-time nudge tells the model to look before
+    editing again. A poke-around `ls`/`cat` is not credited. +4 tests.
+  - **Episodic action-ledger (build 45).** When a cycling nudge fires (4.9 repeat-
+    edit or the verify-gate), it now prepends a terse turn recap — "So far this
+    turn you have: edited f.py 5×, run a check 1× (still not green)." Selective by
+    construction (only those already-gated moments), so no context bloat / JSON
+    corruption. +2 tests. Suite 605 green. **Next:** validate the trio on a live
+    gemmacoder12/qythos9 session and an eval sweep (offline metrics can't see a
+    converging loop — 4.9's lesson).
 - `[x]` **4.8 Turn-ending legibility is data-confirmed closed (2026-07-25).**
   Categorized all 147 recent turn-endings by what the *user actually sees*: 46%
   prose answer, 36% clean-stop with a legible reason, 15% short claim ("All tests

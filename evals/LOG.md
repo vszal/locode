@@ -1566,3 +1566,50 @@ test (`test_repeated_mutating_edit_stops_despite_varying_echo`); 597 green.
 | D77 | Live user observation outranks offline metric conclusions | Round 20 called residual edit-flailing capability-bound from FAILED-edit mining; this SUCCEEDING-edit loop was invisible to that lens and only surfaced in a real session. Watch live runs, not just scores. |
 
 ---
+
+## Round 23 — three anti-cycling levers on top of the build-42 guard (builds 43-45)
+
+Build 42 (Round 22) catches the repeated-edit loop **after** it starts. The user
+then asked the deeper question — *why* do these models repeat and cycle, and can
+we "add nudges to remember what it did after each edit" — and approved building
+all three levers that attack the causes. All Opus-tier (tool descriptions +
+loop.py), shipped 2026-07-26.
+
+**Root cause (delivered to the user).** Weak local models cycle because: (1) the
+next action is a near-deterministic function of the most salient context, so a
+stale mental model reproduces the same edit; (2) editing is **open-loop** — they
+edit without ever running or re-reading, so nothing tells them the edit landed or
+duplicated; (3) **line-number** edits (`replace_lines`) drift as the file shifts,
+turning "the same fix" into new duplications; (4) the first full read gets
+anchored on and the ±3-line echo / compaction can't dislodge it.
+
+**The three levers.**
+- **build 43 — steer off line-numbers.** Reframed the tool descriptions:
+  `edit_file` is now "the PREFERRED editor — content-anchored, so it can't drift";
+  `replace_lines` is "LAST-RESORT — PREFER edit_file", stating line numbers go
+  STALE and a repeat DUPLICATES content. Weak models choose their tool from these
+  descriptions, so this prevents the 4.9 loop at the source. +2 guard tests.
+- **build 44 — verify-gate.** Per-file counter of consecutive mutating edits with
+  no look at ground truth (`agent.max_unverified_edits`, default 3). A verify bash
+  run (py_compile/pytest/python/ruff/mypy) or a re-read of the file re-arms it;
+  crossing the threshold earns a one-time nudge to run or re-read before editing
+  again. `ls`/`cat` is not credited (`_is_verify_bash`). Closes the open loop. +4
+  tests.
+- **build 45 — episodic action-ledger.** Both cycling nudges (4.9 repeat-edit and
+  the verify-gate) now prepend a terse turn recap: "So far this turn you have:
+  edited f.py 5×, run a check 1× (still not green)." Selective by construction —
+  only those already-gated moments — so no context bloat / tool-JSON corruption.
+  +2 tests. Suite 605 green.
+
+**Not yet validated on a live/eval run.** Per D77, offline metrics can't see a
+converging loop, so a green suite is necessary but not sufficient. Next: a live
+gemmacoder12/qythos9 session on a duplication-prone bugfix + an eval sweep,
+watching that (a) the levers fire when they should, (b) no false-positive nudges
+on legitimate multi-edit work.
+
+| # | Decision | Why |
+|---|---|---|
+| D78 | Fix cycling at the cause (tool choice + open loop), not just at the symptom | Build 42 stops a loop already running and burns iterations to get there; steering off line-numbers and gating unverified edits stop it forming. Layered defense — the guard remains the backstop. |
+| D79 | Recap only at already-gated cycling moments, never every turn | A per-turn ledger would bloat context and (brace-dense) corrupt weak models' tool JSON. Attaching it to the repeat-edit / verify nudges makes it self-limiting and lands it exactly when the model has lost the thread. |
+
+---
