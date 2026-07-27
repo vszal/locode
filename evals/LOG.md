@@ -1613,3 +1613,50 @@ on legitimate multi-edit work.
 | D79 | Recap only at already-gated cycling moments, never every turn | A per-turn ledger would bloat context and (brace-dense) corrupt weak models' tool JSON. Attaching it to the repeat-edit / verify nudges makes it self-limiting and lands it exactly when the model has lost the thread. |
 
 ---
+
+## Round 24 — the live A/B that caught Lever 1 as a regression (build 46)
+
+Followed through on Round 23's "not yet validated" with a **same-session paired
+A/B** (the ROADMAP 2.4 recipe: `git checkout <ref>` between arms, same fixture,
+same loaded model — controls for the non-stationarity D75 warns about). Fixture:
+`sync_classes.py` with an **empty `with`-block** (an IndentationError — the exact
+bug class the user reported). Task: "fix so `py_compile` succeeds." Model:
+gemmacoder12 (the reported model, already loaded). n=5 per arm, scored on
+compile-PASS + no content duplication + clean stop.
+
+| arm | build | fixed | duplicated | finish |
+|---|---|---|---|---|
+| control | 42 | **5/5** | 0/5 | clean stop |
+| levers | 45 | **0/5** | 0/5 | clean stop |
+| corrected | 46 | **5/5** | 0/5 | clean stop |
+
+**Build 45 (all three levers) turned a 100%-fix into a 0%-fix.** The culprit was
+Lever 1 (build 43). This is an *indentation* fix, and `edit_file` is content-
+anchored: it PRESERVES the file's existing indentation, so an indent-only change
+collapses to a no-op and is rejected (the 1.5/1.6 mechanism). `replace_lines` is
+the *correct* tool for it — and control proved it, fixing 5/5 with replace_lines
+in 4/5 runs. Lever 1's "LAST-RESORT — PREFER edit_file" blanket demotion drove
+the model onto the one editor that structurally cannot fix an indent bug; it
+looped on no-op edits and fixed nothing. The cruel irony: the user's original bug
+was *also* an indentation fix, so the lever hurt exactly what it meant to help.
+
+**Fix (build 46).** edit_file's description now states it cannot make an
+indentation-only change and routes such fixes to replace_lines; replace_lines
+reads as the RIGHT tool for indentation/whitespace (not a demoted last resort)
+while keeping the stale-line-number / duplication warning. Re-ran the arm: 5/5
+fixed, back to control parity. **Levers 2 and 3 fired on all 5 corrected runs**
+(verify-gate "unverified edits" + the build-42 "repeated edit" nudge) **without
+breaking the fix — confirmed harmless; Lever 1 was the sole regressor.**
+
+No arm ever duplicated content — the original unbounded-duplication failure did
+not reproduce on gemmacoder12 in *any* arm this session (non-stationarity; the
+build-42 guard is the backstop for when it does). And note all three arms
+"finish" by repeat-stop after landing the fix, not a clean self-terminated done
+— the known solved-then-repeat-stop pattern (1.7/r15), orthogonal to these levers.
+
+| # | Decision | Why |
+|---|---|---|
+| D80 | A behavior-shaping change (tool descriptions, nudges) MUST be validated with a live paired A/B before it's trusted, not just a green unit suite | Lever 1 passed 605 unit tests and looked obviously good, yet a 5-run A/B showed it converted 5/5→0/5 on its target bug class. Unit tests prove the mechanism fires; only a live run on the real model shows the *net behavioral effect*. Extends D77. |
+| D81 | edit_file cannot fix indentation — route indent/whitespace fixes to replace_lines, never away from it | edit_file preserves existing indentation by design (1.5/1.6), so an indent-only edit is always a no-op. Steering weak models off replace_lines for these is actively harmful; the description must send them TO it. |
+
+---

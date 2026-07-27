@@ -150,7 +150,11 @@ are user-visible and waste whole generations.*
   means the harness git-checkouts between runs (fragile if interrupted, and the
   working tree must be clean), *or* it shells two worktrees, *or* runs pin a seed
   (Metal non-determinism makes seed-pinning only partial). Needs a decision on
-  which before building.
+  which before building. **Recipe paid off again in Round 24 (2026-07-26):** the
+  manual 3-arm A/B (build 42 / 45 / 46, n=5 each) caught Lever 1 turning a 5/5
+  fix into 0/5 — invisible to the 605-green unit suite. Each arm was ~10-12 min of
+  gemmacoder12 wallclock; the sequential-checkout recipe worked cleanly. That
+  cost/value ratio is the argument for automating this (D80).
 
 ## Milestone 4 — Interactive usability
 *User feedback 2026-07-24: "still very cumbersome to use locode with local
@@ -231,15 +235,22 @@ the lived experience.*
   is legible. +1 loop test (597 green). LOG Round 22. *This corrects the Round 20
   claim that residual edit-flailing was all capability-bound — I had only mined
   FAILED edits; this is a SUCCEEDING-but-non-converging loop, a real harness gap.*
-- `[x]` **4.10 Three anti-cycling levers on top of 4.9 (builds 43-45,
-  2026-07-26).** 4.9 catches the loop *after* it starts; these attack the causes.
-  User asked "why do these models repeat and cycle — can we add nudges to
-  remember what it did after each edit," then approved all three:
-  - **Steer off line-numbers (build 43).** Weak models pick their editor from the
-    tool descriptions. `edit_file` (content-anchored, can't drift) now reads as
-    "the PREFERRED editor"; `replace_lines` reads as "LAST-RESORT — PREFER
-    edit_file", spelling out that line numbers go STALE and a repeat DUPLICATES
-    content. Prevents the 4.9 loop up front instead of catching it. +2 guard tests.
+- `[x]` **4.10 Three anti-cycling levers on top of 4.9 (builds 43-46,
+  2026-07-26, live-A/B validated).** 4.9 catches the loop *after* it starts;
+  these attack the causes. User asked "why do these models repeat and cycle — can
+  we add nudges to remember what it did after each edit," then approved all three.
+  **A same-session paired A/B on gemmacoder12 (LOG Round 24) then caught Lever 1
+  as a regression and the fix restored parity — see the build-46 note.**
+  - **Steer off line-numbers → corrected to *route indent fixes to* replace_lines
+    (build 43, fixed build 46).** Weak models pick their editor from the tool
+    descriptions. The build-43 version demoted `replace_lines` ("LAST-RESORT —
+    PREFER edit_file") — which **backfired**: an indentation fix (the user's own
+    bug class) *needs* replace_lines because edit_file preserves indentation and
+    no-ops an indent-only change (1.5/1.6). The A/B measured it: control 5/5 fixed
+    vs build-45 **0/5**. Build 46 inverts it: edit_file's description says it
+    cannot do an indentation-only change and points those fixes at replace_lines;
+    replace_lines reads as the RIGHT tool for indentation/whitespace (keeping the
+    stale-numbers/duplication warning). Re-ran → **5/5**, back to parity.
   - **Verify-gate (build 44).** The deeper fault is *open-loop editing*: edit,
     never run or re-read, edit again, never learn if it worked. New per-file gate
     (`agent.max_unverified_edits`, default 3) counts consecutive mutating edits
@@ -250,9 +261,9 @@ the lived experience.*
     edit or the verify-gate), it now prepends a terse turn recap — "So far this
     turn you have: edited f.py 5×, run a check 1× (still not green)." Selective by
     construction (only those already-gated moments), so no context bloat / JSON
-    corruption. +2 tests. Suite 605 green. **Next:** validate the trio on a live
-    gemmacoder12/qythos9 session and an eval sweep (offline metrics can't see a
-    converging loop — 4.9's lesson).
+    corruption. +2 tests. Suite 605 green. **Levers 2+3 fired on all 5 corrected
+    (build-46) A/B runs without breaking the fix — confirmed harmless; Lever 1
+    was the sole regressor (D80/D81).**
 - `[x]` **4.8 Turn-ending legibility is data-confirmed closed (2026-07-25).**
   Categorized all 147 recent turn-endings by what the *user actually sees*: 46%
   prose answer, 36% clean-stop with a legible reason, 15% short claim ("All tests
