@@ -644,27 +644,31 @@ class AgentLoop:
                 # waste.
                 batch_sig = tuple(_call_sig(c) for c in calls)
                 seen_result, seen_streak = repeat_streaks.get(batch_sig, (None, 0))
+                # [first-repeat-plan-finish] A redundant (already-seen) update_plan
+                # on a plan whose tasks are ALL done is a weak model signalling
+                # completion the only way it knows — re-stating its finished plan
+                # instead of stopping. This case is tight enough to finish on the
+                # FIRST repeat (seen_streak >= 1) rather than waiting for the
+                # general repeat-stop's max_repeat_calls-1 identical calls: every
+                # call an update_plan AND the plan fully complete AND this exact
+                # batch already emitted once. Finishing here is honest (the model's
+                # own plan says done) and avoids both an extra spin and the
+                # repeat-stop's failure-toned "repeated … without making progress"
+                # on work that in fact landed. Measured live (2026-07-27): gemma
+                # does a 2-call restate on already-correct AND rename-across-files —
+                # build 53 caught only the 3-call variant. The FIRST plan-completing
+                # update_plan (seen_streak 0) still passes through: a real final
+                # summary may follow it.
+                if (seen_streak >= 1
+                        and all(c.name == "update_plan" for c in calls)
+                        and self.plan.complete):
+                    self._on_event({
+                        "phase": "info",
+                        "text": "all planned tasks complete — finishing "
+                                "(model re-stated its finished plan)",
+                        "plan": self.plan.summary()})
+                    return "All planned tasks are complete.\n\n" + self.plan.render()
                 if seen_streak >= self._cfg.agent.max_repeat_calls - 1:
-                    # A redundant (already-seen) update_plan on a plan whose tasks
-                    # are ALL done is a weak model signalling completion the only
-                    # way it knows — re-stating its finished plan instead of
-                    # stopping. Finishing here is honest (the model's own plan says
-                    # done) and avoids the repeat-stop's failure-toned "repeated …
-                    # without making progress" on work that in fact landed
-                    # (measured live: gemmacoder12 rename-across-files, 2026-07-27 —
-                    # both files renamed and verified `30`, plan 3/3, then it
-                    # re-emitted the identical 3/3 plan and got a failure-sounding
-                    # stop). Gated on a genuine repeat (seen_streak) so the FIRST
-                    # update_plan that completes the plan still passes through — a
-                    # real final summary may follow it.
-                    if (all(c.name == "update_plan" for c in calls)
-                            and self.plan.complete):
-                        self._on_event({
-                            "phase": "info",
-                            "text": "all planned tasks complete — finishing "
-                                    "(model re-stated its finished plan)",
-                            "plan": self.plan.summary()})
-                        return "All planned tasks are complete.\n\n" + self.plan.render()
                     if batch_sig not in nudged_repeat:
                         nudged_repeat.add(batch_sig)
                         # "Try something different" is too vague for a weak model

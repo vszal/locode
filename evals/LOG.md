@@ -2106,3 +2106,48 @@ the existing D81 indent-preservation / indent-only-noop logic, and it helps only
 (qythos9 already robust) — so D84-lower value. Deferred to a SUPERVISED session, not cut into
 the edit-semantics core overnight. This is a structural-family lever (fixes without needing
 the weak model to read text), which is why it's worth recording rather than discarding.
+
+---
+
+## Round 33 — build 54: plan-restate finish fires on the FIRST repeat (D89 dormant again)
+
+The `already-correct` case (nothing-to-fix path) surfaced the flail I built build 53
+for, one step earlier. qythos9 is clean (verify → finish, 3it, no edit, r0). gemma
+flails on the done task in two non-stationary shapes (both done=Y — output stays
+correct, so no corruption):
+
+- **pass8 (plan-restate):** read → bash verify (True False) → update_plan[x] →
+  update_plan[x] identical 🔁 → self-terminate. Build 53's guard needs
+  max_repeat_calls-1 (=2) identical calls; gemma restates only ONCE, so build 53
+  MISSES the common 2-call variant and the redundant call gets flagged (r1, PROBLEM).
+
+### Build 54 — fire the plan-complete finish on the first repeat
+Hoisted the plan-complete clean-finish out of the `seen_streak >= max_repeat_calls-1`
+gate to fire at `seen_streak >= 1` (marker `[first-repeat-plan-finish]`). Still triple-
+gated — every call an update_plan AND plan.complete AND already emitted once — so the
+FIRST plan-completing update_plan (streak 0) still passes through (a real summary may
+follow). Strictly a narrower/earlier version of build 53's shipped guard. Unit test
+`test_completed_plan_finishes_on_first_restate` scripts a THIRD sentinel turn that is
+only reached if we did NOT finish at the first restate, and asserts it never surfaces —
+so it fails on build 53 and passes on build 54. Suite 652 green.
+
+### A/B: DORMANT again (D89) — non-stationary flail shape
+ab_firstrepeat (gemma × already-correct × 3, stash-toggle loop.py, marker
+`first-repeat-plan-finish`). CONTROL == TREATMENT exactly: 3/3 repeat-stop, done=Y,
+5it, r1. Read the treatment transcript (D87/D89): minutes after pass8, same code,
+gemma's flail SHAPE had changed — it re-ran the identical PASSING bash verify twice
+(no update_plan at all, no plan created) → repeat-stop. My guard correctly did NOT
+fire (repeated call is bash, plan not complete). So the plan-restate path was dormant
+this session and the aggregate can neither credit nor fault build 54. Committed on the
+directly-observed pass8 transcript + units + no-regression — same discipline as build
+53, whose A/B was dormant for the same reason.
+
+### New observation (deferred): bash-rerun-on-a-done-task → failure-toned stop
+The A/B surfaced a SECOND shape of the same north-star problem: gemma verifies the
+correct answer (bash → True False), then re-runs the byte-identical passing check and
+hits the repeat-stop, whose "repeated … without making progress" message reads as a
+FAILURE on work that in fact landed (done=Y). Unlike the plan-restate, this has NO
+clean fix: with no plan there's no completion signal locode can trust, and a repeated
+passing bash is ambiguous (benign re-verify vs genuinely stuck). The deeper root is
+that gemma sometimes skips planning entirely, leaving locode blind to completion.
+Deferred for a supervised session; qythos9 (the workhorse) plans and finishes cleanly.

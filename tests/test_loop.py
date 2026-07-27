@@ -2044,6 +2044,26 @@ async def test_incomplete_plan_restated_does_not_early_finish(tmp_path):
     assert "All planned tasks are complete" not in out
 
 
+async def test_completed_plan_finishes_on_first_restate(tmp_path):
+    # gemmacoder12 already-correct AND rename-across-files, measured 2026-07-27:
+    # the common shape is a TWO-call restate — the model completes its plan, then
+    # re-emits the identical finished plan exactly once before self-terminating
+    # (build 53's guard only caught the 3-call variant, so this benign-but-noisy
+    # spin still got flagged). The clean-finish must fire on the FIRST repeat.
+    # Script a third, distinct assistant message that is only ever reached if we
+    # DID NOT finish at the first restate: its sentinel must not surface.
+    done = ["[x] Rename in models.py", "[x] Rename in views.py", "[x] Verify"]
+    loop = make_loop(tmp_path, [
+        native_call("update_plan", tasks=done),
+        native_call("update_plan", tasks=done),
+        {"role": "assistant", "content": "SENTINEL-THIRD-TURN"}])
+    out = await loop.run_turn("rename get_user to fetch_user")
+    assert loop.plan.complete
+    assert "All planned tasks are complete" in out
+    assert "SENTINEL-THIRD-TURN" not in out  # finished before consuming turn 3
+    assert "without making progress" not in out
+
+
 # --- repeated mutating edit (gemmacoder12 duplicating-replace loop) -----------
 async def test_repeated_mutating_edit_stops_despite_varying_echo(tmp_path):
     # gemmacoder12, user-reported: the model re-issues a byte-IDENTICAL
