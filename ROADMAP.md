@@ -117,6 +117,13 @@ are user-visible and waste whole generations.*
   can actually complete instead of staying open and jamming the completion gate.
   Gated on all-keys-marked so an ordinary object isn't mistaken for a plan.
   +2 plan tests (541 green).
+- `[x]` **1.7c update_plan word-value reset (build 51, 2026-07-27)** — 1.7b let the
+  *value* win, but only when it was a single-char/known marker. r27 qythos9 sent
+  **word** values — `{"[x] Create primes.py": "finished"}` — and "finished" wasn't
+  in `_MARKERS`, so the recovery discarded the key's `[x]` and reset every task to
+  open → plan stuck `0/N` → open-tasks nudge drove a green, finished task to a
+  repeat-stop. Fix: status synonyms + `status_marker_for()`, and fall back to the
+  KEY's marker when the value is unintelligible. See 4.14. +4 tests (641 green).
 
 ## Milestone 2 — Eval-harness trustworthiness
 *The gate must catch real regressions without crying wolf on noise.*
@@ -281,6 +288,30 @@ the lived experience.*
     Left plan.py:156 **unchanged** — it was not the lever; the plan mark honestly
     reflected the model's (wrong) belief, which the verify gate now corrects at
     source. LOG Round 27.
+- `[x]` **4.14 The "open plan tasks" re-do loop — two root causes (2026-07-27).**
+  Same symptom both times: qythos9 flails to a **repeat-stop re-doing a GREEN,
+  finished `add-test` task** because the plan never reads complete, so the
+  open-tasks nudge fires forever. Found by reading pass3 + ab_plandict transcripts
+  (D87). Full method in LOG Rounds 28–29.
+  - **build 51 (9249bdf):** `update_plan` `{task: status}` recovery reset every
+    task to OPEN when the dict *value* was an unrecognized status word — qythos9
+    sent `{"[x] Create primes.py": "finished"}`, "finished" wasn't in `_MARKERS`,
+    so the key's `[x]` was discarded and the plan stuck at `0/N` forever. Fix:
+    finished/complete/completed/not-started/in_progress/started synonyms; new
+    `status_marker_for()`; when the value is unintelligible, KEEP the key's own
+    marker. Extends 1.7b. `ab.py` now toggles comma-separated multi-file changes.
+  - **build 52 (23e440d):** on CLEAN-array plans the model runs the suite green
+    then narrates "All tests pass" **without** marking its `[>] run pytest and
+    verify` task done → plan stuck `2/3` → nudge → re-runs the passing tests. Fix:
+    before the open-tasks nudge, if a green pytest result already appeared this
+    turn AND the current task is run/verify-tests-shaped (`_VERIFY_TASK_RE`,
+    verb-gated so "Create test_primes.py" is excluded), `Plan.complete_current()`
+    credits it. Misfire is benign by construction (real green + a run-tests task).
+  - Both A/Bs were **dormant** (D89: non-stationary trigger no-showed; the build-52
+    session was wall-budget-heavy) but showed **no regression**; the fixes rest on
+    the directly-observed transcripts + tests (641 / 646 green). **D88: a plan
+    done-counter stuck at zero is a loop bug, not cosmetic. D89: a dormant-path A/B
+    is neutral — confirm the fixed path fired before crediting/faulting the numbers.**
 - `[x]` **4.12 Session observability: see a run as the user sees it on screen
   (2026-07-26).** Prompted by the user: "I'm unclear what you can *see* of locode
   as a CLI tool ... I'm seeing a lot of repeats and failed tool calls and I'm
