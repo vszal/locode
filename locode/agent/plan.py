@@ -37,10 +37,12 @@ DONE = "done"
 # state, so accept every spelling seen in practice and treat anything
 # unrecognized as "not started".
 _MARKERS = {
-    "x": DONE, "X": DONE, "done": DONE, "v": DONE, "✓": DONE, "✔": DONE,
+    "x": DONE, "X": DONE, "done": DONE, "finished": DONE, "complete": DONE,
+    "completed": DONE, "v": DONE, "✓": DONE, "✔": DONE,
     ">": DOING, "doing": DOING, "~": DOING, "-": DOING, "*": DOING,
-    "in progress": DOING, "wip": DOING,
-    "": TODO, " ": TODO, "todo": TODO, "pending": TODO, "o": TODO,
+    "in progress": DOING, "in_progress": DOING, "started": DOING, "wip": DOING,
+    "": TODO, " ": TODO, "todo": TODO, "to do": TODO, "not started": TODO,
+    "not_started": TODO, "pending": TODO, "o": TODO,
 }
 
 _MARKER_RE = re.compile(r"^\s*\[([^\]]{0,12})\]\s*(.*)$", re.DOTALL)
@@ -151,6 +153,21 @@ def has_status_marker(text: str) -> bool:
     if not m:
         return False
     return m.group(1).strip().lower() in _MARKERS
+
+
+def status_marker_for(word: str) -> str | None:
+    """Canonical marker char (`x` / `>` / ` `) for a status word or char, or
+    None when it isn't a status this module recognizes.
+
+    Lets the update_plan tool interpret the *values* of a `{task: status}` dict
+    the model sometimes sends (values like "finished", "in progress", "done").
+    When this returns None the value is unintelligible, and the caller should
+    fall back to whatever marker the task's key already carries rather than
+    silently resetting the task to open."""
+    status = _MARKERS.get(word.strip().lower())
+    if status is None:
+        return None
+    return {DONE: "x", DOING: ">"}.get(status, " ")
 
 
 def strip_status_marker(text: str) -> str:

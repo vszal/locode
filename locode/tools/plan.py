@@ -18,6 +18,7 @@ from locode.agent.plan import (
     MAX_TASKS,
     Plan,
     has_status_marker,
+    status_marker_for,
     strip_status_marker,
 )
 from locode.tools.base import ToolContext, ToolResult
@@ -69,18 +70,25 @@ class UpdatePlan:
             # {task_text: status} — the model marked the keys AND repeated the
             # status in the values. Measured 2026-07-25 (qythos9 exec-bugfix):
             # sent {"[ ] Run tests": "done", "[>] Fix wrap": "in progress"}. The
-            # key's marker and the value disagree; the value is the live intent,
-            # so let it win — otherwise "Run tests" stays open forever and the
-            # completion gate never lets the turn finish. Gated on every key
+            # key's marker and the value can disagree; the value is the live
+            # intent, so let it win *when we can read it*. Gated on every key
             # already looking like a task line, so an ordinary object can't be
             # mistaken for a plan.
+            #
+            # But an unintelligible value word must NOT reset the task to open —
+            # measured 2026-07-27 (qythos9 add-test): the model sent
+            # {"[x] Create primes.py": "finished", ...}, "finished" wasn't a
+            # recognized status, every task got slammed back to "[ ]", the plan
+            # read 0/N done forever, and the "open plan tasks" nudge drove a
+            # green, finished task into a repeat-stop. So: value wins if it maps
+            # to a status; otherwise keep the marker the key already carries.
             rebuilt = []
             for k, v in raw.items():
-                text = strip_status_marker(str(k))
-                marker = str(v).strip() if isinstance(v, str) else ""
-                if not (marker and has_status_marker(f"[{marker}] x")):
-                    marker = " "
-                rebuilt.append(f"[{marker}] {text}")
+                val_marker = status_marker_for(v) if isinstance(v, str) else None
+                if val_marker is not None:
+                    rebuilt.append(f"[{val_marker}] {strip_status_marker(str(k))}")
+                else:
+                    rebuilt.append(str(k))  # trust the key's own marker
             raw = rebuilt
         if isinstance(raw, str):
             # Models sometimes send a newline-joined string instead of an array.

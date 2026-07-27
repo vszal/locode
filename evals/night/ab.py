@@ -67,7 +67,9 @@ def summarize(rows: list[dict], arm: str) -> dict:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--fix-file", required=True, help="repo-relative path to toggle")
+    ap.add_argument("--fix-file", required=True,
+                    help="repo-relative path(s) to toggle; comma-separated for a "
+                         "multi-file change")
     ap.add_argument("--marker", required=True,
                     help="substring present only in the treatment version")
     ap.add_argument("--cases", default="indent-bug,undefined-vars,new-module")
@@ -78,10 +80,13 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--max-wall", type=int, default=180)
     a = ap.parse_args(argv)
 
-    fix = ROOT / a.fix_file
-    has_marker = lambda: a.marker in fix.read_text()
+    fix_files = [f.strip() for f in a.fix_file.split(",") if f.strip()]
+    fixes = [ROOT / f for f in fix_files]
+    # The marker lives in exactly one of the files; the change is "present" when
+    # any toggled file still carries it, "removed" when none do.
+    has_marker = lambda: any(a.marker in f.read_text() for f in fixes)
     if not has_marker():
-        print(f"ERROR: --marker not in working-tree {a.fix_file}; apply the change first.")
+        print(f"ERROR: --marker not in any working-tree {fix_files}; apply the change first.")
         return 2
 
     cases = [c for c in a.cases.split(",") if c in B.CASES]
@@ -94,7 +99,7 @@ def main(argv: list[str]) -> int:
     all_rows: list[dict] = []
     for rep in range(1, a.reps + 1):
         print(f"\n=== rep {rep}/{a.reps} ===")
-        _git("stash", "push", "-q", "--", a.fix_file)  # CONTROL: change removed
+        _git("stash", "push", "-q", "--", *fix_files)  # CONTROL: change removed
         if has_marker():
             print("WARN: stash did not remove the change; skipping rep to stay honest")
             if _git("stash", "list"):

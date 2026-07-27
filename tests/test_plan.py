@@ -260,6 +260,70 @@ async def test_tool_recovers_a_task_to_status_dict():
     assert plan.tasks[0].text == "Run tests to see failures"
 
 
+async def test_tool_recovers_task_status_dict_with_synonym_values():
+    """The r27 qythos9 add-test shape: {"[x] ...": "finished", ...}. "finished"
+    is a done-synonym the marker table didn't used to know, and the old code
+    reset every such task to open — the plan read 0/N done forever, the "open
+    plan tasks" nudge fired, and a green, finished task was driven into a
+    repeat-stop. The synonym must now count as done, so the plan completes."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": {
+            "[x] Create primes.py with is_prime": "finished",
+            "[x] Create test_primes.py with pytest cases": "finished",
+            "[x] Run the tests and confirm they pass": "finished",
+        }},
+        make_ctx(plan))
+    assert res.ok
+    assert len(plan.tasks) == 3
+    assert all(t.status == DONE for t in plan.tasks)
+    assert plan.complete
+    assert "All tasks are done" in res.content
+
+
+async def test_tool_falls_back_to_key_marker_when_value_unintelligible():
+    """When the value word maps to no known status, the task keeps the marker
+    its own key already carries rather than silently resetting to open. Here the
+    keys say done/doing/open and the garbage values must not overwrite them."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": {
+            "[x] first task": "gibberish",
+            "[>] second task": "???",
+            "[ ] third task": "",
+        }},
+        make_ctx(plan))
+    assert res.ok
+    assert [t.status for t in plan.tasks] == [DONE, DOING, TODO]
+
+
+async def test_tool_value_still_wins_over_key_when_recognized():
+    """The original r16 guarantee is preserved: a recognized value overrides the
+    key's (possibly stale) marker."""
+    plan = Plan()
+    res = await UpdatePlan().run(
+        {"tasks": {
+            "[ ] Run tests": "finished",   # stale open key, fresh done value
+            "[x] Fix the bug": "in progress",  # stale done key, fresh doing value
+        }},
+        make_ctx(plan))
+    assert res.ok
+    assert [t.status for t in plan.tasks] == [DONE, DOING]
+
+
+def test_status_marker_for_maps_words_and_chars():
+    from locode.agent.plan import status_marker_for
+    assert status_marker_for("finished") == "x"
+    assert status_marker_for("done") == "x"
+    assert status_marker_for("x") == "x"
+    assert status_marker_for("in progress") == ">"
+    assert status_marker_for("doing") == ">"
+    assert status_marker_for("pending") == " "
+    assert status_marker_for("not started") == " "
+    assert status_marker_for("banana") is None
+    assert status_marker_for("") == " "  # empty is an explicit TODO marker
+
+
 async def test_tool_does_not_mistake_an_ordinary_object_for_a_plan():
     """The {task: status} recovery is gated on every key looking like a task
     line. A dict whose keys are NOT marked task lines must not be silently

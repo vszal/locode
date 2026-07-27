@@ -1840,3 +1840,64 @@ induced). **Zero false-fire on qythos9** in 20 runs. +6 tests, suite 637 green.
 |---|---|---|
 | D86 | **Confident false-completion is a third pathology, orthogonal to flail** — and it's caught by *forcing verification*, not by clearer text or plan-message edits. | The `syntax-fix` false-completion has zero flail signature (clean "answered", `f0 n0 r0`); only the real check sees it. Unlike D84's flail (which ignores clearer text), this DOES yield to a structural gate that makes the model run the check it claimed — the model, once it *sees* the SyntaxError, fixes it 4/5. The gate is prevention-class (D82): it stops a confidently-wrong final answer, the worst outcome for pain #1. |
 | D87 | **Read the transcript before naming the root cause.** | The false-completion looked like a plan-tool defect (plan.py:156 "give your final answer now") from the counters alone; the transcript showed the model had hallucinated the verify — a completely different lever. Had I "fixed" plan.py I'd have shipped to the wrong module. Same lesson that a corrupting A/B data point (the list-cmd crash) was only caught by reading the run, not the aggregate. |
+
+## Round 28 (2026-07-27) — plan `{task: status}` done-miscount → 0/N-forever loop
+
+### pass3 (32-run battery, build 50): the verify-gate holds, no regression
+Read the transcripts (D87) rather than the counters. `syntax-fix gemma` flipped
+from the Round-27 clean false-completion (3it) to a `done=N` **repeat-stop** (7it
+f3 n3 r2) — but the verify-gate is *not* implicated: the model never reaches a
+"compiles" claim. It **misdiagnoses** the bug (calls line 2's valid
+`line.split(',')` a "trailing comma error", never sees line 1's missing colon),
+tries to `replace_lines` a line with identical text, and loops on the no-op until
+the repeat-stop guard catches it. Pure capability/diagnosis miss (D84/D75) — the
+build-50 gate's A/B win stands untouched.
+
+### The real find: `update_plan` reset every task to open on a word-value
+`add-test qythos9` in pass3 flailed 16it r5 to a repeat-stop — on a **green,
+finished** task. Transcript: the model sent the `{task: status}` dict shape with
+**word values** — `{"[x] Create primes.py": "finished", ...}`. The tool's
+`{task:status}` recovery (tools/plan.py) checked `has_status_marker("[finished] x")`,
+which is false (`_MARKERS` knew `done` but not `finished`), so it **discarded the
+key's correct `[x]` and reset the task to `[ ]` open**. Plan read `0/3 done`
+forever → the "open plan tasks" nudge fired every turn → qythos9 re-wrote the
+already-correct files → repeat-stop. A done-counter stuck at zero converts a
+solved task into an infinite loop.
+
+**Fix (build 51):** (1) `_MARKERS` gained `finished`/`complete`/`completed`/`not
+started`/`in_progress`/`started` synonyms; (2) new `status_marker_for(word)`
+helper; (3) structurally, when the dict **value** maps to no known status, keep
+the marker the **key** already carries instead of resetting to open — the value
+still wins when it *is* recognized (preserves the r16 disagree-case guarantee).
++4 tests (exact pass3 shape reproduced), suite 641 green.
+
+### A/B: neutral (dormant path), not negative — read before concluding (D87)
+Paired stash-toggle A/B (`--fix-file locode/tools/plan.py,locode/agent/plan.py`,
+`--marker "trust the key's own marker"`, add-test × 2 models × 3 reps). Aggregate
+looked *worse* for treatment (done 6=6, iters 4.0→7.3, repeat-stops 0→1). The
+transcripts explain it: **neither arm emitted the dict shape this session** (0
+runs with `': '` plan values) — both used clean arrays and the plan counted fine
+(`0/3→2/3`). So build-51's code path was **dormant in both arms**; the iter gap
+is 100% non-stationarity (D75), not the fix. The fix stands on its unit tests +
+the transcript-confirmed pass3 reproduction. ab.py extended to toggle multiple
+comma-separated files (harness only, no build bump).
+
+### NEW pathology surfaced by the same transcripts (next target)
+Even with clean-array plans, qythos9 loops on the **last** task: it does the work
+(`pytest → 4 passed`, plan `2/3 done`) but narrates "All tests pass" in prose
+**without calling update_plan to mark the final task `[x]`**. The `_nudge_open_tasks`
+nudge says "Continue with: Run pytest and verify — do the work now", whose escape
+hatch is worded for *unnecessary/impossible* tasks, not *already-completed* ones —
+so the model **re-runs the passing tests** (repeat) instead of marking done. This
+reproduced in **both** A/B arms this session (rT2, rC2), so it's the better-
+supported next target. Fix candidate: when a green test already appeared this turn
+and the sole open task is a verify/test task, either auto-mark it done (best for
+visibility → plan shows 3/3) or reword the nudge to "tests already passed — mark
+this done and answer, don't re-run." Structural (auto-complete) preferred over
+nudge-wording per D84. Needs its own reproduce→design→A/B.
+
+### Decisions
+| # | Decision | Why |
+|---|---|---|
+| D88 | **A "done" counter stuck at zero is a loop bug, not a cosmetic one.** A plan that can never reach complete turns the "open tasks" nudge into a perpetual-motion machine on already-finished work. | Two distinct plan miscounts (the r22 truncated-array, now the r28 word-value reset) both produced infinite re-do loops. Any recovery path that can't preserve a *done* status is a turn-killer — treat the plan's done-count as correctness-critical, not advisory. |
+| D89 | **A neutral A/B (dormant code path) is not a failed A/B — verify the path was exercised before reading the aggregate.** | Build-51's A/B looked negative until the transcripts showed neither arm hit the changed code. Non-stationary triggers mean the pathology you're fixing may simply not recur that session; the aggregate then measures only noise. Confirm the fixed path fired (here: grep the plan values) before crediting *or* faulting the numbers. |
