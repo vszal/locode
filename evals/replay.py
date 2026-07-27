@@ -82,6 +82,20 @@ def classify_result(content: str, is_error: bool) -> str:
 # can learn from, or a guard save). Used only for the "no-op" verdict count.
 _NOOP_CATS = {"noop", "identical"}
 
+# Tools that change workspace state. A *successful* one is real forward
+# progress, so it clears the repeat-tracking set: re-issuing a previously-seen
+# call after a successful edit is legitimate re-verification (e.g. reproduce a
+# crash → fix → re-run the same command to confirm green), not spinning. A
+# pathological repeat is re-issuing a call with NO successful mutation between.
+# Failed edits (error=True) do NOT clear, so genuine edit-match-miss loops stay
+# flagged.
+_MUTATING_TOOLS = {"write_file", "append_file", "move_file", "edit_file",
+                   "replace_lines"}
+
+
+def _cleared_by_mutation(ev: dict) -> bool:
+    return ev.get("name") in _MUTATING_TOOLS and not ev.get("error")
+
 
 def call_key(ev: dict) -> tuple:
     """Canonical identity of a tool call, for repeat detection: name + args with
@@ -133,6 +147,8 @@ def summarize(events: list[dict]) -> dict:
                 fails += 1
                 if cat in _NOOP_CATS:
                     noops += 1
+            if _cleared_by_mutation(ev):
+                seen_keys.clear()
         elif ph == "nudge":
             nudges[ev.get("reason", "?")] += 1
         elif ph == "denied":
@@ -238,6 +254,8 @@ def transcript_lines(events: list[dict], *, color: bool = False) -> list[str]:
             if tag:
                 row += "  " + _c(f"[{tag}]", "\033[36m", color)
             lines.append(row)
+            if _cleared_by_mutation(ev):
+                seen_keys.clear()
         elif ph == "nudge":
             lines.append(f"{t:7.1f}s " + render.format_nudge(ev.get("reason", ""), color=color))
         elif ph == "denied":

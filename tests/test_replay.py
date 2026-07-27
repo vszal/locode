@@ -110,6 +110,52 @@ def test_summarize_clean_run_has_no_flags():
     assert s["stop_reason"] is None
 
 
+# --- repeat vs. legitimate re-verification ------------------------------------
+def test_successful_mutation_clears_repeat_tracking():
+    # reproduce a crash → fix → re-run the SAME command to verify. The second
+    # bash is byte-identical but a successful edit changed the file between them,
+    # so it is legitimate verification, NOT a spin.
+    events = [
+        _run("bash", cmd="python3 report.py"),
+        _result("bash", "KeyError: 'amount'", error=True),   # reproduce (fail is real)
+        _run("edit_file", path="report.py", old="a", new="b"),
+        _result("edit_file", "edited report.py", error=False),  # progress → clears
+        _run("bash", cmd="python3 report.py"),               # verify, identical call
+        _result("bash", "12", error=False),
+    ]
+    s = replay.summarize(events)
+    assert s["repeats"] == 0            # the re-run is verification, not a repeat
+    assert s["fails"] == 1             # the deliberate crash-repro is still a fail
+
+
+def test_repeat_after_failed_edit_still_flags():
+    # a no-op/failed edit is NOT progress, so re-issuing the same command after it
+    # is a genuine spin and must stay flagged.
+    events = [
+        _run("bash", cmd="python3 sync.py"),
+        _result("bash", "still broken", error=True),
+        _run("edit_file", path="sync.py", old="a", new="a"),
+        _result("edit_file", "`new` is identical to `old`", error=True),  # no progress
+        _run("bash", cmd="python3 sync.py"),                 # genuine repeat
+        _result("bash", "still broken", error=True),
+    ]
+    s = replay.summarize(events)
+    assert s["repeats"] == 1
+
+
+def test_transcript_no_repeat_tag_across_successful_edit():
+    events = [
+        _run("bash", cmd="python3 report.py"),
+        _result("bash", "KeyError", error=True),
+        _run("edit_file", path="report.py", old="a", new="b"),
+        _result("edit_file", "edited report.py", error=False),
+        _run("bash", cmd="python3 report.py"),
+        _result("bash", "12", error=False),
+    ]
+    text = "\n".join(replay.transcript_lines(events, color=False))
+    assert "REPEAT" not in text
+
+
 # --- rendering smoke ----------------------------------------------------------
 def test_verdict_lines_surface_the_pathologies():
     s = replay.summarize([

@@ -1955,3 +1955,63 @@ gemmacoder12 capability flail (repeat-stops that still LAND — D84; gemma is no
 the workhorse); qythos9 near-spotless (only undefined-vars mild: 6it f1 r1). Net:
 builds 51+52 confirmed working live, no regression, and the "flailer=gemma,
 qythos9=clean" split from Round 27 holds.
+
+---
+
+## Round 30 — prompt-variety cases + a replay repeat false-positive (harness, no build bump)
+
+### 3 new battery cases (under-tested paths)
+All prior 8 cases were self-contained single-file edits. Added variety per the
+standing overnight instruction, each stressing a path nothing else exercised:
+- **read-before-edit** — the correct port lives in a *second* file (`config.py`);
+  the model must read it before editing `server.py`. (Nothing else forced a
+  cross-file read.)
+- **rename-across-files** — rename a symbol across `models.py` + `views.py`
+  (def + import + call), distinct from `refactor-rename` (single-file).
+- **fix-traceback** — a runtime `KeyError` (not syntax): run → read traceback →
+  fix `.get`. Distinct signal from `syntax-fix` (py_compile) and `add-test`
+  (pytest-green). Each check verified to pass-on-fix / fail-on-broken first.
+
+pass5 (both models, --max-iter 25 --max-wall 240): **qythos9 3/3 clean**,
+gemmacoder12 3/3 land correct output but with genuine repeat-flail (D84). Every
+one of the 6 runs got the right answer.
+
+### Finding: replay flagged a FLAWLESS run as flailing (visibility defect)
+`fix-traceback qythos9` did the textbook arc — read → `python3 report.py` (crash)
+→ edit → `python3 report.py` (verify `12`) — yet replay stamped it 🔁 1 repeat
+(→ PROBLEM via `_problem`, which trips on any repeat). The repeat detector had **no
+notion of intervening progress**: it flagged the identical verify-run even though a
+successful edit changed the file between the two calls. This is a defect in the #1
+north-star tool (visibility): a perfect run mislabeled as a spin pollutes triage
+(pass5 over-counted 4/6 problem rows).
+
+### Fix (evals/replay.py): a successful mutation clears the spin-tracking
+`_MUTATING_TOOLS = {write_file, append_file, move_file, edit_file, replace_lines}`.
+On a mutating result with `error=False`, `seen_keys.clear()` in both `summarize`
+and `transcript_lines`. Principle: a pathological repeat is re-issuing a call with
+**no successful mutation between**; re-running after real progress is legitimate
+re-verification. Failed/no-op edits (`error=True`) do NOT clear, so genuine
+edit-match-miss loops stay flagged. Audited on the undefined-vars gemma transcript:
+r4→r2 — the 2 dropped were legit re-runs after successful edits (one produced a
+*different* error, one went green), the 2 kept were real post-no-op spins the
+agent's own detector stopped on. +3 tests (clears-on-success, still-flags-after-
+failed-edit, transcript-no-tag), suite 649 green. No `__build__` bump (harness).
+
+### No product bug — the LOOP already gates on progress (loop.py:186)
+Checked whether the agent's own repeat detector shares this blind spot: it does
+NOT. `repeat_streaks` stores the last result per call signature and "only counts
+a repeat when the result is unchanged too" — so a `python3 x.py` that goes
+crash→`12` across a fix is never a stall to the loop. That's why fix-traceback
+qythos9 self-terminated with zero nudges. The gap was only in the observability
+tool. Note the two lenses differ by design: the **loop** (behavior) gates on
+call-signature + *result-unchanged*; **replay** (visibility) now gates on
+call-key + *intervening successful mutation*. They agree on every observed case;
+replay's version flags literal re-issues after no forward progress, and attributes
+edit-then-rerun-same-error to the fail/no-op counters rather than to repeats.
+
+### D90 — a repeat flag needs a progress denominator
+"Same call twice" is not a pathology; "same call twice with nothing accomplished
+between" is. Any repeat/loop detector must gate on intervening forward progress or
+it cries wolf on the correct reproduce→fix→verify pattern — the exact arc a good
+agent runs on a runtime bug. locode's loop already does this (result-gate); the
+replay tool now does too (mutation-gate).

@@ -174,6 +174,75 @@ def _case_add_test():
     return files, prompt, check
 
 
+def _case_read_before_edit():
+    # The correct value lives in ANOTHER file — the model must read config.py
+    # before editing server.py, not guess. Stresses read-then-edit.
+    files = {
+        "config.py": "PORT = 8080\nHOST = 'localhost'\n",
+        "server.py": ("def url():\n"
+                      "    return 'http://localhost:9090/api'\n"),
+    }
+    prompt = ("server.py hardcodes port 9090 in its url function, but the correct "
+              "port is the PORT value defined in config.py. Look at config.py to "
+              "find the right port, then update server.py so url returns a URL "
+              "using that port. Verify with python3 -c \"import server; "
+              "print(server.url())\" which should print http://localhost:8080/api.")
+    def check(w):
+        rc, out = _run_py(w, "import server; print(server.url())")
+        return (rc == 0 and out.strip() == "http://localhost:8080/api",
+                f"url={out.strip()!r}")
+    return files, prompt, check
+
+
+def _case_rename_across_files():
+    # A symbol used in TWO files: definition + import + call site. Single-file
+    # rename is already covered by refactor-rename; this needs grep/glob + edits
+    # that stay consistent across files.
+    files = {
+        "models.py": "def get_user(uid):\n    return uid * 10\n",
+        "views.py": ("from models import get_user\n\n"
+                     "def show(uid):\n"
+                     "    return get_user(uid)\n"),
+    }
+    prompt = ("Rename the function get_user to fetch_user everywhere it appears "
+              "across BOTH models.py and views.py — the definition, the import, and "
+              "the call site — keeping behavior identical. Nothing named get_user "
+              "may remain. Verify with python3 -c \"import views; "
+              "print(views.show(3))\" which should print 30.")
+    def check(w):
+        rc, out = _run_py(w, "import views; print(views.show(3))")
+        m = (w / "models.py").read_text()
+        v = (w / "views.py").read_text()
+        gone = "get_user" not in m and "get_user" not in v
+        renamed = "fetch_user" in m and "fetch_user" in v
+        return (rc == 0 and out.strip() == "30" and gone and renamed,
+                f"show(3)={out.strip()!r} get_user_gone={gone} renamed={renamed}")
+    return files, prompt, check
+
+
+def _case_fix_traceback():
+    # Crashes at RUNTIME (KeyError), not compile time — the model must run it,
+    # read the traceback, and fix. Different signal from syntax-fix (py_compile)
+    # and add-test (pytest green).
+    files = {"report.py": (
+        "def total(rows):\n"
+        "    return sum(r['amount'] for r in rows)\n\n"
+        "data = [{'amount': 5}, {'amount': 7}, {'cost': 3}]\n"
+        "print(total(data))\n")}
+    prompt = ("report.py crashes when you run it, because one row is missing its "
+              "amount. Run it to see the error, then fix the total function so a "
+              "row with no amount counts as zero instead of crashing. Verify with "
+              "python3 report.py, which should print 12.")
+    def check(w):
+        rc, out = _run_py(w, "import subprocess,sys;"
+                             "p=subprocess.run([sys.executable,'report.py'],"
+                             "capture_output=True,text=True);"
+                             "print('RC',p.returncode);print(p.stdout.strip())")
+        printed_12 = "\n12" in ("\n" + out) and "RC 0" in out
+        return (printed_12, f"out={out.strip()[:60]!r}")
+    return files, prompt, check
+
+
 CASES = {
     "logic-bug": _case_logic_bug,
     "indent-bug": _case_indent_bug,
@@ -183,6 +252,9 @@ CASES = {
     "refactor-rename": _case_refactor_rename,
     "syntax-fix": _case_syntax_fix,
     "add-test": _case_add_test,
+    "read-before-edit": _case_read_before_edit,
+    "rename-across-files": _case_rename_across_files,
+    "fix-traceback": _case_fix_traceback,
 }
 
 
