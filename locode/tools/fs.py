@@ -533,9 +533,11 @@ class MoveFile:
 class EditFile:
     name = "edit_file"
     description = (
-        "Replace text in a file. `old` is the exact text to replace (copy it "
-        "verbatim from the file — do NOT include the line-number prefixes that "
-        "read_file prints) and must match once unless replace_all is true. "
+        "The PREFERRED editor — content-anchored, so it can't drift the way "
+        "line-number edits do. Replace text in a file. `old` is the exact text "
+        "to replace (copy it verbatim from the file — do NOT include the "
+        "line-number prefixes that read_file prints) and must match once unless "
+        "replace_all is true. "
         "`new` is the REPLACEMENT and must DIFFER from `old` — it has to contain "
         "your actual change; an edit whose `new` equals `old` does nothing and is "
         "rejected. Keep `old` to the SMALLEST unique snippet that needs changing "
@@ -657,15 +659,19 @@ def try_replace_lines(text: str, start, end, new: str):
 class ReplaceLines:
     name = "replace_lines"
     description = (
-        "Replace a RANGE OF LINES in a file by their line numbers — the fallback "
-        "for when edit_file cannot match the text (a malformed line, odd "
-        "whitespace, or bytes you cannot reproduce exactly). `start` and `end` "
-        "are 1-based inclusive line numbers exactly as read_file prints them (do "
-        "NOT include the number prefixes in `new`). `new` is the replacement text "
-        "for that whole range; pass an empty string to DELETE the lines. Re-read "
-        "the file first to get current line numbers — a prior edit shifts every "
-        "line below it, so stale numbers hit the wrong place. Do NOT put a "
-        "trailing newline in `new` unless you mean to add a blank line."
+        "LAST-RESORT fallback — PREFER edit_file. Line numbers go STALE the "
+        "instant any edit shifts the file, so a repeated replace_lines with the "
+        "same start/end lands on DIFFERENT text each time and DUPLICATES "
+        "content. Only reach for this when edit_file genuinely cannot match the "
+        "text (a malformed line, odd whitespace, or bytes you cannot reproduce "
+        "exactly). Replaces a RANGE OF LINES by their line numbers. `start` and "
+        "`end` are 1-based inclusive line numbers exactly as read_file prints "
+        "them (do NOT include the number prefixes in `new`). `new` is the "
+        "replacement text for that whole range; pass an empty string to DELETE "
+        "the lines. ALWAYS re-read the file immediately before each call to get "
+        "current line numbers — a prior edit shifts every line below it, so "
+        "stale numbers hit the wrong place. Do NOT put a trailing newline in "
+        "`new` unless you mean to add a blank line."
     )
     permission = "ask"
     schema = {

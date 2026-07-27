@@ -523,3 +523,18 @@ async def test_replace_lines_missing_new_is_not_a_silent_delete(ctx, tmp_path):
     res = await fs.ReplaceLines().run({"path": "c.py", "start": 2, "end": 2}, ctx)
     assert res.is_error and "`new`" in res.content
     assert (tmp_path / "c.py").read_text() == "a\nb\nc\n"  # untouched
+
+
+def test_edit_file_is_advertised_as_preferred_content_anchored():
+    # Lever 1 (steer off line-numbers): weak local models pick tools by their
+    # descriptions, so edit_file must read as the default choice.
+    desc = fs.EditFile.description
+    assert "PREFERRED" in desc and "content-anchored" in desc
+
+
+def test_replace_lines_warns_about_stale_line_numbers():
+    # replace_lines must read as the last resort and warn that repeating it
+    # duplicates content — the exact failure the build-42 loop guard caught.
+    desc = fs.ReplaceLines.description
+    assert "PREFER edit_file" in desc
+    assert "STALE" in desc and "DUPLICATES" in desc
