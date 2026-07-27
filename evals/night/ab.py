@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
-"""Paired A/B for the silent-success bash signal (build 49).
+"""Generic paired A/B for a single-file behavior change (D75/D80).
 
-Controls for model non-stationarity (D75/D80) by toggling the ONE change via
-`git stash` and running control (stashed = build 48 "(no output)") and treatment
-(applied = build 49 "exit 0 — command succeeded") back-to-back per rep, so the
-two arms are adjacent in time. Reuses the battery's cases + scoring.
+Isolates ONE uncommitted change by toggling it with `git stash push -- <file>`:
+runs control (change stashed) and treatment (change present) back-to-back per
+rep so the two arms are adjacent in time and model non-stationarity cancels.
+The change must be UNCOMMITTED in the working tree when this starts.
 
-    python evals/night/ab_silentok.py --cases indent-bug,add-test \
+    python evals/night/ab.py --fix-file locode/tools/fs.py \
+        --marker "parses cleanly" --cases indent-bug,undefined-vars,new-module \
         --models gemmacoder12,qythos9 --reps 3
 
-The fix is expected to reduce repeat-stops / repeats on tasks whose verify step
-is a silent success (py_compile, quiet test) without regressing done-rate.
+--marker is a substring that is present ONLY in the treatment (working-tree)
+version of --fix-file; it's how each arm self-verifies it's testing what it
+thinks. Reuses run_battery's cases + scoring; reports done-rate, repeat-stops,
+total repeats, and avg iterations per arm.
 """
 
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,17 +29,10 @@ sys.path.insert(0, str(ROOT / "evals" / "night"))
 sys.path.insert(0, str(ROOT / "evals"))
 import run_battery as B  # noqa: E402
 
-FIX_FILE = "locode/tools/shell.py"
-
 
 def _git(*a: str) -> str:
     return subprocess.run(["git", *a], cwd=ROOT, capture_output=True,
                           text=True).stdout.strip()
-
-
-def _stash_has_fix() -> bool:
-    # The treatment string must be present in the working tree.
-    return "command succeeded" in (ROOT / FIX_FILE).read_text()
 
 
 def run_arm(arm: str, cases: list[str], models: list[str], rep: int,
@@ -48,7 +45,7 @@ def run_arm(arm: str, cases: list[str], models: list[str], rep: int,
             r["arm"] = arm
             rows.append(r)
             s = r["s"]
-            print(f"  [{arm}] {case:<12} {model:<13} done={'Y' if r['done'] else 'N'} "
+            print(f"  [{arm}] {case:<15} {model:<13} done={'Y' if r['done'] else 'N'} "
                   f"{s['iterations']:>2}it f{s['fails']} n{s['noops']} r{s['repeats']} "
                   f"{'green' if s['saw_green'] else '     '} "
                   f"{(s['stop_reason'] or 'answered')[:30]}", flush=True)
@@ -70,49 +67,51 @@ def summarize(rows: list[dict], arm: str) -> dict:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cases", default="indent-bug,add-test")
+    ap.add_argument("--fix-file", required=True, help="repo-relative path to toggle")
+    ap.add_argument("--marker", required=True,
+                    help="substring present only in the treatment version")
+    ap.add_argument("--cases", default="indent-bug,undefined-vars,new-module")
     ap.add_argument("--models", default="gemmacoder12,qythos9")
     ap.add_argument("--reps", type=int, default=3)
-    ap.add_argument("--outdir", default=str(ROOT / "evals/night/results/ab_silentok"))
+    ap.add_argument("--outdir", default=str(ROOT / "evals/night/results/ab"))
     ap.add_argument("--max-iter", type=int, default=18)
     ap.add_argument("--max-wall", type=int, default=180)
     a = ap.parse_args(argv)
 
-    if not _stash_has_fix():
-        print("ERROR: working tree does not contain the fix — apply it first.")
+    fix = ROOT / a.fix_file
+    has_marker = lambda: a.marker in fix.read_text()
+    if not has_marker():
+        print(f"ERROR: --marker not in working-tree {a.fix_file}; apply the change first.")
         return 2
 
     cases = [c for c in a.cases.split(",") if c in B.CASES]
     models = [m for m in a.models.split(",") if m]
     outdir = Path(a.outdir).resolve()
     if outdir.exists():
-        import shutil
         shutil.rmtree(outdir)
     outdir.mkdir(parents=True)
 
     all_rows: list[dict] = []
     for rep in range(1, a.reps + 1):
         print(f"\n=== rep {rep}/{a.reps} ===")
-        # CONTROL first: stash the fix (working tree -> build 48 behavior).
-        _git("stash", "push", "-q", "--", FIX_FILE)
-        stashed = not _stash_has_fix()
-        if not stashed:
-            print("WARN: stash did not remove the fix; skipping to keep arms honest")
-            _git("stash", "pop", "-q") if _git("stash", "list") else None
+        _git("stash", "push", "-q", "--", a.fix_file)  # CONTROL: change removed
+        if has_marker():
+            print("WARN: stash did not remove the change; skipping rep to stay honest")
+            if _git("stash", "list"):
+                _git("stash", "pop", "-q")
             continue
         try:
             all_rows += run_arm("C", cases, models, rep, outdir,
                                 max_iter=a.max_iter, max_wall=a.max_wall)
         finally:
-            _git("stash", "pop", "-q")  # restore the fix
-        assert _stash_has_fix(), "fix not restored after control arm!"
-        # TREATMENT: fix present.
-        all_rows += run_arm("T", cases, models, rep, outdir,
+            _git("stash", "pop", "-q")  # restore the change
+        assert has_marker(), "change not restored after control arm!"
+        all_rows += run_arm("T", cases, models, rep, outdir,  # TREATMENT
                             max_iter=a.max_iter, max_wall=a.max_wall)
 
     c, t = summarize(all_rows, "C"), summarize(all_rows, "T")
     print("\n================ A/B RESULT ================")
-    print(f"                 CONTROL(48)   TREATMENT(49)")
+    print(f"                 CONTROL      TREATMENT")
     print(f"  runs           {c['n']:>7}   {t['n']:>11}")
     print(f"  done           {c['done']:>7}   {t['done']:>11}")
     print(f"  repeat-stops   {c['repeat_stops']:>7}   {t['repeat_stops']:>11}")

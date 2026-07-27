@@ -1714,3 +1714,54 @@ regression** and is a **directional win** on the live model.
 | D83 | Scope a content guard to the *transition*, not the *state* — reject valid→invalid, never invalid→anything | A guard keyed on "output is invalid" would block the model from fixing an already-broken file (the empty-with-block case), re-introducing a Lever-1-style regression. Keying on the transition (parsed before, doesn't parse after) refuses only genuine corruption and always lets repair through. |
 
 ---
+
+## Round 26 — overnight battery: two "clearer signal" flail fixes, both rejected (2026-07-27)
+
+First round driven end-to-end by the **observability suite** (Round 25's
+`replay.py` + `--show-events`) and a new **prompt battery** (`evals/night/run_battery.py`:
+8 varied real tasks — logic/indent/undefined-var/syntax bugs, add-logging,
+new-module, refactor-rename, add-test — each run captured as transcript + event
+log and scored on *did the task get done* AND *how hard did it flail*).
+
+**Harness bug caught first (the instrument before the data).** Pass-1 initially
+reported every pathology count as zero: `--log-events` used a ROOT-relative path
+but the `locode` subprocess runs with `cwd=workdir`, so the logs were written
+nested under the workdir and `replay.load()` read empty files. Fixed by making
+the outdir absolute (`.resolve()`). Lesson: verify the instrument before
+trusting a night of numbers.
+
+**Pass-1 (16 runs, both models).** Ranked the pathologies. Standout: **indent-bug**
+— both models flail (qythos9 fails outright; gemmacoder12 fixes the file then
+repeat-stops). Root causes differ: qythos9 uses **tabs** where the file uses
+spaces + mis-ranges the replacement (orphan duplicate `return`), and the
+syntax-guard never engages because the start state is *already invalid* (D83).
+gemmacoder12 *fixes* the file on the first `replace_lines`, then can't tell it's
+done and loops rejected/no-op re-edits to a repeat-stop.
+
+**Two fixes, two paired same-session A/Bs (D80), both on the hypothesis "give the
+model a clearer success signal and it will flail less" — toggled via
+`git stash push -- <file>` so control/treatment are adjacent in time
+(`evals/night/ab.py`).**
+
+| build | change | A/B (cases × 2 models × 3 reps) | verdict |
+|---|---|---|---|
+| **49** | bash silent success `(no output)` → `(exit 0 — command succeeded, no output)` | indent-bug+add-test | flail-**NEUTRAL** (done 12/12 both; repeat-stops 2↔4, repeats 10↔12 inside indent-bug's own run-to-run noise) |
+| **50** | edit "✓ now parses cleanly" on invalid→valid .py + reject-msg "already parses as-is" hint | indent-bug+undefined-vars+new-module | flail-**NEGATIVE** (done 17/17 both; repeat-stops **1→5**; on the *target* case gemma went 0-stops-all-done → 2-stops+1-fail) |
+
+Build 49 **kept**, reframed honestly as a **visibility** win (pain #1: `(no output)`
+is ambiguous to a human reading `--show-events` too) and documented as
+flail-neutral — *not* claimed as a flail fix. Build 50 **reverted** in full
+(source, tests, bump) — a rejected hypothesis, consistently wrong-direction on
+the exact case it targeted. Transcript diff of the target: control did
+fix→`py_compile`(new call)→done; treatment did fix(+parse-note)→**re-ran the
+identical `replace_lines`**→no-op→repeat-stop.
+
+The loop's repeat handling was re-audited and is **sound**: it nudges-and-
+*continues* first (loop.py:616) and only stops on persistence — the model gets a
+chance to recover and ignores it. So the stop isn't premature; the model is
+stubborn.
+
+| # | Decision | Why |
+|---|---|---|
+| D84 | Weak-model mid-task **flail does not yield to clearer tool-result text** — route flail fixes elsewhere | Two paired A/Bs (b49 neutral, b50 negative) on "signal success more clearly" failed to help and one hurt. The models re-run/re-edit after a success regardless of how legibly it's signaled: this is a planning/**stopping-behavior** problem, not a tool-result information deficit. Additive result/nudge text is spent budget. Future flail work → loop mechanics (already well-tuned) or accept it's capability-bound; spend the "clearer output" lever on **human visibility** instead, where it demonstrably pays (b49). |
+| D85 | The **pass-1 baseline is not a valid control** — only a same-session stash-toggle A/B is | indent-bug flailed to a repeat-stop in pass-1 but ran clean as the A/B control arm minutes later (same code). Non-stationarity (D75) dominates the flail metric across sessions; cross-session before/after "improvements" are noise. |
