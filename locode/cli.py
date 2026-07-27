@@ -43,6 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Append structured JSONL telemetry (iterations, tool "
                         "calls, nudges, stop reason) to PATH. For eval "
                         "harnesses and post-mortem debugging.")
+    p.add_argument("--show-events", dest="show_events", action="store_true",
+                   help="Headless: render tool calls, results, and nudges to "
+                        "stdout interleaved with the model's prose — the same "
+                        "transcript the interactive REPL shows on screen — so a "
+                        "captured run is readable, not just the raw token stream.")
     p.add_argument("--no-splash", action="store_true", help="Suppress the banner.")
     p.add_argument("--no-markdown", action="store_true",
                    help="Stream raw tokens instead of line-buffered markdown.")
@@ -83,10 +88,29 @@ async def _headless(args) -> int:
     for t in (x.strip() for x in args.allow_tool.split(",") if x.strip()):
         policy.remember(t, AUTO)
     event_log = EventLog(args.log_events) if args.log_events else None
+
+    def _write(s: str) -> None:
+        sys.stdout.write(s)
+        sys.stdout.flush()
+
+    # --show-events reproduces the on-screen transcript (prose + clean tool /
+    # result / nudge lines) via the REPL's own renderer; plain -p streams only
+    # raw tokens and tees events to the log.
+    if args.show_events:
+        from locode.ui import render as _render
+        from locode.ui.headless import HeadlessView
+        view = HeadlessView(_write, color=_render.should_color(),
+                            markdown=cfg.ui.markdown, cwd=str(Path.cwd()))
+        on_delta, on_event = view.on_delta, tee(event_log, view.on_event)
+    else:
+        view = None
+        on_delta, on_event = _write, tee(event_log, None)
+
     # Headless: no confirm/select -> ASK tools that weren't pre-allowed are denied.
     loop = AgentLoop(client, manager, registry, policy, cfg, cwd=str(Path.cwd()),
-                     on_delta=lambda s: (sys.stdout.write(s), sys.stdout.flush()),
-                     on_event=tee(event_log, None))
+                     on_delta=on_delta, on_event=on_event)
+    if view is not None:
+        view.loop = loop
     try:
         result = await loop.run_turn(text)
     except Exception as e:
