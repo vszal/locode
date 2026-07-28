@@ -2215,3 +2215,49 @@ step 4 and leave the verified-good file intact → done=Y. Fix value reinforced;
 recommendation unchanged; still gated on user go/no-go (core edit-result semantics).
 
 No code change this round (harness-only run + this log).
+
+## Round 36 — pass13 edit-stress probes (TWO new gemma failure modes found)
+
+User asked to "continue probing edits tonight to find more problems." Added three
+edit-mechanic probes not covered by the existing battery — dup-match (ambiguous
+`old`, appears twice), two-bugs (two fixes in one file), remove-block (deletion
+edit) — and ran them + diff-report control × {gemmacoder12, qythos9} × 2 (pass13).
+qythos9 8/8 clean r0. gemma surfaced two NEW done=N shapes (dup-match it handled
+fine, both reps correct).
+
+### Finding 1 — two-bugs: PLAN-ONLY FALSE COMPLETION (gemma 2/2 done=N)
+gemma's ONLY action was a single update_plan marking all three tasks [x] — it
+never read or edited stats.py (file byte-for-byte unchanged: `s -= x` and `+ 1`
+still present), then ended its turn. Output = the original buggy -6 -1.0.
+Confirmed MODEL confabulation, NOT the build-53/54 plan-finish (no "all planned
+tasks complete — finishing" event; that path requires a RE-STATED plan at
+seen_streak>=1 — here it's a single first-turn plan and the model self-terminated).
+Only 2 iterations, f0 n0 r0, "answered." The model asserts completion via the plan
+tool with zero work behind it.
+  Candidate lever (build-50 hallucinated-verify family): gate/ nudge a plan marked
+  complete when the action ledger shows ZERO mutating actions (no edit_file/
+  write_file/replace_lines/bash) — "you marked everything done but haven't edited
+  any file or run anything; do the actual work." Structural (ledger, not text).
+  loop.py core, Opus-tier — flagged, not built.
+
+### Finding 2 — remove-block: NUMBER-ANCHORED DELETION CORRUPTS THE FILE (gemma 2/2 done=N)
+gemma deletes via replace_lines BY LINE NUMBER; each deletion shifts the numbering,
+so its next numeric target is wrong. It chases the moving target across ~6-14
+replace_lines calls, over-deletes the `def setup()` block and mangles main's return
+(final: `return None`, setup() called but undefined) → NameError/Traceback (RC!=0).
+r1 hit repeat-stop, r2 ran to max-iter. qythos9 (5it clean) deletes with
+CONTENT-ANCHORED edit_file (old="    print('DEBUG...')", new="") — two shift-immune
+edits + verify. The failure is number-anchoring on a shifting file.
+  Candidate lever (prior art a8e4cbc "steer weak models off line-number edits toward
+  edit_file"): steer DELETIONS to content-anchored edit_file, and/or have
+  replace_lines report the resulting line-shift so the model re-anchors instead of
+  reusing stale numbers. fs.py/loop.py core, Opus-tier — flagged, not built.
+
+### Landscape note
+diff-report control: gemma 2/2 done=Y this run (f1 repeat) — non-stationary, better
+than pass12's 2/2 done=N. qythos9 clean throughout. Both new levers are gemma-only;
+qythos9 remains the reliable workhorse on every edit shape probed.
+
+No code change this round (probes + observation + this log). Three levers now queued
+for a supervised session: already-applied short-circuit (R35, evidenced), completion
+gate (F1), deletion-steering (F2).
