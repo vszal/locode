@@ -603,6 +603,40 @@ def test_replace_lines_description_is_the_tool_for_indent_and_warns_on_stale():
     assert "STALE" in desc and "DUPLICATE" in desc
 
 
+def test_descriptions_steer_deletion_to_edit_file():
+    # Lever 2 (build 56): number-anchored deletion is the remove-block trap —
+    # each delete renumbers the lines below, so deleting several blocks by number
+    # over-deletes/duplicates (gemmacoder12 ~80% fail). edit_file with new="" is
+    # shift-immune. Both descriptions must steer deletion to edit_file, WITHOUT
+    # demoting replace_lines for its legitimate indentation use (the b45 lesson).
+    edit_desc = fs.EditFile.description
+    rl_desc = fs.ReplaceLines.description
+    assert "DELETE" in edit_desc and "empty string" in edit_desc
+    assert "PREFERRED way to DELETE" in edit_desc
+    assert "PREFER edit_file" in rl_desc
+    # replace_lines is still presented as the RIGHT tool for indentation, not a
+    # blanket last resort (guards against re-breaking the indent path).
+    assert "RIGHT tool" in rl_desc
+
+
+async def test_edit_file_deletes_with_empty_new(ctx, tmp_path):
+    # The steered path must actually work: old=the exact line(s), new="" removes
+    # them, content-anchored so a second delete still matches after the first.
+    (tmp_path / "app.py").write_text(
+        "def main():\n"
+        "    print('DEBUG: a')\n"
+        "    x = 1\n"
+        "    print('DEBUG: b')\n"
+        "    return x\n")
+    r1 = await fs.EditFile().run(
+        {"path": "app.py", "old": "    print('DEBUG: a')\n", "new": ""}, ctx)
+    r2 = await fs.EditFile().run(
+        {"path": "app.py", "old": "    print('DEBUG: b')\n", "new": ""}, ctx)
+    assert r1.ok and r2.ok
+    assert (tmp_path / "app.py").read_text() == \
+        "def main():\n    x = 1\n    return x\n"
+
+
 async def test_edit_file_rejects_edit_that_introduces_syntax_error(ctx, tmp_path):
     # build 47: an edit that turns PARSEABLE .py into a SyntaxError (here an
     # unclosed paren) must NOT land — a warned-but-applied corrupt edit is what
