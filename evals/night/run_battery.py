@@ -654,7 +654,11 @@ def run_one(case: str, model: str, rep: int, outdir: Path, *,
     transcript = rundir / "transcript.txt"
     cmd = [LOCODE, "-p", prompt, "-m", model, "--no-splash", "--no-markdown",
            "--show-events", "--allow-tool",
-           "edit_file,write_file,replace_lines,read_file,bash,glob,grep",
+           # append_file is a legitimate mutating tool the user approves
+           # interactively; omitting it here denied a model that reached for it
+           # (append-func qythos9) and scored a FALSE Traceback failure unrelated
+           # to capability — the case comment even says it "probes append_file".
+           "edit_file,write_file,append_file,replace_lines,read_file,bash,glob,grep",
            "--max-iterations", str(max_iter), "--max-wallclock", str(max_wall),
            "--log-events", str(log)]
     t0 = time.monotonic()
