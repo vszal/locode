@@ -491,6 +491,63 @@ def _case_remove_block():
     return files, prompt, check
 
 
+def _case_mid_block():
+    # Replace a line in the MIDDLE of a function, flanked by lines that must
+    # survive. Probes replacement precision: a numeric replace_lines with a wrong
+    # range clobbers the header/footer; content-anchored edit_file stays surgical.
+    files = {"pipeline.py": (
+        "def run(data):\n"
+        "    header = 'START'\n"
+        "    out = [x * 2 for x in data]\n"
+        "    footer = 'END'\n"
+        "    return header, out, footer\n")}
+    prompt = ("pipeline.py has a run function whose middle transform line doubles "
+              "each value but should square it instead. Change only that transform "
+              "line so each value is squared, leaving the header and footer lines "
+              "intact. Verify with python3 -c \"import pipeline; "
+              "print(pipeline.run([1,2,3]))\" which should print "
+              "('START', [1, 4, 9], 'END').")
+    def check(w):
+        rc, out = _run_py(w, "import pipeline; print(pipeline.run([1,2,3]))")
+        return (rc == 0 and out.strip() == "('START', [1, 4, 9], 'END')", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
+def _case_insert_const():
+    # Insert a NEW line near the top (a missing module constant), above existing
+    # code. Probes positional insertion / prepend rather than replace — models
+    # that only know replace-in-place often botch adding a fresh line.
+    files = {"report.py": (
+        "def make(rows):\n"
+        "    parts = [str(r) for r in rows]\n"
+        "    return SEP.join(parts)\n")}
+    prompt = ("report.py references a name SEP that is never defined, so make "
+              "crashes with a NameError. Add a module-level line defining SEP as "
+              "the string comma-space (a comma followed by a space) near the top "
+              "of the file, above the make function. Do not change the make "
+              "function body. Verify with python3 -c \"import report; "
+              "print(report.make([1,2,3]))\" which should print 1, 2, 3.")
+    def check(w):
+        rc, out = _run_py(w, "import report; print(report.make([1,2,3]))")
+        return (rc == 0 and out.strip() == "1, 2, 3", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
+def _case_append_func():
+    # Add a new function to an EXISTING file (append at end) without disturbing
+    # what's there. Distinct from new-module (fresh file): probes append_file /
+    # end-of-file edit and whether the model preserves the original definition.
+    files = {"mathx.py": "def square(n):\n    return n * n\n"}
+    prompt = ("mathx.py defines a square function. Add a new function named cube "
+              "to the same file that returns n times n times n, without removing "
+              "or changing square. Verify with python3 -c \"import mathx; "
+              "print(mathx.square(3), mathx.cube(3))\" which should print 9 27.")
+    def check(w):
+        rc, out = _run_py(w, "import mathx; print(mathx.square(3), mathx.cube(3))")
+        return (rc == 0 and out.strip() == "9 27", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
 CASES = {
     "logic-bug": _case_logic_bug,
     "indent-bug": _case_indent_bug,
@@ -511,6 +568,9 @@ CASES = {
     "dup-match": _case_dup_match,
     "two-bugs": _case_two_bugs,
     "remove-block": _case_remove_block,
+    "mid-block": _case_mid_block,
+    "insert-const": _case_insert_const,
+    "append-func": _case_append_func,
 }
 
 
