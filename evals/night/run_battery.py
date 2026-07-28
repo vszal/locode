@@ -588,6 +588,32 @@ def _case_locate_in_large():
     return files, prompt, check
 
 
+def _case_deep_nest():
+    # Fix one line at DEEP indentation (5 levels / 20 spaces). Probes whether the
+    # model reproduces the exact deep indentation in its edit rather than
+    # under/over-indenting and tripping the syntax-guard. Kept dict/quote-free so
+    # it isolates indentation from the insert-const string-mangling dimension.
+    files = {"grid.py": (
+        "def count_hot(grid, threshold):\n"
+        "    n = 0\n"
+        "    for row in grid:\n"
+        "        for val in row:\n"
+        "            if val >= 0:\n"
+        "                if val > threshold:\n"
+        "                    n = n - 1\n"
+        "    return n\n")}
+    prompt = ("grid.py has a count_hot function that should count how many values "
+              "across the grid are strictly greater than the threshold. Deep inside "
+              "the nested loops it mistakenly decreases the counter instead of "
+              "increasing it. Fix that one line so it counts correctly, keeping the "
+              "deep indentation intact. Verify with python3 -c \"import grid; "
+              "print(grid.count_hot([[1,5,9],[2,8,3]], 4))\" which should print 3.")
+    def check(w):
+        rc, out = _run_py(w, "import grid; print(grid.count_hot([[1,5,9],[2,8,3]], 4))")
+        return (rc == 0 and out.strip() == "3", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
 CASES = {
     "logic-bug": _case_logic_bug,
     "indent-bug": _case_indent_bug,
@@ -612,6 +638,7 @@ CASES = {
     "insert-const": _case_insert_const,
     "append-func": _case_append_func,
     "locate-in-large": _case_locate_in_large,
+    "deep-nest": _case_deep_nest,
 }
 
 
