@@ -548,6 +548,46 @@ def _case_append_func():
     return files, prompt, check
 
 
+def _case_locate_in_large():
+    # Localization under length: ONE bug in a multi-function file. Probes whether
+    # the model reads the whole file, finds the right function, and edits it
+    # surgically — vs mis-locating or clobbering a neighbor. The bug is in
+    # apply_discount (adds the discount instead of subtracting it).
+    files = {"orders.py": (
+        "TAX_RATE = 0.1\n\n"
+        "def subtotal(items):\n"
+        "    total = 0\n"
+        "    for price, qty in items:\n"
+        "        total += price * qty\n"
+        "    return total\n\n"
+        "def apply_tax(amount):\n"
+        "    return round(amount * (1 + TAX_RATE), 2)\n\n"
+        "def apply_discount(amount, pct):\n"
+        "    # pct is a percentage off, e.g. 20 means 20% off\n"
+        "    return round(amount + amount * (pct / 100), 2)\n\n"
+        "def shipping(amount):\n"
+        "    if amount >= 100:\n"
+        "        return 0.0\n"
+        "    return 5.0\n\n"
+        "def line_label(name, qty):\n"
+        "    return name + ' x' + str(qty)\n\n"
+        "def order_total(items, pct):\n"
+        "    s = subtotal(items)\n"
+        "    discounted = apply_discount(s, pct)\n"
+        "    taxed = apply_tax(discounted)\n"
+        "    return round(taxed + shipping(discounted), 2)\n")}
+    prompt = ("orders.py has one bug: the apply_discount function is supposed to "
+              "take a percentage OFF the amount, but it currently adds that "
+              "percentage instead of subtracting it. Fix only apply_discount so a "
+              "discount reduces the amount, leaving every other function unchanged. "
+              "Verify with python3 -c \"import orders; "
+              "print(orders.apply_discount(200, 25))\" which should print 150.0.")
+    def check(w):
+        rc, out = _run_py(w, "import orders; print(orders.apply_discount(200, 25))")
+        return (rc == 0 and out.strip() == "150.0", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
 CASES = {
     "logic-bug": _case_logic_bug,
     "indent-bug": _case_indent_bug,
@@ -571,6 +611,7 @@ CASES = {
     "mid-block": _case_mid_block,
     "insert-const": _case_insert_const,
     "append-func": _case_append_func,
+    "locate-in-large": _case_locate_in_large,
 }
 
 
