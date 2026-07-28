@@ -412,6 +412,85 @@ def _case_already_correct():
     return files, prompt, check
 
 
+def _case_dup_match():
+    # Ambiguous `old`: the buggy line appears TWICE; only ONE must change. A
+    # naive edit_file old="timeout = 30" matches both — probes whether the model
+    # adds surrounding context to disambiguate (and whether the harness rejects
+    # a non-unique old rather than silently clobbering both occurrences).
+    files = {"net.py": (
+        "def fetch(url):\n"
+        "    timeout = 30\n"
+        "    return _get(url, timeout)\n\n"
+        "def poll(url):\n"
+        "    timeout = 30\n"
+        "    return _get(url, timeout)\n\n"
+        "def _get(url, timeout):\n"
+        "    return (url, timeout)\n")}
+    prompt = ("net.py has two functions, fetch and poll, that each set a local "
+              "timeout of 30. Change ONLY the timeout inside the fetch function to "
+              "60. Leave the timeout inside poll unchanged at 30. Verify with "
+              "python3 -c \"import net; print(net.fetch('u'), net.poll('u'))\" "
+              "which should print ('u', 60) ('u', 30).")
+    def check(w):
+        rc, out = _run_py(w, "import net; print(net.fetch('u'), net.poll('u'))")
+        return (rc == 0 and out.strip() == "('u', 60) ('u', 30)", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
+def _case_two_bugs():
+    # Two independent bugs in ONE file, in different functions. Probes multi-edit
+    # state-tracking within a single file: the model must land two separate edits
+    # and recognize when the first is done before moving to the second (the
+    # compounding case behind the already-applied pathology).
+    files = {"stats.py": (
+        "def total(xs):\n"
+        "    s = 0\n"
+        "    for x in xs:\n"
+        "        s -= x\n"
+        "    return s\n\n"
+        "def average(xs):\n"
+        "    return total(xs) / len(xs) + 1\n")}
+    prompt = ("stats.py has two separate bugs. In the total function the loop "
+              "subtracts each value instead of adding it. In the average function "
+              "there is a stray plus one that makes the result wrong. Fix both so "
+              "that total of 1, 2, 3 is 6 and average of 1, 2, 3 is 2.0. Verify "
+              "with python3 -c \"import stats; print(stats.total([1,2,3]), "
+              "stats.average([1,2,3]))\" which should print 6 2.0.")
+    def check(w):
+        rc, out = _run_py(w, "import stats; print(stats.total([1,2,3]), stats.average([1,2,3]))")
+        return (rc == 0 and out.strip() == "6 2.0", f"out={out.strip()!r}")
+    return files, prompt, check
+
+
+def _case_remove_block():
+    # Deletion edit (old=lines, new=empty) — a distinct mechanic from replace.
+    # Weak models often botch deletions: they leave one of a pair, over-delete a
+    # neighboring line, or turn the delete into a no-op re-edit. Must remove both
+    # DEBUG lines and nothing else.
+    files = {"app.py": (
+        "def main():\n"
+        "    setup()\n"
+        "    print('DEBUG: entering main')\n"
+        "    result = compute()\n"
+        "    print('DEBUG: computed', result)\n"
+        "    return result\n\n"
+        "def setup():\n"
+        "    return None\n\n"
+        "def compute():\n"
+        "    return 42\n")}
+    prompt = ("app.py has two DEBUG print lines inside the main function that "
+              "should be removed for production. Delete both DEBUG print lines and "
+              "nothing else. The function must still work: verify with python3 -c "
+              "\"import app; print(app.main())\" which should print 42 and nothing "
+              "else.")
+    def check(w):
+        rc, out = _run_py(w, "import app; print(app.main())")
+        txt = (w / "app.py").read_text()
+        ok = rc == 0 and out.strip() == "42" and "DEBUG" not in txt
+        return (ok, f"out={out.strip()!r} debug_left={'DEBUG' in txt}")
+    return files, prompt, check
+
+
 CASES = {
     "logic-bug": _case_logic_bug,
     "indent-bug": _case_indent_bug,
@@ -429,6 +508,9 @@ CASES = {
     "already-correct": _case_already_correct,
     "emits-nothing": _case_emits_nothing,
     "diff-report": _case_diff_report,
+    "dup-match": _case_dup_match,
+    "two-bugs": _case_two_bugs,
+    "remove-block": _case_remove_block,
 }
 
 
