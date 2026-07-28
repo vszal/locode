@@ -458,6 +458,26 @@ the lived experience.*
     **The real fix for noisy-row *attribution* (crediting vs rejecting a REVIEW
     row) is interleaved paired runs at higher n — queued, see Milestone 4 next
     steps.** (LOG Round 16, D65–D67.)
+  - **Update 2026-07-28 (builds 55/56): two NEW harness levers land, and lever #2
+    is a decisive same-session A/B win — the "edit-path levers exhausted" framing
+    was incomplete.** From the R38 frequency-backed edit-failure map, two of three
+    approved levers shipped. **#1 already-applied short-circuit (build 55):** when
+    `old` produced no real change but `new` is already present and differs in
+    content from `old`, edit_file/replace_lines now answer with a NON-error
+    no_change ("already applied — don't revert, move on") instead of the
+    is_error=True that made a model revert its own working fix (pass11/12 revert
+    loop); safety nets (nochange streak, repeat streak) intact. **#2
+    deletion-steering (build 56):** reframed the tool descriptions so edit_file
+    (content-anchored `new=""`) is the PREFERRED deletion path and replace_lines
+    steers deletion away from stale line numbers — kept surgical so replace_lines
+    stays the indentation tool (b45 lesson). **A/B (gemma, remove-block, 5+5,
+    D75/D85 stash-toggle, ONLY the description text toggled): treatment 5/5 clean
+    vs control 0/5 Traceback.** Number-anchored multi-delete renumbers under
+    itself → corruption; content anchors are shift-immune. So `remove-block`'s
+    ~80% gemma failure was tool-choice (harness-fixable), NOT the 3.1 capability
+    wall — refines the 4.4 assessment for the deletion sub-case. Lever #3
+    (completion-gate, ~29% plan-only false-completion) remains unbuilt/unapproved.
+    (LOG Round 40.)
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+

@@ -2356,3 +2356,43 @@ FLAIL-but-lands (done=Y): append, localize-in-large, deep-nest, ambiguous-match.
 gemma INTERMITTENT: plan-only false completion (~29%). gemma CLEAN-ish: replace/
 mid-block, logic/operator fixes. qythos9: clean on every edit shape probed. No
 further distinct edit dimensions to probe — map is saturated. No code change.
+
+## Round 40 — levers #1 + #2 SHIP; lever #2 A/B is decisive (0/5 → 5/5)
+
+Two of the three approved anti-cycling levers landed and are verified.
+
+### Lever #1 — already-applied short-circuit (build 55, fs.py)
+The revert loop (pass11 r1, pass12 r1): a model applies a fix, verifies it, then
+re-submits the identical edit; `old` is gone, so edit_file returned is_error=True
+(not_found, or an indent-only "changed nothing" when `old` fuzzy-matches the
+already-fixed line). Per loop.py's contract that reads as a FIXABLE error and the
+model reverts its own working fix. Fix: when `old` produced no real change but
+`new` is already present AND differs in content from `old` (`_already_applied` +
+`_same_content` guard), answer with a NON-error no_change ("already applied — don't
+re-apply, don't revert, move on"), in BOTH the not_found and noop branches;
+replace_lines' identical branch too. Safety intact — no_change=True still feeds the
+nochange stop-net and byte-identical re-submits still accrue a repeat streak, so a
+true loop is still nudged then stopped; only the FIRST-occurrence framing flips from
+"error" to "done". The `_same_content` guard keeps a genuine indent-only no-op on
+its replace_lines steer (the b45 lesson). Unit-verified; full suite 657 green.
+
+### Lever #2 — deletion-steering (build 56, tool descriptions)
+remove-block root cause (confirmed pass16): gemma deletes by line number via
+replace_lines; each delete renumbers the lines below, so the second delete lands
+wrong → over-delete → Traceback. It picked replace_lines because that was the ONLY
+tool whose description mentioned deletion. Reframed both descriptions: edit_file is
+now the PREFERRED way to DELETE (new="" + exact line in `old`, SHIFT-IMMUNE);
+replace_lines steers deletion to edit_file up front. Surgical — replace_lines stays
+"the RIGHT tool" for indentation (b45: a blanket demotion fixed 0/5 vs 5/5 on indent
+bugs). Description-only; suite 659 green.
+
+### Same-session A/B (gemma, remove-block, 5 reps each, D75/D85 stash-toggle)
+- TREATMENT (build 56, new descriptions): **5/5 clean**, done=Y, out='42',
+  debug_left=False, ~18s each.
+- CONTROL (295ca2d fs.py = lever #1 logic + OLD descriptions): **0/5**, all done=N,
+  Traceback, ~28s each.
+Decisive: lever #2 flips remove-block 0/5 → 5/5 for gemma, isolated to the
+description text (only variable toggled). Mechanism verified end-to-end: old text →
+number-anchored replace_lines → shift trap → Traceback; new text → edit_file new=""
+→ shift-immune → clean. Both commits pushed (295ca2d, 8402e7b). Lever #3
+(completion-gate) remains unbuilt/unapproved.
