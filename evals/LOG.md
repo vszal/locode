@@ -2296,3 +2296,45 @@ Net for the night: pass13 found the two strong new modes (plan-only false comple
 number-anchored deletion corruption); pass14 adds insert-const as a narrower,
 value-sensitive string-mangling data point. qythos9 clean across every edit shape
 probed (pass13+14: 14/14). No code change; probes + observation + this log.
+
+## Round 38 — pass15/16 REPRODUCIBILITY check on the pass13/14 edit findings
+
+Re-ran the three candidate gemma edit-failures across more reps to get honest
+frequencies rather than trust single 2/2 snapshots (D89 discipline). qythos9 stayed
+clean on every rep of every case. Pooled gemma done=N rates:
+
+  remove-block  (number-anchored deletion corruption)  : 4/5  ~80%  ROBUST
+    pass13 2/2 done=N; pass16 r1 done=Y (but 14it, f2 n2 r2 heavy flail), r2/r3 done=N.
+    Even the lone "success" was costly. This is the strongest, most reproducible
+    finding of the night — the deletion-steering lever (steer deletions to
+    content-anchored edit_file; prior art a8e4cbc) is the highest-value candidate.
+
+  insert-const  (string-literal mangling on inline insert): 5/5  100%  but NARROW
+    pass14 2/2 done=N; pass16 3/3 done=N. Fully reproducible, BUT scope is narrow:
+    triggered by an escaping-hostile string value (the ', ' separator) that the
+    model corrupts into an unterminated literal. The build-47 syntax-guard correctly
+    refuses the broken write every time; the residual is gemma re-emitting the same
+    corruption (D84). 100% when triggered, but the trigger is value-specific — not a
+    general insertion failure (mid-block replace and top-insert of simpler values are
+    fine).
+
+  two-bugs      (plan-only false completion)             : 2/7  ~29%  INTERMITTENT
+    pass13 2/2 done=N (single update_plan, file untouched); pass15 2/2 done=Y;
+    pass16 3/3 done=Y. CORRECTS the R36 "strong" framing — the false-completion MODE
+    is real (seen cleanly twice) but fires only ~29% of the time (model
+    non-stationarity, D75/D85). The completion-gate lever (gate "done" on >=1 mutating
+    action) is still valid but addresses an intermittent, not a consistent, failure.
+
+### Landscape (this night, pass13-16, edit-mechanic probes)
+qythos9: clean on 100% of edit shapes probed (fix/replace, delete, insert, append,
+multi-edit, ambiguous-match, localize-in-large). gemma: reliable on replace/append/
+localize/ambiguous; fails on DELETION (~80%) and escaping-hostile INSERT (100% when
+triggered); intermittently false-completes multi-edit tasks (~29%).
+
+Prioritized lever queue for a supervised session (unchanged order, now frequency-
+backed): (1) already-applied short-circuit (R35, evidenced, user-gated); (2)
+deletion-steering to edit_file (remove-block, ~80% — highest new value); (3)
+completion-gate on zero mutating actions (two-bugs, ~29%). insert-const is D84 /
+value-specific — no clean lever, syntax-guard already contains the damage.
+
+No code change; reproducibility observation + this log.
