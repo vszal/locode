@@ -685,18 +685,29 @@ class EditFile:
                 "one. The matches are at:\n" + _match_locations(text, old),
                 is_error=True)
         # `old` didn't produce a real change (it's not in the file, or a tolerant/
-        # fuzzy match landed on a line that's byte-identical to `new`). If `new` is
-        # ALREADY present and differs in content from `old`, the edit was already
-        # made — say so as a NON-error so the model finishes instead of reading a
-        # fixable error and reverting its own working fix. (`_same_content` keeps
-        # the indent-only no-op below on its replace_lines steer.)
-        if status in ("not_found", "noop") \
-                and _already_applied(text, new) and not _same_content(old, new):
+        # fuzzy match landed on a line that's byte-identical to `new`). Two shapes
+        # of "already done" are answered as a NON-error so the model finishes
+        # instead of reading a fixable error and thrashing:
+        #  1. REPLACEMENT already applied — `new` is already present AND differs in
+        #     content from `old` (an earlier step made this change; a plain
+        #     not-found would drive the model to revert its own working fix).
+        #     `_same_content` keeps a genuine indent-only no-op on its steer below.
+        #  2. DELETION already done — `new` is empty and `old` (non-empty) has no
+        #     exact/tolerant/FUZZY match, i.e. the lines to remove are already gone
+        #     (deleting absent content is a no-op whose goal already holds). Left as
+        #     an error, its _not_found_help even suggests replace_lines — and a
+        #     line-number re-delete lands on SHIFTED lines and corrupts the file
+        #     (observed: remove-block, gemma re-deleted an already-gone DEBUG line,
+        #     escalated to replace_lines, and over-deleted the return).
+        deletion_done = new.strip() == "" and old.strip() != ""
+        replacement_done = _already_applied(text, new) and not _same_content(old, new)
+        if status in ("not_found", "noop") and (deletion_done or replacement_done):
             return ToolResult(
-                "This edit is ALREADY APPLIED: the file already contains `new` — "
-                "you (or an earlier step) already made this change. Nothing to do. "
-                "Do NOT re-apply it and do NOT revert it. Move on to the next step, "
-                "or if the task is done, finish.",
+                "This edit is ALREADY DONE: the file already reflects it — either "
+                "`new` is already present, or (for a deletion) the lines in `old` "
+                "are already gone. Nothing to do. Do NOT re-apply or re-delete it, "
+                "do NOT revert it, and do NOT switch to line-number edits to force "
+                "it. Move on to the next step, or if the task is done, finish.",
                 no_change=True)
         if status == "not_found":
             return ToolResult(_not_found_help(text, old, p), is_error=True)

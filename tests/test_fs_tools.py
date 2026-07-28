@@ -300,7 +300,7 @@ async def test_edit_file_already_applied_is_nonerror_noop(ctx, tmp_path):
     res = await fs.EditFile().run(
         {"path": "c.py", "old": "return 0", "new": "return 42"}, ctx)
     assert res.ok and res.no_change
-    assert "already applied" in res.content.lower()
+    assert "already done" in res.content.lower()
     assert (tmp_path / "c.py").read_text() == "def f():\n    return 42\n"
 
 
@@ -313,7 +313,7 @@ async def test_edit_file_already_applied_via_noop_path(ctx, tmp_path):
     res = await fs.EditFile().run(
         {"path": "c.py", "old": "timeout = 30", "new": "timeout = 60"}, ctx)
     assert res.ok and res.no_change
-    assert "already applied" in res.content.lower()
+    assert "already done" in res.content.lower()
     assert (tmp_path / "c.py").read_text() == "timeout = 60\nretries = 3\n"
 
 
@@ -324,6 +324,33 @@ async def test_edit_file_short_new_still_not_found(ctx, tmp_path):
     res = await fs.EditFile().run(
         {"path": "c.py", "old": "zzz", "new": "1"}, ctx)
     assert res.is_error and "replace_lines" in res.content
+
+
+async def test_edit_file_redelete_already_gone_is_nonerror(ctx, tmp_path):
+    # build 57: the deletion arm of already-done. The model deleted a line, then
+    # re-submits the same delete (old=<gone line>, new=""). `old` no longer matches
+    # (not even fuzzily → the content is truly gone), so a plain not-found would
+    # fire AND suggest replace_lines — a line-number re-delete lands on shifted
+    # lines and corrupts the file (the remove-block over-delete). Must be a
+    # NON-error "already done" that explicitly says NOT to switch to line numbers.
+    (tmp_path / "app.py").write_text("def main():\n    x = 1\n    return x\n")
+    res = await fs.EditFile().run(
+        {"path": "app.py", "old": "    print('DEBUG: entering main')\n", "new": ""},
+        ctx)
+    assert res.ok and res.no_change
+    assert "already done" in res.content.lower()
+    assert "line-number" in res.content.lower()  # steers OFF replace_lines
+    assert (tmp_path / "app.py").read_text() == "def main():\n    x = 1\n    return x\n"
+
+
+async def test_edit_file_first_delete_still_works(ctx, tmp_path):
+    # Guard: extending already-done to deletions must NOT break a real first-time
+    # delete — old present, new="" removes it (status ok, not the already-done arm).
+    (tmp_path / "app.py").write_text("def main():\n    print('DEBUG')\n    return 1\n")
+    res = await fs.EditFile().run(
+        {"path": "app.py", "old": "    print('DEBUG')\n", "new": ""}, ctx)
+    assert res.ok and not res.no_change
+    assert (tmp_path / "app.py").read_text() == "def main():\n    return 1\n"
 
 
 def test_already_applied_helper():
