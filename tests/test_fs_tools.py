@@ -291,6 +291,56 @@ async def test_edit_file_genuinely_absent_errors(ctx, tmp_path):
     assert res.is_error and "not found" in res.content
 
 
+async def test_edit_file_already_applied_is_nonerror_noop(ctx, tmp_path):
+    # build 55: the model applied a fix, verified it, then re-submitted the same
+    # edit; `old` is gone but `new` is already in the file. Answer "already
+    # applied" (non-error no_change) so the model doesn't read a not-found error
+    # as fixable and revert its own working change.
+    (tmp_path / "c.py").write_text("def f():\n    return 42\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "return 0", "new": "return 42"}, ctx)
+    assert res.ok and res.no_change
+    assert "already applied" in res.content.lower()
+    assert (tmp_path / "c.py").read_text() == "def f():\n    return 42\n"
+
+
+async def test_edit_file_already_applied_via_noop_path(ctx, tmp_path):
+    # The re-submit often lands in the noop branch, not not_found: `old` (the OLD
+    # buggy line) fuzzy-matches the already-fixed line, and replacing it with `new`
+    # is byte-identical. That must ALSO read as already-applied (non-error), not as
+    # the indent-only "changed nothing" error that would drive a revert.
+    (tmp_path / "c.py").write_text("timeout = 60\nretries = 3\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "timeout = 30", "new": "timeout = 60"}, ctx)
+    assert res.ok and res.no_change
+    assert "already applied" in res.content.lower()
+    assert (tmp_path / "c.py").read_text() == "timeout = 60\nretries = 3\n"
+
+
+async def test_edit_file_short_new_still_not_found(ctx, tmp_path):
+    # A trivial `new` (<3 chars) that coincidentally occurs must NOT be masked as
+    # already-applied — it stays a genuine not-found so the model can correct it.
+    (tmp_path / "c.py").write_text("a = 1\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "zzz", "new": "1"}, ctx)
+    assert res.is_error and "replace_lines" in res.content
+
+
+def test_already_applied_helper():
+    assert fs._already_applied("def f():\n    return 42\n", "return 42")
+    assert not fs._already_applied("x = 1\n", "y")          # too short
+    assert not fs._already_applied("x = 1\n", "return 42")  # absent
+    # present at a different indent than `new` carries -> tolerant match catches it
+    assert fs._already_applied("class A:\n        if x:\n            y = 1\n",
+                               "if x:\n    y = 1")
+
+
+def test_same_content_distinguishes_indent_from_real_change():
+    assert fs._same_content("x = 1", "    x = 1")       # indent-only
+    assert fs._same_content("     2\ty = 2", "y = 2")   # lineno prefix only
+    assert not fs._same_content("return 0", "return 42")  # different content
+
+
 def test_not_found_help_shows_verbatim_snippet_and_caveat():
     from pathlib import Path
     msg = fs._not_found_help("import os\ndef handle_click(self):\n    pass\n",
@@ -458,11 +508,14 @@ async def test_replace_lines_out_of_range_errors_and_leaves_file(ctx, tmp_path):
     assert (tmp_path / "c.py").read_text() == "a\nb\n"
 
 
-async def test_replace_lines_identical_is_a_noop_error(ctx, tmp_path):
+async def test_replace_lines_identical_is_a_nonerror_noop(ctx, tmp_path):
+    # build 55: an identical replace is "already in place" — a NON-error no_change
+    # so the model reads it as done, not as a fixable error it should revert.
     (tmp_path / "c.py").write_text("a\nb\nc\n")
     res = await fs.ReplaceLines().run(
         {"path": "c.py", "start": 2, "end": 2, "new": "b"}, ctx)
-    assert res.is_error and "nothing" in res.content.lower()
+    assert res.ok and res.no_change
+    assert "already in place" in res.content.lower()
     assert (tmp_path / "c.py").read_text() == "a\nb\nc\n"
 
 

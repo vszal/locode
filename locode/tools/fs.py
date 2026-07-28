@@ -159,6 +159,35 @@ def try_edit(text: str, old: str, new: str, replace_all: bool):
     return None, "", "not_found", 0
 
 
+def _already_applied(text: str, new: str) -> bool:
+    """True when `new` is already present in `text` — i.e. an edit that "can't
+    find `old`" can't find it because the change has ALREADY been made and `old`
+    is gone. The classic weak-model loop: it applies a fix, verifies it works,
+    then re-submits the identical edit; `old` no longer exists, a plain not-found
+    reads as a fixable error, and the model reverts its own working fix. Detecting
+    this lets edit_file answer "already done" (non-error) instead.
+
+    Guarded by a minimum content length so a trivial `new` (a bracket, a short
+    token) that happens to occur elsewhere can't mask a genuine not-found. Checks
+    exact presence first, then whitespace-tolerant (the fix may have been written
+    at a different indent than `new` carries)."""
+    if len(new.strip()) < 3:
+        return False
+    if new in text:
+        return True
+    return _tolerant_spans(text, new, False) is not None
+
+
+def _same_content(a: str, b: str) -> bool:
+    """True when `a` and `b` differ only in per-line whitespace or a copied
+    read_file line-number prefix — the indent-only case edit_file can't serve.
+    Used to tell an indent-only no-op (keep steering to replace_lines) apart from
+    an already-applied edit (old was the OLD content, new is the fix, and the
+    file now holds new): the latter has genuinely different content."""
+    return [_match_key(l) for l in _old_block(a)] == \
+        [_match_key(l) for l in _old_block(b)]
+
+
 def _match_locations(text: str, old: str, limit: int = 6) -> str:
     """List where `old` occurs, as `line N: <first line of the match>`, so a
     model that matched several places can add context to pin the one it means.
@@ -649,6 +678,20 @@ class EditFile:
                 "matches exactly ONE place, or pass replace_all to change every "
                 "one. The matches are at:\n" + _match_locations(text, old),
                 is_error=True)
+        # `old` didn't produce a real change (it's not in the file, or a tolerant/
+        # fuzzy match landed on a line that's byte-identical to `new`). If `new` is
+        # ALREADY present and differs in content from `old`, the edit was already
+        # made — say so as a NON-error so the model finishes instead of reading a
+        # fixable error and reverting its own working fix. (`_same_content` keeps
+        # the indent-only no-op below on its replace_lines steer.)
+        if status in ("not_found", "noop") \
+                and _already_applied(text, new) and not _same_content(old, new):
+            return ToolResult(
+                "This edit is ALREADY APPLIED: the file already contains `new` — "
+                "you (or an earlier step) already made this change. Nothing to do. "
+                "Do NOT re-apply it and do NOT revert it. Move on to the next step, "
+                "or if the task is done, finish.",
+                no_change=True)
         if status == "not_found":
             return ToolResult(_not_found_help(text, old, p), is_error=True)
         if status == "noop":
@@ -766,11 +809,12 @@ class ReplaceLines:
                 "may have shifted them).", is_error=True)
         if updated == text:
             return ToolResult(
-                "This edit changed NOTHING: the replacement is identical to what is "
-                "already on those lines. If you are fixing a bug, put the corrected "
-                "code in `new`; if the lines are already correct, the problem is "
-                "elsewhere — do NOT resend this same replacement.",
-                is_error=True, no_change=True)
+                "This replacement is ALREADY IN PLACE: `new` is identical to what "
+                "is already on those lines, so there is nothing to change — the "
+                "code is already what you want. Nothing to do. Do NOT resend this "
+                "same replacement and do NOT revert it. Move on to the next step, "
+                "or if the task is done, finish.",
+                no_change=True)
         broke = _syntax_reject(p, text, updated)
         if broke:
             return ToolResult(broke, is_error=True)
