@@ -2338,3 +2338,21 @@ completion-gate on zero mutating actions (two-bugs, ~29%). insert-const is D84 /
 value-specific — no clean lever, syntax-guard already contains the damage.
 
 No code change; reproducibility observation + this log.
+
+## Round 39 — pass17 deep-nest probe (NEGATIVE: deep indentation is handled)
+
+Probed fixing one line at 5-level (20-space) indentation, dict/quote-free to isolate
+indentation. qythos9 3/3 clean r0. gemma 3/3 done=Y (all correct '3') but flailed on
+2/3 (r1 f3 n2 r2, r3 f1 r1) — the syntax-guard catches mis-indented attempts and
+gemma retries until the deep indentation matches, self-correcting. Flail-cost, NOT a
+correctness failure. Useful negative: indentation precision at depth is NOT a hard
+gemma failure (unlike DELETION ~80% and escaping-hostile INSERT 100%, which do not
+self-correct).
+
+### Edit-failure map now complete (pass13-17)
+gemma HARD failures (done=N): number-anchored deletion corruption (~80%), inline
+insert of escaping-hostile string values (100%, syntax-guard-contained). gemma
+FLAIL-but-lands (done=Y): append, localize-in-large, deep-nest, ambiguous-match.
+gemma INTERMITTENT: plan-only false completion (~29%). gemma CLEAN-ish: replace/
+mid-block, logic/operator fixes. qythos9: clean on every edit shape probed. No
+further distinct edit dimensions to probe — map is saturated. No code change.
