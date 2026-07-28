@@ -2261,3 +2261,38 @@ qythos9 remains the reliable workhorse on every edit shape probed.
 No code change this round (probes + observation + this log). Three levers now queued
 for a supervised session: already-applied short-circuit (R35, evidenced), completion
 gate (F1), deletion-steering (F2).
+
+## Round 37 — pass14 edit probes (mid-block clean; insert-const string-literal mangling)
+
+Second edit-probe batch (mid-block, insert-const, append-func × {gemma, qythos9}
+× 2). qythos9 6/6 clean. Lighter yield than pass13; one new gemma done=N, two
+negatives.
+
+### mid-block — CLEAN both models (negative result, useful)
+Replace a middle line while preserving flanks: both models 4/4 clean r0. Replacement
+precision is NOT a failure dimension — the earlier remove-block corruption was
+specific to DELETION (empty `new`) chasing shifting line numbers, not replacement.
+
+### insert-const — gemma 2/2 done=N: STRING-LITERAL MANGLING on inline insert (narrow)
+gemma inserts a module constant via edit_file(old='def make(rows):',
+new="SEP = ', \ndef make(rows):") — but the `new` is a BROKEN string literal: it
+emits `SEP = ', ` then a newline, losing the closing quote of the ', ' separator →
+unterminated-string SyntaxError. The build-47 syntax-guard rejects it; gemma
+re-emits the identical mangled edit → repeat-stop → file unchanged → NameError
+Traceback. qythos9 sidesteps: write_file the whole file with a safe placeholder,
+then edit_file to refine SEP to ", " (two steps, no inline-escaping trap).
+  Caveat: partly VALUE-sensitive — the comma-space separator is escaping-hostile
+  (echoes the known "weak models corrupt tool JSON around quotes/braces" note). Real
+  but narrow; not a clean generalizable lever like the pass13 pair. The syntax-guard
+  DID its job (refused the broken write); the residual is the model re-emitting the
+  same corruption — D84 territory. No new lever; logged as a known-shape data point.
+
+### append-func — gemma flails but LANDS (done=Y, not a hard failure)
+Add cube() to an existing file: gemma r1 f2/r1, r2 f4/n2/r1 — heavy flail but both
+reps end done=Y (9 27). qythos9 4/4 clean. Append is a flail-cost case, not a
+correctness failure.
+
+Net for the night: pass13 found the two strong new modes (plan-only false completion,
+number-anchored deletion corruption); pass14 adds insert-const as a narrower,
+value-sensitive string-mangling data point. qythos9 clean across every edit shape
+probed (pass13+14: 14/14). No code change; probes + observation + this log.
