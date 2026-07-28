@@ -2396,3 +2396,43 @@ description text (only variable toggled). Mechanism verified end-to-end: old tex
 number-anchored replace_lines → shift trap → Traceback; new text → edit_file new=""
 → shift-immune → clean. Both commits pushed (295ca2d, 8402e7b). Lever #3
 (completion-gate) remains unbuilt/unapproved.
+
+## Round 41 — build 56 regression sweep surfaces a lever-#1 GAP; build 57 closes it
+
+Ran a build-56 regression sweep (indent-bug, remove-block, mid-block, dup-match,
+insert-const, append-func × both models × 2). Findings:
+
+- **No description regression** (the b45 risk from touching tool descriptions):
+  indent-bug 3/3 clean, mid-block 4/4, dup-match 4/4. The indentation path is
+  intact — lever #2 stayed surgical.
+- **append-func qythos9 2/2 Traceback was a HARNESS bug, not a regression.**
+  Replay: qythos9 chose append_file, which was absent from the eval --allow-tool
+  list → denied ("no approver") → function never added → AttributeError. Added
+  append_file to the allowlist (the case comment literally says it "probes
+  append_file"); re-run qythos9 2/2 clean. Non-stationary tool choice (pass14 used
+  edit_file) had masked the gap. Evals-only fix, committed.
+- **insert-const gemma improvement is tool choice, NOT a lever.** Replay: gemma
+  used write_file (whole-file rewrite), sidestepping the inline-escaping mangle
+  that kills its edit_file attempts; correct out, benign redundant-rewrite flail
+  caught by the repeat guard. Do NOT credit levers #1/#2 for it.
+- **THE REAL FIND — a lever-#1 gap for DELETIONS (remove-block gemma 1/4,
+  out='None').** Replay showed the mechanism precisely: gemma correctly deleted
+  both DEBUG lines via edit_file new="" (lever #2 steering WORKED), verified 42,
+  then RE-submitted the first delete. `old` is gone → not_found ERROR (lever #1
+  didn't cover it: new="" fails the len>=3 guard) → the error's _not_found_help
+  suggested replace_lines → gemma escalated to line-number deletes on a file whose
+  lines had already shifted → over-deleted the return line → out='None'. The
+  not_found error was itself the corruption trigger.
+
+**Build 57 fix (deletion arm of already-done):** when new is empty and old
+(non-empty) has no exact/tolerant/FUZZY match, the lines are truly gone — deleting
+absent content is a no-op whose goal already holds. Answer NON-error no_change
+("already done — do NOT re-delete, do NOT switch to line-number edits"), which
+kills both the thrash and the replace_lines escalation. +2 tests, suite 661 green.
+
+**Validation (gemma, remove-block, build 57, n=6): 6/6 clean, f0 n0 r0 — zero
+flail.** Not only is the corruption gone, the re-delete no longer produces an
+error to recover from, so even the flail (f1 on prior passing runs) vanished.
+remove-block combined under the fix: A/B 5/5 + build-57 6/6 = 11/11 clean, on a
+case that was ~80% gemma HARD-fail before the levers. Lever #1's revert-loop
+coverage is now complete across BOTH replacement and deletion shapes.

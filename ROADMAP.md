@@ -478,6 +478,17 @@ the lived experience.*
     wall — refines the 4.4 assessment for the deletion sub-case. Lever #3
     (completion-gate, ~29% plan-only false-completion) remains unbuilt/unapproved.
     (LOG Round 40.)
+  - **Update 2026-07-28 (build 57): lever #1 extended to DELETIONS; remove-block
+    now 11/11.** A build-56 regression sweep replay showed lever #2's steering
+    working (gemma deletes via edit_file new="") but a residual corruption: after
+    a correct+verified delete, gemma RE-submits it, `old` is gone → not_found
+    ERROR (lever #1's len>=3 guard skipped empty `new`) → the error suggested
+    replace_lines → line-number re-delete on shifted lines over-deleted the return
+    (out='None'). Fix: a not_found deletion (empty `new`, `old` truly absent) is
+    "already done" — non-error, and explicitly steers OFF line numbers. Validated
+    gemma 6/6 clean with ZERO flail; combined 11/11 on a former ~80%-fail case.
+    Also fixed an eval-harness bug the sweep exposed (append_file missing from the
+    battery allowlist → false qythos9 Traceback). (LOG Round 41.)
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
