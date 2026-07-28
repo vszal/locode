@@ -523,8 +523,8 @@ def _case_insert_const():
         "    return SEP.join(parts)\n")}
     prompt = ("report.py references a name SEP that is never defined, so make "
               "crashes with a NameError. Add a module-level line defining SEP as "
-              "the string comma-space (a comma followed by a space) near the top "
-              "of the file, above the make function. Do not change the make "
+              "a two-character string: a comma followed by one space. Put it near "
+              "the top of the file, above the make function. Do not change the make "
               "function body. Verify with python3 -c \"import report; "
               "print(report.make([1,2,3]))\" which should print 1, 2, 3.")
     def check(w):

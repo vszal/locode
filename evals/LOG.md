@@ -2436,3 +2436,56 @@ error to recover from, so even the flail (f1 on prior passing runs) vanished.
 remove-block combined under the fix: A/B 5/5 + build-57 6/6 = 11/11 clean, on a
 case that was ~80% gemma HARD-fail before the levers. Lever #1's revert-loop
 coverage is now complete across BOTH replacement and deletion shapes.
+
+## Round 42 — build-57 wide-net sweep triage (24 cases × 2 models, reps=1)
+
+Full-battery regression check after levers #1/#2 + the deletion arm shipped.
+**12/48 problem rows — all triaged, ZERO regressions attributable to the levers
+or the description edits.** Buckets:
+- **Capability walls (gemma):** even-median, dedup-order, undefined-vars,
+  syntax-fix, insert-const (escaping-hostile insert → Traceback). Weak-model
+  limits; the anti-cycling stop-nets caught every one (STOP: repeated call).
+- **Benign repeat-flail, CORRECT output (done=Y):** diff-report, remove-block
+  (out='42' debug_left=False), append-func (out='9 27'), deep-nest (out='3').
+  Right answer landed, then the repeat-guard fired on a redundant re-submit.
+- **b45 NOT regressed:** indent-bug gemma still reached for replace_lines (3×,
+  the tool the b45 lesson protects) and the syntax-guard correctly REFUSED a
+  corruption (🛡 save). My lever-#2 deletion-steering did not drive it off
+  replace_lines for indentation. Confirmed clean.
+- **insert-const qythos9 (out='1comma-space2comma-space3'):** NOT a product
+  regression — the model used write_file and wrote the literal words
+  "comma-space" as SEP. Root cause was the eval CASE prose: "define SEP as the
+  string comma-space (a comma followed by a space)". Harness fix (no build
+  bump): reworded to "a two-character string: a comma followed by one space".
+- **Deletion fix holds:** remove-block correct on both the wide sweep and the
+  dedicated n=6 rerun (0/6 problem rows).
+
+Net: the three levers introduced no new failures and no tool-flight; every
+problem row is a pre-existing weak-model capability limit or a benign
+stop-net-caught flail. Build 57 stands.
+
+## Round 43 — flail-stability probe (reps=3 on the 4 "benign flail" cases)
+
+Purpose: a benign repeat-flail is only safe if it ALWAYS ends with correct
+output. reps=3 × {diff-report, append-func, deep-nest, remove-block} × both
+models split the bucket:
+- **Confirmed benign (output correct every rep; only the repeat-guard fires):**
+  append-func gemma 3/3 (out='9 27'), deep-nest gemma 3/3 (out='3'),
+  remove-block both models 6/6 (out='42' debug_left=False). qythos9 clean on all.
+  These stop-nets are robust — the flag is noise, the answer is right.
+- **diff-report gemma — NOT benign: 2/3 WRONG (out='\n', empty).** The reps=1
+  wide sweep caught the lucky 1/3 (done=Y) and I'd mis-bucketed it. Root causes,
+  both PRE-EXISTING (not lever regressions):
+  - **r2 = pure false-completion:** 1 iter, ZERO tool calls, self-terminated
+    "answered" — model declared done without editing anything. This is precisely
+    the lever-#3 (completion-gate on zero mutating actions) target, and here it
+    yields SILENT wrong output on a realistic ~50-line multi-function file.
+  - **r1 = newline-mangle no-op-stuck:** gemma flattened the multi-line block so
+    old==new; the no-op branch ("edit does NOTHING") fired correctly, model
+    couldn't recover, stop-net halted. Capability wall.
+
+Takeaway: shipped levers introduced no new failures; the stability probe's real
+find is EVIDENCE for lever #3 — diff-report gemma r2 is a zero-action false
+completion that current stop-nets don't catch (no mutating action ever happens,
+so no repeat/noop/error streak accrues). Lever #3 remains UNAPPROVED — logged as
+accumulating justification, not built.

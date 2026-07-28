@@ -489,6 +489,19 @@ the lived experience.*
     gemma 6/6 clean with ZERO flail; combined 11/11 on a former ~80%-fail case.
     Also fixed an eval-harness bug the sweep exposed (append_file missing from the
     battery allowlist → false qythos9 Traceback). (LOG Round 41.)
+  - **Update 2026-07-28 (post-build-57, no code change): stability probe →
+    lever-#3 evidence.** A reps=3 probe on the 4 "benign flail" cases confirmed
+    append-func/deep-nest/remove-block flails ALWAYS end correct (repeat-guard
+    noise, safe). But it reclassified **diff-report gemma from a reps=1 lucky
+    done=Y to a real 2/3 failure** — and rep r2 is a **pure false-completion:
+    1 iteration, ZERO tool calls, self-terminated "answered", silent wrong output
+    (`'\n'`)** on a realistic ~50-line multi-function file. Current stop-nets can
+    NEVER catch this shape: with no mutating action, no repeat/noop/error streak
+    accrues. This is the exact lever-#3 (completion-gate on zero mutating actions)
+    target — logged as accumulating justification. **Lever #3 remains
+    unbuilt/unapproved; needs explicit user OK before building.** Also reworded
+    the insert-const case (harness-only) to remove a "comma-space" literal-string
+    trap that produced a false-negative qythos9 signal. (LOG Rounds 42–43.)
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
