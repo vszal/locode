@@ -47,6 +47,20 @@ def test_env_overrides_toml(tmp_path, monkeypatch):
     assert cfg.server.port == 7000
 
 
+def test_env_sets_max_history_chars(tmp_path, monkeypatch):
+    # The knob that lets an eval force a single headless turn through the
+    # auto-compact path; a real session only crosses it over many turns.
+    p = tmp_path / "config.toml"
+    p.write_text("[agent]\nmax_history_chars = 100000\n")
+    monkeypatch.setenv("LOCODE_MAX_HISTORY_CHARS", "30000")
+    assert Config.load(p).agent.max_history_chars == 30000
+
+
+def test_env_max_history_chars_ignores_garbage(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCODE_MAX_HISTORY_CHARS", "lots")
+    assert Config.load(tmp_path / "missing.toml").agent.max_history_chars == 100_000
+
+
 def test_cli_override_wins(tmp_path):
     cfg = Config().override(model="gemma27", port=1234)
     assert cfg.model.default == "gemma27"

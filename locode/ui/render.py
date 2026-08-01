@@ -246,12 +246,33 @@ _FAIL_RE = re.compile(
     re.IGNORECASE)
 
 
-def _salient(content: str) -> tuple[str, bool]:
+# Tools whose result is DATA, not a status report: file bodies, path lists,
+# matching source lines. Verdict-sniffing them is a category error — the regexes
+# above match any `except ValueError:` or `print("Error: ...")` that happens to
+# be in the file, so reading an ordinary Python module rendered as a red ✗
+# headlined by a random line from its middle. (Reported 2026-08-01: a user read
+# a healthy script and saw `✗ 187  print(f"Error: Local directory ...`, which
+# reads as "the read failed".) A genuine failure in these tools still sets
+# is_error on the ToolResult and is still shown red.
+_DATA_TOOLS = frozenset({"read_file", "glob", "grep", "ls"})
+
+
+def _salient(content: str, *, sniff_verdict: bool = True) -> tuple[str, bool]:
     """(summary line, looks_failed) for a tool result. Surfaces the conclusion
-    line (scanning from the end, where verdicts live) rather than the banner."""
+    line (scanning from the end, where verdicts live) rather than the banner.
+
+    With sniff_verdict False the content is treated as opaque data: first line
+    plus a count, and never flagged as failed (see _DATA_TOOLS)."""
     text = (content or "").strip()
     if not text:
         return "(no output)", False
+    if not sniff_verdict:
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if not lines:
+            return "(no output)", False
+        if len(lines) == 1:
+            return _truncate(lines[0], 80), False
+        return f"{_truncate(lines[0], 56)}  (+{len(lines) - 1} more lines)", False
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     if not lines:
         return "(no output)", False
@@ -273,7 +294,7 @@ def format_run(name: str, args: dict, *, color: bool = True) -> str:
 
 
 def format_result(name: str, content: str, is_error: bool, *, color: bool = True) -> str:
-    summ, failed = _salient(content)
+    summ, failed = _salient(content, sniff_verdict=name not in _DATA_TOOLS)
     if is_error:
         return f"    {_wrap('✗', _RED, color)} {_wrap(summ, _RED, color)}"
     if failed:

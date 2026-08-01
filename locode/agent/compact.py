@@ -28,6 +28,24 @@ agentic tool-call transcript:
     tool-CALL argument bodies (e.g. the full file text passed to write_file)
     outside the recent window keep their shape (tool name, path) but not
     their bulk.
+  - Collapse: a prose reply the model has already sent verbatim is kept ONCE
+    and marked with how often it recurred (see _dedupe_stale_claims).
+
+THE RATCHET (2026-08-01, user-reported session). The three rules above are
+individually sensible and together produced the product's worst failure mode.
+Shrinking a tool result to "output omitted" while keeping any assistant reply
+under _MAX_MESSAGE_CHARS *verbatim* inverts the fidelity: the model's CLAIM
+about the evidence outlived the evidence itself. And because a short confident
+summary is always under the threshold, every restatement of it also survived —
+so a wrong conclusion accumulated copies while the output that would refute it
+was stripped. Measured on the reported session's shape: 44,591 -> 1,865 chars,
+of which the survivors were six identical copies of one stale, wrong summary
+interleaved with "output omitted" placeholders. The model then had no way back
+— it was being fed its own error as the best-attested thing in context.
+
+Hence the two rules that break it: repeated prose collapses to a single
+annotated copy (accumulation is capped at one), and a collapsed tool result
+now says its conclusions are stale rather than implying they still stand.
 """
 
 from __future__ import annotations
@@ -68,6 +86,21 @@ _MAX_MESSAGE_CHARS = 800
 # though everything else in the window is left completely untouched. Well
 # above _MAX_MESSAGE_CHARS so ordinary recent turns are never affected.
 _RECENT_SHRINK_THRESHOLD = 4000
+
+# Below this length a repeated reply is an acknowledgement ("Done.", "OK") and
+# collapsing it would be noise-for-noise; the ratchet is driven by substantial
+# prose summaries. The reported session's stale summary was ~450 chars.
+_MIN_DEDUPE_CHARS = 120
+
+# Appended to the single surviving copy of a repeated reply. Deliberately
+# actionable rather than a bare "[x2]": the model that most needs this is the
+# one stuck restating a stale conclusion, and the useful thing to tell it is
+# what to do INSTEAD. Machine-strippable so a later pass can re-read the count
+# and merge it (see _repeat_count) rather than nesting markers.
+_REPEAT_MARKER_RE = re.compile(
+    r"\n\[compacted: this exact reply was sent (\d+) times?[^\]]*\]\s*$")
+
+_WS_RE = re.compile(r"\s+")
 
 
 def estimate_chars(history: list[dict]) -> int:
@@ -114,7 +147,18 @@ def compact_history(history: list[dict], *, keep_recent: int = 8) -> tuple[list[
 
     shrunk_recent = [_shrink_if_oversized(m) for m in recent]
 
-    new_history = system + kept + shrunk_recent
+    # Deduped across the WHOLE body, recent window included, and AFTER shrinking
+    # (so two copies truncated to the same head still compare equal).
+    #
+    # The recent window is otherwise left alone as "work in progress" — but a
+    # verbatim-repeated prose reply is the exact opposite of progress, and the
+    # recent window is where a stale claim does the MOST damage, being both the
+    # most salient position and the one the model reads back first. Confining
+    # the dedupe to `old` capped the ratchet's growth but still handed the model
+    # keep_recent/2 fresh copies of its own stale conclusion every pass, which
+    # is the reported failure verbatim. Precedent for reaching into the window
+    # when a specific pathology demands it: _shrink_if_oversized.
+    new_history = system + _dedupe_stale_claims(kept + shrunk_recent)
     after_n, after_chars = len(new_history), estimate_chars(new_history)
     if new_history == history:
         return history, (f"nothing to compact ({before_n} messages, "
@@ -142,6 +186,77 @@ def _kind(msg: dict) -> str:
     return "user_prompt"
 
 
+def _repeat_count(content: str) -> int:
+    """How many sends this message already stands for — 1 unless a previous
+    compaction pass already collapsed copies into it."""
+    m = _REPEAT_MARKER_RE.search(content)
+    return int(m.group(1)) if m else 1
+
+
+def _strip_repeat_marker(content: str) -> str:
+    return _REPEAT_MARKER_RE.sub("", content)
+
+
+def _repeat_marker(n: int) -> str:
+    return (f"\n[compacted: this exact reply was sent {n} times and never "
+            "advanced the task — do not send it again. Re-read the file or "
+            "re-run the command and base your next reply on that output.]")
+
+
+def _dedupe_key(msg: dict) -> str | None:
+    """The identity a repeated prose reply is collapsed on, or None when the
+    message must be left alone.
+
+    Two exclusions matter. A reply carrying a ```tool``` fence is never
+    collapsed — dropping one would break the call/result pairing that the rest
+    of the history is threaded on, and a genuinely repeated CALL is the repeat
+    guard's job in loop.py, not compaction's. And a short reply is an
+    acknowledgement, not a stale conclusion (see _MIN_DEDUPE_CHARS)."""
+    if _kind(msg) != "assistant":
+        return None
+    content = msg.get("content") or ""
+    if _FENCE_BLOCK_RE.search(content):
+        return None
+    body = _strip_repeat_marker(content)
+    key = _WS_RE.sub(" ", body).strip().lower()
+    return key if len(key) >= _MIN_DEDUPE_CHARS else None
+
+
+def _dedupe_stale_claims(msgs: list[dict]) -> list[dict]:
+    """Keep the FIRST copy of each repeated prose reply, annotated with the
+    total send count; drop the rest.
+
+    First rather than last, for two reasons: it keeps the claim at the point in
+    the transcript where it was actually introduced (so it reads as old, which
+    it is), and it keeps message positions stable across passes, which is what
+    makes a second pass a no-op. Counts merge across passes because the marker
+    is parsed back out by _repeat_count before comparison."""
+    counts: dict[str, int] = {}
+    first: dict[str, int] = {}
+    for i, m in enumerate(msgs):
+        key = _dedupe_key(m)
+        if key is None:
+            continue
+        counts[key] = counts.get(key, 0) + _repeat_count(m.get("content") or "")
+        first.setdefault(key, i)
+
+    out: list[dict] = []
+    for i, m in enumerate(msgs):
+        key = _dedupe_key(m)
+        if key is None:
+            out.append(m)
+            continue
+        if first[key] != i:
+            continue  # a later copy of a claim already kept above
+        n = counts[key]
+        if n < 2:
+            out.append(m)
+            continue
+        body = _strip_repeat_marker(m.get("content") or "")
+        out.append({**m, "content": body + _repeat_marker(n)})
+    return out
+
+
 def _shrink_if_oversized(msg: dict) -> dict:
     """Applied to every message in the recent window — normally a pure no-op.
     Prompts and live nudges are never touched here regardless of size. A
@@ -167,20 +282,39 @@ def _shrink_tool_result(msg: dict) -> dict:
     names = list(dict.fromkeys(_TOOL_NAME_RE.findall(content)))
     if not names:
         return _truncate(msg)
+    # NOT "already used earlier in this session" — that phrasing reads as an
+    # endorsement of whatever the model concluded from the output, which is
+    # exactly the half of the ratchet that let a stale claim stand in for the
+    # evidence it was supposed to rest on. Say it's gone and re-checkable.
+    # "Re-read or re-run if you need it" used to lead this sentence, and in the
+    # regime that triggers compaction at all — a corpus bigger than the budget —
+    # that is an invitation into the loop: the re-read costs the same space
+    # again and evicts something else. Keep the anti-ratchet half (don't trust
+    # the stale conclusion) but make re-reading the deliberate choice, not the
+    # suggested default.
     summary = ("Tool results (compacted): " + ", ".join(names) +
-              " — output omitted, already used earlier in this session.")
+              " — output dropped to fit the context budget; you did run these, "
+              "only the text is gone. Don't trust an earlier conclusion about "
+              "them, and re-run one only if you need its output again.")
     return {**msg, "content": summary}
 
 
 def _shrink_assistant(msg: dict) -> dict:
     content = msg.get("content") or ""
+    # A repeat marker from an earlier pass is signal, not bulk. Hold it aside
+    # so truncation can't eat it (which would lose the count AND un-annotate a
+    # claim that is still stale), then reattach.
+    marker = ""
+    found = _REPEAT_MARKER_RE.search(content)
+    if found:
+        marker, content = found.group(0), content[:found.start()]
     shrunk = _FENCE_BLOCK_RE.sub(_shrink_fenced_block, content)
-    if shrunk != content:
-        msg = {**msg, "content": shrunk}
-        content = shrunk
-    if len(content) > _MAX_MESSAGE_CHARS:
-        return _truncate(msg)
-    return msg
+    if len(shrunk) > _MAX_MESSAGE_CHARS:
+        shrunk = (f"{shrunk[:_MAX_MESSAGE_CHARS]}"
+                  f"\n…[compacted: {len(shrunk):,} chars total]")
+    if shrunk == content and not marker:
+        return msg
+    return {**msg, "content": shrunk + marker}
 
 
 def _shrink_fenced_block(m: re.Match) -> str:

@@ -1002,6 +1002,11 @@ async def test_slow_progress_nudges_once_past_grace(tmp_path, monkeypatch):
     cfg.agent.slow_progress_ratio = 0.5
     cfg.agent.slow_progress_grace_seconds = 10
     cfg.agent.slow_progress_grace_iterations = 1
+    # The dirs must EXIST: a script of 20 failing ls calls now trips the
+    # consecutive-error guard long before the wallclock, which is not what this
+    # test is about.
+    for i in range(20):
+        (tmp_path / f"d{i}").mkdir()
     scripted = [native_call("ls", path=f"d{i}") for i in range(20)]
     client = SlowFakeClient(scripted, clock, seconds_per_call=50)
     loop = make_loop_with_client(tmp_path, client, cfg=cfg)
@@ -2232,3 +2237,231 @@ def test_ledger_line_is_empty_when_nothing_worth_reciting():
     line = _ledger_line({"f.py": 2}, {}, 1, True)
     assert "edited f.py 2×" in line and "run a check 1×" in line
     assert "not green" not in line
+
+
+# --- compaction vs the repeat guard -----------------------------------------
+# Two guards that are each correct alone were killing turns together: compaction
+# tells the model "output omitted — re-read if you need it", then the repeat
+# guard stops it for making that identical read. See _forgive_rereads.
+
+def _sig(name, **args):
+    return (name, json.dumps(args, sort_keys=True, ensure_ascii=False))
+
+
+def test_forgive_rereads_clears_read_only_streaks():
+    from locode.agent.loop import _forgive_rereads
+    streaks = {(_sig("read_file", path="a.py"),): ("out", 2),
+               (_sig("grep", pattern="x"),): ("out", 1)}
+    nudged = {(_sig("read_file", path="a.py"),)}
+    assert _forgive_rereads(streaks, nudged, {}) == 2
+    assert streaks == {}
+    assert nudged == set()  # nudge re-armed, so it doesn't stop on sight
+
+
+def test_forgive_rereads_never_forgives_mutations_or_bash():
+    from locode.agent.loop import _forgive_rereads
+    # A repeated mutating edit is not progress no matter what the context looks
+    # like (build 42), and bash can mutate — both keep their streaks.
+    edit = (_sig("edit_file", path="a.py", old="x", new="y"),)
+    shell = (_sig("bash", command="rm -rf build"),)
+    streaks = {edit: ("ok", 2), shell: ("ok", 2)}
+    assert _forgive_rereads(streaks, set(), {}) == 0
+    assert set(streaks) == {edit, shell}
+
+
+def test_forgive_rereads_leaves_mixed_batches_alone():
+    from locode.agent.loop import _forgive_rereads
+    # One batch carrying both a read and an edit still counts as a repeat.
+    mixed = (_sig("read_file", path="a.py"), _sig("edit_file", path="a.py"))
+    streaks = {mixed: ("ok", 2)}
+    assert _forgive_rereads(streaks, set(), {}) == 0
+    assert set(streaks) == {mixed}
+
+
+def test_forgive_rereads_is_bounded_per_signature():
+    # Unbounded forgiveness disarms the repeat guard exactly when compaction is
+    # frequent: every firing wipes the streak, so a real read loop never
+    # accumulates one. Measured live at a 70k budget — 7 compactions, 18
+    # forgiven re-reads, 16 repeats, no answer.
+    from locode.agent.loop import _forgive_rereads, _MAX_FORGIVEN_REREADS
+    sig = (_sig("read_file", path="a.py"),)
+    counts: dict = {}
+    for _ in range(_MAX_FORGIVEN_REREADS):
+        assert _forgive_rereads({sig: ("out", 2)}, set(), counts) == 1
+    streaks = {sig: ("out", 2)}
+    assert _forgive_rereads(streaks, set(), counts) == 0
+    assert streaks == {sig: ("out", 2)}   # the guard can see it again
+
+
+@pytest.mark.asyncio
+async def test_compaction_mid_turn_does_not_repeat_stop_a_reread(tmp_path):
+    # The live build-58 failure: the model finished its edit, then re-read three
+    # files whose output compaction had discarded, and was repeat-stopped for it.
+    for n in "abc":
+        (tmp_path / f"{n}.py").write_text(f"# {n}\n" + ("x = 1\n" * 1200))
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 2
+    cfg.agent.max_history_chars = 40_000
+    cfg.agent.auto_compact_ratio = 0.25   # compact early and often
+    reads = [native_call("read_file", path=f"./{n}.py") for n in "abc"]
+    loop = make_loop(tmp_path, reads + reads
+                     + [{"role": "assistant", "content": "a.py is longest."}], cfg=cfg)
+    out = await loop.run_turn("read the three files, then tell me about them")
+    assert out == "a.py is longest."
+    assert "repeated the same tool call" not in out
+
+
+@pytest.mark.asyncio
+async def test_reread_loop_still_stops_despite_frequent_compaction(tmp_path):
+    # The other side of the bound: the same read over and over, with compaction
+    # firing between each, must still be caught. Forgiveness buys a re-read a
+    # second chance, not immunity.
+    (tmp_path / "a.py").write_text("# a\n" + ("x = 1\n" * 1200))
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 2
+    cfg.agent.max_history_chars = 40_000
+    cfg.agent.auto_compact_ratio = 0.25
+    loop = make_loop(tmp_path, [native_call("read_file", path="./a.py")] * 12, cfg=cfg)
+    out = await loop.run_turn("read a.py")
+    assert "repeated the same tool call" in out
+
+
+@pytest.mark.asyncio
+async def test_repeat_stop_still_fires_when_compaction_never_runs(tmp_path):
+    # The guard must keep working normally — this is the control for the test
+    # above, with the history far too small to ever trigger compaction.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    loop = make_loop(tmp_path, [native_call("read_file", path="./a.py")] * 8, cfg=cfg)
+    out = await loop.run_turn("read a.py")
+    assert "repeated the same tool call" in out
+
+
+# --- telling the model it was compacted (4.17) ------------------------------
+# Compaction used to be invisible to the model: evidence vanished from under it
+# with no signal, so it read the gap as forgetfulness and re-read — which costs
+# the same space again and compacts again. Live thrash (eval long-context-find,
+# 88k of files against a 70k budget): read alpha..echo, compact, then
+# alpha/bravo/alpha/charlie/alpha/charlie/delta/delta until the repeat guard
+# stopped the turn with the question unanswered.
+
+def _compact_notices(events):
+    # Counted from the event stream, not the final history: the notice is an
+    # ordinary message and a LATER compaction pass may well shrink it away
+    # again. What matters is that it was in front of the model at the moment
+    # its context was cut, which is exactly what the event records.
+    return [e for e in events
+            if e.get("phase") == "nudge" and e.get("reason") == "context compacted"]
+
+
+@pytest.mark.asyncio
+async def test_compaction_tells_the_model_it_happened(tmp_path):
+    for n in "abc":
+        (tmp_path / f"{n}.py").write_text(f"# {n}\n" + ("x = 1\n" * 1200))
+    cfg = Config()
+    cfg.agent.max_history_chars = 40_000
+    cfg.agent.auto_compact_ratio = 0.25
+    reads = [native_call("read_file", path=f"./{n}.py") for n in "abc"]
+    loop = make_loop(tmp_path, reads + [{"role": "assistant", "content": "done"}],
+                     cfg=cfg)
+    events: list = []
+    loop._on_event = events.append
+    await loop.run_turn("read the three files")
+    assert _compact_notices(events), \
+        "the model was never told its context had been compacted"
+    body = next(m["content"] for m in loop.history
+                if m.get("kind") == "nudge" and "Context notice" in m["content"])
+    assert "re-read" in body      # the specific behaviour to avoid
+    assert "survive" in body      # and why writing conclusions down works
+
+
+@pytest.mark.asyncio
+async def test_compaction_notice_is_bounded(tmp_path):
+    # Repeating the advice every single compaction turns it into boilerplate
+    # AND spends the very budget it is warning about. Say it twice, then stop.
+    from locode.agent.loop import _MAX_COMPACT_NOTICES
+    (tmp_path / "a.py").write_text("# a\n" + ("x = 1\n" * 1200))
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 50        # let it run; we're counting notices
+    cfg.agent.max_history_chars = 40_000
+    cfg.agent.auto_compact_ratio = 0.25
+    loop = make_loop(tmp_path, [native_call("read_file", path="./a.py")] * 14,
+                     cfg=cfg)
+    events: list = []
+    loop._on_event = events.append
+    await loop.run_turn("read a.py")
+    # Compaction fires on nearly every one of the ~50 iterations here; the
+    # notice must not.
+    assert len(_compact_notices(events)) == _MAX_COMPACT_NOTICES
+
+
+@pytest.mark.asyncio
+async def test_no_compaction_no_notice(tmp_path):
+    # Control: a small turn must not get a scary context warning.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop(tmp_path, [native_call("read_file", path="./a.py"),
+                                {"role": "assistant", "content": "read it"}])
+    events: list = []
+    loop._on_event = events.append
+    await loop.run_turn("read a.py")
+    assert _compact_notices(events) == []
+
+
+# --- every call failing (4.16) ----------------------------------------------
+# Content-independent sibling of the same-error stall. A model guessing at
+# filenames gets a NEW error each time, so neither max_error_stall (keyed on
+# error text) nor the repeat guard (keyed on the call) can see it. Observed:
+# nine consecutive iterations reading notes/golf.py ... notes/tango.py, none of
+# which existed, after compaction dropped the real file contents.
+
+def _allerr_nudges(loop):
+    return [m for m in loop.history
+            if m.get("kind") == "nudge" and "ALL failed" in m["content"]]
+
+
+@pytest.mark.asyncio
+async def test_distinct_failing_calls_are_nudged_then_stopped(tmp_path):
+    cfg = Config()
+    cfg.agent.max_consecutive_errors = 3
+    # Every path distinct, so the repeat guard never fires; every error text
+    # distinct, so the same-error stall never fires either.
+    scripted = [native_call("read_file", path=f"./gone{i}.py") for i in range(12)]
+    loop = make_loop(tmp_path, scripted, cfg=cfg)
+    out = await loop.run_turn("find the handler")
+    assert len(_allerr_nudges(loop)) == 1        # steered once...
+    assert "every tool call kept failing" in out  # ...then the turn ends
+
+
+@pytest.mark.asyncio
+async def test_one_success_clears_the_all_error_streak(tmp_path):
+    # The guard must not punish a model that is failing occasionally but
+    # getting somewhere: any success in a batch resets the count.
+    cfg = Config()
+    cfg.agent.max_consecutive_errors = 3
+    scripted = []
+    for i in range(6):
+        (tmp_path / f"ok{i}.py").write_text(f"x = {i}\n")
+        scripted.append(native_call("read_file", path=f"./gone{i}.py"))
+        scripted.append(native_call("read_file", path=f"./ok{i}.py"))
+    scripted.append({"role": "assistant", "content": "a.py holds x."})
+    loop = make_loop(tmp_path, scripted, cfg=cfg)
+    out = await loop.run_turn("look around")
+    assert out == "a.py holds x."
+    assert _allerr_nudges(loop) == []
+
+
+@pytest.mark.asyncio
+async def test_partly_failing_batch_does_not_count(tmp_path):
+    # A parallel batch where one call succeeded did something; only a batch in
+    # which NOTHING succeeded is counted.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.agent.max_consecutive_errors = 2
+    batch = native_multi(("read_file", {"path": "./a.py"}),
+                         ("read_file", {"path": "./gone.py"}))
+    loop = make_loop(tmp_path, [batch] * 5
+                     + [{"role": "assistant", "content": "done looking."}], cfg=cfg)
+    out = await loop.run_turn("look")
+    assert _allerr_nudges(loop) == []
+    assert "every tool call kept failing" not in out

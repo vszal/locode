@@ -188,6 +188,87 @@ the lived experience.*
   dead-ends). Slower 9B that can hit the generation cap on large writes, but
   editing reliability dominates interactive use. Landed in config.py,
   scaffold.py, config.toml.example, test_config.py (build 26). User decision.
+- `[x]` **4.15 The compaction ratchet + the guards that fought it (builds
+  58-61, 2026-08-01).** User: qythos9 "still falls into repeat loops, stops
+  before plans are finished ... basically not usable" — then supplied a real
+  failing session (`~/Code/skills`, `sync_gke_compute_classes.py`). The eval
+  said 31/31 clean. Both were true: **every battery case finished far below the
+  75,000-char auto-compact threshold**, so the entire context-management path
+  had zero coverage, and builds 55-57 were validated in a regime real sessions
+  leave within two tool calls.
+  - **The ratchet (b58, `agent/compact.py`).** Fidelity inversion: a short
+    confident assistant claim survived compaction verbatim while the tool
+    evidence it rested on collapsed to a one-liner, and repeated copies
+    accumulated. Measured on the reported shape: 44,591 → 1,865 chars with six
+    identical copies of a wrong conclusion, none of its evidence.
+    `_dedupe_stale_claims` now runs over the kept region *and* the recent
+    window (confining it to the pre-window region left the fresh copies exactly
+    where they hurt most), collapsing ≥120-char identical prose replies to one
+    annotated copy: "this exact reply was sent N times and never advanced the
+    task — do not send it again." Never touches a reply carrying a tool call
+    (that would break call/result pairing) or a short ack. Counts merge across
+    passes; the marker is held aside during truncation so a later pass can't
+    silently un-annotate a still-stale claim. The collapsed-tool-output summary
+    no longer says "already used earlier" — it says re-read, don't assume your
+    earlier conclusion holds.
+  - **Repeat guard vs compaction (b59, `agent/loop.py`).** The two contradicted
+    each other: compaction tells the model to re-read, then `seen_streak`
+    killed the identical re-read as a loop. `_forgive_rereads` clears
+    read-only (`read_file`/`ls`/`glob`/`grep`) streaks and re-arms the nudge on
+    every auto-compact. Live A/B: before = repeat-stopped at 9 iterations with
+    the question unanswered; after = 14 iterations, 3 compactions, converged,
+    correct answer. **Bounded in b62** after the new eval case caught the
+    obvious follow-on defect: forgiving unconditionally *disarms* the repeat
+    guard precisely when compaction is frequent, because every firing wipes the
+    streaks and a real read loop never accumulates one. Measured at a 70k
+    budget before the bound: 11 compactions, 24 repeats, 30 iterations, no
+    answer. Each signature now gets `_MAX_FORGIVEN_REREADS = 2`; after that the
+    guard sees it again.
+  - **Reads rendered as failures (b60, `render._salient`).** Verdict-sniffing
+    was applied to `read_file` output, so reading any file containing the word
+    "error" rendered a red ✗ headlined by that line. `_DATA_TOOLS` now skip the
+    sniff; `bash` still gets it.
+  - **Coverage (b61 + `evals/`).** `LOCODE_MAX_HISTORY_CHARS` lets one headless
+    turn be put in the compaction regime on purpose. `replay.py` now counts and
+    shows compactions and forgiven re-reads — they were previously invisible in
+    every replay, which is a large part of why the ratchet survived so many
+    sweeps. New `evals/night/real_battery.py` case `long-context-find`: six
+    ~15k handler modules where the target is identified by *behaviour* (one
+    handler reports its neighbour's name in `handled_by`) so no grep can
+    shortcut the reading. qythos9 passes it — reads all six, localizes
+    correctly, lands the edit on the far side of a compaction.
+- `[x]` **4.16 Consecutive-error guard (build 63).** Surfaced by 4.15's case:
+  after compaction dropped the file contents, qythos9 invented `notes/golf.py`
+  … `notes/tango.py` and burned **nine consecutive iterations** on files that
+  never existed. Nothing stopped it. The repeat guard couldn't (each path is
+  genuinely a new call); `max_error_stall` couldn't either, because it keys on
+  *byte-identical error output* and "no such file: …/golf.py" ≠ "…/hotel.py".
+  The fix is content-independent: `_run_calls` now also reports whether **every
+  call that ran** errored, and `max_consecutive_errors` (default 4) batches of
+  that nudges once — say plainly that everything failed, stop guessing paths,
+  `ls`/`glob` and work from names that came back — then ends the turn. Any
+  single success anywhere in a batch clears the streak, so a model that is
+  failing *and* getting somewhere is untouched. Denied and unknown-tool calls
+  are excluded (they never reached a tool; denials have their own counter).
+- `[x]` **4.17 Compaction is visible to the model (build 64).** The last half of
+  the ratchet, and the one that actually reproduces the user's report. Auto-
+  compaction was announced to the *user* and hidden from the *model*: evidence
+  vanished from under it with no signal, so it read the gap as forgetfulness and
+  re-read — and a re-read costs the same space again, so it compacts again.
+  Measured (eval `long-context-find`, six modules totalling 88k chars against a
+  70k budget): read alpha…echo, compact, then alpha/bravo/alpha/charlie/alpha/
+  charlie/delta/delta, 8 repeats, turn stopped, question unanswered. No loop
+  guard can fix that — the corpus genuinely does not fit, so the model *must*
+  work file-by-file and record findings, and it cannot know to do that unless
+  it is told. Two changes: (a) the loop appends a bounded `Context notice`
+  (`_MAX_COMPACT_NOTICES = 2` — the third is boilerplate, and it costs the very
+  budget it warns about) saying older tool output was dropped, that re-reading
+  evicts something else, and that *replies survive compaction while tool output
+  does not*, so state each conclusion in plain text before moving on; (b) the
+  shrunk-result summary no longer *opens* with "Re-read or re-run if you need
+  it" — in the only regime where compaction fires, that sentence is an
+  invitation into the loop. It keeps the anti-ratchet half ("don't trust an
+  earlier conclusion") and makes the re-read a deliberate choice.
 - `[x]` **4.5 Tool-result verdict is legible (build 39).** Found by *watching* a
   weak model fix a real bug (not from a score): `format_result` summarized a
   multi-line result by its first line, so a `pytest` result rendered as

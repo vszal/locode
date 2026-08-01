@@ -346,3 +346,47 @@ def test_slash_has_retry_and_describe():
     assert "retry" in slash.command_names()
     assert slash.describe("retry")
     assert slash.describe("nope") == ""
+
+
+# --- data tools are not verdict-sniffed --------------------------------------
+# Reading a file whose CONTENTS mention an exception is not a failed read.
+
+_SRC_WITH_ERROR_TEXT = (
+    '     1\t"""Sync helper."""\n'
+    "     2\timport os\n"
+    "   187\t        print(f\"Error: Local directory {LOCAL_DIR} missing\")\n"
+    "   188\t    return 0\n")
+
+
+def test_read_file_containing_the_word_error_is_not_marked_failed():
+    # The reported bug: a healthy read rendered as `✗ 187  print(f"Error: ...`,
+    # which reads as "the read failed" and buries what was actually read.
+    out = render.format_result("read_file", _SRC_WITH_ERROR_TEXT,
+                               is_error=False, color=False)
+    assert "✗" not in out
+    assert "✓" in out
+    assert "Sync helper" in out       # headline is the file's FIRST line...
+    assert "Local directory" not in out  # ...not a line from its middle
+
+
+def test_grep_hits_quoting_exceptions_are_not_marked_failed():
+    hits = "a.py:12: raise ValueError(bad)\nb.py:3: except Exception:"
+    out = render.format_result("grep", hits, is_error=False, color=False)
+    assert "✗" not in out
+
+
+def test_data_tool_still_shows_a_genuine_tool_error():
+    # is_error on the ToolResult is the real signal and still wins.
+    out = render.format_result("read_file", "no such file: /tmp/x",
+                               is_error=True, color=False)
+    assert "✗" in out
+
+
+def test_bash_output_is_still_verdict_sniffed():
+    # The behaviour this fix must NOT regress: bash output IS a status report.
+    failed = render.format_result("bash", "collected 3 items\n2 failed, 1 passed",
+                                  is_error=False, color=False)
+    passed = render.format_result("bash", "collected 3 items\n3 passed in 0.1s",
+                                  is_error=False, color=False)
+    assert "✗" in failed and "2 failed" in failed
+    assert "✓" in passed and "3 passed" in passed

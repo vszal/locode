@@ -144,6 +144,7 @@ class AgentConfig:
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing
+    max_consecutive_errors: int = 4  # nudge/bail when nothing at all succeeds
     # Nudge if the model edits the SAME file this many times in a row without
     # ever running anything (py_compile/pytest/python) or re-reading it to see
     # the result — the open-loop editing that lets a weak model "fix" a file
@@ -318,6 +319,15 @@ class Config:
             self.server.auto_start = False
         if "LOCODE_EDITOR" in env:
             self.editor.command = env["LOCODE_EDITOR"]
+        # Compaction budget. Exposed because the auto-compact path is otherwise
+        # untestable end-to-end: a real session crosses the 75k threshold over
+        # many turns, but an eval case is one headless turn. Setting this low
+        # puts a short run into the compaction regime on purpose.
+        if "LOCODE_MAX_HISTORY_CHARS" in env:
+            try:
+                self.agent.max_history_chars = int(env["LOCODE_MAX_HISTORY_CHARS"])
+            except ValueError:
+                pass
         # Search keys: explicit config wins; otherwise fall back to standard envs.
         if not self.web.tavily_api_key and env.get("TAVILY_API_KEY"):
             self.web.tavily_api_key = env["TAVILY_API_KEY"]

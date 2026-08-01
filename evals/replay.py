@@ -118,6 +118,13 @@ def summarize(events: list[dict]) -> dict:
     stop_reason = None
     model = None
     wall = 0.0
+    # Auto-compaction was completely invisible here, which is a large part of
+    # why the compaction ratchet (see agent/compact.py) survived so many sweeps:
+    # no case in the battery ever grew big enough to trigger it, and nothing
+    # would have reported it if one had. A run that compacted is in a different
+    # regime from one that didn't and has to be readable as such.
+    compactions = 0
+    rereads_forgiven = 0
 
     for ev in events:
         ph = ev.get("phase")
@@ -149,6 +156,10 @@ def summarize(events: list[dict]) -> dict:
                     noops += 1
             if _cleared_by_mutation(ev):
                 seen_keys.clear()
+        elif ph == "info":
+            if "auto-compacted" in (ev.get("text") or ""):
+                compactions += 1
+                rereads_forgiven += int(ev.get("rereads_forgiven") or 0)
         elif ph == "nudge":
             nudges[ev.get("reason", "?")] += 1
         elif ph == "denied":
@@ -170,6 +181,8 @@ def summarize(events: list[dict]) -> dict:
         "saw_green": saw_green,
         "stop_reason": stop_reason,
         "wall": wall,
+        "compactions": compactions,
+        "rereads_forgiven": rereads_forgiven,
     }
 
 
@@ -183,6 +196,12 @@ def verdict_lines(name: str, s: dict, *, color: bool = False) -> list[str]:
     head = _c(f"VERDICT {name} · {s['model']}", "\033[1m", color)
     l2 = (f"  {s['iterations']} iters · {s['wall']:.0f}s · "
           f"{s['tool_calls']} tool calls")
+    # Say so loudly: a compacted run has had context deleted under it, so its
+    # flails mean something different from an uncompacted run's.
+    if s.get("compactions"):
+        l2 += _c(f" · ⚠ {s['compactions']} compaction(s)", yellow, color)
+        if s.get("rereads_forgiven"):
+            l2 += _c(f", {s['rereads_forgiven']} re-read(s) forgiven", dim, color)
     flags = []
     if s["fails"]:
         flags.append(_c(f"✗ {s['fails']} failed", red, color))
@@ -210,13 +229,23 @@ def verdict_lines(name: str, s: dict, *, color: bool = False) -> list[str]:
     return lines
 
 
+def _clip(s: str, n: int) -> str:
+    """Length-clip without touching whitespace (render._truncate flattens it)."""
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
 def _edit_preview(name: str, args: dict) -> str:
     """A short peek at what an edit is trying to do, so a repeated edit is
     visible as the same old→new (format_run alone only shows the path)."""
     if name in ("edit_file",):
-        old = render._truncate(str(args.get("old", "")), 32)
-        new = render._truncate(str(args.get("new", "")), 32)
-        return f"      {old!r} ⟶ {new!r}"
+        # repr FIRST, then truncate: render._truncate flattens "\n" to a space,
+        # which turned a correct '# FIXME\n\ndef f():' into a preview reading
+        # '# FIXME  def f():' -- i.e. it looked like the edit had commented the
+        # def out. Misread a passing run as a failure on the strength of it
+        # (2026-08-01). Whitespace is the whole story in a Python edit.
+        old = _clip(repr(str(args.get("old", ""))), 36)
+        new = _clip(repr(str(args.get("new", ""))), 36)
+        return f"      {old} ⟶ {new}"
     if name == "replace_lines":
         return f"      lines {args.get('start')}-{args.get('end')}"
     return ""

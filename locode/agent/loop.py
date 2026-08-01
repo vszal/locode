@@ -47,6 +47,23 @@ PROSE_REPEAT_MIN_CHARS = 2000
 _MUTATING_EDIT_TOOLS = frozenset(
     {"write_file", "append_file", "edit_file", "replace_lines"})
 
+# Pure reads: no side effects, and their whole value is the output they put in
+# the context. When compaction throws that output away (agent/compact.py), a
+# re-issued read is the ONLY way back to the evidence — see _forgive_rereads.
+# bash is deliberately absent: it can mutate, so its streak always stands.
+_REREADABLE_TOOLS = frozenset({"read_file", "ls", "glob", "grep"})
+
+# How many times one read signature may be forgiven before the repeat guard is
+# allowed to see it again. Two: the first re-read after a compaction is the
+# system working as designed, a second is plausible, a third is a loop.
+_MAX_FORGIVEN_REREADS = 2
+
+# How many times a turn tells the model that its context was compacted. The
+# advice ("write down what you found; re-reading costs the same space again")
+# is worth saying, and worth saying twice; by the third time it is boilerplate
+# the model reads past, and it competes for the same budget it is warning about.
+_MAX_COMPACT_NOTICES = 2
+
 # How much of a reply's opening identifies it. Long enough that two unrelated
 # replies don't collide, short enough to sit well inside the region a
 # regenerated document reproduces verbatim.
@@ -194,6 +211,10 @@ class AgentLoop:
         # Lets the repeat nudge pick the accurate message.
         repeat_varied: dict[tuple, bool] = {}
         error_streaks: dict[str, int] = {}
+        # Per-signature budget for _forgive_rereads, so frequent compaction
+        # can't permanently disarm the repeat guard for read-only batches.
+        forgiven_rereads: dict[tuple, int] = {}
+        compact_notices = 0
         # Consecutive iterations whose edit batch changed the file NOTHING (a
         # blind guess — usually at a line the error names but that is actually
         # fine, since tracebacks/compilers misreport the location). The first is
@@ -202,6 +223,10 @@ class AgentLoop:
         # third stops the turn. Reset the moment any batch does real work.
         nochange_streak = 0
         nudged_nochange = False
+        # Consecutive batches in which nothing succeeded, regardless of what
+        # the errors said. See the all_errored branch below.
+        allerr_streak = 0
+        nudged_allerr = False
         # Verify-gate: consecutive mutating edits to a file (by basename) with no
         # intervening look at ground truth. A verify bash run (py_compile/pytest/
         # python) resets ALL counters; re-reading a file resets that file's. When
@@ -264,8 +289,28 @@ class AgentLoop:
                         keep_recent=self._cfg.agent.compact_keep_recent)
                     new_chars = estimate_chars(self.history)
                     if new_chars != history_chars:
+                        # Compaction just deleted evidence from the context, so
+                        # re-reading it is no longer repetition (_forgive_rereads).
+                        forgiven = _forgive_rereads(repeat_streaks, nudged_repeat,
+                                                    forgiven_rereads)
                         self._on_event({"phase": "info",
-                                        "text": f"auto-compacted context: {report}"})
+                                        "text": f"auto-compacted context: {report}",
+                                        "rereads_forgiven": forgiven})
+                        # Tell the MODEL, not just the user. Silent compaction is
+                        # the other half of the ratchet: evidence vanishes from
+                        # under a model that has no idea it happened, so it never
+                        # consolidates and just re-reads — and re-reading costs
+                        # the same space again, so it compacts again. Observed as
+                        # a hard thrash (eval long-context-find): six modules
+                        # totalling 88k chars against a 70k budget, read
+                        # alpha..echo, compact, then alpha/bravo/alpha/charlie/
+                        # alpha/charlie/delta/delta until the repeat guard
+                        # stopped the turn. Bounded like the re-read forgiveness
+                        # for the same reason: repeating the advice every
+                        # compaction becomes noise the model tunes out.
+                        if compact_notices < _MAX_COMPACT_NOTICES:
+                            compact_notices += 1
+                            self._notice_compacted()
                     history_chars = new_chars
                 if history_chars > self._cfg.agent.max_history_chars:
                     return self._stop(
@@ -716,7 +761,8 @@ class AgentLoop:
                         if base:
                             unverified_edits[base] = unverified_edits.get(base, 0) + 1
                             edit_tally[base] = edit_tally.get(base, 0) + 1
-                error_sig, result_sig, no_change = await self._run_calls(calls)
+                error_sig, result_sig, no_change, all_errored = \
+                    await self._run_calls(calls)
                 # Headless only: an ASK tool nobody can approve is refused for
                 # the whole session, so a model still trying after this many
                 # refusals is not going to stop on its own. Interactively the
@@ -759,6 +805,25 @@ class AgentLoop:
                             continue
                         return self._stop("edits kept hitting the same error "
                                           "without making progress")
+                # Content-INDEPENDENT sibling of the stall above. The same-error
+                # streak keys on the error text, so a model that varies the
+                # thing it gets wrong slips past it: guessing at filenames
+                # yields a new "no such file" every iteration, and the repeat
+                # guard sees genuinely-new calls too. Nine consecutive
+                # all-failing iterations went unremarked that way. Nothing
+                # succeeding, whatever the reason, is not progress. A single
+                # success anywhere in a batch clears it.
+                if all_errored:
+                    allerr_streak += 1
+                    if allerr_streak >= self._cfg.agent.max_consecutive_errors:
+                        if not nudged_allerr:
+                            nudged_allerr = True
+                            self._nudge_all_errors(allerr_streak)
+                            continue
+                        return self._stop("every tool call kept failing — the "
+                                          "model could not find its footing")
+                else:
+                    allerr_streak = 0
                 # A no-change edit (old==new, indent-only, identical replace) is
                 # the model editing blind — almost always the reported error line
                 # is fine and the real fault is elsewhere. Distinct from the
@@ -813,9 +878,9 @@ class AgentLoop:
             return "⛔ interrupted"
 
     # --- internals -------------------------------------------------------
-    async def _run_calls(self, calls) -> tuple[str | None, str, bool]:
-        """Run the batch, feed the results back, and return two signatures plus a
-        no-change flag.
+    async def _run_calls(self, calls) -> tuple[str | None, str, bool, bool]:
+        """Run the batch, feed the results back, and return two signatures plus
+        a no-change flag and an all-errored flag.
 
         The first is the ERROR signature — the joined content of any is_error
         results, keyed by tool name, or None if nothing errored — which the loop
@@ -832,13 +897,26 @@ class AgentLoop:
         one whose output is identical cannot make progress no matter how often
         it is retried.
 
-        The third is True when any call in the batch was a no-change edit."""
+        The third is True when any call in the batch was a no-change edit.
+
+        The fourth is True when every call that actually RAN in this batch
+        errored — content-independent, unlike the error signature above. That
+        distinction is the whole point: a model guessing at paths produces a
+        different error string every time ("no such file: …/golf.py", then
+        hotel, then india), so the same-error stall never fires and the repeat
+        guard never fires either, because each call is genuinely new. Nine such
+        iterations in a row were observed after compaction dropped the file
+        contents out from under qythos9. Whatever the errors say, a batch in
+        which nothing succeeded is not progress. Denied and unknown-tool calls
+        are excluded — they never reached a tool, and denials have their own
+        counter."""
         ctx = ToolContext(cwd=self._cwd, cancel=self.cancel,
                           confirm=self._confirm, select=self._select,
                           plan=self.plan)
         results: list[tuple[str, str]] = []
         error_parts: list[str] = []
         no_change = False
+        ran = errored = 0
         for call in calls:
             tool = self._registry.get(call.name)
             if tool is None:
@@ -898,6 +976,9 @@ class AgentLoop:
                             "error": res.is_error, "content": res.content,
                             "seconds": round(time.monotonic() - t0, 3)})
             results.append((call.name, res.content))
+            ran += 1
+            if res.is_error:
+                errored += 1
             if call.name == "bash" and _looks_green_test(res.content):
                 # A genuinely green test run appeared this turn. Restricted to
                 # bash (the only tool that runs tests) so a read_file of a file
@@ -924,7 +1005,8 @@ class AgentLoop:
         self.history.append({"role": "user", "content": tool_results_block(results),
                              "kind": "tool_result"})
         result_sig = "\n".join(f"{name}: {content}" for name, content in results)
-        return ("\n".join(error_parts) if error_parts else None), result_sig, no_change
+        return (("\n".join(error_parts) if error_parts else None), result_sig,
+                no_change, ran > 0 and errored == ran)
 
     def _denial_text(self, name: str, reason: str = "user declined") -> str:
         """What a refused tool call tells the model.
@@ -1128,6 +1210,57 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "error unchanged across edits"})
+
+    def _nudge_all_errors(self, n: int) -> None:
+        """Steer a model that is failing on every call, whatever the errors say.
+
+        The shape this was written for: after compaction discarded the file
+        contents, the model kept reading plausible-sounding paths that did not
+        exist — golf.py, hotel.py, india.py — inventing the rest of the NATO
+        alphabet. It needs to be told to stop guessing and go look, not to try
+        harder."""
+        self.history.append({
+            "role": "user",
+            "content": (f"Your last {n} tool calls ALL failed — nothing "
+                        "succeeded. Stop and re-establish what actually "
+                        "exists before calling anything else. If the failures "
+                        "are missing paths, do NOT guess another filename: "
+                        "list the directory (ls) or glob for the files, and "
+                        "work only from names that came back. If they are "
+                        "something else, read the error text and fix the call "
+                        "itself rather than retrying a variant of it. If you "
+                        "cannot make progress, say so in plain text now."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "every tool call failing"})
+
+    def _notice_compacted(self) -> None:
+        """Tell the model its own context was just structurally compacted.
+
+        Deliberately not framed as a correction — nothing has gone wrong yet.
+        It is the one piece of information the model cannot observe for itself
+        and cannot act correctly without: that the tool output it is reasoning
+        from is being deleted behind it, and that its own written words are the
+        only thing that survives. Without this the model treats the gap as
+        forgetfulness and re-reads, which is what makes the thrash."""
+        self.history.append({
+            "role": "user",
+            "content": ("Context notice: this conversation exceeded its size "
+                        "budget, so older tool output has been dropped. Two "
+                        "consequences. First, you cannot hold every file at "
+                        "once — re-reading a file you already read costs the "
+                        "same space again and will just push out something "
+                        "else, so do not re-read unless you have a specific "
+                        "reason to doubt what you saw. Second, your own replies "
+                        "survive compaction but tool output does not: after you "
+                        "examine something, state what you concluded from it in "
+                        "plain text — the file, the finding, and whether it is "
+                        "still open — before you move to the next one. Work "
+                        "through the remaining items one at a time, recording "
+                        "each result as you go."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "context compacted"})
 
     def _nudge_missing_deliverable(self, missing: set[str],
                                    drafted: bool = False) -> None:
@@ -1445,6 +1578,42 @@ def _reply_chars(msg) -> int:
 def _call_sig(call) -> tuple:
     """A stable identity for a tool call, for detecting no-progress repetition."""
     return (call.name, json.dumps(call.args, sort_keys=True, ensure_ascii=False))
+
+
+def _forgive_rereads(repeat_streaks: dict, nudged_repeat: set,
+                     forgiven_counts: dict) -> int:
+    """Drop the repeat streaks of read-only batches after compaction. Returns
+    how many were forgiven.
+
+    Two guards that are each right on their own were fighting: compaction
+    replaces a tool result with "output omitted — re-read or re-run if you need
+    it", and the repeat guard then stops the turn for making that identical read
+    again. The model does exactly what the context tells it to and gets killed
+    for it — observed live on build 58 (a run that had already completed its
+    edit correctly, then repeat-stopped re-reading three files whose output had
+    been compacted away). The streak is only meaningful while the *result* is
+    still in context to have been learned from; once it isn't, the call is new
+    information, not a repeat.
+
+    Scoped to _REREADABLE_TOOLS. A repeated mutating edit is never progress no
+    matter what the context looks like (build 42's duplicating replace_lines),
+    and bash can mutate, so neither is ever forgiven.
+
+    Bounded per signature. Forgiving unconditionally *disarms* the repeat guard
+    in exactly the regime it is needed most: when compaction fires often, every
+    firing wipes the streaks, and a genuine read loop never accumulates one.
+    Measured on the long-context case at a 70k budget — 7 compactions, 18
+    forgiven re-reads, 16 repeats, 23 iterations and no answer. Re-reading a
+    file whose output was compacted away is legitimate once or twice; a third
+    time is a loop, and the guard should be allowed to see it."""
+    stale = [sig for sig in repeat_streaks
+             if sig and all(name in _REREADABLE_TOOLS for name, _ in sig)
+             and forgiven_counts.get(sig, 0) < _MAX_FORGIVEN_REREADS]
+    for sig in stale:
+        repeat_streaks.pop(sig, None)
+        nudged_repeat.discard(sig)  # re-arm the nudge, don't stop on sight
+        forgiven_counts[sig] = forgiven_counts.get(sig, 0) + 1
+    return len(stale)
 
 
 def _render_calls_as_fenced(calls) -> str:

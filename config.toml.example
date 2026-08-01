@@ -73,6 +73,11 @@ max_repetition_aborts = 3
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 max_nochange_edits = 2          # redirect/bail if edits keep changing nothing
+# Consecutive batches in which EVERY call errored. Content-independent, unlike
+# max_error_stall above: a model guessing at filenames gets a different "no such
+# file" each time, so neither the same-error stall nor the repeat guard sees it
+# (each call really is new). Nudged once, then the turn stops.
+max_consecutive_errors = 4
 # Nudge if the model edits the SAME file this many times in a row without ever
 # running anything (py_compile/pytest/python) or re-reading it — the open-loop
 # editing that lets a weak model "fix" a file into a duplicated mess. A verify
@@ -106,6 +111,8 @@ slow_progress_grace_iterations = 1
 # hard-crashed with a Metal "Insufficient Memory" abort instead of returning
 # an error. Default is conservative for a ~32K-token local model's context
 # window; raise it for models with a much larger window (e.g. a 1M-ctx model).
+# Also settable as $LOCODE_MAX_HISTORY_CHARS, so a single run can be dropped
+# into the compaction regime on purpose (used by the eval battery).
 max_history_chars = 100000
 # Soft threshold (fraction of max_history_chars) that triggers structural,
 # deterministic compaction BEFORE the hard stop above can fire — no model
