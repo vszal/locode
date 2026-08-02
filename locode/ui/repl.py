@@ -64,6 +64,9 @@ class Repl:
         self._spinner = Spinner(enabled=config.ui.spinner and self._color)
         self._last_prompt = ""
         self._server_up = False
+        # Distinct from _server_up: whether the SELECTED model is the resident
+        # one. A server can be up serving something else entirely.
+        self._model_up = False
         self._turn_chars = 0
         self._tally = {"iterations": 0, "tool_calls": 0, "nudges": 0}
         self._files_changed: set[str] = set()
@@ -86,10 +89,16 @@ class Repl:
 
     # --- public ----------------------------------------------------------
     async def run(self, splash: bool = True) -> int:
-        self._server_up = await self._manager.is_up()
+        # Ask about the selected model, not just the port. If it's already
+        # resident the server is trivially up, so that costs one round trip.
+        self._model_up = await self._manager.is_up(self._loop.model_alias)
+        self._server_up = self._model_up or await self._manager.is_up()
         if splash:
             print(banner.render(self._loop.model_alias, self._server_up,
-                                self._loop._cwd, __full_version__, color=self._color))
+                                self._loop._cwd, __full_version__,
+                                color=self._color, model_up=self._model_up))
+        if not self._model_up:
+            await self._preload_model()
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         session: PromptSession = PromptSession(
             history=FileHistory(str(HISTORY_PATH)), style=_PROMPT_STYLE,
@@ -143,11 +152,14 @@ class Repl:
             return
         except Exception as e:  # surface model/server errors without crashing
             self._server_up = not _is_conn_error(e)
+            self._model_up = self._model_up and self._server_up
             print("\n" + self._format_error(e))
             return
         finally:
             self._spinner.stop()  # never let the wait spinner leak into the prompt
-        self._server_up = True
+        # A completed turn went through ensure_up, so the selected model is now
+        # the resident one whatever it was before.
+        self._server_up = self._model_up = True
         elapsed = time.monotonic() - t0
         if result and result not in ("", None):
             if result.startswith(("⛔", "⏹")):
@@ -184,8 +196,44 @@ class Repl:
                         "<edge>│</edge> <arrow>❯</arrow> ")
         return _fmt
 
+    async def _preload_model(self) -> None:
+        """Load the selected model now rather than on the first turn.
+
+        `-m` against a server holding different weights is a full stop/start,
+        so doing it here makes the wait visible and attributable at the prompt
+        instead of ambushing the first turn. Failure is never fatal: the REPL
+        stays usable so the user can `/model` to something that fits.
+        """
+        alias = self._loop.model_alias
+        try:
+            self._manager.resolve(alias)  # a typo must surface now, not on turn 1
+        except KeyError as e:
+            print(self._format_error(e))
+            return
+        # auto_start=off means "don't launch a server for me". Switching one
+        # that's already running is a different thing, and still allowed.
+        if not self._server_up and not self._cfg.server.auto_start:
+            return
+        self._spinner.start(f"loading {alias}…")
+        try:
+            await self._manager.ensure_up(alias)
+        except Exception as e:
+            self._spinner.stop()
+            print(self._format_error(e))
+            self._server_up = await self._manager.is_up()
+            return
+        finally:
+            self._spinner.stop()
+        self._server_up = self._model_up = True
+        print(render.dim(f"  ● {alias} ready", color=self._color))
+
     def _toolbar(self):
-        up = "● up" if self._server_up else "○ down"
+        if self._model_up:
+            up = "● up"
+        elif self._server_up:
+            up = "◐ other model"
+        else:
+            up = "○ down"
         toks = sum(len(m.get("content") or "") for m in self._loop.history) // 4
         ctx = f"{toks / 1000:.1f}k" if toks >= 1000 else str(toks)
         return (f" {up} · ctx ~{ctx} · {Path(self._loop._cwd).name} · "
@@ -369,7 +417,7 @@ class Repl:
             print(self._format_error(e))
             return
         self._spinner.stop()
-        self._server_up = True
+        self._server_up = self._model_up = True
         print(f"now serving {mid}")
 
     async def _slash_server(self, rest: str) -> None:
@@ -379,16 +427,19 @@ class Repl:
                 await self._manager.switch(self._loop.model_alias)
             finally:
                 self._spinner.stop()
-            self._server_up = True
+            self._server_up = self._model_up = True
             print("restarted")
         elif rest == "stop":
             await self._manager.stop()
-            self._server_up = False
+            self._server_up = self._model_up = False
             print("stopped")
         else:
             st = await self._manager.status()
+            self._model_up = await self._manager.is_up(self._loop.model_alias)
             self._server_up = st.up
-            print(f"server: {'up' if st.up else 'down'}  {st.model_id or ''}")
+            loaded = "" if self._model_up else "  (not the selected model)"
+            print(f"server: {'up' if st.up else 'down'}  "
+                  f"{st.model_id or ''}{loaded if st.up else ''}")
 
     def _slash_save(self, rest: str) -> None:
         from datetime import datetime

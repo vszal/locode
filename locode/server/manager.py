@@ -121,13 +121,35 @@ class SingleGpuManager:
         return sorted(set(self._overrides) | set(aliases.known_aliases()))
 
     # --- status ----------------------------------------------------------
-    async def is_up(self) -> bool:
+    async def is_up(self, alias: str | None = None) -> bool:
+        """Bare: does *a* server answer at base_url?
+
+        With `alias`, the narrower question the UI actually needs: is that model
+        the one currently loaded? A reachable server proves nothing about which
+        weights are resident — mlx serves one model at a time and /v1/models
+        lists the whole HF cache — so the bare check reports "up" for a server
+        holding a completely different model. An alias that doesn't resolve is
+        not loaded by definition; the caller surfaces the naming error.
+        """
+        if alias is None:
+            try:
+                async with httpx.AsyncClient(timeout=3) as c:
+                    r = await c.get(f"{self._base}/v1/models")
+                    return r.status_code == 200
+            except httpx.HTTPError:
+                return False
         try:
-            async with httpx.AsyncClient(timeout=3) as c:
-                r = await c.get(f"{self._base}/v1/models")
-                return r.status_code == 200
-        except httpx.HTTPError:
+            target = self.resolve(alias)
+        except KeyError:
             return False
+        served = await self.list_served()
+        if not served:
+            return False
+        # Same split as ensure_up: locally the process's --model arg is the only
+        # truth; remotely we can't introspect, so the served list is all we have.
+        if self._managed:
+            return self._resident_model() == target
+        return target in served
 
     async def list_served(self) -> list[str]:
         try:

@@ -330,6 +330,11 @@ def error(msg: str, *, color: bool = True) -> str:
     return _wrap("✗ " + msg, _RED, color)
 
 
+def dim(msg: str, *, color: bool = True) -> str:
+    """A muted status line (same weight as the banner's status row)."""
+    return _wrap(msg, _DIM, color)
+
+
 # --- input-box rules ----------------------------------------------------------
 def rule(width: int, *, lead: str = "─", label: str = "", color: bool = True) -> str:
     """A horizontal box rule, e.g. `╭─ qwen14 ─────…` (lead='╭', label='qwen14')

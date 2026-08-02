@@ -369,3 +369,59 @@ def test_memory_budget_skips_when_uncached(monkeypatch):
     monkeypatch.setattr(mod, "_model_disk_bytes", lambda mid: None)
     monkeypatch.setattr(mod, "_total_ram_bytes", lambda: 24 * GB)
     m._check_memory_budget("org/uncached", profile_for("org/uncached"))   # no raise
+
+
+# --- is_up(alias): is the SELECTED model loaded, not just "a server answers" ---
+def _served_mgr(monkeypatch, served, resident, **over):
+    m = _mgr(**over)
+
+    async def fake_served():
+        return served
+
+    monkeypatch.setattr(m, "list_served", fake_served)
+    monkeypatch.setattr(m, "_resident_model", lambda: resident)
+    return m
+
+
+async def test_is_up_alias_false_when_a_different_model_is_resident(monkeypatch):
+    # The reported bug: `-m qwen14` against a server holding qwencoder14 said
+    # "up". /v1/models lists the whole HF cache, so the target appears in the
+    # served list without being loaded.
+    m = _served_mgr(monkeypatch,
+                    served=["mlx-community/Qwen3-14B-4bit",
+                            "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"],
+                    resident="mlx-community/Qwen2.5-Coder-14B-Instruct-4bit")
+    assert await m.is_up("qwen14") is False
+    assert await m.is_up("qwencoder14") is True
+
+
+async def test_is_up_alias_true_when_resident(monkeypatch):
+    m = _served_mgr(monkeypatch, served=["mlx-community/Qwen3-14B-4bit"],
+                    resident="mlx-community/Qwen3-14B-4bit")
+    assert await m.is_up("qwen14") is True
+
+
+async def test_is_up_alias_false_when_nothing_served(monkeypatch):
+    m = _served_mgr(monkeypatch, served=[], resident=None)
+    assert await m.is_up("qwen14") is False
+
+
+async def test_is_up_alias_accepts_full_id(monkeypatch):
+    m = _served_mgr(monkeypatch, served=["mlx-community/Qwen3-14B-4bit"],
+                    resident="mlx-community/Qwen3-14B-4bit")
+    assert await m.is_up("mlx-community/Qwen3-14B-4bit") is True
+
+
+async def test_is_up_unknown_alias_is_not_up(monkeypatch):
+    # An alias that doesn't resolve can't be loaded; report that instead of
+    # raising, and let the caller surface the naming error.
+    m = _served_mgr(monkeypatch, served=["mlx-community/Qwen3-14B-4bit"],
+                    resident="mlx-community/Qwen3-14B-4bit")
+    assert await m.is_up("nope") is False
+
+
+async def test_remote_is_up_alias_trusts_served_list(monkeypatch):
+    # No process to introspect on a remote box, so the served list is all we have.
+    m = _remote_manager(monkeypatch, ["mlx-community/Qwen3-14B-4bit"])
+    assert await m.is_up("qwen14") is True
+    assert await m.is_up("qwen4i") is False
