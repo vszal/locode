@@ -1,0 +1,420 @@
+#!/usr/bin/env python3
+"""Paired same-session A/B: run two versions of the agent against each other NOW.
+
+Why this exists
+---------------
+The sweep-vs-saved-sweep comparison in `harness.py compare` has a confounder it
+cannot remove: the two sweeps ran hours or days apart. Between them the box was
+differently loaded, the server was restarted, and — the part with no fix — the
+model is sampled, so its own behaviour drifts. Every gate in `harness.py` is
+built to survive that drift, which is why it is deliberately hard to trip and
+why a real 5-point improvement can sit under the noise floor unprovable.
+
+The fix is not a better statistic, it is a better experiment. Run both versions
+in the SAME session, alternating, and compare them run-for-run:
+
+  - **Same session.** No restart, no reload, no overnight thermal change between
+    the two arms. Whatever the box is doing today, it is doing it to both.
+  - **Interleaved.** Arm order flips on every repeat, so warmup, cache state and
+    slow thermal drift land on both arms equally instead of on whichever went
+    first.
+  - **Paired.** The statistic is the per-pair difference, so the between-run
+    variance that dominates the unpaired test — one case is simply harder than
+    another, one repeat drew a bad sample — cancels within the pair.
+
+The baseline arm is a git worktree at some ref; the candidate is the live
+working tree, uncommitted edits included. That is the question you actually
+have: *does the thing I just wrote help?*
+
+Usage
+-----
+    python evals/ab.py --base HEAD~1 -m qythos9 --repeat 6
+    python evals/ab.py --base v0.1.0 --cand /path/to/other/tree -m qythos9
+
+Exit codes mirror `harness.py compare`: 0 = no regression (improved, or no
+detectable difference), 1 = the candidate is worse, 2 = inconclusive, meaning
+the experiment did not answer the question and should be re-run bigger.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import itertools
+import json
+import random
+import shutil
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+from dataclasses import asdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from harness import (  # noqa: E402
+    REPO_ROOT, RESULTS_DIR, RunResult, discover_cases, run_case, summarize,
+    print_report,
+)
+
+# A sign-flip test on n pairs can produce at most 2**n distinct outcomes, so its
+# smallest attainable two-sided p-value is 2/2**n. At 5 pairs that floor is
+# 0.0625 — above alpha, so NO result, however clean, could ever be called
+# significant. Running fewer pairs than this is not a weak experiment, it is an
+# experiment whose answer is fixed in advance.
+_ALPHA = 0.05
+_MIN_PAIRS = 6
+# Above this, enumerating every sign assignment costs more than sampling them.
+_EXACT_MAX_PAIRS = 18
+_PERM_ITERS = 20000
+
+
+# --------------------------------------------------------------------------
+# the two arms
+# --------------------------------------------------------------------------
+def _git(*args: str, cwd: Path = REPO_ROOT) -> str:
+    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if out.returncode != 0:
+        raise SystemExit(f"git {' '.join(args)} failed: {out.stderr.strip()}")
+    return out.stdout.strip()
+
+
+def make_worktree(ref: str, path: Path) -> str:
+    """Check `ref` out into its own worktree. Returns the resolved sha."""
+    sha = _git("rev-parse", "--short", ref)
+    _git("worktree", "add", "--detach", "-q", str(path), ref)
+    return sha
+
+
+def remove_worktree(path: Path) -> None:
+    subprocess.run(["git", "worktree", "remove", "--force", str(path)],
+                   cwd=REPO_ROOT, capture_output=True, text=True)
+    subprocess.run(["git", "worktree", "prune"], cwd=REPO_ROOT,
+                   capture_output=True, text=True)
+
+
+def tree_digest(root: Path) -> str:
+    """Content hash of a tree's `locode/` package — what actually runs.
+
+    Compared between the arms before any GPU time is spent. Two arms that are
+    byte-identical produce a delta of exactly zero, which reads as "the change
+    had no effect" and is the most believable wrong answer this tool could give.
+    """
+    h = hashlib.sha256()
+    for p in sorted((root / "locode").rglob("*.py")):
+        h.update(str(p.relative_to(root)).encode())
+        h.update(p.read_bytes())
+    return h.hexdigest()[:16]
+
+
+# --------------------------------------------------------------------------
+# the paired statistic
+# --------------------------------------------------------------------------
+def pair_runs(runs: list[RunResult]) -> tuple[list[dict], list[dict]]:
+    """Match base/cand runs on (case, model, repeat).
+
+    Returns (pairs, dropped). A pair survives only if BOTH arms produced a
+    verdict: an invalid run has no score, and substituting one — as a 0.0, or by
+    comparing against the other arm's mean — would put a number where the
+    experiment has none. Dropping in pairs is what keeps the comparison paired.
+    """
+    by_key: dict[tuple, dict] = {}
+    for r in runs:
+        key = (r.case, r.model, r.repeat)
+        by_key.setdefault(key, {})[r.arm] = r
+
+    pairs, dropped = [], []
+    for key in sorted(by_key):
+        arms = by_key[key]
+        b, c = arms.get("base"), arms.get("cand")
+        rec = {"case": key[0], "model": key[1], "repeat": key[2]}
+        if b is None or c is None:
+            dropped.append(dict(rec, why="incomplete pair: one arm never ran"))
+            continue
+        if b.invalid or c.invalid:
+            why = " / ".join(f"{a}: {r.invalid}" for a, r in
+                             (("base", b), ("cand", c)) if r.invalid)
+            dropped.append(dict(rec, why=f"ungraded — {why}"))
+            continue
+        pairs.append(dict(rec, base=b.score, cand=c.score,
+                          delta=round(c.score - b.score, 6)))
+    return pairs, dropped
+
+
+def signflip_p(deltas: list[float], iters: int = _PERM_ITERS,
+               seed: int = 0) -> float:
+    """Two-sided paired sign-flip (randomization) test on the mean difference.
+
+    Under the null "the two arms are interchangeable", the sign of each pair's
+    delta is arbitrary — so the null distribution is generated by flipping signs,
+    not by pooling and reshuffling across pairs. Pooling would throw away the
+    pairing and reintroduce exactly the between-case variance the design exists
+    to cancel.
+
+    The statistic is the SUM of the deltas, not their mean, which is what lets
+    tied pairs be dropped first: flipping the sign of a zero changes nothing, so
+    a tie contributes no information and the null distribution over n pairs with
+    k ties is identical to the one over the n-k that moved. Dropping them keeps
+    the exact-enumeration branch reachable and — via `effective_pairs` — stops a
+    run padded with ties from looking better powered than it is.
+
+    Exact by enumeration while that is cheap, sampled above that. +1 smoothing on
+    the sampled branch so p is never reported as 0.
+    """
+    ds = [d for d in deltas if d != 0]
+    n = len(ds)
+    if n == 0:
+        return 1.0
+    obs = abs(sum(ds))
+    if obs == 0:  # symmetric deltas that cancel exactly
+        return 1.0
+    if n <= _EXACT_MAX_PAIRS:
+        ge = sum(1 for signs in itertools.product((1, -1), repeat=n)
+                 if abs(sum(s * d for s, d in zip(signs, ds))) >= obs - 1e-12)
+        return ge / (2 ** n)
+    rng = random.Random(seed)
+    ge = sum(1 for _ in range(iters)
+             if abs(sum(d if rng.random() < 0.5 else -d for d in ds))
+             >= obs - 1e-12)
+    return (ge + 1) / (iters + 1)
+
+
+def effective_pairs(deltas: list[float]) -> int:
+    """Pairs that carry information: the ones where the two arms differed.
+
+    A pair scoring the same on both arms cannot move a sign-flip test, so
+    counting it toward the sample size overstates the experiment's power: six
+    pairs of which five tie is a one-pair experiment wearing a six-pair label.
+    """
+    return sum(1 for d in deltas if d != 0)
+
+
+def analyze(pairs: list[dict], dropped: list[dict]) -> dict:
+    """Verdict on the paired deltas. `status` is one of improved / regressed /
+    no-difference / inconclusive."""
+    deltas = [p["delta"] for p in pairs]
+    n = len(deltas)
+    n_eff = effective_pairs(deltas)
+    out: dict = {
+        "n_pairs": n,
+        "n_effective": n_eff,
+        "n_dropped": len(dropped),
+        "min_pairs": _MIN_PAIRS,
+        "mean_delta": round(statistics.mean(deltas), 4) if deltas else None,
+        "wins": sum(1 for d in deltas if d > 0),
+        "losses": sum(1 for d in deltas if d < 0),
+        "ties": sum(1 for d in deltas if d == 0),
+        "p": None,
+        "status": "inconclusive",
+        "why": "",
+    }
+    if n == 0:
+        out["why"] = "no pair had a verdict on both arms"
+        return out
+    if n_eff < _MIN_PAIRS:
+        # Stated as arithmetic, not as a hunch: the test cannot reach alpha here.
+        out["p"] = signflip_p(deltas)
+        tied = "" if n_eff == n else (
+            f" ({n} ran, but {n - n_eff} scored the same on both arms and a tie "
+            f"cannot move a sign-flip test)")
+        out["why"] = (f"only {n_eff} informative pair(s){tied}; a sign-flip test "
+                      f"needs {_MIN_PAIRS} before any result can reach "
+                      f"p<{_ALPHA} (its floor is 2/2^n = {2 / 2 ** n_eff:.3f})")
+        return out
+    p = signflip_p(deltas)
+    out["p"] = round(p, 4)
+    mean = out["mean_delta"]
+    if p < _ALPHA and mean > 0:
+        out["status"] = "improved"
+    elif p < _ALPHA and mean < 0:
+        out["status"] = "regressed"
+    else:
+        out["status"] = "no-difference"
+        out["why"] = ("the arms are not distinguishable at this sample size — "
+                      "which is not the same as equal")
+    return out
+
+
+def per_case(pairs: list[dict]) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for case in sorted({p["case"] for p in pairs}):
+        ds = [p["delta"] for p in pairs if p["case"] == case]
+        out[case] = {
+            "n": len(ds),
+            "mean_delta": round(statistics.mean(ds), 4),
+            "base": round(statistics.mean(
+                [p["base"] for p in pairs if p["case"] == case]), 4),
+            "cand": round(statistics.mean(
+                [p["cand"] for p in pairs if p["case"] == case]), 4),
+        }
+    return out
+
+
+# --------------------------------------------------------------------------
+# reporting
+# --------------------------------------------------------------------------
+_STATUS_LINE = {
+    "improved": "✅ IMPROVED — the candidate beat the baseline",
+    "regressed": "❌ REGRESSED — the candidate lost to the baseline",
+    "no-difference": "➖ NO DETECTABLE DIFFERENCE",
+    "inconclusive": "⚠️  INCONCLUSIVE — the experiment did not answer the question",
+}
+_EXIT = {"improved": 0, "no-difference": 0, "regressed": 1, "inconclusive": 2}
+
+
+def print_ab_report(report: dict) -> int:
+    a = report["analysis"]
+    print("\n" + "=" * 72)
+    print(f"PAIRED A/B · {report['label']}")
+    print(f"  base : {report['base_ref']} ({report['base_sha']})")
+    print(f"  cand : {report['cand_desc']}")
+    print("=" * 72)
+
+    if report["case_table"]:
+        print(f"\n{'case':<24}{'n':>4}{'base':>9}{'cand':>9}{'delta':>9}")
+        print("-" * 55)
+        for case, row in report["case_table"].items():
+            print(f"{case:<24}{row['n']:>4}{row['base']:>9.3f}"
+                  f"{row['cand']:>9.3f}{row['mean_delta']:>+9.3f}")
+
+    if a["n_pairs"]:
+        tied = ("" if a["n_effective"] == a["n_pairs"]
+                else f" — {a['n_effective']} informative")
+        print(f"\npairs      : {a['n_pairs']}  "
+              f"(W{a['wins']}/L{a['losses']}/T{a['ties']}){tied}")
+        print(f"mean delta : {a['mean_delta']:+.4f}  (candidate − baseline)")
+        print(f"sign-flip p: {a['p']}")
+    if a["n_dropped"]:
+        print(f"dropped    : {a['n_dropped']} pair(s) with an ungraded arm")
+        for d in report["dropped"][:5]:
+            print(f"             {d['case']} r{d['repeat']} — {d['why']}")
+
+    print(f"\n{_STATUS_LINE[a['status']]}")
+    if a["why"]:
+        print(f"   {a['why']}")
+    return _EXIT[a["status"]]
+
+
+# --------------------------------------------------------------------------
+# driver
+# --------------------------------------------------------------------------
+def _plan(cases, models, repeat):
+    """(case, model, repeat, arm_order) for every pair, arm order alternating.
+
+    The flip is per repeat so that across the run each arm goes first exactly
+    half the time. Whichever arm runs second inherits a warmer cache and a hotter
+    box; unflipped, that advantage would be a constant offset on one arm and
+    would read as a real effect.
+    """
+    for model in models:
+        for case in cases:
+            for rep in range(1, repeat + 1):
+                order = ("base", "cand") if rep % 2 else ("cand", "base")
+                yield case, model, rep, order
+
+
+def run_ab(*, base_root: Path, cand_root: Path | None, cases, models,
+           repeat: int, results_dir: Path, label: str, base_ref: str,
+           base_sha: str, keep: bool = True) -> dict:
+    roots = {"base": base_root, "cand": cand_root}
+    runs: list[RunResult] = []
+    total = len(cases) * len(models) * repeat * 2
+    n = 0
+    for case, model, rep, order in _plan(cases, models, repeat):
+        for arm in order:
+            n += 1
+            print(f"[{n}/{total}] {case.id} · {model} · r{rep} · {arm}…",
+                  flush=True)
+            r = run_case(case, model, rep, results_dir, keep=keep,
+                         agent_root=roots[arm], arm=arm)
+            runs.append(r)
+            note = f"  [{r.invalid}]" if r.invalid else ""
+            print(f"        {arm}: score={r.score:.2f} {r.seconds}s{note}",
+                  flush=True)
+            _persist(results_dir, runs, label, base_ref, base_sha, cand_root)
+    return _persist(results_dir, runs, label, base_ref, base_sha, cand_root)
+
+
+def _persist(results_dir: Path, runs: list[RunResult], label: str,
+             base_ref: str, base_sha: str, cand_root: Path | None) -> dict:
+    pairs, dropped = pair_runs(runs)
+    report = {
+        "kind": "paired-ab",
+        "label": label,
+        "created": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "base_ref": base_ref,
+        "base_sha": base_sha,
+        "cand_desc": (str(cand_root) if cand_root else
+                      f"working tree ({REPO_ROOT})"),
+        "pairs": pairs,
+        "dropped": dropped,
+        "case_table": per_case(pairs),
+        "analysis": analyze(pairs, dropped),
+        "runs": [asdict(r) for r in runs],
+        "summary": summarize(runs),
+    }
+    (results_dir / "ab.json").write_text(json.dumps(report, indent=2))
+    return report
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--base", required=True,
+                    help="git ref for the baseline arm (e.g. HEAD~1, a tag)")
+    ap.add_argument("--cand", default=None,
+                    help="candidate source tree (default: the live working tree)")
+    ap.add_argument("-m", "--model", action="append", required=True)
+    ap.add_argument("-c", "--case", action="append")
+    # Above _MIN_PAIRS on purpose: eval scores tie often, and a tie carries no
+    # information, so a run sized exactly at the floor lands on "inconclusive"
+    # the moment one pair comes out even.
+    ap.add_argument("-r", "--repeat", type=int, default=8)
+    ap.add_argument("--label", default=None)
+    ap.add_argument("--clean", action="store_true",
+                    help="delete each run's scratch workspace when it finishes")
+    ap.add_argument("--allow-identical", action="store_true",
+                    help="run even when both arms are byte-identical (an A/A "
+                         "calibration: measures the noise floor, not a change)")
+    args = ap.parse_args(argv)
+
+    cases = discover_cases(args.case or None)
+    if not cases:
+        print("no cases found", file=sys.stderr)
+        return 2
+
+    label = args.label or f"ab-{time.strftime('%Y%m%d-%H%M%S')}"
+    results_dir = RESULTS_DIR / label
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    cand_root = Path(args.cand).resolve() if args.cand else REPO_ROOT
+    wt = Path(tempfile.mkdtemp(prefix="locode-ab-base-")) / "tree"
+    base_sha = make_worktree(args.base, wt)
+    try:
+        if tree_digest(wt) == tree_digest(cand_root) and not args.allow_identical:
+            print(f"!! both arms are the same code ({args.base} == the "
+                  f"candidate tree). Every delta would be noise reported as a "
+                  f"result. Pass --allow-identical to run it as an A/A "
+                  f"calibration.", file=sys.stderr)
+            return 2
+        n_pairs = len(cases) * len(args.model) * args.repeat
+        if n_pairs < _MIN_PAIRS:
+            print(f"!! this plan yields {n_pairs} pair(s); below {_MIN_PAIRS} "
+                  f"no outcome can reach p<{_ALPHA}. Raise --repeat.\n",
+                  flush=True)
+        report = run_ab(base_root=wt, cand_root=cand_root, cases=cases,
+                        models=args.model, repeat=args.repeat,
+                        results_dir=results_dir, label=label,
+                        base_ref=args.base, base_sha=base_sha,
+                        keep=not args.clean)
+    finally:
+        remove_worktree(wt)
+        shutil.rmtree(wt.parent, ignore_errors=True)
+
+    print_report(report["summary"], f"RUNS · {label}")
+    rc = print_ab_report(report)
+    print(f"\nwrote {results_dir / 'ab.json'}")
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())

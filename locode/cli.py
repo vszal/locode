@@ -52,7 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-markdown", action="store_true",
                    help="Stream raw tokens instead of line-buffered markdown.")
     p.add_argument("--logo", action="store_true", help="Print the banner and exit.")
-    p.add_argument("--version", action="version", version=f"locode {__version__}")
+    # Full version, not bare __version__: __version__ tracks pyproject and does
+    # not move per commit, so it printed the same string for every build. The
+    # paired A/B runs two source trees side by side and `--version` was the
+    # obvious way to check which one you had — and it could not tell them apart.
+    p.add_argument("--version", action="version",
+                   version=f"locode {__full_version__}")
     return p
 
 

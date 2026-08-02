@@ -70,6 +70,10 @@ REPO_ROOT = EVALS_DIR.parent
 # Run the installed-in-place locode from the repo venv so we always measure the
 # working tree, never a stale site-packages copy.
 LOCODE_BIN = REPO_ROOT / ".venv" / "bin" / "locode"
+# Used only by the paired A/B (`ab.py`), which needs to run a DIFFERENT source
+# tree than the installed one. See that file's docstring for why an import shim
+# is required rather than PYTHONPATH.
+AGENT_LAUNCHER = EVALS_DIR / "_agent_launcher.py"
 
 
 # --------------------------------------------------------------------------
@@ -277,6 +281,10 @@ class RunResult:
     # the rescore path) — they simply claim every run was valid, which is the
     # behaviour they were scored under anyway.
     invalid: str = ""
+    # Which side of a paired A/B produced this run ("base"/"cand"), or "" for an
+    # ordinary sweep. Additive with a default so pre-A/B results.json files still
+    # load through `RunResult(**raw)`.
+    arm: str = ""
 
 
 def _load_checker(case: Case):
@@ -320,8 +328,11 @@ class CheckCtx:
 
 
 def run_case(case: Case, model: str, repeat: int, results_dir: Path,
-             keep: bool = True) -> RunResult:
-    stamp = f"{case.id}__{model}__r{repeat}"
+             keep: bool = True, agent_root: Path | None = None,
+             arm: str = "") -> RunResult:
+    """Run one case once. `agent_root` selects WHICH locode source tree runs it
+    (a git worktree, for the paired A/B); None means the installed one."""
+    stamp = f"{case.id}__{model}__r{repeat}" + (f"__{arm}" if arm else "")
     workdir = Path(tempfile.mkdtemp(prefix=f"locode-eval-{stamp}-"))
     seed = case.path / "seed"
     if seed.is_dir():
@@ -337,9 +348,11 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
     out_path = results_dir / "stdout" / f"{stamp}.txt"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [str(LOCODE_BIN), "-p", case.prompt, "-m", model,
-           "--log-events", str(log_path), "--no-markdown",
-           "--allow-tool", ",".join(case.allow_tools)] + case.extra_args
+    launch = ([str(LOCODE_BIN)] if agent_root is None else
+              [sys.executable, str(AGENT_LAUNCHER), str(Path(agent_root).resolve())])
+    cmd = launch + ["-p", case.prompt, "-m", model,
+                    "--log-events", str(log_path), "--no-markdown",
+                    "--allow-tool", ",".join(case.allow_tools)] + case.extra_args
 
     env = dict(os.environ)
     env["NO_COLOR"] = "1"
@@ -362,16 +375,29 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
                 _kill_tree(proc)
                 out_fh.write("\n[TIMEOUT: harness killed the process]\n")
     except FileNotFoundError:
-        msg = f"locode not found at {LOCODE_BIN}"
+        msg = f"locode not found at {cmd[0]}"
         return RunResult(case.id, case.track, model, repeat, 0.0, {}, {}, -1,
                          False, 0.0, str(workdir), error=msg,
-                         invalid=f"harness: {msg}")
+                         invalid=f"harness: {msg}", arm=arm)
     seconds = round(time.monotonic() - t0, 1)
     stdout = out_path.read_text(errors="replace")
 
     events = parse_events(log_path)
     metrics = metrics_from_events(events)
     metrics["harness_timeout"] = timed_out
+
+    # An agent that logged NOTHING never started — a bad interpreter, a missing
+    # package, or the launcher refusing because the A/B's two arms resolved to
+    # the same tree. Every metric above reads clean for such a run (zero
+    # iterations, no stop reason, `clean_finish=True`) and the checker grades the
+    # untouched workdir 0.0, so without this it lands as a confident model
+    # failure. It is the one outcome an A/B must never mistake for a result.
+    launch_error = ""
+    if not events:
+        tail = next((ln.strip() for ln in reversed(stdout.splitlines())
+                     if ln.strip()), "")
+        launch_error = (f"launch: the agent logged no events (exit {rc})"
+                        + (f" — {tail[:200]}" if tail else ""))
 
     checks: dict = {}
     err = ""
@@ -384,13 +410,14 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
             err = f"checker raised: {type(e).__name__}: {e}"
     score = _score(checks)
     invalid = _invalidity(error=err, checks=checks, has_checker=checker is not None,
-                          infra_error=metrics.get("infra_error"))
+                          infra_error=metrics.get("infra_error"),
+                          launch_error=launch_error)
 
     if not keep:
         shutil.rmtree(workdir, ignore_errors=True)
     return RunResult(case.id, case.track, model, repeat, score, checks, metrics,
                      rc, timed_out, seconds, str(workdir), error=err,
-                     invalid=invalid)
+                     invalid=invalid, arm=arm)
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
@@ -411,7 +438,7 @@ def _kill_tree(proc: subprocess.Popen) -> None:
 
 
 def _invalidity(*, error: str, checks: dict, has_checker: bool,
-                infra_error: str | None) -> str:
+                infra_error: str | None, launch_error: str = "") -> str:
     """Why a run yielded no usable verdict, or "" when it yielded one.
 
     The distinction this draws is *"the model failed the case"* versus *"the
@@ -428,6 +455,11 @@ def _invalidity(*, error: str, checks: dict, has_checker: bool,
     `case.timeout` — that is agent behaviour and belongs in the score. And a
     checker that ran to completion returning all-False is a real verdict.
     """
+    if launch_error:
+        # Nothing downstream means anything if the agent never ran. This is the
+        # first check because an unstarted agent still yields an empty workdir,
+        # which a checker grades — as 0.0, indistinguishable from failure.
+        return launch_error
     if error:
         # Covers `ctx.bash` hitting subprocess.TimeoutExpired — a 180s pytest
         # that never returned. It could mean the model wrote hanging code, or it
@@ -1208,7 +1240,9 @@ def cmd_rescore(args) -> int:
         case = cases.get(raw["case"])
         workdir = Path(raw.get("workdir", ""))
 
-        stamp = f"{raw['case']}__{raw['model']}__r{raw['repeat']}"
+        arm = raw.get("arm", "")
+        stamp = (f"{raw['case']}__{raw['model']}__r{raw['repeat']}"
+                 + (f"__{arm}" if arm else ""))
         events = parse_events(results_dir / "events" / f"{stamp}.jsonl")
         out_path = results_dir / "stdout" / f"{stamp}.txt"
         stdout = out_path.read_text(errors="replace") if out_path.is_file() else ""
@@ -1249,8 +1283,14 @@ def cmd_rescore(args) -> int:
             # the verdict are fresh. This is also how sweeps recorded before the
             # `invalid` field existed acquire one — the same reason metrics are
             # always recomputed rather than frozen at the day of the run.
-            invalid = _invalidity(error=err, checks=checks, has_checker=True,
-                                  infra_error=metrics.get("infra_error"))
+            invalid = _invalidity(
+                error=err, checks=checks, has_checker=True,
+                infra_error=metrics.get("infra_error"),
+                # An empty event log is as damning on a rescore as it was live:
+                # the checker is grading a workdir no agent ever touched.
+                launch_error=("" if events else
+                              f"launch: the agent logged no events "
+                              f"(exit {raw.get('returncode', -1)})"))
 
         raw = dict(raw, score=score, checks=checks, metrics=metrics, error=err,
                    invalid=invalid)

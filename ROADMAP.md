@@ -185,7 +185,39 @@ are user-visible and waste whole generations.*
   the p-value is advisory, the refusal conditions, graded-vs-ungraded, and why
   baselines are session-bound. Constants in the doc are checked against the
   module rather than transcribed.
-- `[!]` **2.4 Same-session paired A/B for regression checks** — *evidence
+- `[x]` **2.4 Same-session paired A/B for regression checks (build 75,
+  2026-08-02)** — shipped as `evals/ab.py`. The design tension below was settled
+  in favour of **git worktrees**: no checkout of the live tree, so an interrupted
+  run cannot leave the repo on a detached HEAD, and the candidate arm can be the
+  *dirty working tree* — which is the question you actually have ("does the thing
+  I just wrote help?") and which the checkout recipe could not express at all.
+  - **`PYTHONPATH` cannot select the tree.** Verified empirically: the editable
+    install registers `__editable___locode_0_1_0_finder` on `sys.meta_path`, and
+    meta-path finders run *before* `sys.path`, so a decoy tree at build 999 was
+    ignored and `import locode` still resolved to the main checkout. Hence
+    `evals/_agent_launcher.py`, which drops the editable finder, puts the
+    requested root first, and then **asserts** the import came from there.
+  - **Three refusals.** Identical arms (a zero delta from the same code reads as
+    "no effect" — the most believable wrong answer available); fewer than 6
+    **informative** pairs (a sign-flip test's p floor is 2/2ⁿ, so at n=5 *no*
+    outcome could reach alpha — the experiment's answer is fixed in advance, and
+    a *tie* is not informative because flipping the sign of zero changes nothing,
+    so ties must not be counted toward n; caught by rendering a report with one
+    tie in it and noticing W5/L0/T1 at p=0.0625 was being announced as "no
+    difference"); and any run that logged **no events**, now `invalid` rather than
+    scored 0.0, because an agent that never started leaves an untouched workdir
+    that a checker confidently grades zero while every process metric reads clean
+    (`clean_finish=True`, zero iterations). That last one is the failure mode an
+    A/B must never mistake for a result.
+  - Interleaving flips arm order every repeat, so cache warmth and thermal drift
+    land on both arms instead of on whichever ran second. A pair is dropped whole
+    when either arm is ungraded — substituting 0.0 for an infra-killed baseline
+    run would manufacture a large fake win.
+  - Also fixed here: `--version` printed bare `__version__`, identical for every
+    build, so the obvious way to check which arm you were running could not tell
+    them apart. It now prints `__full_version__`.
+  - 31 tests in `tests/test_ab.py` (878 total, green). Original entry follows.
+- ~~`[!]`~~ **2.4 (original entry)** — *evidence
   hardened 2026-07-25 (Round 21, D75).* A historical score from another session
   is **not a valid baseline** for a sweep run today: build 30 scored 0.62 on
   exec-bugfix qythos9 in the r26 session vs 0.92 in its own r13/r16/r19 sessions —

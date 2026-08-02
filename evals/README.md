@@ -73,7 +73,8 @@ why — so it is never the sole basis for a FAIL.
 ### Graded vs ungraded runs
 
 A run that produced no verdict — the checker raised, the case ships no
-`check.py`, the turn died on a transport error — is recorded as **ungraded** and
+`check.py`, the turn died on a transport error, or the agent logged no events at
+all (`launch`: it never started) — is recorded as **ungraded** and
 **excluded from every score**, rather than scored `0.0`. Scoring it zero is
 indistinguishable from the model having failed the case, which is how a flaky
 box turns into an apparent code regression. Reports print an `⚠️ ungraded` line
@@ -88,7 +89,43 @@ Do not compare against a results.json from another session. These models are
 non-stationary: build 30 scored 0.62 on one case in one session and 0.92 on the
 same code in another. A saved historical baseline cannot distinguish a real
 regression from session drift — run baseline and candidate in the same session,
-against the same loaded server.
+against the same loaded server. `ab.py` does that for you; see below.
+
+## Paired A/B — the honest way to test a change
+
+```
+python evals/ab.py --base HEAD~1 -m qythos9 --repeat 6
+python evals/ab.py --base v0.1.0 --cand /some/other/tree -m qythos9 -c exec-bugfix
+```
+
+The baseline arm is a **git worktree** at `--base`; the candidate is the live
+working tree (uncommitted edits included), or `--cand`. Both arms are launched
+through `_agent_launcher.py`, which imports `locode` from a chosen source tree —
+`PYTHONPATH` cannot do this, because the editable install puts a finder on
+`sys.meta_path` that is consulted before `sys.path`. The launcher asserts after
+importing that it got the tree it asked for and exits non-zero if not.
+
+Three properties, each removing one confounder:
+
+- **Same session** — no restart or overnight thermal change between the arms.
+- **Interleaved** — arm order flips every repeat, so cache warmth and drift land
+  on both arms rather than on whichever ran second.
+- **Paired** — the statistic is the per-pair difference, so between-case and
+  between-draw variance cancels inside the pair instead of swamping the test.
+
+The verdict is a two-sided **sign-flip** test on the paired deltas (exact by
+enumeration up to 18 pairs). Exit codes match `compare`: 0 improved or no
+detectable difference, 1 regressed, 2 inconclusive.
+
+Two refusals, both before any GPU time is spent:
+
+| Refusal | Why |
+|---|---|
+| both arms hash identical | A zero delta from the same code reads as "the change had no effect" — the most believable wrong answer this tool could give. Pass `--allow-identical` for a deliberate A/A noise-floor calibration. |
+| fewer than 6 **informative** pairs | A sign-flip test on n pairs has a p-value floor of 2/2ⁿ. At 5 pairs that is 0.0625 — above alpha, so *no* outcome could reach significance. Fewer pairs than this is an experiment whose answer is fixed in advance. A pair that scored the *same* on both arms does not count: flipping the sign of zero changes nothing, so ties carry no information. `--repeat` defaults to 8 for that headroom. |
+
+A pair is dropped whole when **either** arm is ungraded (see below). Substituting
+a 0.0 for an infra-killed baseline run would manufacture a large fake win.
 
 To read what actually happened inside a run:
 
@@ -217,6 +254,8 @@ Two rules learned the hard way:
 ```
 evals/
     harness.py       runner, event mining, scoring, regression gate
+    ab.py            paired same-session A/B of two source trees
+    _agent_launcher.py   imports locode from a chosen tree (used by ab.py)
     LOG.md           the improvement loop's running log — rounds, decisions,
                      obstacles, measured deltas
     cases/           the benchmark
