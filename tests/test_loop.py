@@ -2610,3 +2610,122 @@ async def test_partly_failing_batch_does_not_count(tmp_path):
     out = await loop.run_turn("look")
     assert _allerr_nudges(loop) == []
     assert "every tool call kept failing" not in out
+
+
+# --- the zero-change completion gate (lever #3) ---------------------------
+#
+# The pathology: the model answers "done" having taken no action at all. Every
+# other stop-net counts actions — repeats, no-ops, errors — so with zero actions
+# there is nothing for any of them to count. Measured live (gemmacoder12
+# diff-report, 2026-07-28): one iteration, zero tool calls, a self-terminated
+# "answered", and silently wrong output.
+
+@pytest.mark.parametrize("text", [
+    "fix the bug in report.py",
+    "remove the debug block from main.py",
+    "add a docstring to utils.py",
+    "refactor parser.py so it stops using globals",
+    "config.yaml needs updating to point at the new host",
+    "rename the helper in tools.py",
+])
+def test_change_requests_are_recognised(text):
+    assert loop_mod._asks_for_a_change(text)
+
+
+@pytest.mark.parametrize("text", [
+    "what does report.py do?",
+    "explain how the queue works in main.py",
+    "which function in utils.py handles retries?",
+    "summarize the design decisions in ARCHITECTURE.md",
+    # No file named at all — the gate deliberately stays quiet rather than
+    # guessing at what a bare "fix it" refers to.
+    "fix the bug",
+    "write a short summary of what this project does",
+])
+def test_read_only_and_unanchored_requests_are_not_change_requests(text):
+    assert not loop_mod._asks_for_a_change(text)
+
+
+async def test_declaring_done_without_acting_is_nudged(tmp_path):
+    (tmp_path / "report.py").write_text("def f():\n    return 1\n")
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "The bug is fixed."},
+        native_call("read_file", path="report.py"),
+        {"role": "assistant", "content": "Now corrected in report.py."},
+    ])
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("fix the bug in report.py")
+    assert "corrected" in out
+    assert any(e.get("reason") == "declared done without acting" for e in events)
+
+
+async def test_the_zero_change_gate_fires_only_once(tmp_path):
+    """A model that insists it is done gets its second answer returned, not a
+    third nudge — the gate's claim is that "I did nothing" deserves to be said
+    twice, not that it is always wrong."""
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "Nothing to do; the code is correct."},
+    ])
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("fix the bug in report.py")
+    assert out == "Nothing to do; the code is correct."
+    assert len([e for e in events
+                if e.get("reason") == "declared done without acting"]) == 1
+
+
+async def test_a_read_only_question_is_never_gated(tmp_path):
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "It parses the log and prints a total."},
+    ])
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("what does report.py do?")
+    assert out.startswith("It parses")
+    assert not any(e.get("reason") == "declared done without acting"
+                   for e in events)
+
+
+async def test_an_edit_disarms_the_gate(tmp_path):
+    (tmp_path / "report.py").write_text("x = 1\n")
+    loop = make_loop(tmp_path, [
+        native_call("write_file", path="report.py", content="x = 2\n"),
+        {"role": "assistant", "content": "Done."},
+    ])
+    events = []
+    loop._on_event = events.append
+    assert await loop.run_turn("fix the bug in report.py") == "Done."
+    assert not any(e.get("reason") == "declared done without acting"
+                   for e in events)
+
+
+async def test_a_bash_run_disarms_the_gate(tmp_path):
+    """bash counts as having acted even when the command only reads: it CAN
+    mutate and the loop cannot cheaply tell which, so the gate stays quiet."""
+    (tmp_path / "report.py").write_text("x = 1\n")
+    loop = make_loop_with_bash(tmp_path, [
+        native_call("bash", cmd="cat report.py"),
+        {"role": "assistant", "content": "Already correct — no change needed."},
+    ], FakeBash("x = 1"))
+    events = []
+    loop._on_event = events.append
+    out = await loop.run_turn("fix the bug in report.py")
+    assert "no change needed" in out
+    assert not any(e.get("reason") == "declared done without acting"
+                   for e in events)
+
+
+async def test_a_named_deliverable_stays_with_the_deliverable_gate(tmp_path):
+    """The two gates partition on expected_artifacts. "write a PLAN.md" is the
+    deliverable gate's case; stacking both nudged one mistake twice and turned a
+    clean return into a repeat-stop."""
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": "Here is the plan: step one, step two."},
+    ])
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("write a PLAN.md for the queue")
+    reasons = [e.get("reason") for e in events if e.get("phase") == "nudge"]
+    assert not any(r == "declared done without acting" for r in reasons)
+    assert any("deliverable" in (r or "") for r in reasons)

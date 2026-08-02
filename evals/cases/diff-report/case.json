@@ -1,0 +1,9 @@
+{
+  "id": "diff-report",
+  "track": "execute",
+  "description": "a multi-function script whose compute_changes declares its result lists but never fills them; fix that one function",
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "replace_lines", "bash", "ls", "grep", "glob"],
+  "timeout": 240,
+  "extra_args": ["--max-iterations", "18", "--max-wallclock", "180"],
+  "weight": 1.0
+}

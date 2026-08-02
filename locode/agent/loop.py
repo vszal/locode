@@ -286,6 +286,16 @@ class AgentLoop:
         # different" that a stuck model just ignores.
         mentioned_files = _mentioned_files(user_text)
         read_paths: set[str] = set()
+        # [zero-change gate] Did the request ask for the workspace to end up
+        # different, and has the model done anything that could have changed it?
+        # A model that answers "done" having never acted is invisible to every
+        # other stop-net: with no mutating call there is no repeat, no-op or
+        # error streak to accrue. Measured live (gemmacoder12 diff-report,
+        # 2026-07-28): one iteration, ZERO tool calls, a self-terminated
+        # "answered", and silently wrong output.
+        wants_change = _asks_for_a_change(user_text)
+        acted = False
+        nudged_zero_change = False
         try:
             for i in range(self._cfg.agent.max_iterations):
                 now = time.monotonic()
@@ -704,6 +714,42 @@ class AgentLoop:
                         nudged_unverified_verify = True
                         self._nudge_unverified_verify()
                         continue
+                    # [zero-change gate] The request asked for a change to a
+                    # named file and the turn is ending without the model having
+                    # taken a single action that could have made one. Every
+                    # pathology counter is blind here by construction — they all
+                    # count actions, and there were none — so this is the last
+                    # thing standing between a plan-shaped monologue and a
+                    # confident wrong answer.
+                    #
+                    # Last in the cascade on purpose: it is the broadest gate,
+                    # and the specific ones above (missing deliverable, open
+                    # tasks, announced intent, unverified test/compile claims)
+                    # give better-targeted advice for the cases they own.
+                    #
+                    # `expected_artifacts` is the seam between this gate and the
+                    # deliverable one, and they partition cleanly because
+                    # _expected_artifacts needs a WRITE verb next to the
+                    # filename: "write a PLAN.md" belongs to that gate, which
+                    # already nudges and then stops naming the missing file,
+                    # while "fix the bug in report.py" names nothing to create
+                    # and so reaches here. Without this clause the two stack, and
+                    # a model that answered a deliverable nudge in prose gets
+                    # nudged twice for one mistake — caught by
+                    # test_differing_prose_is_not_a_repeat, which went from a
+                    # clean return to a repeat-stop.
+                    #
+                    # Double-gated in the shape build 50 established: the request
+                    # must be change-shaped AND nothing may have run. One-shot,
+                    # and it nudges rather than stops — if the model comes back
+                    # and says the file already does what was asked, that answer
+                    # is returned. The gate's claim is only that "I did nothing"
+                    # deserves to be said twice before it is believed.
+                    if (wants_change and not expected_artifacts
+                            and not acted and not nudged_zero_change):
+                        nudged_zero_change = True
+                        self._nudge_zero_change()
+                        continue
                     return content  # final answer
                 if trimmed:
                     self._on_event({"phase": "info",
@@ -768,6 +814,16 @@ class AgentLoop:
                                       "without making progress")
                 consecutive_malformed = 0  # progress made
                 for c in calls:
+                    # [zero-change gate] Anything that could have left the
+                    # workspace different disarms it. bash counts even when the
+                    # command only reads: it CAN mutate (sed -i, mkdir, a
+                    # generator script), the loop cannot cheaply tell which, and
+                    # the same reasoning already keeps bash out of
+                    # _REREADABLE_TOOLS. Erring toward silence is deliberate —
+                    # see _asks_for_a_change.
+                    if c.name in _MUTATING_EDIT_TOOLS or c.name in ("bash",
+                                                                    "move_file"):
+                        acted = True
                     if c.name in ("write_file", "append_file", "edit_file"):
                         path = c.args.get("path")
                         if path:
@@ -1437,6 +1493,22 @@ class AgentLoop:
         self._on_event({"phase": "nudge",
                         "reason": "compile/run claimed ok but never verified"})
 
+    def _nudge_zero_change(self) -> None:
+        self.history.append({
+            "role": "user",
+            "content": ("The request asked you to change a file, and this turn "
+                        "you have not run a single tool — nothing has been read, "
+                        "edited or checked, so nothing in the workspace is "
+                        "different. Describing the change is not making it. "
+                        "Open the file with a read_file tool call, make the edit "
+                        "with edit_file, and confirm the result. If you believe "
+                        "no change is needed, say so explicitly and give the "
+                        "specific evidence from the file that shows it."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge",
+                        "reason": "declared done without acting"})
+
     def _nudge_slow(self) -> None:
         self.history.append({
             "role": "user",
@@ -1500,6 +1572,46 @@ _WRITE_VERB_RE = re.compile(
     r"|updat(?:e|es|ing))\b",
     re.IGNORECASE,
 )
+
+
+# Verbs that ask for the WORKSPACE to end up different — a superset of
+# _WRITE_VERB_RE, which only covers producing a new file. "fix", "remove" and
+# "refactor" are requests for a change that name no artifact to create, and they
+# are the shapes the completion gate below exists for.
+_CHANGE_VERB_RE = re.compile(
+    r"\b(?:fix(?:es|ing|ed)?|repair\w*|correct(?:s|ing|ed)?|add(?:s|ing|ed)?"
+    r"|implement\w*|creat(?:e|es|ing)|writ(?:e|es|ing)|updat(?:e|es|ing)"
+    r"|modif\w*|chang(?:e|es|ing)|edit(?:s|ing|ed)?|remov(?:e|es|ing)"
+    r"|delet(?:e|es|ing)|renam(?:e|es|ing)|refactor\w*|replac(?:e|es|ing)"
+    r"|insert(?:s|ing|ed)?|append(?:s|ing|ed)?|rewrit(?:e|es|ing)"
+    r"|extract(?:s|ing|ed)?|split(?:s|ting)?|migrat\w*|convert\w*)\b",
+    re.IGNORECASE,
+)
+# How far a change verb may sit from the file it acts on. Both directions:
+# "fix the bug in report.py" puts the verb before, "report.py needs fixing"
+# after.
+_CHANGE_WINDOW = 80
+
+
+def _asks_for_a_change(user_text: str) -> bool:
+    """Whether the request asks for the workspace to end up different.
+
+    Anchored on a file-like token with a change verb nearby, the same windowing
+    idiom `_expected_artifacts` uses. Requiring the filename is what keeps
+    "write a short summary of what this does" — a request whose deliverable is
+    prose in the reply — from reading as a request to edit something. The cost
+    is a narrow gate: a change request that names no file at all does not match,
+    and the completion gate simply stays quiet. That is the right direction to
+    be wrong in. A gate that stays quiet leaves today's behaviour; a gate that
+    fires on a question wastes a turn arguing with the model about whether it
+    should have edited a file the user never asked it to touch.
+    """
+    for m in _ARTIFACT_RE.finditer(user_text):
+        window = user_text[max(0, m.start() - _CHANGE_WINDOW):
+                           m.end() + _CHANGE_WINDOW]
+        if _CHANGE_VERB_RE.search(window):
+            return True
+    return False
 
 
 def _expected_artifacts(user_text: str) -> set[str]:
