@@ -149,9 +149,21 @@ are user-visible and waste whole generations.*
   rows as high-uncertainty (Wilson interval / a minimum-variance floor, not the
   observed stdev), and (b) compare *intervals*, not point means. Also stop
   comparing an n=3 baseline to an n=8 candidate as if like-for-like.
-- `[ ]` **2.2 Infra-kill scored as model failure** — the checker's 180s pytest
-  timeout scores an infrastructure kill as 0.00, indistinguishable from a model
-  failure (same class as fixed in c00e8a4).
+- `[x]` **2.2 Infra-kill scored as model failure** — *build 73.* A run that
+  produced no verdict (checker raised — including `ctx.bash`'s 180s pytest
+  timeout — no `check.py`, or a turn that died on a transport error) is now
+  recorded as **ungraded** via `RunResult.invalid` and excluded from every
+  score, instead of landing as a 0.0 that is indistinguishable from the model
+  failing the case. Rows and sweeps report `n_invalid`/`invalid_rate`; absent
+  stats render as `-`, never `0.00`. The gate goes INCONCLUSIVE over
+  `_MAX_INVALID_RATE` (20%) or on any row where nothing could be graded — which
+  also removes the inversion where an ungraded row read as a catastrophic drop.
+  A **harness timeout is deliberately still scored**: the model really did grind
+  past the limit, and that is agent behaviour.
+  *Measured impact on history:* only 3 of 28 saved sweeps contained ungraded
+  runs, the largest correction being r8-append 0.752 → **0.793** (+0.041). Past
+  conclusions survive — but +0.041 is the size of `_GATE_OVERALL_FLOOR`, so the
+  bug was one bad run away from mattering. +15 tests.
 - `[ ]` **2.3 Gate/compare ergonomics** — `compare` takes two positional
   results.json paths; document the threshold and exit codes where a user looks.
 - `[!]` **2.4 Same-session paired A/B for regression checks** — *evidence

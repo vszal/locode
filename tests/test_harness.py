@@ -26,11 +26,11 @@ def _load_harness():
 harness = _load_harness()
 
 
-def _run(case="c", model="m", score=1.0, **metrics):
+def _run(case="c", model="m", score=1.0, invalid="", **metrics):
     return harness.RunResult(
         case=case, track="t", model=model, repeat=1, score=score,
         checks={}, metrics=metrics, returncode=0, timed_out=False,
-        seconds=1.0, workdir="/tmp")
+        seconds=1.0, workdir="/tmp", invalid=invalid)
 
 
 # --- _gen_rate ------------------------------------------------------------
@@ -439,3 +439,157 @@ def test_summarize_records_total_gen_chars():
             _run(gen_chars=2000, gen_seconds=20.0)]
     s = harness.summarize(runs)
     assert s["gen_chars"] == 3000
+
+
+# --- ungraded runs: infra kill vs model failure ---------------------------
+# The conflation this section pins down: a run the harness could not grade used
+# to score 0.0 and average straight into the sweep mean, which is exactly what a
+# genuine model failure looks like. A contended box then reads as a code
+# regression, and a good change gets reverted.
+
+def test_a_checker_timeout_is_not_a_model_failure():
+    # ctx.bash() raising TimeoutExpired on a 180s pytest: the harness cannot
+    # tell "the model wrote hanging code" from "the box was busy".
+    reason = harness._invalidity(
+        error="checker raised: TimeoutExpired: Command '...' timed out",
+        checks={}, has_checker=True, infra_error=None)
+    assert reason
+    assert harness._invalid_kind(reason) == "checker raised"
+
+
+def test_a_case_with_no_checker_is_not_a_zero():
+    reason = harness._invalidity(error="", checks={}, has_checker=False,
+                                 infra_error=None)
+    assert harness._invalid_kind(reason) == "no checker"
+
+
+def test_a_transport_death_invalidates_even_with_checks_present():
+    # The turn died mid-flight, so the checks describe a truncated run.
+    reason = harness._invalidity(error="", checks={"a": True}, has_checker=True,
+                                 infra_error="connection reset")
+    assert harness._invalid_kind(reason) == "infrastructure"
+
+
+def test_a_real_verdict_is_valid():
+    assert harness._invalidity(error="", checks={"a": True, "b": False},
+                               has_checker=True, infra_error=None) == ""
+
+
+def test_all_false_checks_are_a_real_verdict_not_an_infra_kill():
+    # The model genuinely failed every check. That IS a zero.
+    assert harness._invalidity(error="", checks={"a": False, "b": False},
+                               has_checker=True, infra_error=None) == ""
+
+
+def test_summarize_excludes_ungraded_runs_from_the_mean():
+    # Three runs scored 1.0, one infra-killed. The old behaviour averaged the
+    # kill in as a 0.0 and reported 0.75.
+    runs = [_run(score=1.0), _run(score=1.0), _run(score=1.0),
+            _run(score=0.0, invalid="infrastructure: connection reset")]
+    s = harness.summarize(runs)
+    assert s["overall_score"] == 1.0
+    assert s["n_valid"] == 3 and s["invalid_runs"] == 1
+    assert s["invalid_rate"] == 0.25
+    assert s["invalid_reasons"] == {"infrastructure": 1}
+    assert s["rows"]["c::m"]["n"] == 3
+    assert s["rows"]["c::m"]["n_invalid"] == 1
+
+
+def test_a_row_where_nothing_could_be_graded_reads_as_unmeasured():
+    runs = [_run(score=0.0, invalid="no checker: x"),
+            _run(score=0.0, invalid="no checker: x")]
+    row = harness.summarize(runs)["rows"]["c::m"]
+    # None, not 0.0 — "not measured" must not look like "measured and failed".
+    assert row["n"] == 0 and row["n_invalid"] == 2
+    assert row["score_mean"] is None
+    assert row["seconds_mean"] is None
+    assert row["clean_finish_rate"] is None
+    assert row["scores"] == []
+
+
+def test_report_prints_a_dash_not_a_zero_for_an_ungraded_row(capsys):
+    s = harness.summarize([_run(score=0.0, invalid="infrastructure: boom"),
+                           _run(case="d", score=1.0)])
+    harness.print_report(s)
+    out = capsys.readouterr().out
+    assert "ungraded" in out
+    # The ungraded row's cells are dashes; a 0.00 there would read as a score.
+    row = next(ln for ln in out.splitlines() if ln.startswith("c "))
+    assert "0.00" not in row and "-" in row
+    # The row that WAS graded still prints its number.
+    assert "1.00" in next(ln for ln in out.splitlines() if ln.startswith("d "))
+
+
+def test_a_sweep_with_nothing_graded_reports_no_headline_score(capsys):
+    harness.print_report(
+        harness.summarize([_run(score=0.0, invalid="infrastructure: boom")]))
+    out = capsys.readouterr().out
+    assert "overall score      : n/a" in out
+    assert "0.000" not in out
+
+
+def test_summarize_is_silent_when_every_run_was_graded(capsys):
+    harness.print_report(harness.summarize([_run(score=1.0)]))
+    assert "ungraded" not in capsys.readouterr().out
+
+
+def test_gen_rate_still_counts_ungraded_runs():
+    # Throughput measures the BOX. A run the checker could not grade still
+    # generated tokens, and excluding it would blind the throttle check exactly
+    # when things are going wrong.
+    runs = [_run(score=1.0, gen_chars=1000, gen_seconds=10.0),
+            _run(score=0.0, invalid="infrastructure: boom",
+                 gen_chars=2000, gen_seconds=20.0)]
+    s = harness.summarize(runs)
+    assert s["gen_chars"] == 3000
+    assert s["gen_rate"] == 100.0
+
+
+# --- the gate's response to ungraded runs ---------------------------------
+
+def test_gate_is_inconclusive_when_too_much_of_a_sweep_is_ungraded(capsys):
+    base = _full({"a::m": 1.0})
+    cand = _full({"a::m": 0.2}, overall=0.2)
+    cand.update(invalid_rate=0.5, invalid_runs=3, n_runs=6,
+                invalid_reasons={"infrastructure": 3})
+    assert harness.compare(base, cand) == 2
+    assert "INCONCLUSIVE" in capsys.readouterr().out
+
+
+def test_a_few_ungraded_runs_do_not_block_the_gate():
+    base = _full({"a::m": 1.0})
+    cand = _full({"a::m": 1.0})
+    cand.update(invalid_rate=0.1, invalid_runs=1, n_runs=10,
+                invalid_reasons={"checker raised": 1})
+    assert harness._validity_warnings(base, cand) == []
+
+
+def test_an_all_ungraded_row_is_inconclusive_never_a_hard_fail(capsys):
+    # The inversion this prevents: a row the harness could not grade at all
+    # being read as a score of nothing, i.e. a catastrophic regression.
+    base = _full({"a::m": 1.0, "b::m": 1.0})
+    cand = _full({"a::m": 1.0, "b::m": 1.0})
+    cand["rows"]["b::m"].update(n=0, n_invalid=4, score_mean=None,
+                                score_min=None,
+                                invalid_reasons={"infrastructure": 4})
+    assert harness.compare(base, cand) == 2
+    out = capsys.readouterr().out
+    assert "INCONCLUSIVE" in out
+    assert "NO run could be graded" in out
+
+
+def test_summaries_without_the_field_are_treated_as_fully_graded():
+    # Sweeps recorded before `invalid` existed carry no rate; they must compare
+    # exactly as they always did rather than trip the new check.
+    base, cand = _full({"a::m": 1.0}), _full({"a::m": 1.0})
+    assert "invalid_rate" not in base
+    assert harness._validity_warnings(base, cand) == []
+
+
+def test_a_legacy_result_row_loads_with_a_default_of_valid():
+    # RunResult(**raw) over a results.json written before the field existed.
+    raw = {"case": "c", "track": "t", "model": "m", "repeat": 1, "score": 1.0,
+           "checks": {}, "metrics": {}, "returncode": 0, "timed_out": False,
+           "seconds": 1.0, "workdir": "/tmp"}
+    assert harness.RunResult(**raw).invalid == ""
+

@@ -269,6 +269,14 @@ class RunResult:
     seconds: float
     workdir: str
     error: str = ""
+    # Why this run produced NO usable verdict, or "" if it produced one. Scoring
+    # such a run 0.0 and averaging it in is indistinguishable from the model
+    # having failed the case, which silently deflates a sweep for reasons that
+    # have nothing to do with the code under test. Empty by default so results
+    # written before this field existed still load (see `RunResult(**raw)` in
+    # the rescore path) — they simply claim every run was valid, which is the
+    # behaviour they were scored under anyway.
+    invalid: str = ""
 
 
 def _load_checker(case: Case):
@@ -354,9 +362,10 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
                 _kill_tree(proc)
                 out_fh.write("\n[TIMEOUT: harness killed the process]\n")
     except FileNotFoundError:
+        msg = f"locode not found at {LOCODE_BIN}"
         return RunResult(case.id, case.track, model, repeat, 0.0, {}, {}, -1,
-                         False, 0.0, str(workdir),
-                         error=f"locode not found at {LOCODE_BIN}")
+                         False, 0.0, str(workdir), error=msg,
+                         invalid=f"harness: {msg}")
     seconds = round(time.monotonic() - t0, 1)
     stdout = out_path.read_text(errors="replace")
 
@@ -374,11 +383,14 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
         except Exception as e:  # a broken checker must not lose the whole run
             err = f"checker raised: {type(e).__name__}: {e}"
     score = _score(checks)
+    invalid = _invalidity(error=err, checks=checks, has_checker=checker is not None,
+                          infra_error=metrics.get("infra_error"))
 
     if not keep:
         shutil.rmtree(workdir, ignore_errors=True)
     return RunResult(case.id, case.track, model, repeat, score, checks, metrics,
-                     rc, timed_out, seconds, str(workdir), error=err)
+                     rc, timed_out, seconds, str(workdir), error=err,
+                     invalid=invalid)
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
@@ -398,6 +410,46 @@ def _kill_tree(proc: subprocess.Popen) -> None:
         pass
 
 
+def _invalidity(*, error: str, checks: dict, has_checker: bool,
+                infra_error: str | None) -> str:
+    """Why a run yielded no usable verdict, or "" when it yielded one.
+
+    The distinction this draws is *"the model failed the case"* versus *"the
+    harness never found out"*. Only the first is a score. The second used to
+    land as 0.0 — a checker that raised, a case with no `check.py`, a turn that
+    died on a transport error — and averaged straight into the sweep mean, so a
+    flaky box read as a code regression. That is the failure mode the whole
+    validity layer exists to prevent (see `_validity_warnings`), applied per run
+    rather than per sweep.
+
+    Reasons are formatted `kind: detail` so callers can histogram by kind.
+
+    Deliberately NOT invalid: a harness timeout. The model really did grind past
+    `case.timeout` — that is agent behaviour and belongs in the score. And a
+    checker that ran to completion returning all-False is a real verdict.
+    """
+    if error:
+        # Covers `ctx.bash` hitting subprocess.TimeoutExpired — a 180s pytest
+        # that never returned. It could mean the model wrote hanging code, or it
+        # could mean the box was contended; the harness cannot tell which, and
+        # "cannot tell" must not be recorded as "the model scored zero".
+        return error if ":" in error else f"checker error: {error}"
+    if not has_checker:
+        return "no checker: the case ships no check.py, so nothing was graded"
+    if infra_error:
+        # The turn died mid-flight, so whatever the checker found describes a
+        # truncated run rather than the agent's actual output.
+        return f"infrastructure: {infra_error}"
+    if not checks:
+        return "no checks: the checker returned an empty verdict"
+    return ""
+
+
+def _invalid_kind(reason: str) -> str:
+    """The coarse category of an invalidity reason, for histogramming."""
+    return reason.split(":", 1)[0].strip() if reason else ""
+
+
 def _score(checks: dict) -> float:
     if not checks:
         return 0.0
@@ -415,46 +467,70 @@ def summarize(runs: list[RunResult]) -> dict:
         by_case.setdefault(f"{r.case}::{r.model}", []).append(r)
 
     rows = {}
-    for key, group in sorted(by_case.items()):
+    for key, whole in sorted(by_case.items()):
+        # Every statistic below is computed over the runs that actually produced
+        # a verdict. The row itself is still emitted when NONE did, with null
+        # stats and a non-zero n_invalid — dropping it silently would let a row
+        # that never ran look identical to a row that was never requested, and
+        # the gate's missing-row check would then not fire either.
+        group = [r for r in whole if not r.invalid]
+        bad = [r for r in whole if r.invalid]
         scores = [r.score for r in group]
         rows[key] = {
-            "case": group[0].case,
-            "track": group[0].track,
-            "model": group[0].model,
+            "case": whole[0].case,
+            "track": whole[0].track,
+            "model": whole[0].model,
             "n": len(group),
-            "score_mean": round(statistics.mean(scores), 3),
-            "score_min": round(min(scores), 3),
+            "n_invalid": len(bad),
+            "invalid_reasons": dict(Counter(_invalid_kind(r.invalid) for r in bad)),
+            "score_mean": round(statistics.mean(scores), 3) if scores else None,
+            "score_min": round(min(scores), 3) if scores else None,
             # Per-run scores, kept so the regression gate can reason about a
             # row's *variance*, not just its mean. At n=6 these models drift up
             # to ~0.4 in per-sweep mean under identical code (r18 vs r19), so a
             # bare mean delta cannot tell a real regression from sampling noise.
             "scores": [round(s, 3) for s in scores],
-            "iterations_mean": round(statistics.mean(
-                [r.metrics.get("iterations", 0) for r in group]), 1),
-            "nudges_mean": round(statistics.mean(
-                [r.metrics.get("nudges", 0) for r in group]), 1),
-            "clean_finish_rate": round(statistics.mean(
-                [1.0 if r.metrics.get("clean_finish") else 0.0 for r in group]), 3),
-            "seconds_mean": round(statistics.mean([r.seconds for r in group]), 1),
+            "iterations_mean": _mean_or_none(
+                [r.metrics.get("iterations", 0) for r in group], 1),
+            "nudges_mean": _mean_or_none(
+                [r.metrics.get("nudges", 0) for r in group], 1),
+            "clean_finish_rate": _mean_or_none(
+                [1.0 if r.metrics.get("clean_finish") else 0.0 for r in group], 3),
+            "seconds_mean": _mean_or_none([r.seconds for r in group], 1),
             "gen_rate_mean": _mean_rate(group),
             "stop_reasons": [r.metrics.get("stop_reason") for r in group
                              if r.metrics.get("stop_reason")],
         }
 
+    good = [r for r in runs if not r.invalid]
+    bad = [r for r in runs if r.invalid]
     weights = {r.case: 1.0 for r in runs}
-    overall = round(statistics.mean([r.score for r in runs]), 3) if runs else 0.0
+    overall = round(statistics.mean([r.score for r in good]), 3) if good else 0.0
     return {
         "overall_score": overall,
         "clean_finish_rate": round(statistics.mean(
-            [1.0 if r.metrics.get("clean_finish") else 0.0 for r in runs]), 3)
-        if runs else 0.0,
-        "total_nudges": sum(r.metrics.get("nudges", 0) for r in runs),
-        "total_iterations": sum(r.metrics.get("iterations", 0) for r in runs),
+            [1.0 if r.metrics.get("clean_finish") else 0.0 for r in good]), 3)
+        if good else 0.0,
+        "total_nudges": sum(r.metrics.get("nudges", 0) for r in good),
+        "total_iterations": sum(r.metrics.get("iterations", 0) for r in good),
         "nudge_histogram": dict(sum(
-            (Counter(r.metrics.get("nudges_by_reason", {})) for r in runs),
+            (Counter(r.metrics.get("nudges_by_reason", {})) for r in good),
             Counter())),
+        # Runs the harness never got a verdict from. Surfaced at the top level
+        # (not just per row) because the number that matters to a reader is
+        # "how much of this sweep is real" — and because the gate refuses to
+        # judge a sweep where too little of it is.
+        "n_runs": len(runs),
+        "n_valid": len(good),
+        "invalid_runs": len(bad),
+        "invalid_rate": round(len(bad) / len(runs), 3) if runs else 0.0,
+        "invalid_reasons": dict(Counter(_invalid_kind(r.invalid) for r in bad)),
         # Aggregated over the whole sweep rather than averaged per row, so one
-        # short case can't outvote a long one on what the box was doing.
+        # short case can't outvote a long one on what the box was doing. These
+        # two alone stay over ALL runs, invalid included: they measure the BOX,
+        # and a run the checker couldn't grade still generated tokens at
+        # whatever rate the box managed. Excluding them would blind the throttle
+        # check exactly when things are going wrong.
         "gen_rate": _mean_rate(runs),
         # Total chars generated across the sweep — lets the throttle check tell a
         # slow box (lots of chars, low rate) from short no-op runs (few chars,
@@ -465,6 +541,13 @@ def summarize(runs: list[RunResult]) -> dict:
     }
 
 
+def _mean_or_none(values: list, digits: int) -> float | None:
+    """Mean, or None when there is nothing to average. None rather than 0.0 so a
+    row whose runs were ALL invalid reads as "not measured" instead of "measured
+    and scored zero" — the exact conflation this whole layer removes."""
+    return round(statistics.mean(values), digits) if values else None
+
+
 def _mean_rate(runs: list[RunResult]) -> float | None:
     """Pooled chars/sec across runs: total chars over total generation seconds.
     None when no run recorded throughput (a sweep from before it was tracked)."""
@@ -473,16 +556,41 @@ def _mean_rate(runs: list[RunResult]) -> float | None:
     return round(chars / seconds, 1) if chars and seconds else None
 
 
+def _cell(row: dict, key: str, width: int, digits: int) -> str:
+    """One report cell: the stat, or a dash when the row had no graded run to
+    compute it from. Never a zero — a zero here reads as a measured result."""
+    v = row.get(key)
+    text = "-" if v is None else f"{v:.{digits}f}"
+    return f"{text:>{width}}"
+
+
 def print_report(summary: dict, title: str = "") -> None:
     if title:
         print(f"\n=== {title} ===")
-    print(f"overall score      : {summary['overall_score']:.3f}")
-    print(f"clean-finish rate  : {summary['clean_finish_rate']:.3f}")
+    # When nothing was graded the stored aggregates are 0.0 (kept numeric so the
+    # gate's arithmetic never has to special-case them), but printing "0.000" as
+    # the headline would assert a result the sweep never produced.
+    graded = summary.get("n_valid", 1) > 0
+    if graded:
+        print(f"overall score      : {summary['overall_score']:.3f}")
+        print(f"clean-finish rate  : {summary['clean_finish_rate']:.3f}")
+    else:
+        print("overall score      : n/a — no run in this sweep could be graded")
+        print("clean-finish rate  : n/a")
     print(f"total iterations   : {summary['total_iterations']}")
     print(f"total nudges       : {summary['total_nudges']}  "
           f"{summary['nudge_histogram'] or ''}")
     rate = summary.get("gen_rate")
     print(f"generation rate    : {f'{rate:.1f} chars/s' if rate else 'n/a'}")
+    # Printed only when non-zero, but printed LOUDLY: a reader who skims the
+    # overall score needs to know it was computed over a subset before they
+    # trust it. Silence here means every run was graded.
+    if summary.get("invalid_runs"):
+        print(f"⚠️  ungraded runs   : {summary['invalid_runs']} of "
+              f"{summary.get('n_runs', '?')} "
+              f"({summary.get('invalid_rate', 0):.0%}) excluded — "
+              f"{summary.get('invalid_reasons') or {}}")
+        print("    (the scores above average only the runs that WERE graded)")
     print()
     hdr = f"{'case':<26}{'model':<14}{'n':>2} {'score':>6} {'iter':>5} " \
           f"{'nudge':>6} {'clean':>6} {'secs':>7} {'ch/s':>7}"
@@ -491,9 +599,15 @@ def print_report(summary: dict, title: str = "") -> None:
     for row in summary["rows"].values():
         rr = row.get("gen_rate_mean")
         print(f"{row['case']:<26}{row['model']:<14}{row['n']:>2} "
-              f"{row['score_mean']:>6.2f} {row['iterations_mean']:>5.1f} "
-              f"{row['nudges_mean']:>6.1f} {row['clean_finish_rate']:>6.2f} "
-              f"{row['seconds_mean']:>7.1f} {(f'{rr:.0f}' if rr else '-'):>7}")
+              f"{_cell(row, 'score_mean', 6, 2)} "
+              f"{_cell(row, 'iterations_mean', 5, 1)} "
+              f"{_cell(row, 'nudges_mean', 6, 1)} "
+              f"{_cell(row, 'clean_finish_rate', 6, 2)} "
+              f"{_cell(row, 'seconds_mean', 7, 1)} "
+              f"{(f'{rr:.0f}' if rr else '-'):>7}")
+        if row.get("n_invalid"):
+            print(f"    ⚠️  {row['n_invalid']} ungraded "
+                  f"{row.get('invalid_reasons') or {}}")
         for sr in dict.fromkeys(row["stop_reasons"]):
             print(f"    ⏹ {sr}")
 
@@ -514,6 +628,12 @@ MIN_GEN_RATE = 30.0
 # e2e sweep on the SAME box clocked 45.8). Gate the warning on a minimum average
 # generation per run so it stops crying wolf on legitimately terse runs.
 MIN_GEN_CHARS_PER_RUN = 800.0
+
+# Above this share of ungraded runs, a sweep is no longer comparable to another
+# one. Set at a fifth: below it, dropping the odd checker timeout leaves the
+# remaining runs a fair sample; above it, whatever went wrong went wrong broadly
+# enough that the surviving runs are a self-selected subset, not a sample.
+_MAX_INVALID_RATE = 0.20
 
 
 def _rate_is_trustworthy(summary: dict) -> bool:
@@ -569,6 +689,26 @@ def _validity_warnings(baseline: dict, candidate: dict) -> list[str]:
        fraction of the baseline's chars/s makes the same work miss deadlines it
        previously cleared, which reads as a quality regression."""
     warnings = []
+    for name, s in (("baseline", baseline), ("candidate", candidate)):
+        # 3. UNGRADED RUNS. Excluding them from the mean (rather than scoring
+        #    them 0.0) is what keeps the number honest, but past some fraction
+        #    the two sweeps are no longer averaging comparable amounts of
+        #    evidence and the comparison stops being like-for-like regardless.
+        rate = s.get("invalid_rate") or 0.0
+        if rate > _MAX_INVALID_RATE:
+            warnings.append(
+                f"{name} could not grade {s.get('invalid_runs')} of "
+                f"{s.get('n_runs')} runs ({rate:.0%}, over the "
+                f"{_MAX_INVALID_RATE:.0%} limit) — {s.get('invalid_reasons') or {}}; "
+                "too little of the sweep produced a verdict to compare")
+    dead = sorted(k for k, r in candidate["rows"].items()
+                  if r.get("n", 0) == 0 and r.get("n_invalid", 0))
+    if dead:
+        warnings.append(
+            f"candidate has {len(dead)} row(s) where NO run could be graded "
+            f"({', '.join(dead[:4])}{', …' if len(dead) > 4 else ''}) — those "
+            "cases contributed nothing, so the overall score covers less than "
+            "the baseline's")
     missing = [k for k in baseline["rows"] if k not in candidate["rows"]]
     if missing:
         warnings.append(
@@ -620,6 +760,7 @@ _GATE_OVERALL_FLOOR = 0.05   # pooled-overall hard-fail needs at least this drop
                              # everything) — and where same-code drift is ~0.
 _GATE_BOOT_ITERS = 20000
 _GATE_PERM_ITERS = 20000
+
 
 
 def _bootstrap_ci(scores: list[float], pct: float = 90.0,
@@ -739,6 +880,12 @@ def compare(baseline: dict, candidate: dict) -> int:
                     f"{key}: {info['base_mean']:.2f} -> {info['cand_mean']:.2f} "
                     f"(drop {info['drop']:.2f}, p={info['p']:.3f}; high per-sweep "
                     f"noise — could be sampling drift, base CI [{blo:.2f},{bhi:.2f}])")
+        elif brow.get("score_mean") is None or crow.get("score_mean") is None:
+            # A row where nothing could be graded has no mean to compare. It is
+            # already reported as a validity warning (which forces INCONCLUSIVE);
+            # treating the absent mean as a drop here would turn an infrastructure
+            # failure into a hard FAIL, the precise inversion this work removes.
+            continue
         else:
             # Legacy summary without per-run scores (old baseline, or a synthetic
             # summary): fall back to the fixed per-case tolerance. A single flaky
@@ -1017,12 +1164,16 @@ def cmd_rescore(args) -> int:
 
         checks, err = raw.get("checks", {}), raw.get("error", "")
         score = old_score
+        invalid = raw.get("invalid", "")
         checker = _load_checker(case) if case is not None else None
         if checker is None or not workdir.is_dir():
             why = ("case no longer exists" if case is None
                    else "scratch workspace is gone (run with --clean?)")
             print(f"  !! {raw['case']} · {raw['model']} — {why}; "
                   f"metrics rescored, checks kept as-is")
+            # Checks were kept as-is, so the recorded validity is kept too — a
+            # rescore that could not re-run the checker has learned nothing new
+            # about whether the original run produced a verdict.
         else:
             ctx = CheckCtx(workdir=workdir, events=events, stdout=stdout,
                            case=case)
@@ -1032,8 +1183,16 @@ def cmd_rescore(args) -> int:
             except Exception as e:
                 err = f"checker raised: {type(e).__name__}: {e}"
             score = _score(checks)
+            # Recomputed, not carried forward: the checker just ran again, and
+            # the metrics were re-mined from the event log, so both inputs to
+            # the verdict are fresh. This is also how sweeps recorded before the
+            # `invalid` field existed acquire one — the same reason metrics are
+            # always recomputed rather than frozen at the day of the run.
+            invalid = _invalidity(error=err, checks=checks, has_checker=True,
+                                  infra_error=metrics.get("infra_error"))
 
-        raw = dict(raw, score=score, checks=checks, metrics=metrics, error=err)
+        raw = dict(raw, score=score, checks=checks, metrics=metrics, error=err,
+                   invalid=invalid)
         runs.append(RunResult(**raw))
         if abs(score - old_score) > 1e-9:
             changed += 1
