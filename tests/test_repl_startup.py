@@ -13,6 +13,7 @@ from locode.model.client import ModelClient
 from locode.server.manager import SingleGpuManager
 from locode.tools import build_registry
 from locode.ui import banner
+from locode.ui import repl as repl_mod
 from locode.ui.repl import Repl
 
 _ALIASES = {
@@ -83,6 +84,94 @@ def test_banner_says_down_not_starting_when_no_server():
     # "starting…" was a guess; nothing is necessarily starting.
     out = banner.render("qwen14", False, "/w", "0.1.0", color=False)
     assert "server: down" in out
+
+
+def test_art_and_status_are_separable():
+    # The status row is a snapshot of state the preload is about to change, so
+    # it has to be printable on its own, after the art.
+    art = banner.art(color=False)
+    status = banner.status("qwen14", True, "/w", "0.1.0", color=False)
+    assert "server:" not in art and "██" in art
+    assert "██" not in status and "● server: up" in status
+
+
+def test_render_still_composes_both():
+    # --logo has nothing to wait on and keeps the one-shot form.
+    out = banner.render("qwen14", True, "/w", "0.1.0", color=False)
+    assert "██" in out and "● server: up" in out
+    assert out.endswith(banner.status("qwen14", True, "/w", "0.1.0", color=False))
+
+
+# --- startup ordering ---------------------------------------------------------
+def _no_prompt(monkeypatch):
+    """Make the first prompt read EOF, so run() prints startup and returns."""
+    class _Session:
+        def __init__(self, *a, **k):
+            pass
+
+        async def prompt_async(self, *a, **k):
+            raise EOFError
+
+    monkeypatch.setattr(repl_mod, "PromptSession", _Session)
+
+
+async def test_status_row_reflects_the_model_loaded_during_startup(monkeypatch,
+                                                                   capsys):
+    # The bug: the whole banner printed BEFORE _preload_model, so a model that
+    # loaded successfully still sat under "○ qwen14   ○ server: down" — a line
+    # printed above the prompt, where nothing can go back and rewrite it.
+    r = _repl(monkeypatch)
+    _stub_manager(r, resident=None)
+    _no_prompt(monkeypatch)
+
+    assert await r.run() == 0
+
+    out = capsys.readouterr().out
+    assert "● qwen14   ● server: up" in out
+    assert "server: down" not in out
+    # ...and the art still came first, so the splash is unchanged.
+    assert out.index("██") < out.index("● qwen14")
+
+
+async def test_startup_says_ready_once(monkeypatch, capsys):
+    # The status row says everything "● qwen14 ready" said, with more detail.
+    r = _repl(monkeypatch)
+    _stub_manager(r, resident=None)
+    _no_prompt(monkeypatch)
+
+    await r.run()
+
+    assert "ready" not in capsys.readouterr().out
+
+
+async def test_status_row_reports_down_when_the_load_fails(monkeypatch, capsys):
+    r = _repl(monkeypatch)
+    _stub_manager(r, resident=None)
+    _no_prompt(monkeypatch)
+
+    async def boom(alias=None):
+        raise RuntimeError("refusing to load: it needs ~28.0 GB")
+
+    r._manager.ensure_up = boom
+
+    await r.run()
+
+    out = capsys.readouterr().out
+    assert "○ qwen14" in out and "server: down" in out
+    assert "needs ~28.0 GB" in out
+
+
+async def test_no_splash_keeps_the_ready_line(monkeypatch, capsys):
+    # With --no-splash there's no status row to carry the news, so the preload
+    # has to announce itself.
+    r = _repl(monkeypatch)
+    _stub_manager(r, resident=None)
+    _no_prompt(monkeypatch)
+
+    await r.run(splash=False)
+
+    out = capsys.readouterr().out
+    assert "qwen14 ready" in out and "██" not in out
 
 
 # --- preload -----------------------------------------------------------------

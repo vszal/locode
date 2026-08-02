@@ -402,6 +402,10 @@ def test_wired_cap_blocks_a_model_that_free_ram_would_allow(monkeypatch):
     monkeypatch.setattr(mod, "_model_disk_bytes", lambda mid: 14 * GB)
     monkeypatch.setattr(mod, "_total_ram_bytes", lambda: 24 * GB)
     monkeypatch.setattr(mod, "_wired_limit_bytes", lambda total: 20000 * 1024 * 1024)
+    # Devstral's real shape, stated here rather than read from the HF cache:
+    # the model can be (and now has been) deleted from disk, and a guard test
+    # must not depend on which weights happen to be downloaded.
+    monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
     dev = "mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit"
     with pytest.raises(RuntimeError, match="wired-memory cap"):
         m._check_memory_budget(dev, profile_for(dev))

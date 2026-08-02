@@ -93,12 +93,20 @@ class Repl:
         # resident the server is trivially up, so that costs one round trip.
         self._model_up = await self._manager.is_up(self._loop.model_alias)
         self._server_up = self._model_up or await self._manager.is_up()
+        # Art first (instant), status last (true). The status row is a snapshot
+        # of state the preload is about to change, and it's printed above the
+        # prompt where nothing can go back and rewrite it — so printing the
+        # whole banner up front left "○ server: down" on screen next to a model
+        # that had just finished loading.
         if splash:
-            print(banner.render(self._loop.model_alias, self._server_up,
+            print(banner.art(color=self._color))
+            print()
+        if not self._model_up:
+            await self._preload_model(announce=not splash)
+        if splash:
+            print(banner.status(self._loop.model_alias, self._server_up,
                                 self._loop._cwd, __full_version__,
                                 color=self._color, model_up=self._model_up))
-        if not self._model_up:
-            await self._preload_model()
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         session: PromptSession = PromptSession(
             history=FileHistory(str(HISTORY_PATH)), style=_PROMPT_STYLE,
@@ -196,7 +204,7 @@ class Repl:
                         "<edge>│</edge> <arrow>❯</arrow> ")
         return _fmt
 
-    async def _preload_model(self) -> None:
+    async def _preload_model(self, announce: bool = True) -> None:
         """Load the selected model now rather than on the first turn.
 
         `-m` against a server holding different weights is a full stop/start,
@@ -225,7 +233,10 @@ class Repl:
         finally:
             self._spinner.stop()
         self._server_up = self._model_up = True
-        print(render.dim(f"  ● {alias} ready", color=self._color))
+        # With the splash on, the status row prints straight after this and says
+        # the same thing in more detail; only announce when there's no banner.
+        if announce:
+            print(render.dim(f"  ● {alias} ready", color=self._color))
 
     def _toolbar(self):
         if self._model_up:

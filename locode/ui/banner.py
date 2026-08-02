@@ -15,7 +15,15 @@ DIM = "\033[2m"
 RESET = "\033[0m"
 
 
-def render(model: str, server_up: bool, cwd: str, version: str,
+def art(color: bool = True) -> str:
+    """Just the block letters. Split from the status row so a caller can show
+    the splash immediately and print the status only once it's true — printing
+    both up front is what left a stale "server: down" on screen after the model
+    had finished loading."""
+    return f"{ACCENT}{BANNER}{RESET}" if color else BANNER
+
+
+def status(model: str, server_up: bool, cwd: str, version: str,
            color: bool = True, model_up: bool | None = None) -> str:
     """Status line: one dot for the selected MODEL, one for the SERVER.
 
@@ -29,10 +37,16 @@ def render(model: str, server_up: bool, cwd: str, version: str,
     dot_model = "●" if model_up else "○"
     dot_server = "●" if server_up else "○"
     server_txt = "server: up" if server_up else "server: down"
-    banner = f"{ACCENT}{BANNER}{RESET}" if color else BANNER
-    status = f"  {dot_model} {model}   {dot_server} {server_txt}   {cwd}   v{version}"
+    line = f"  {dot_model} {model}   {dot_server} {server_txt}   {cwd}   v{version}"
     hint = "  type a task, /help for commands, Esc to interrupt"
     if color:
-        status = f"{DIM}{status}{RESET}"
+        line = f"{DIM}{line}{RESET}"
         hint = f"{DIM}{hint}{RESET}"
-    return f"{banner}\n\n{status}\n{hint}"
+    return f"{line}\n{hint}"
+
+
+def render(model: str, server_up: bool, cwd: str, version: str,
+           color: bool = True, model_up: bool | None = None) -> str:
+    """Art + status in one string, for callers with nothing to wait on."""
+    return (f"{art(color)}\n\n"
+            f"{status(model, server_up, cwd, version, color, model_up)}")
