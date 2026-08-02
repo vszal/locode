@@ -434,8 +434,9 @@ warm that would exceed the budget rather than crashing the machine.
 ## 6. Interactivity
 
 ### 6.1 REPL (`ui/repl.py`)
-Built on **`prompt_toolkit`**: multiline input (Enter submits, **Esc+Enter** for
-a newline), history (persisted to `~/.local/state/locode/history`),
+Built on **`prompt_toolkit`**: multiline input (Enter submits, **Esc+Enter** or
+**Ctrl-J** for a newline — see §6.5), history (persisted to
+`~/.local/state/locode/history`),
 reverse-search, **slash-command tab-completion**, and a custom key-binding layer
 for interrupt. The **input area is enclosed in a box** — a titled top rule
 (`╭─ <model> ───`), a `│` left edge on each line, and a bottom rule (`╰───`)
@@ -526,7 +527,28 @@ In-REPL commands (not model-visible):
 | `/permissions`       | Show/edit per-tool permission policy. |
 | `/cwd [path]`        | Show or change the agent's working directory. |
 | `/cost` / `/tokens`  | Show token usage + timing for the session. |
+| `/terminal-setup`    | Map **Shift+Enter** to newline in the host terminal ([§6.5.1](#651-shiftenter-uitermsetuppy)). |
 | `/help`              | List commands. |
+
+#### 6.5.1 Shift+Enter (`ui/termsetup.py`)
+Shift+Enter **cannot be bound by a terminal program.** A terminal transmits the
+same byte — CR, `\r` — for both Enter and Shift+Enter; the modifier is discarded
+before any program sees it, and `prompt_toolkit`'s key table contains no
+modified-Enter key at all. Hence the two portable newline keys locode binds:
+**Esc+Enter** (`\x1b\r`) and **Ctrl-J** (`\n`), both distinguishable from a bare
+CR everywhere.
+
+`/terminal-setup` closes the gap from the other side: it maps Shift+Enter to
+`\x1b\r` in the *terminal's own* keymap, which is byte-identical to Esc+Enter, so
+locode needs no new binding. Terminals whose config is a plain text or JSON array
+file (Zed, VS Code, Ghostty, kitty, Alacritty) are edited in place — backed up to
+`*.locode.bak`, idempotent via a marker comment, and appended textually so the
+JSONC comments users keep in those files survive. Terminals configured through an
+Apple plist or a Lua table (iTerm2, Terminal.app, WezTerm) get printed
+instructions instead; a bad write there costs the user their terminal settings.
+Detection is `$TERM_PROGRAM` first, then terminal-specific env vars — but
+deliberately **not** `ALACRITTY_WINDOW_ID`, which Zed also exports because it
+vendors the `alacritty_terminal` crate.
 
 ### 6.6 Non-interactive / pipe mode
 `locode -p "prompt"` (or stdin pipe) runs **one** agent turn headless and

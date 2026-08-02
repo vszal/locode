@@ -17,6 +17,7 @@ COMMANDS: dict[str, str] = {
     "resume": "Restore a saved conversation: /resume [name] (no name lists them)",
     "permissions": "Show the per-tool permission policy",
     "cwd": "Show or change the working directory: /cwd [path]",
+    "terminal-setup": "Map Shift+Enter to newline in your terminal (--dry-run to preview)",
     "help": "List commands",
     "quit": "Exit locode",
 }

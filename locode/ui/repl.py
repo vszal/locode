@@ -6,6 +6,8 @@ slash completion, per-turn timing, multiline input, friendly errors).
 
 from __future__ import annotations
 
+import os
+import platform
 import time
 from pathlib import Path
 
@@ -23,7 +25,7 @@ from locode.agent.loop import AgentLoop
 from locode.config import HISTORY_PATH, STATE_DIR
 from locode.permissions import PermissionPolicy
 from locode.telemetry import tee
-from locode.ui import banner, choice, editor, render, slash
+from locode.ui import banner, choice, editor, render, slash, termsetup
 from locode.ui.interrupt import RawWriter, interrupt_scope
 from locode.ui.spinner import Spinner
 
@@ -248,7 +250,7 @@ class Repl:
         toks = sum(len(m.get("content") or "") for m in self._loop.history) // 4
         ctx = f"{toks / 1000:.1f}k" if toks >= 1000 else str(toks)
         return (f" {up} · ctx ~{ctx} · {Path(self._loop._cwd).name} · "
-                f"Esc+Enter newline · /help ")
+                f"Esc+Enter/Ctrl-J newline · /help ")
 
     def _keybindings(self) -> KeyBindings:
         kb = KeyBindings()
@@ -257,7 +259,13 @@ class Repl:
         def _submit(event):
             event.current_buffer.validate_and_handle()
 
+        # Two newline keys, because Shift+Enter isn't available to bind: a
+        # terminal sends the same CR for Enter and Shift+Enter, so the modifier
+        # never reaches us (prompt_toolkit has no such key either). Esc+Enter
+        # sends ESC+CR and Ctrl-J sends LF — both distinguishable from CR, both
+        # working everywhere. /terminal-setup maps Shift+Enter onto ESC+CR.
         @kb.add("escape", "enter")
+        @kb.add("c-j")
         def _newline(event):
             event.current_buffer.insert_text("\n")
 
@@ -398,6 +406,8 @@ class Repl:
             if rest:
                 self._loop._cwd = rest
             print(f"cwd: {self._loop._cwd}")
+        elif cmd == "terminal-setup":
+            self._slash_terminal_setup(rest)
         elif cmd == "open":
             ed = editor.resolve_editor(self._cfg.editor)
             if ed and rest:
@@ -407,6 +417,49 @@ class Repl:
         else:
             print(f"unknown command: /{cmd} (try /help)")
         return False
+
+    def _slash_terminal_setup(self, rest: str) -> None:
+        """Map Shift+Enter to ESC+CR in the host terminal's own keymap."""
+        term = termsetup.detect(os.environ)
+        if term is None:
+            print(termsetup.unknown_help())
+            return
+        dry = rest.strip() in ("--dry-run", "-n", "dry-run")
+        print(f"terminal: {term.name}")
+        if term.kind == "manual":
+            # A plist or a Lua table — editable in principle, but a wrong write
+            # costs the user their terminal settings. Instructions instead.
+            print(f"locode can't edit {term.name}'s config safely. Do this:\n")
+            print(termsetup.instructions(term))
+            return
+        path = termsetup.config_path(term, Path.home(), platform.system())
+        if path is None:
+            print(f"no known config path for {term.name} on this platform")
+            return
+        print(f"config:   {path}")
+        if dry:
+            print("\nwould add:\n")
+            print(termsetup.instructions(term))
+            return
+        try:
+            outcome, backup = termsetup.apply(term, path)
+        except termsetup.NotAnArray:
+            print(f"✗ {path.name} isn't a JSON array — leaving it untouched.\n"
+                  f"  Add this entry yourself:\n")
+            print(termsetup.instructions(term))
+            return
+        except OSError as e:
+            print(f"✗ could not write {path}: {e}")
+            return
+        if outcome == "already":
+            print("✓ Shift+Enter is already mapped — nothing to do")
+            return
+        if backup:
+            print(f"backup:   {backup}")
+        print(f"✓ {'created' if outcome == 'created' else 'updated'} — "
+              f"Shift+Enter now inserts a newline")
+        if term.note:
+            print(f"  {term.note}")
 
     async def _slash_model(self, rest: str) -> None:
         if not rest:
