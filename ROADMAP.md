@@ -141,14 +141,25 @@ are user-visible and waste whole generations.*
 ## Milestone 2 — Eval-harness trustworthiness
 *The gate must catch real regressions without crying wolf on noise.*
 
-- `[ ]` **2.1 Variance/n-aware regression gate** — the fixed `0.15` per-row
-  threshold sits below the noise floor at low n. **Finding (2026-07-24):** a
-  naive Welch/2·se test does **not** silence the r12 false positives — the
-  baseline was n=3 with *zero* within-sample variance (3/3 identical), so its
-  own samples understate its true uncertainty. A real fix must (a) treat tiny-n
-  rows as high-uncertainty (Wilson interval / a minimum-variance floor, not the
-  observed stdev), and (b) compare *intervals*, not point means. Also stop
-  comparing an n=3 baseline to an n=8 candidate as if like-for-like.
+- `[x]` **2.1 Variance/n-aware regression gate** — *build 74.* Parts (a) and (b)
+  of this item were already shipped by the bootstrap-CI/permutation work: the
+  gate compares *intervals* rather than point means and refuses to hard-fail a
+  row whose sweeps aren't internally consistent. The **degenerate-sample hole
+  named in the original finding was still open**, and measured open: a baseline
+  of `[1.0]×3` produced a CI of exactly `(1.0, 1.0)` and hard-FAILed an
+  `[0.8]×8` candidate — the r12 false positive, reproduced verbatim.
+  - Every gate interval is now widened by a floor standard error of
+    `_GATE_MIN_SE/n` (`_score_ci`), so k-for-k identical runs read as *weak
+    evidence* rather than certainty. The floor **shrinks with n**, which is what
+    lets it coexist with the tuned n=6 behaviour — 0.167 wide at n=3 (swallows
+    r12's 0.20 drop), 0.083 at n=6 (a genuine 1.00→0.50 slide still separates
+    and FAILs). *A flat Wilson interval was tried first and rejected: at n=6 it
+    puts `[1.0]×6` at [0.69,1.0] against `[0.5]×6` at [0.22,0.78], which overlap
+    — it would have silenced the regressions the gate exists to catch.*
+  - `_GATE_MIN_N = 4` and `_GATE_MAX_N_RATIO = 2.0` close the third clause: too
+    few runs, or an n=3-vs-n=8 mismatch, can now only REVIEW, never FAIL.
+  - `_bootstrap_ci` stays pure — its zero-width answer is the correct
+    *empirical* one; the floor belongs to the gate, not the statistic. +7 tests.
 - `[x]` **2.2 Infra-kill scored as model failure** — *build 73.* A run that
   produced no verdict (checker raised — including `ctx.bash`'s 180s pytest
   timeout — no `check.py`, or a turn that died on a transport error) is now
@@ -164,8 +175,16 @@ are user-visible and waste whole generations.*
   runs, the largest correction being r8-append 0.752 → **0.793** (+0.041). Past
   conclusions survive — but +0.041 is the size of `_GATE_OVERALL_FLOOR`, so the
   bug was one bad run away from mattering. +15 tests.
-- `[ ]` **2.3 Gate/compare ergonomics** — `compare` takes two positional
-  results.json paths; document the threshold and exit codes where a user looks.
+- `[x]` **2.3 Gate/compare ergonomics** — *build 74.* `evals/README.md` had
+  documented only the legacy fixed thresholds ("drops more than 0.15… overall
+  over 0.05"), which the variance-aware gate replaced — it described a gate that
+  no longer existed. Replaced with the real contract: argument order, the three
+  **exit codes** (with the note that `2` = INCONCLUSIVE means *re-run*, not
+  revert — it aborts under `set -e` like a failure but is not one), the full
+  hard-FAIL table keyed to the actual constant names, the pooled backstop, why
+  the p-value is advisory, the refusal conditions, graded-vs-ungraded, and why
+  baselines are session-bound. Constants in the doc are checked against the
+  module rather than transcribed.
 - `[!]` **2.4 Same-session paired A/B for regression checks** — *evidence
   hardened 2026-07-25 (Round 21, D75).* A historical score from another session
   is **not a valid baseline** for a sweep run today: build 30 scored 0.62 on

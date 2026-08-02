@@ -761,6 +761,35 @@ _GATE_OVERALL_FLOOR = 0.05   # pooled-overall hard-fail needs at least this drop
 _GATE_BOOT_ITERS = 20000
 _GATE_PERM_ITERS = 20000
 
+# --- small-n uncertainty (the r12 false positive) -------------------------
+# A sample that came back k-for-k identical has an OBSERVED variance of zero,
+# and every interval built from its own samples — bootstrap, Welch, 2·se — is
+# then zero-width. The gate reads that as certainty and hard-fails anything
+# outside it. That is not a hypothetical: r12's baseline was n=3, 3/3 identical,
+# and it failed a candidate that was merely a bit lower.
+#
+# Three identical runs are weak evidence; six are stronger; the interval has to
+# say so. So every CI is widened by at least a floor standard error of
+# _GATE_MIN_SE/n — Laplace-style smoothing, read as "with n identical samples,
+# assume about one unobserved half-point of disagreement". It shrinks with n,
+# which is what makes it compatible with the tuned n=6 behaviour: at n=3 the
+# floor is 0.167 (wide enough to swallow r12's 0.20 drop), at n=6 it is 0.083
+# (narrow enough that a genuine 1.00 -> 0.50 slide still separates and FAILs).
+# A flat Wilson interval was tried first and is far too conservative here: at
+# n=6 it puts [1.0]*6 at [0.69, 1.0] and [0.5]*6 at [0.22, 0.78], which overlap,
+# silencing exactly the regressions the gate exists to catch.
+_GATE_MIN_SE = 0.5
+_GATE_Z = 1.645              # one-sided 95% / the 90% two-sided CI used above
+
+# No row may hard-FAIL on fewer runs than this, however clean the split looks.
+# Below it the floor above is doing nearly all the work anyway, and a verdict
+# that reverts a change on three runs is not one worth acting on.
+_GATE_MIN_N = 4
+
+# Nor may a row hard-FAIL when the two sweeps are of very different sizes: an
+# n=3 baseline against an n=8 candidate is not a like-for-like comparison, and
+# the smaller side's mean is the one carrying all the uncertainty.
+_GATE_MAX_N_RATIO = 2.0
 
 
 def _bootstrap_ci(scores: list[float], pct: float = 90.0,
@@ -777,6 +806,25 @@ def _bootstrap_ci(scores: list[float], pct: float = 90.0,
     means = sorted(sum(rng.choice(scores) for _ in range(n)) / n for _ in range(iters))
     lo = (100.0 - pct) / 2.0 / 100.0
     return (means[int(lo * iters)], means[int((1.0 - lo) * iters) - 1])
+
+
+def _score_ci(scores: list[float]) -> tuple[float, float]:
+    """The interval the gate actually reasons about: the bootstrap CI, widened
+    to at least the small-n floor. Never narrower than +/- z * _GATE_MIN_SE/n,
+    so a run of identical results reads as "little evidence" rather than as
+    certainty. `_bootstrap_ci` stays pure — its zero-width answer is the correct
+    *empirical* one, and other callers still want it."""
+    if not scores:
+        return (0.0, 0.0)
+    lo, hi = _bootstrap_ci(scores)
+    mean = statistics.mean(scores)
+    half = _GATE_Z * (_GATE_MIN_SE / len(scores))
+    lo, hi = min(lo, mean - half), max(hi, mean + half)
+    # Scores are bounded in [0,1], so an interval reaching past either end is
+    # not a claim about anything. Clamping cannot change a verdict — the only
+    # test is `cand_hi >= base_lo`, and a clamp only ever moves those toward
+    # overlap, which is already the answer whenever a bound is exceeded.
+    return (max(0.0, lo), min(1.0, hi))
 
 
 def _permutation_drop_p(base: list[float], cand: list[float],
@@ -808,17 +856,26 @@ def _classify_row(base: list[float], cand: list[float]) -> dict:
     advisory. See the module constants above for why noisy rows can't hard-fail."""
     bm, cm = statistics.mean(base), statistics.mean(cand)
     drop = bm - cm
-    blo, bhi = _bootstrap_ci(base)
-    clo, chi = _bootstrap_ci(cand)
+    blo, bhi = _score_ci(base)
+    clo, chi = _score_ci(cand)
     p, _ = _permutation_drop_p(base, cand)
+    nb, nc = len(base), len(cand)
+    # Too few runs, or two sweeps of very different sizes: whatever the split
+    # looks like, this row has no standing to revert a change on its own. It can
+    # still surface as REVIEW so a human sees it.
+    thin = (min(nb, nc) < _GATE_MIN_N
+            or max(nb, nc) / max(min(nb, nc), 1) > _GATE_MAX_N_RATIO)
     info = {"base_mean": bm, "cand_mean": cm, "drop": drop, "p": p,
-            "base_ci": (blo, bhi), "cand_ci": (clo, chi)}
+            "base_ci": (blo, bhi), "cand_ci": (clo, chi),
+            "n_base": nb, "n_cand": nc, "thin": thin}
     if drop < _GATE_ROW_FLOOR:
         info["status"] = "ok"
     elif chi >= blo:
         # Candidate's CI still overlaps the baseline's: the drop is inside the
         # noise band, nothing to act on.
         info["status"] = "noise"
+    elif thin:
+        info["status"] = "review"
     elif (statistics.pstdev(base) < _GATE_STABLE_STD
           and statistics.pstdev(cand) < _GATE_STABLE_STD):
         # Both sweeps are internally consistent and their CIs are separated —
@@ -876,10 +933,14 @@ def compare(baseline: dict, candidate: dict) -> int:
                     f"(drop {info['drop']:.2f}; both sweeps internally consistent)")
             elif info["status"] == "review":
                 blo, bhi = info["base_ci"]
+                why = (f"only n={info['n_base']} vs n={info['n_cand']} — too "
+                       "few runs, or too uneven, to revert a change on"
+                       if info["thin"] else
+                       "high per-sweep noise — could be sampling drift")
                 reviews.append(
                     f"{key}: {info['base_mean']:.2f} -> {info['cand_mean']:.2f} "
-                    f"(drop {info['drop']:.2f}, p={info['p']:.3f}; high per-sweep "
-                    f"noise — could be sampling drift, base CI [{blo:.2f},{bhi:.2f}])")
+                    f"(drop {info['drop']:.2f}, p={info['p']:.3f}; {why}, "
+                    f"base CI [{blo:.2f},{bhi:.2f}])")
         elif brow.get("score_mean") is None or crow.get("score_mean") is None:
             # A row where nothing could be graded has no mean to compare. It is
             # already reported as a validity warning (which forces INCONCLUSIVE);

@@ -593,3 +593,67 @@ def test_a_legacy_result_row_loads_with_a_default_of_valid():
            "seconds": 1.0, "workdir": "/tmp"}
     assert harness.RunResult(**raw).invalid == ""
 
+
+# --- small-n uncertainty (2.1) --------------------------------------------
+# The r12 false positive: a baseline of 3 identical runs has zero OBSERVED
+# variance, so every interval built from its own samples is zero-width and the
+# gate reads it as certainty. These pin the floor that fixes it without
+# blunting the genuine regressions the gate already caught.
+
+def test_a_tiny_all_identical_baseline_does_not_hard_fail(capsys):
+    """r12's exact shape: n=3, 3/3 identical, against a larger, slightly lower
+    candidate. Before the floor this was a zero-width CI and a hard FAIL."""
+    base = _scored({"a::m": [1.0] * 3})
+    cand = _scored({"a::m": [0.8] * 8})
+    assert harness.compare(base, cand) == 0
+    assert "FAIL" not in capsys.readouterr().out
+
+
+def test_the_ci_floor_shrinks_with_n():
+    # This is what lets the floor coexist with the tuned n=6 behaviour: it is
+    # wide enough at n=3 to swallow r12's drop, narrow enough at n=8 not to.
+    w3 = harness._score_ci([1.0] * 3)
+    w8 = harness._score_ci([1.0] * 8)
+    assert (1.0 - w3[0]) > (1.0 - w8[0]) > 0.0
+
+
+def test_a_constant_sample_never_gets_a_zero_width_gate_interval():
+    lo, hi = harness._score_ci([0.5] * 4)
+    assert lo < 0.5 < hi
+    # ...while the raw empirical CI is still honestly zero-width.
+    assert harness._bootstrap_ci([0.5] * 4) == (0.5, 0.5)
+
+
+def test_gate_intervals_stay_inside_the_score_range():
+    lo, hi = harness._score_ci([1.0] * 3)
+    assert 0.0 <= lo and hi <= 1.0
+
+
+def test_too_few_runs_can_only_review_never_fail(capsys):
+    # A big drop, both sweeps internally consistent — but on 3 runs each.
+    base = _scored({"a::m": [1.0] * 3})
+    cand = _scored({"a::m": [0.3] * 3})
+    assert harness.compare(base, cand) == 0
+    out = capsys.readouterr().out
+    assert "REVIEW" in out
+    assert "too few runs" in out
+    assert "FAIL" not in out
+
+
+def test_lopsided_n_can_only_review_never_fail(capsys):
+    # Equal-variance, big drop, enough runs on both sides — but 4 vs 12 is not
+    # a like-for-like comparison.
+    base = _scored({"a::m": [1.0] * 4})
+    cand = _scored({"a::m": [0.3] * 12})
+    info = harness._classify_row([1.0] * 4, [0.3] * 12)
+    assert info["thin"] and info["status"] == "review"
+    assert harness.compare(base, cand) == 0
+    assert "too few runs, or too uneven" in capsys.readouterr().out
+
+
+def test_a_comparable_pair_at_the_minimum_n_still_fails(capsys):
+    # n=4 vs n=4 is the smallest comparison the gate will still act on.
+    base = _scored({"a::m": [1.0] * 4})
+    cand = _scored({"a::m": [0.4] * 4})
+    assert harness.compare(base, cand) == 1
+    assert "FAIL" in capsys.readouterr().out
