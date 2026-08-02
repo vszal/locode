@@ -6,6 +6,17 @@ server, and — critically — wait for wired Metal memory to fall before starti
 a different model, since MLX weights live in wired buffers and switching without
 that wait can push past the memory ceiling and crash the machine.
 
+"Crash the machine" is literal, and the preflight guard here exists because it
+happened twice: a 24B model was admitted by a check that compared only against
+free RAM while counting a flat 1.5 GB for the cache. Its real KV cache is ~6 GB
+at our context, and the ceiling that actually matters is the macOS GPU wired
+cap, not free RAM — the box took an IOGPUGroupMemory kernel panic both times.
+So the guard now (a) sizes the KV cache from each model's own attention shape,
+per layer type, and (b) budgets against the tighter of (RAM − reserve) and
+sysctl iogpu.wired_limit_mb. Relatedly, the SIGTERM→SIGKILL escalation in
+_terminate_servers scales its grace period with model size: hard-killing a
+process that still holds tens of GB of live Metal buffers is its own hazard.
+
 The PoolManager (concurrent mode) is a later milestone; this is the default.
 """
 
@@ -36,9 +47,21 @@ from locode.server import aliases
 
 GB = 1024 ** 3
 # MLX's wired working set runs somewhat above the raw on-disk weight size
-# (framework buffers, the growing KV cache headroom); pad the estimate so the
-# guard stays conservative rather than optimistic.
+# (framework buffers, allocator slack); pad the estimate so the guard stays
+# conservative rather than optimistic. The KV cache is NOT in here — it is
+# estimated separately from the model's real shape, see kv_cache_bytes.
 _WEIGHT_OVERHEAD = 1.15
+# MLX holds the KV cache in fp16 regardless of weight quantization.
+_KV_DTYPE_BYTES = 2
+# Rough chars-per-token for the history budget. Deliberately low (i.e. yields
+# MORE tokens for a given char budget) so the cache estimate errs large.
+_CHARS_PER_TOKEN = 3.0
+# macOS caps GPU-wired allocations at iogpu.wired_limit_mb. A value of 0 means
+# "kernel default", which is ~75% of physical RAM.
+_DEFAULT_WIRED_FRACTION = 0.75
+# Extra SIGTERM grace per GB of resident weights, and the overall cap.
+_TERM_SECS_PER_GB = 2.0
+_TERM_WAIT_MAX = 60.0
 
 
 @dataclass
@@ -234,6 +257,21 @@ class SingleGpuManager:
         await self._wait_up(model_id)
         return model_id
 
+    def _cache_bytes(self, model_id: str, profile: Profile) -> int:
+        """KV-cache bytes to budget for this model at our peak context.
+
+        Prefers the model's real attention shape over the profile's flat figure,
+        which is a per-model *prompt-cache* budget and badly understates a big
+        model's live cache: a 40-layer/8-KV-head/128-dim 24B costs 160 KB per
+        token, so a 41k-token context is ~6 GB against a 1.5 GB profile figure.
+        Never returns less than the profile figure.
+        """
+        measured = kv_cache_bytes(_model_config(model_id),
+                                  context_tokens_for(self._cfg))
+        if not measured:
+            return profile.prompt_cache_bytes
+        return max(profile.prompt_cache_bytes, measured)
+
     def _check_memory_budget(self, model_id: str, profile: Profile) -> None:
         """Refuse to launch a model that won't fit, instead of thrashing the box.
         Skips silently when the guard is disabled or the footprint can't be
@@ -245,16 +283,77 @@ class SingleGpuManager:
         total = _total_ram_bytes()
         if not model_bytes or not total:
             return
+        cache_bytes = self._cache_bytes(model_id, profile)
+        wired = _wired_limit_bytes(total)
         ok, need, budget = memory_fits(
-            model_bytes, profile.prompt_cache_bytes, total, int(reserve_gb * GB))
-        if not ok:
-            raise RuntimeError(
-                f"refusing to load {model_id}: it needs ~{need / GB:.1f} GB "
-                f"(weights {model_bytes / GB:.1f} GB + overhead + cache) but the "
-                f"budget is {budget / GB:.1f} GB (RAM {total / GB:.1f} GB − "
-                f"{reserve_gb:.0f} GB reserve). Loading it would likely thrash the "
-                f"machine — free RAM, pick a smaller model, or lower "
-                f"[server].memory_reserve_gb (0 disables this guard).")
+            model_bytes, cache_bytes, total, int(reserve_gb * GB),
+            wired_limit=wired)
+        if ok:
+            return
+        # Name the ceiling that actually bound, so the suggested fix matches the
+        # cause: lowering the reserve does nothing when the wired cap is binding.
+        if wired is not None and wired <= total - int(reserve_gb * GB):
+            ceiling = (f"the macOS GPU wired-memory cap "
+                       f"(iogpu.wired_limit_mb = {wired // (1024 * 1024)})")
+            remedy = ("pick a smaller model, shorten "
+                      "[agent].max_history_chars, or raise the wired cap — but "
+                      "raising it takes memory macOS itself needs, and "
+                      "overshooting it panics the GPU driver")
+        else:
+            ceiling = (f"RAM {total / GB:.1f} GB − {reserve_gb:.0f} GB reserve")
+            remedy = ("free RAM, pick a smaller model, shorten "
+                      "[agent].max_history_chars, or lower "
+                      "[server].memory_reserve_gb (0 disables this guard)")
+        raise RuntimeError(
+            f"refusing to load {model_id}: it needs ~{need / GB:.1f} GB "
+            f"(weights {model_bytes / GB:.1f} GB × {_WEIGHT_OVERHEAD} + "
+            f"{cache_bytes / GB:.1f} GB KV cache at "
+            f"{context_tokens_for(self._cfg):,} tokens) but the budget is "
+            f"{budget / GB:.1f} GB, set by {ceiling}. Loading it would risk "
+            f"taking the machine down — {remedy}."
+            + self._suggestion(budget, model_id))
+
+    def _suggestion(self, budget: int, refused_id: str) -> str:
+        """A concrete alias that does fit, appended to the refusal.
+
+        Being told what won't work leaves the user to re-derive what will, one
+        rejected `-m` at a time. Prefers the configured default (it's the one
+        chosen on merit) and otherwise names the largest alias that fits, which
+        is the closest thing to "most capable" we can read off disk. Silent when
+        nothing fits or the scan fails — a suggestion is a courtesy and must
+        never mask the refusal itself.
+        """
+        try:
+            fits = self._fitting_aliases(budget, refused_id)
+        except Exception:
+            return ""
+        if not fits:
+            return ""
+        default = self._cfg.model.default
+        alias, need = next((f for f in fits if f[0] == default), fits[0])
+        return (f" {alias} fits ({need / GB:.1f} GB) — "
+                f"`/model {alias}`, or start with -m {alias}.")
+
+    def _fitting_aliases(self, budget: int,
+                         exclude_id: str = "") -> list[tuple[str, int]]:
+        """(alias, estimated_need) for every cached alias inside `budget`,
+        largest first. Uncached aliases can't be estimated and are skipped."""
+        out: list[tuple[str, int]] = []
+        for alias in self.known_aliases():
+            try:
+                mid = self.resolve(alias)
+            except KeyError:
+                continue
+            if mid == exclude_id:
+                continue
+            weights = _model_disk_bytes(mid)
+            if not weights:
+                continue
+            prof = profile_for(mid)
+            need = int(weights * _WEIGHT_OVERHEAD) + self._cache_bytes(mid, prof)
+            if need <= budget:
+                out.append((alias, need))
+        return sorted(out, key=lambda t: -t[1])
 
     async def _wait_up(self, model_id_substr: str, secs: int = 120) -> None:
         for _ in range(secs // 2):
@@ -272,9 +371,23 @@ class SingleGpuManager:
             await asyncio.sleep(2)
         raise TimeoutError(f"server did not come up serving {model_id_substr}")
 
-    # Grace period for a SIGTERM'd server to exit before we SIGKILL it.
+    # Base grace period for a SIGTERM'd server to exit before we SIGKILL it.
+    # The effective wait scales with the resident model — see _term_wait.
     _TERM_WAIT = 6.0
     _KILL_WAIT = 6.0
+
+    def _term_wait(self) -> float:
+        """SIGTERM grace period, scaled to the resident model's weight size.
+
+        A flat 6 s is fine for a 2 GB model and far too short for a 14 GB one:
+        unwiring tens of GB of Metal buffers takes real time, so the escalation
+        fired on a server that was shutting down normally. SIGKILLing a process
+        mid-teardown while it holds live IOGPU allocations is exactly the shape
+        that panics the driver, so the wait has to cover an orderly exit.
+        """
+        model_id = self._resident_model()
+        return term_wait_for(_model_disk_bytes(model_id) if model_id else None,
+                             base=self._TERM_WAIT)
 
     async def stop(self) -> None:
         if not self._managed:
@@ -291,7 +404,7 @@ class SingleGpuManager:
         SIGTERM — without the SIGKILL escalation it keeps holding the port and its
         memory, so the next start() can't bind and the machine stays pinned."""
         self._signal_servers(signal.SIGTERM)
-        if await self._wait_servers_gone(self._TERM_WAIT):
+        if await self._wait_servers_gone(self._term_wait()):
             return
         self._signal_servers(signal.SIGKILL)
         await self._wait_servers_gone(self._KILL_WAIT)
@@ -347,12 +460,38 @@ class SingleGpuManager:
 
 
 def memory_fits(model_bytes: int, cache_bytes: int, total_ram: int,
-                reserve_bytes: int, overhead: float = _WEIGHT_OVERHEAD):
-    """Pure: does (weights × overhead + prompt cache) fit in (RAM − reserve)?
-    Returns (ok, estimated_need_bytes, budget_bytes)."""
+                reserve_bytes: int, overhead: float = _WEIGHT_OVERHEAD,
+                wired_limit: int | None = None):
+    """Pure: does (weights × overhead + KV cache) fit under the memory ceiling?
+
+    The ceiling is the TIGHTER of (RAM − reserve) and the macOS wired-memory cap
+    when one is known: a model can sit comfortably inside free RAM and still
+    panic the GPU driver by exceeding iogpu.wired_limit_mb.
+
+    Returns (ok, estimated_need_bytes, budget_bytes).
+    """
     need = int(model_bytes * overhead) + cache_bytes
     budget = total_ram - reserve_bytes
+    if wired_limit is not None:
+        budget = min(budget, wired_limit)
     return need <= budget, need, budget
+
+
+def term_wait_for(weight_bytes: int | None, base: float = 6.0) -> float:
+    """Pure: seconds to let a SIGTERM'd server exit, given its weight size.
+    Unknown size falls back to `base` — we only ever *extend* the wait on
+    evidence, never shorten it."""
+    if not weight_bytes or weight_bytes <= 0:
+        return base
+    return min(base + _TERM_SECS_PER_GB * (weight_bytes / GB), _TERM_WAIT_MAX)
+
+
+def context_tokens_for(cfg: Config) -> int:
+    """Peak context the agent can present to the model, in tokens: the whole
+    history budget plus one full generation. This is what the KV cache has to
+    hold at the worst moment, which is the moment that decides whether the load
+    was safe."""
+    return int(cfg.agent.max_history_chars / _CHARS_PER_TOKEN) + cfg.model.max_tokens
 
 
 def _total_ram_bytes() -> int | None:
@@ -365,6 +504,28 @@ def _total_ram_bytes() -> int | None:
         return None
 
 
+def _wired_limit_bytes(total_ram: int | None) -> int | None:
+    """macOS's GPU wired-memory cap in bytes, or None off Darwin / if unknown.
+
+    This — not free RAM — is the ceiling MLX actually hits: weights and KV cache
+    live in wired Metal buffers, and allocating past the cap is what takes the
+    machine down rather than merely swapping. Raising it above the default is a
+    common "make the big model fit" tweak that instead removes the headroom
+    macOS itself needs, so the guard must read the live value.
+    """
+    if platform.system() != "Darwin":
+        return None
+    try:
+        out = subprocess.run(["sysctl", "-n", "iogpu.wired_limit_mb"],
+                             capture_output=True, text=True, timeout=5)
+        mb = int(out.stdout.strip())
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    if mb > 0:
+        return mb * 1024 * 1024
+    return int(total_ram * _DEFAULT_WIRED_FRACTION) if total_ram else None
+
+
 def _hf_hub_dir() -> Path:
     if os.environ.get("HF_HUB_CACHE"):
         return Path(os.environ["HF_HUB_CACHE"])
@@ -373,15 +534,21 @@ def _hf_hub_dir() -> Path:
     return root / "hub"
 
 
-def _model_disk_bytes(model_id: str) -> int | None:
-    """Sum the *.safetensors weight sizes in the HF cache for `model_id` (a good
-    proxy for the wired memory it will need). None if it isn't cached locally —
-    we can't estimate a model we haven't downloaded, so the guard skips it."""
+def _snapshot_root(model_id: str) -> Path | None:
+    """The HF cache `snapshots/` dir for `model_id`, or None if not cached."""
     if "/" not in model_id:
         return None
     org, name = model_id.split("/", 1)
     snap = _hf_hub_dir() / f"models--{org}--{name}" / "snapshots"
-    if not snap.is_dir():
+    return snap if snap.is_dir() else None
+
+
+def _model_disk_bytes(model_id: str) -> int | None:
+    """Sum the *.safetensors weight sizes in the HF cache for `model_id` (a good
+    proxy for the wired memory it will need). None if it isn't cached locally —
+    we can't estimate a model we haven't downloaded, so the guard skips it."""
+    snap = _snapshot_root(model_id)
+    if snap is None:
         return None
     total, found = 0, False
     for st in snap.rglob("*.safetensors"):
@@ -391,6 +558,100 @@ def _model_disk_bytes(model_id: str) -> int | None:
         except OSError:
             pass
     return total if found else None
+
+
+def _model_config(model_id: str) -> dict[str, Any] | None:
+    """The cached model's config.json as a dict, or None if unreadable."""
+    snap = _snapshot_root(model_id)
+    if snap is None:
+        return None
+    for cfg_path in snap.rglob("config.json"):
+        try:
+            with open(cfg_path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
+
+
+def kv_cache_bytes(config: dict[str, Any] | None, tokens: int) -> int | None:
+    """Bytes of KV cache a model holds at `tokens` of context, from its config.
+
+    Both K and V are stored per layer at `kv_heads × head_dim`, in fp16 — MLX
+    keeps the cache in half precision even when the *weights* are 4-bit, so
+    quantization does not shrink it. Returns None when the config doesn't carry
+    the shape (the caller then falls back to the profile figure).
+
+    Layers are NOT uniform, and assuming they are overestimates badly enough to
+    block models that run fine:
+      - `full_attention` grows with the whole context.
+      - `sliding_attention` is pinned at `sliding_window` tokens. Gemma-3 runs
+        40 of its 48 layers on a 1024-token window, so the flat estimate came
+        out ~5x high.
+      - `linear_attention` (gated delta-net / Mamba-style, as in the Qwythos and
+        Bonsai hybrids) keeps a fixed-size recurrent state that does not scale
+        with context at all. Counted as zero here; it's a few MB, well inside
+        the weight overhead.
+
+    Vision-tower repos nest the language model's shape under `text_config`;
+    prefer that so a VL-derived text model isn't measured against the wrapper.
+    """
+    if not isinstance(config, dict):
+        return None
+    tc = config.get("text_config")
+    tc = tc if isinstance(tc, dict) else config
+    try:
+        layers = int(tc["num_hidden_layers"])
+        kv_heads = int(tc["num_key_value_heads"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    head_dim = tc.get("head_dim")
+    if not head_dim:
+        try:  # derive it the usual way when the config doesn't state it
+            head_dim = int(tc["hidden_size"]) // int(tc["num_attention_heads"])
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            return None
+    try:
+        head_dim = int(head_dim)
+    except (TypeError, ValueError):
+        return None
+    if min(layers, kv_heads, head_dim) <= 0 or tokens <= 0:
+        return None
+
+    per_layer_token = 2 * kv_heads * head_dim * _KV_DTYPE_BYTES
+    window = _sliding_window(tc)
+    types = tc.get("layer_types")
+    if isinstance(types, list) and types:
+        total = 0
+        for kind in types:
+            if kind == "linear_attention":
+                continue
+            span = tokens
+            if kind == "sliding_attention" and window:
+                span = min(tokens, window)
+            total += span * per_layer_token
+        return total
+    # No per-layer map: uniform attention, with a global window if one applies.
+    span = min(tokens, window) if window else tokens
+    return layers * span * per_layer_token
+
+
+def _sliding_window(tc: dict[str, Any]) -> int | None:
+    """The effective sliding-window size, or None if the model isn't using one.
+
+    `sliding_window` may be set while `use_sliding_window` is false — Qwen2.5
+    ships a 131072 window it does not apply — so the flag has to win when it is
+    explicitly false.
+    """
+    if tc.get("use_sliding_window") is False:
+        return None
+    try:
+        window = int(tc.get("sliding_window") or 0)
+    except (TypeError, ValueError):
+        return None
+    return window if window > 0 else None
 
 
 def _resident_model_id() -> str | None:

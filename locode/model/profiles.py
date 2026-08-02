@@ -64,9 +64,18 @@ _RULES: list[tuple[str, Profile]] = [
     # Its template also enforces strict user/assistant alternation, so a nudge
     # landing after a tool result (both role "user") made the server 404 mid-
     # session. Any other Mistral-family model added here needs the same flag.
+    #
+    # MEMORY: does NOT fit a 24GB box. 14.1GB of weights plus a ~6.3GB KV cache
+    # at our default context needs ~22.5GB against a ~19GB budget, and it took
+    # this machine down with an IOGPUGroupMemory kernel panic twice (2026-08-01,
+    # 2026-08-02) before the preflight guard learned to count the cache. Fitting
+    # it would mean cutting max_history_chars to ~31k, well below the ~70k where
+    # the compaction battery already thrashes — so there is no usable setting on
+    # 24GB, not merely a tight one. Needs ≥32GB to be worth trying.
     ("Devstral", Profile(False, False, GB_1_5, "good",
                          "Mistral agentic coder; fenced only (native tools "
-                         "conflict w/ its template); clean JSON",
+                         "conflict w/ its template); clean JSON; needs ≥32GB "
+                         "RAM — panics a 24GB box",
                          strict_alternation=True)),
     # Qwythos-9B (Claude-Mythos distill; text tower of a Qwen3.5-VL, mxfp8,
     # 1M ctx, ~9.6GB peak). It is a *reasoning* model: by default it emits a long

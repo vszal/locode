@@ -21,9 +21,16 @@ base_url = ""          # full override, e.g. "https://gpu-box.lan:8081"; wins ov
 auto_start = true       # launch a LOCAL mlx server if none is reachable (managed only)
 manage = "auto"         # own the server process? "auto" (yes iff loopback) | "yes" | "no"
 mlx_bin = ""            # path to mlx_lm.server; auto-detected if empty
-# Refuse to load a local model whose estimated footprint (weights x overhead +
-# prompt cache) won't fit in (total RAM - this reserve), so a too-big model
-# can't thrash the machine. 0 disables the guard.
+# Refuse to load a local model whose estimated footprint won't fit, so a too-big
+# model can't take the machine down. 0 disables the guard.
+#   footprint = weights x 1.15 + KV cache, where the KV cache is computed from
+#     the model's own attention shape at the peak context locode can present
+#     (agent.max_history_chars + model.max_tokens). A 24B costs ~160 KB/token,
+#     so a 100k-char history budget is ~6 GB of cache on top of the weights.
+#   ceiling   = the TIGHTER of (total RAM - this reserve) and, on macOS, the GPU
+#     wired-memory cap (sysctl iogpu.wired_limit_mb). Weights and cache live in
+#     wired Metal buffers; exceeding that cap panics the GPU driver rather than
+#     merely swapping, so raising it to fit a bigger model is not a safe trade.
 memory_reserve_gb = 5.0
 
 [model]

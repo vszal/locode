@@ -42,8 +42,10 @@ class ServerConfig:
     manage: str = "auto"          # "auto" | "yes" | "no"
     mlx_bin: str = ""  # auto-detected if empty
     # Refuse to load a local model whose estimated footprint (weights × overhead
-    # + prompt cache) won't fit in (total RAM − this reserve), so a too-big model
-    # can't thrash the machine. 0 disables the guard.
+    # + a KV cache sized from the model's real attention shape at our peak
+    # context) won't fit under the tighter of (total RAM − this reserve) and the
+    # macOS GPU wired-memory cap, so a too-big model can't take the machine
+    # down. 0 disables the guard. See server/manager.py:_check_memory_budget.
     memory_reserve_gb: float = 5.0
 
     def endpoint(self) -> str:
