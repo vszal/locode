@@ -377,7 +377,8 @@ class AgentLoop:
                 try:
                     async with self._interrupt():
                         msg = await self._client.complete(
-                            _wire(self.history), model_id, tools=tools,
+                            _wire(self.history, profile.strict_alternation),
+                            model_id, tools=tools,
                             temperature=self._cfg.model.temperature,
                             max_tokens=self._cfg.model.max_tokens,
                             frequency_penalty=self._cfg.model.frequency_penalty,
@@ -1454,12 +1455,34 @@ class AgentLoop:
         return f"⏹ stopped ({why})"
 
 
-def _wire(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _wire(history: list[dict[str, Any]],
+          merge_roles: bool = False) -> list[dict[str, Any]]:
     """The history as sent to the model server: role/content only. `history`
     entries also carry a "kind" tag (agent/compact.py's classification of
     system/user_prompt/assistant/tool_result/nudge) that's purely internal
-    bookkeeping and must never leak onto the wire."""
-    return [{"role": m["role"], "content": m["content"]} for m in history]
+    bookkeeping and must never leak onto the wire.
+
+    `merge_roles` collapses consecutive same-role messages into one, for models
+    whose chat template refuses them (see Profile.strict_alternation). It is
+    off by default so every other model's wire format is byte-identical to
+    before — nudges keep arriving as their own user turn."""
+    msgs = [{"role": m["role"], "content": m["content"]} for m in history]
+    return _merge_consecutive(msgs) if merge_roles else msgs
+
+
+def _merge_consecutive(msgs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Join runs of same-role messages with a blank line between them.
+
+    Content-preserving: nothing is dropped, so a nudge merged into the tool
+    result it follows still reaches the model — just inside the same turn."""
+    out: list[dict[str, Any]] = []
+    for m in msgs:
+        if out and out[-1]["role"] == m["role"]:
+            joined = f"{out[-1]['content']}\n\n{m['content']}".strip()
+            out[-1] = {"role": m["role"], "content": joined}
+        else:
+            out.append(dict(m))
+    return out
 
 
 _OPEN_FENCE_RE = re.compile(r"```(?:tool_call|tool|json)\b", re.IGNORECASE)

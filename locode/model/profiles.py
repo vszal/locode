@@ -25,6 +25,13 @@ class Profile:
     prompt_cache_bytes: int  # per-model wired-memory budget (Apple single-GPU)
     tool_reliability: str    # "good" | "fair" | "poor"
     notes: str = ""
+    # Does this model's chat template REFUSE two messages of the same role in a
+    # row? Mistral-family templates raise a Jinja TemplateError ("conversation
+    # roles must alternate user and assistant"), and mlx_lm turns any such
+    # exception into a bare HTTP 404 — so the turn dies looking like a server
+    # problem. locode's tool results and nudges are both role "user", so a nudge
+    # after a tool result trips it. True => merge same-role runs on the wire.
+    strict_alternation: bool = False
 
 
 # Matched in order; first substring hit wins. Keep most-specific first.
@@ -54,9 +61,13 @@ _RULES: list[tuple[str, Profile]] = [
     # protocol, which conflicts with our fenced ```tool prompt and makes the
     # model return EMPTY. With native_tools off it uses the fenced format — and
     # emits clean, correctly-escaped JSON (verified live).
+    # Its template also enforces strict user/assistant alternation, so a nudge
+    # landing after a tool result (both role "user") made the server 404 mid-
+    # session. Any other Mistral-family model added here needs the same flag.
     ("Devstral", Profile(False, False, GB_1_5, "good",
                          "Mistral agentic coder; fenced only (native tools "
-                         "conflict w/ its template); clean JSON")),
+                         "conflict w/ its template); clean JSON",
+                         strict_alternation=True)),
     # Qwythos-9B (Claude-Mythos distill; text tower of a Qwen3.5-VL, mxfp8,
     # 1M ctx, ~9.6GB peak). It is a *reasoning* model: by default it emits a long
     # `reasoning` (chain-of-thought) field before any `content`. locode streams

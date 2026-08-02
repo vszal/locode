@@ -26,6 +26,42 @@ OnDelta = Callable[[str], Any]
 _STREAM_DONE = object()
 
 
+class ModelServerError(RuntimeError):
+    """A non-2xx from the model server, carrying the server's own explanation.
+
+    Exists because the status code alone is actively misleading here: mlx_lm
+    answers 404 for any exception raised inside generate(), so a chat-template
+    error and a genuinely missing endpoint look identical from the outside.
+    """
+
+    def __init__(self, status: int, detail: str = ""):
+        self.status = status
+        self.detail = detail
+        super().__init__(f"model server returned {status}"
+                         + (f": {detail}" if detail else ""))
+
+
+async def _error_detail(r: httpx.Response) -> str:
+    """The server's error text from an unread streaming response, best-effort.
+
+    Prefers the OpenAI-shaped {"error": ...} body mlx_lm sends; falls back to
+    raw text, and to "" if the body can't be read at all — a missing
+    explanation must never mask the status we already have.
+    """
+    try:
+        raw = (await r.aread()).decode("utf-8", "replace").strip()
+    except Exception:
+        return ""
+    try:
+        obj = json.loads(raw)
+    except ValueError:
+        return raw[:500]
+    err = obj.get("error", obj) if isinstance(obj, dict) else obj
+    if isinstance(err, dict):
+        err = err.get("message", err)
+    return str(err)[:500]
+
+
 class ModelClient:
     def __init__(self, base_url: str, timeout: float = 600.0,
                  transport: httpx.AsyncBaseTransport | None = None):
@@ -99,7 +135,16 @@ class ModelClient:
 
         async with self._client() as c:
             async with c.stream("POST", "/v1/chat/completions", json=body) as r:
-                r.raise_for_status()
+                if r.status_code >= 400:
+                    # The body carries the ACTUAL cause and must be read before
+                    # raising: on a streamed response nothing has been read yet,
+                    # so raise_for_status() alone reports a bare status line.
+                    # mlx_lm in particular funnels every generate() exception —
+                    # chat-template errors included — into a 404, which then
+                    # reads as "the endpoint is missing" instead of the real
+                    # problem. See _error_detail for the extraction.
+                    raise ModelServerError(r.status_code,
+                                           await _error_detail(r)) from None
                 line_iter = r.aiter_lines()
                 # Wait on the cancel token alongside each read so an abort lands
                 # even while the model is silent (prefill / first-token latency).
