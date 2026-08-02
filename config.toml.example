@@ -78,6 +78,14 @@ max_nochange_edits = 2          # redirect/bail if edits keep changing nothing
 # file" each time, so neither the same-error stall nor the repeat guard sees it
 # (each call really is new). Nudged once, then the turn stops.
 max_consecutive_errors = 4
+# The success-side twin of the above: consecutive batches in which every call
+# EXITED CLEAN AND RETURNED NOTHING — an empty grep, an empty glob, a git query
+# against a path that isn't in the repo. Every other guard here keys on failure,
+# so a model that is wrong in a way that produces no errors falls through all of
+# them and keeps rephrasing the same wrong question. Lower than the error
+# counter because an empty answer repeats perfectly: the query is deterministic,
+# so waiting longer only buys identical silence.
+max_noinfo_calls = 3
 # Nudge if the model edits the SAME file this many times in a row without ever
 # running anything (py_compile/pytest/python) or re-reading it — the open-loop
 # editing that lets a weak model "fix" a file into a duplicated mess. A verify

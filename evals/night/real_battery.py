@@ -443,7 +443,91 @@ def _case_long_context_find():
     return files, prompt, check, tools, env
 
 
+_SYNC_PY = '''#!/usr/bin/env python3
+"""Sync assets from the vendored upstream tree into ./local.
+
+Reports every file that is new or changed upstream. Run with no arguments.
+"""
+import os
+from pathlib import Path
+
+SOURCE_ROOT = Path("./upstream")
+SOURCE_PATH = "shared/vendor/widgets"
+LOCAL_DIR = Path("./local")
+
+
+def scan(root):
+    found = {}
+    for dirpath, _dirs, names in os.walk(root):
+        for n in names:
+            p = Path(dirpath) / n
+            found[str(p.relative_to(root))] = p.read_text()
+    return found
+
+
+def main():
+    source = scan(SOURCE_ROOT / SOURCE_PATH)
+    local = scan(LOCAL_DIR)
+    changed = [n for n, body in source.items()
+               if n not in local or local[n] != body]
+    if not changed:
+        print("no differences")
+        return
+    for n in sorted(changed):
+        print("differs:", n)
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _case_empty_query_diagnosis():
+    """Diagnose a bug whose only evidence is that queries come back EMPTY.
+
+    Modelled on a real qythos9 failure. SOURCE_PATH names a directory that
+    exists but holds nothing -- the upstream files actually live one level up.
+    So the script walks an empty tree, finds no files, and cheerfully prints
+    "no differences". Nothing errors anywhere: the script exits 0, and every
+    ls/glob/grep aimed at the wrong path succeeds and returns nothing. Every
+    other guard in the loop keys on failure, so this shape used to run until
+    the repeat guard ended the turn.
+    """
+    files = {
+        "sync.py": _SYNC_PY,
+        # SOURCE_PATH points HERE: the directory exists and is empty. That is
+        # the load-bearing detail. A merely-missing path makes ls/glob/grep
+        # ERROR, which is a loud signal every existing guard can already see;
+        # an EMPTY one makes them all succeed and return nothing, which is the
+        # failure mode under test. os.walk yields nothing either way, so the
+        # script exits 0 and prints "no differences" regardless.
+        "upstream/shared/vendor/widgets/": "",
+        # The real upstream content, one level ABOVE where SOURCE_PATH looks.
+        "upstream/shared/widgets/button.txt": "button v2\n",
+        "upstream/shared/widgets/slider.txt": "slider v2\n",
+        "local/button.txt": "button v1\n",
+        "local/slider.txt": "slider v1\n",
+    }
+    prompt = ("The sync.py script says there are no differences, but the "
+              "upstream widgets really have changed and it should be "
+              "reporting them. Run it, work out why it finds nothing, and fix "
+              "it so it reports the changed files.")
+
+    def check(w):
+        import subprocess
+        r = subprocess.run(["python3", "sync.py"], cwd=w, capture_output=True,
+                           text=True, timeout=60)
+        out = (r.stdout or "").strip()
+        names = {ln.split(":", 1)[1].strip() for ln in out.splitlines()
+                 if ln.startswith("differs:")}
+        ok = names == {"button.txt", "slider.txt"}
+        return (ok, f"rc={r.returncode} out={out[:60]!r}")
+
+    return files, prompt, check
+
+
 CASES = {
+    "empty-query-diagnosis": _case_empty_query_diagnosis,
     "locate-symptom": _case_locate_symptom,
     "add-json-flag": _case_add_json_flag,
     "keep-tests-green": _case_keep_tests_green,
@@ -468,6 +552,14 @@ def run_one(case: str, model: str, rep: int, outdir: Path, *,
     work.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
         dest = work / name
+        # A trailing slash means "create this as an EMPTY DIRECTORY". Needed
+        # because an empty dir is not expressible as a file, and it is the whole
+        # point of empty-query-diagnosis: a path that EXISTS and holds nothing
+        # makes ls/glob/grep return empty, where a path that is merely missing
+        # makes them error — a completely different signal to the model.
+        if name.endswith("/"):
+            dest.mkdir(parents=True, exist_ok=True)
+            continue
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(content)
     log = rundir / "events.jsonl"

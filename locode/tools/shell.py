@@ -23,6 +23,14 @@ from locode.tools.installhint import install_hint
 _MAX_OUTPUT = 64 * 1024
 _DEFAULT_TIMEOUT = 120
 
+# The rc-0-no-output sentinel. Exported because the agent loop matches on it to
+# detect a run of calls that all succeeded and all said nothing (see
+# agent/loop.py, _NOINFO_RESULTS) — keep the two in sync.
+_EMPTY_OK = ("(exit 0 — the command ran fine but printed nothing. If it was a "
+             "query, that IS the result: nothing matched. Re-running it "
+             "unchanged will print nothing again — question the assumption "
+             "behind it instead.)")
+
 
 class Bash:
     name = "bash"
@@ -81,11 +89,17 @@ class Bash:
             if hint:
                 body += f"\n\n{hint}"
             return ToolResult(body, is_error=True)
-        # A silent success (rc 0, no output) is the common shape of a passing
-        # verify — `py_compile`, a quiet formatter, a test runner with -q that
-        # printed nothing. Returning a bare "(no output)" reads as ambiguous, so
-        # a weak model re-runs the identical command hoping for confirmation and
-        # trips the repeat-stop on a task that was ALREADY done (observed on
-        # indent-bug: file fixed, py_compile green, model re-ran to a repeat-stop).
-        # An explicit positive signal lets it recognize completion and finish.
-        return ToolResult(text.rstrip() or "(exit 0 — command succeeded, no output)")
+        # rc 0 with no output has TWO readings and one sentence has to serve
+        # both. As a verify — `py_compile`, a quiet formatter, `pytest -q` that
+        # printed nothing — silence is success, and a bare "(no output)" reads
+        # as ambiguous enough that a weak model re-runs the identical command
+        # hoping for confirmation (observed on indent-bug: file fixed, compile
+        # green, re-ran to a repeat-stop). As a QUERY — ls-tree, ls-remote,
+        # find, git log -- <path> — silence is the answer: nothing matched.
+        # Saying only "command succeeded" there is worse than ambiguous, it is
+        # misleading, and the model reads it as "worked but told me nothing" and
+        # re-runs. Observed live: six consecutive empty-but-green git queries
+        # against a path prefix that did not exist in the repo, four of them
+        # byte-identical, until the repeat guard ended the turn. So: state that
+        # it ran, give the query reading, and rule out the unchanged re-run.
+        return ToolResult(text.rstrip() or _EMPTY_OK)

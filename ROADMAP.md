@@ -269,6 +269,50 @@ the lived experience.*
   it" — in the only regime where compaction fires, that sentence is an
   invitation into the loop. It keeps the anti-ratchet half ("don't trust an
   earlier conclusion") and makes the re-read a deliberate choice.
+- `[x]` **4.18 No-information guard (build 65).** From a second live report, and
+  a failure mode *none* of the guards above could see: every one of them keys on
+  something going **wrong**. Transcript: asked to diagnose why a sync script
+  detects no differences, qythos9 read `SOURCE_PATH = "skills/cloud/…"` out of
+  the script and went looking for that path in git — `ls-remote <url> <path>`,
+  `ls-tree -r HEAD <path>`, the same with `2>&1`, the same again. Six
+  consecutive **exit-0, empty** results, four byte-identical, until the repeat
+  guard ended the turn with nothing diagnosed. The emptiness *was* the answer
+  (no such prefix in that repo) and the harness had no way to say so.
+  `max_error_stall` needs errors; `max_consecutive_errors` needs failures; the
+  repeat guard needs identical calls and only caught the tail. Two changes:
+  (a) `_run_calls` reports a fifth flag — every call that ran **succeeded and
+  returned no information** (matched against exact sentinels: the bash rc-0
+  sentinel, `(no matches)`, `(empty directory)`, `(empty file)`; whole results
+  only, so a grep that finds the literal text "(no matches)" still counts as a
+  hit) — and `max_noinfo_calls` (default 3, lower than the error counter because
+  a deterministic query repeats its silence perfectly) nudges once toward
+  questioning the *assumption* behind the query, then ends the turn;
+  (b) `shell.py`'s rc-0-no-output sentinel no longer says only "command
+  succeeded". That wording was written for a passing `py_compile`, where silence
+  really is success — but for a query it is misleading, and the model reads it
+  as "worked but told me nothing" and re-runs. It now carries both readings and
+  rules out the unchanged re-run explicitly.
+- `[x]` **4.19 The open-tasks nudge stops fighting the repeat guard (build 66).**
+  Found while validating 4.18, and worth more than the guard that surfaced it.
+  Two guards, each correct alone, combining into a manufactured failure: the
+  model edited the script, ran `python3 sync.py`, got the right output — **fix
+  landed, verified** — but its own plan still had "test the fix by running the
+  script again" open. The open-tasks nudge fired and told it to finish. The only
+  action that closes that task is re-running the script. It complied, and the
+  repeat guard ended the turn with *"repeated the same tool call without making
+  progress."* **Two of three runs were reported as failures on a task that had
+  already succeeded** — precisely the "stops before plans are finished" in the
+  original user report, with the harness inventing the failure. Same shape as
+  4.14 (compaction vs the repeat guard) from the other direction, and the same
+  remedy: `_forgive_nudged_verifies` clears the repeat streak for the call we
+  just demanded. Scoped harder than the compaction case — read-only tools plus
+  bash only when `_is_verify_bash` says it checks rather than mutates — and
+  bounded at ONE forgiveness per signature, because nothing was actually lost
+  here, so a second identical re-run after we've excused one is a real loop.
+  A/B on the same fixture, 3 reps: repeat-stops **3/3 -> 0/3**, every run now
+  self-terminating, and the 2/3 that were already correct are finally reported
+  as such. The principle, worth keeping: *a nudge that demands work must not
+  leave the model in a state where the only compliant action is punished.*
 - `[x]` **4.5 Tool-result verdict is legible (build 39).** Found by *watching* a
   weak model fix a real bug (not from a score): `format_result` summarized a
   multi-line result by its first line, so a `pytest` result rendered as

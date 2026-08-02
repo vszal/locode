@@ -145,6 +145,10 @@ class AgentConfig:
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing
     max_consecutive_errors: int = 4  # nudge/bail when nothing at all succeeds
+    # Consecutive batches where everything SUCCEEDED and returned nothing. Lower
+    # than max_consecutive_errors: an empty answer repeats perfectly (the query
+    # is deterministic), so waiting longer only buys identical silence.
+    max_noinfo_calls: int = 3
     # Nudge if the model edits the SAME file this many times in a row without
     # ever running anything (py_compile/pytest/python) or re-reading it to see
     # the result — the open-loop editing that lets a weak model "fix" a file

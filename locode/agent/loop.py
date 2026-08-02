@@ -25,6 +25,7 @@ from locode.model import toolparse
 from locode.model.profiles import profile_for
 from locode.permissions import AUTO, ASK, DENY, PermissionPolicy
 from locode.tools.base import Registry, ToolContext, ToolResult
+from locode.tools.shell import _EMPTY_OK
 
 # confirm(name, args, preview) -> "yes" | "always" | "no" | "no_always"
 Confirm = Callable[[str, dict, str], Awaitable[str]]
@@ -58,11 +59,32 @@ _REREADABLE_TOOLS = frozenset({"read_file", "ls", "glob", "grep"})
 # system working as designed, a second is plausible, a third is a loop.
 _MAX_FORGIVEN_REREADS = 2
 
+# Exact sentinels a tool returns when it ran fine and found nothing. Matched as
+# whole results, never as substrings — a grep that legitimately finds the text
+# "(no matches)" inside a file must not read as an empty grep. shell._EMPTY_OK
+# is imported rather than copied so the two can't drift apart.
+_NOINFO_RESULTS = frozenset({
+    _EMPTY_OK,            # bash, rc 0 with no output
+    "(no matches)",       # grep / glob
+    "(empty directory)",  # ls
+    "(empty file)",       # read_file
+    "(no output)",
+})
+
+
+def _is_noinfo(content: str) -> bool:
+    """True when a SUCCESSFUL result carried no information at all."""
+    return (content or "").strip() in _NOINFO_RESULTS
+
 # How many times a turn tells the model that its context was compacted. The
 # advice ("write down what you found; re-reading costs the same space again")
 # is worth saying, and worth saying twice; by the third time it is boilerplate
 # the model reads past, and it competes for the same budget it is warning about.
 _MAX_COMPACT_NOTICES = 2
+
+# How many times one signature is excused for being the call an open-tasks nudge
+# just asked for. One: we demanded it, so the first is ours, not the model's.
+_MAX_FORGIVEN_NUDGED = 1
 
 # How much of a reply's opening identifies it. Long enough that two unrelated
 # replies don't collide, short enough to sit well inside the region a
@@ -214,6 +236,8 @@ class AgentLoop:
         # Per-signature budget for _forgive_rereads, so frequent compaction
         # can't permanently disarm the repeat guard for read-only batches.
         forgiven_rereads: dict[tuple, int] = {}
+        # Same, for the verify call an open-tasks nudge just demanded.
+        forgiven_nudged: dict[tuple, int] = {}
         compact_notices = 0
         # Consecutive iterations whose edit batch changed the file NOTHING (a
         # blind guess — usually at a line the error names but that is actually
@@ -227,6 +251,10 @@ class AgentLoop:
         # the errors said. See the all_errored branch below.
         allerr_streak = 0
         nudged_allerr = False
+        # Consecutive batches in which everything succeeded and returned
+        # nothing. See the all_noinfo branch below.
+        noinfo_streak = 0
+        nudged_noinfo = False
         # Verify-gate: consecutive mutating edits to a file (by basename) with no
         # intervening look at ground truth. A verify bash run (py_compile/pytest/
         # python) resets ALL counters; re-reading a file resets that file's. When
@@ -618,6 +646,10 @@ class AgentLoop:
                     if (self.plan.open and open_task_nudges
                             < self._cfg.agent.max_open_task_retries):
                         open_task_nudges += 1
+                        # We are about to demand more work. Don't also punish
+                        # the model for doing it (see _forgive_nudged_verifies).
+                        _forgive_nudged_verifies(repeat_streaks, nudged_repeat,
+                                                 forgiven_nudged)
                         self._nudge_open_tasks()
                         continue
                     # The reply ENDS by announcing an action it never took —
@@ -761,7 +793,7 @@ class AgentLoop:
                         if base:
                             unverified_edits[base] = unverified_edits.get(base, 0) + 1
                             edit_tally[base] = edit_tally.get(base, 0) + 1
-                error_sig, result_sig, no_change, all_errored = \
+                error_sig, result_sig, no_change, all_errored, all_noinfo = \
                     await self._run_calls(calls)
                 # Headless only: an ASK tool nobody can approve is refused for
                 # the whole session, so a model still trying after this many
@@ -824,6 +856,22 @@ class AgentLoop:
                                           "model could not find its footing")
                 else:
                     allerr_streak = 0
+                # The success-side twin of the branch above. Nothing failed, so
+                # no error-keyed guard can see it; the calls differ, so the
+                # repeat guard can't either — yet the model is learning nothing
+                # and will keep rephrasing the same wrong question.
+                if all_noinfo:
+                    noinfo_streak += 1
+                    if noinfo_streak >= self._cfg.agent.max_noinfo_calls:
+                        if not nudged_noinfo:
+                            nudged_noinfo = True
+                            self._nudge_no_information(noinfo_streak)
+                            continue
+                        return self._stop("every tool call kept coming back "
+                                          "empty — the model never questioned "
+                                          "the assumption behind them")
+                else:
+                    noinfo_streak = 0
                 # A no-change edit (old==new, indent-only, identical replace) is
                 # the model editing blind — almost always the reported error line
                 # is fine and the real fault is elsewhere. Distinct from the
@@ -878,9 +926,9 @@ class AgentLoop:
             return "⛔ interrupted"
 
     # --- internals -------------------------------------------------------
-    async def _run_calls(self, calls) -> tuple[str | None, str, bool, bool]:
+    async def _run_calls(self, calls) -> tuple[str | None, str, bool, bool, bool]:
         """Run the batch, feed the results back, and return two signatures plus
-        a no-change flag and an all-errored flag.
+        a no-change flag, an all-errored flag and an all-no-information flag.
 
         The first is the ERROR signature — the joined content of any is_error
         results, keyed by tool name, or None if nothing errored — which the loop
@@ -909,14 +957,25 @@ class AgentLoop:
         contents out from under qythos9. Whatever the errors say, a batch in
         which nothing succeeded is not progress. Denied and unknown-tool calls
         are excluded — they never reached a tool, and denials have their own
-        counter."""
+        counter.
+
+        The fifth is the mirror image of the fourth: every call that ran
+        SUCCEEDED and returned no information — an empty grep, an empty glob, an
+        empty directory, a green-but-silent shell command. Every guard in this
+        loop keys on failure, so a model that is wrong in a way that produces no
+        errors falls through all of them. Observed live: `git ls-remote <url>
+        <path>` and `git ls-tree -r HEAD <path>` against a path prefix that did
+        not exist in the repo — six consecutive exit-0 empty results, four of
+        them byte-identical, before the repeat guard finally ended the turn with
+        nothing diagnosed. Empty output was the answer (the prefix is wrong) and
+        nothing in the harness could say so."""
         ctx = ToolContext(cwd=self._cwd, cancel=self.cancel,
                           confirm=self._confirm, select=self._select,
                           plan=self.plan)
         results: list[tuple[str, str]] = []
         error_parts: list[str] = []
         no_change = False
-        ran = errored = 0
+        ran = errored = noinfo = 0
         for call in calls:
             tool = self._registry.get(call.name)
             if tool is None:
@@ -979,6 +1038,8 @@ class AgentLoop:
             ran += 1
             if res.is_error:
                 errored += 1
+            elif _is_noinfo(res.content):
+                noinfo += 1
             if call.name == "bash" and _looks_green_test(res.content):
                 # A genuinely green test run appeared this turn. Restricted to
                 # bash (the only tool that runs tests) so a read_file of a file
@@ -1006,7 +1067,8 @@ class AgentLoop:
                              "kind": "tool_result"})
         result_sig = "\n".join(f"{name}: {content}" for name, content in results)
         return (("\n".join(error_parts) if error_parts else None), result_sig,
-                no_change, ran > 0 and errored == ran)
+                no_change, ran > 0 and errored == ran,
+                ran > 0 and noinfo == ran)
 
     def _denial_text(self, name: str, reason: str = "user declined") -> str:
         """What a refused tool call tells the model.
@@ -1233,6 +1295,35 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "every tool call failing"})
+
+    def _nudge_no_information(self, n: int) -> None:
+        """Steer a model that is getting clean, empty answers and not hearing them.
+
+        The shape this was written for: the model read a SOURCE_PATH constant
+        out of the script it was debugging and went looking for that path in
+        git — `ls-remote <url> <path>`, then `ls-tree -r HEAD <path>`, then the
+        same again with `2>&1`, then the same again. Every one exited 0 with no
+        output, because the path prefix simply wasn't in the repo. That was the
+        diagnosis, sitting in front of it, indistinguishable from silence."""
+        self.history.append({
+            "role": "user",
+            "content": (f"Your last {n} tool calls all succeeded and all came "
+                        "back empty. Empty output is a RESULT, not a failure to "
+                        "run: it means nothing matched. Re-running the same "
+                        "query — or the same query with a flag, a pipe, or a "
+                        "redirect changed — will return empty again. The thing "
+                        "that is wrong is the assumption behind the query: the "
+                        "path, the ref, the directory, the pattern or the repo "
+                        "you are asking about probably does not exist as you "
+                        "think it does. Verify that assumption with a call that "
+                        "MUST produce output if you are right — list the parent "
+                        "directory, list the whole tree, print the value you are "
+                        "matching on — and work from what comes back. If the "
+                        "empty result is itself the answer to the task, say so "
+                        "in plain text now and move on."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "every call returning empty"})
 
     def _notice_compacted(self) -> None:
         """Tell the model its own context was just structurally compacted.
@@ -1612,6 +1703,55 @@ def _forgive_rereads(repeat_streaks: dict, nudged_repeat: set,
     for sig in stale:
         repeat_streaks.pop(sig, None)
         nudged_repeat.discard(sig)  # re-arm the nudge, don't stop on sight
+        forgiven_counts[sig] = forgiven_counts.get(sig, 0) + 1
+    return len(stale)
+
+
+def _forgive_nudged_verifies(repeat_streaks: dict, nudged_repeat: set,
+                             forgiven_counts: dict) -> int:
+    """Drop the repeat streaks of read-only/verify batches after we push the
+    model back to its own open plan tasks. Returns how many were forgiven.
+
+    The same two-guards-fighting shape as _forgive_rereads, from the other
+    direction. Live transcript (build 65, empty-query-diagnosis): the model
+    edited the script, ran `python3 sync.py`, and got the correct output — the
+    task was DONE and verified. But its plan still had "test the fix by running
+    the script again" open, so the open-tasks nudge fired and told it to finish.
+    The only action that closes that task is re-running the script. It did, and
+    the repeat guard stopped the turn for "repeating the same tool call without
+    making progress". Two of three runs ended that way — reported as a failure,
+    on a task whose fix had already landed and passed.
+
+    A nudge that demands more work must not leave the model in a state where the
+    only compliant action is punished. So the call we just asked for stops
+    counting as a repeat.
+
+    Scoped harder than _forgive_rereads: read-only tools, plus bash ONLY when it
+    looks like a verify (_is_verify_bash — runs/compiles/tests, never a mutating
+    shell command). And bounded at one forgiveness per signature, tighter than
+    the compaction case: there, an external event really had deleted the
+    evidence; here nothing was lost, so a second identical re-run after we have
+    already excused one is a genuine loop."""
+    def _safe(sig) -> bool:
+        for name, argjson in sig:
+            if name in _REREADABLE_TOOLS:
+                continue
+            if name == "bash":
+                try:
+                    cmd = json.loads(argjson).get("cmd", "")
+                except (ValueError, AttributeError):
+                    return False
+                if _is_verify_bash(cmd):
+                    continue
+            return False
+        return True
+
+    stale = [sig for sig in repeat_streaks
+             if sig and _safe(sig)
+             and forgiven_counts.get(sig, 0) < _MAX_FORGIVEN_NUDGED]
+    for sig in stale:
+        repeat_streaks.pop(sig, None)
+        nudged_repeat.discard(sig)
         forgiven_counts[sig] = forgiven_counts.get(sig, 0) + 1
     return len(stale)
 

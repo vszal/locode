@@ -18,11 +18,17 @@ async def test_bash_success(ctx):
 
 
 async def test_bash_silent_success_is_explicit(ctx):
-    # rc 0 with no output must read as an unambiguous success, not a bare
-    # "(no output)" that a weak model re-runs to a repeat-stop.
+    # rc 0 with no output must read unambiguously, not as a bare "(no output)"
+    # that a weak model re-runs to a repeat-stop. It has to carry BOTH readings:
+    # ran-fine (a passing py_compile) and nothing-matched (an empty query). The
+    # earlier wording said only "command succeeded", which is misleading for a
+    # query and sent the model round the same git call four times.
     res = await Bash().run({"cmd": "true"}, ctx)
     assert res.ok and not res.is_error
-    assert "succeeded" in res.content and "exit 0" in res.content
+    assert "exit 0" in res.content
+    assert "ran fine" in res.content        # the verify reading
+    assert "nothing matched" in res.content  # the query reading
+    assert "unchanged" in res.content        # and don't just re-run it
 
 
 async def test_bash_nonzero_exit_is_error(ctx):

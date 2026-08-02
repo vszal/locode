@@ -1002,11 +1002,13 @@ async def test_slow_progress_nudges_once_past_grace(tmp_path, monkeypatch):
     cfg.agent.slow_progress_ratio = 0.5
     cfg.agent.slow_progress_grace_seconds = 10
     cfg.agent.slow_progress_grace_iterations = 1
-    # The dirs must EXIST: a script of 20 failing ls calls now trips the
-    # consecutive-error guard long before the wallclock, which is not what this
-    # test is about.
+    # The dirs must EXIST and must not be EMPTY. This test is about wallclock
+    # and nothing else, so its calls have to sail past every other guard: 20
+    # failing ls calls trip the consecutive-error guard, and 20 ls calls on
+    # empty dirs trip the no-information guard, both long before the clock.
     for i in range(20):
         (tmp_path / f"d{i}").mkdir()
+        (tmp_path / f"d{i}" / "keep.txt").write_text("x\n")
     scripted = [native_call("ls", path=f"d{i}") for i in range(20)]
     client = SlowFakeClient(scripted, clock, seconds_per_call=50)
     loop = make_loop_with_client(tmp_path, client, cfg=cfg)
@@ -2336,6 +2338,149 @@ async def test_repeat_stop_still_fires_when_compaction_never_runs(tmp_path):
     loop = make_loop(tmp_path, [native_call("read_file", path="./a.py")] * 8, cfg=cfg)
     out = await loop.run_turn("read a.py")
     assert "repeated the same tool call" in out
+
+
+# --- the open-tasks nudge vs the repeat guard (4.19) ------------------------
+# Guards fighting each other, the same shape as compaction-vs-repeat (4.14) from
+# the other direction. Live: the fix landed, `python3 sync.py` printed the right
+# answer, and the turn was reported as "repeated the same tool call without
+# making progress" -- because the plan still said "run the script again", the
+# open-tasks nudge demanded it, and the repeat guard punished the compliance.
+
+def test_forgive_nudged_verifies_covers_reads_and_verify_bash():
+    from locode.agent.loop import _forgive_nudged_verifies
+    read = (_sig("read_file", path="a.py"),)
+    verify = (_sig("bash", cmd="python3 sync.py"),)
+    streaks = {read: ("out", 2), verify: ("out", 2)}
+    assert _forgive_nudged_verifies(streaks, set(), {}) == 2
+    assert streaks == {}
+
+
+def test_forgive_nudged_verifies_refuses_mutating_shell():
+    from locode.agent.loop import _forgive_nudged_verifies
+    # bash is only excused when it CHECKS. A destructive command repeated after
+    # a nudge is still a loop, and re-running it is not free.
+    mutate = (_sig("bash", cmd="rm -rf build && cp -r a b"),)
+    edit = (_sig("edit_file", path="a.py", old="x", new="y"),)
+    streaks = {mutate: ("ok", 2), edit: ("ok", 2)}
+    assert _forgive_nudged_verifies(streaks, set(), {}) == 0
+    assert set(streaks) == {mutate, edit}
+
+
+def test_forgive_nudged_verifies_is_bounded():
+    from locode.agent.loop import (_forgive_nudged_verifies,
+                                   _MAX_FORGIVEN_NUDGED)
+    sig = (_sig("bash", cmd="pytest -q"),)
+    counts: dict = {}
+    for _ in range(_MAX_FORGIVEN_NUDGED):
+        assert _forgive_nudged_verifies({sig: ("out", 2)}, set(), counts) == 1
+    streaks = {sig: ("out", 2)}
+    assert _forgive_nudged_verifies(streaks, set(), counts) == 0
+    assert streaks == {sig: ("out", 2)}   # the guard can see it again
+
+
+def test_forgive_nudged_verifies_survives_bad_bash_args(tmp_path):
+    # A weak model sometimes emits cmd as a list, or omits it. Must not raise.
+    from locode.agent.loop import _forgive_nudged_verifies
+    weird = (("bash", "not json at all"),)
+    nocmd = (_sig("bash", command="pytest -q"),)   # wrong key
+    streaks = {weird: ("ok", 2), nocmd: ("ok", 2)}
+    assert _forgive_nudged_verifies(streaks, set(), {}) == 0
+
+
+@pytest.mark.asyncio
+async def test_verify_rerun_demanded_by_plan_nudge_is_not_a_repeat(tmp_path):
+    # The whole transcript, end to end: work, verify, leave a task open, get
+    # nudged, comply by re-verifying. That must not end the turn as a repeat.
+    (tmp_path / "sync.py").write_text("print('differs: button.txt')\n")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 2
+    run = native_call("bash", cmd="python3 sync.py")
+    loop = make_loop(
+        tmp_path,
+        [native_call("update_plan", tasks=["[x] fix it", "[ ] re-run to verify"]),
+         run,                                   # verified once
+         run,                                   # the re-run the nudge demands
+         {"role": "assistant", "content": "verified, output is correct"}],
+        cfg=cfg, confirm=lambda *a, **k: True)
+    out = await loop.run_turn("fix sync.py and verify it")
+    assert "repeated the same tool call" not in out
+    assert out == "verified, output is correct"
+# Every other guard in the loop keys on FAILURE, so a model that is wrong in a
+# way that produces no errors falls through all of them. Live shape: the model
+# read SOURCE_PATH = "skills/cloud/gke-compute-classes" out of the script it was
+# debugging and queried git for it — ls-remote, ls-tree, ls-tree with 2>&1,
+# ls-tree again. Six exit-0 empty results, four byte-identical. The emptiness
+# WAS the diagnosis (no such prefix in the repo) and nothing could say so.
+
+def _noinfo_nudges(loop):
+    return [m for m in loop.history
+            if m.get("kind") == "nudge" and "came back empty" in m["content"]]
+
+
+def test_is_noinfo_matches_whole_results_only(tmp_path):
+    from locode.agent.loop import _is_noinfo
+    from locode.tools.shell import _EMPTY_OK
+    assert _is_noinfo(_EMPTY_OK)
+    assert _is_noinfo("(no matches)")
+    assert _is_noinfo("  (empty directory)  ")   # stripped
+    assert not _is_noinfo("")                    # not a tool result we produce
+    # The trap: a grep that really did find the literal text "(no matches)" in
+    # some file has found something. Substring matching would erase that.
+    assert not _is_noinfo("src/a.py:12:    return '(no matches)'")
+
+
+@pytest.mark.asyncio
+async def test_all_empty_calls_are_nudged_then_stopped(tmp_path):
+    cfg = Config()
+    cfg.agent.max_noinfo_calls = 3
+    # Every pattern distinct, so the repeat guard never fires; every call
+    # succeeds, so neither the error stall nor the all-errored guard can.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    scripted = [native_call("grep", pattern=f"nomatch{i}") for i in range(12)]
+    loop = make_loop(tmp_path, scripted, cfg=cfg)
+    out = await loop.run_turn("find the thing")
+    assert len(_noinfo_nudges(loop)) == 1        # nudged once...
+    assert "kept coming back empty" in out       # ...then the turn ends
+    body = _noinfo_nudges(loop)[0]["content"]
+    assert "assumption" in body                  # name the actual fault
+    assert "nothing matched" in body
+
+
+@pytest.mark.asyncio
+async def test_one_informative_call_clears_the_empty_streak(tmp_path):
+    # A model that IS learning something must be untouched, even if most of its
+    # calls come back empty.
+    cfg = Config()
+    cfg.agent.max_noinfo_calls = 3
+    # Each hit must be a DISTINCT call: repeating one identical successful grep
+    # trips the repeat guard, which spends the iteration on a nudge instead of
+    # running it — and then the empties really do land back-to-back.
+    (tmp_path / "a.py").write_text("".join(f"needle{i} = 1\n" for i in range(6)))
+    scripted = []
+    for i in range(6):
+        scripted += [native_call("grep", pattern=f"nomatch{i}a"),
+                     native_call("grep", pattern=f"nomatch{i}b"),
+                     native_call("grep", pattern=f"needle{i}")]   # this one hits
+    scripted.append({"role": "assistant", "content": "found it"})
+    loop = make_loop(tmp_path, scripted, cfg=cfg)
+    out = await loop.run_turn("find the needle")
+    assert out == "found it"
+    assert _noinfo_nudges(loop) == []
+
+
+@pytest.mark.asyncio
+async def test_failing_calls_do_not_count_as_empty(tmp_path):
+    # An error is not "no information" — it says a great deal. These two guards
+    # must not double-count the same batch.
+    cfg = Config()
+    cfg.agent.max_noinfo_calls = 3
+    cfg.agent.max_consecutive_errors = 99      # keep the sibling guard out
+    scripted = [native_call("read_file", path=f"./gone{i}.py") for i in range(8)]
+    loop = make_loop(tmp_path, scripted, cfg=cfg)
+    out = await loop.run_turn("read them")
+    assert _noinfo_nudges(loop) == []
+    assert "kept coming back empty" not in out
 
 
 # --- telling the model it was compacted (4.17) ------------------------------
