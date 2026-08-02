@@ -29,6 +29,19 @@ are user-visible and waste whole generations.*
     `max_repetition_aborts`. Catches short-phrase AND ~330-char sentence-level
     loops. *Caveat: thresholds are conservative but unvalidated against a full
     sweep — confirm no false-positive aborts on real cases before trusting it.*
+  - `[x]` **1.1c Paragraph-scale loops** — *user-observed 2026-08-02 on qythos9;
+    build 72.* The conservative thresholds had a hole big enough to miss a live
+    loop: a **932-char analysis block** ("Based on the error and the context…
+    Let me look at the exact code") re-emitted verbatim for 241.9s until the
+    user hit Esc. Two independent blockers, both of which had to move: the
+    period exceeded `MAX_UNIT` (700) so it was rejected before repeat-counting
+    ran, and the 2000-char `WINDOW` held only **2.15** reps of it against
+    `MIN_REPS = 4` — arithmetically unreachable even with the cap lifted. Now
+    `WINDOW = 8000`, `MAX_UNIT = 2000`, and `reps_required()` eases long units
+    (≥400 chars) to 3 reps, since 1200+ chars of byte-identical text is already
+    conclusive and waiting for a 4th burns another ~1 KB. The real block is
+    pinned as a fixture, plus an invariant test that the window can always hold
+    `MIN_REPS` units at `MAX_UNIT`. +6 tests; all prior negatives still pass.
 - `[ ]` **1.2 Large-file EDIT truncation** — salvage today covers
   `write_file`/`append_file` only; a truncated `edit_file` of a big span still
   loses everything (the e2e/qwencoder14 wallclock death at ~20.4k chars).

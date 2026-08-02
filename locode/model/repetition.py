@@ -20,17 +20,33 @@ good work.
 from __future__ import annotations
 
 # Only the tail matters — a loop is detected by what the model is doing NOW, not
-# by repetition scattered earlier in a long, legitimate reply.
-WINDOW = 2000
-# Largest repeating unit we look for. Real degeneration loops at two scales: a
-# short phrase (`megahyper`, ~9 chars) and a whole sentence template (~300+
-# chars), so this has to reach well past a single line.
-MAX_UNIT = 700
+# by repetition scattered earlier in a long, legitimate reply. Must be wide
+# enough to hold MIN_REPS whole units at MAX_UNIT, or the longest loops can
+# never accumulate enough repeats to be seen (see below).
+WINDOW = 8000
+# Largest repeating unit we look for. Real degeneration loops at three scales: a
+# short phrase (`megahyper`, ~9 chars), a sentence template (~300 chars), and a
+# whole multi-paragraph ANALYSIS BLOCK — the qythos9 case that motivated raising
+# this was a 932-char unit ("Based on the error and the context… Let me look at
+# the exact code") repeated verbatim. At 700 that loop was rejected outright for
+# being too long, and even lifting the cap alone would not have helped: a
+# 2000-char window holds only 2.15 reps of a 932-char unit, so MIN_REPS=4 was
+# arithmetically unreachable. Both had to move together.
+MAX_UNIT = 2000
 # The repeated span must be at least this many chars AND repeat at least this
 # many times. Both, so neither a short stutter nor a couple of long paragraphs
 # that happen to rhyme trips it.
 MIN_SPAN = 600
 MIN_REPS = 4
+# Confidence in a repeat scales with how long the repeating unit is: a 9-char
+# unit seen 3 times is everywhere in ordinary text, while a 400+ char block
+# reproduced BYTE-IDENTICALLY three times running is not something legitimate
+# prose or code does — that is 1200+ chars of exact duplication. So long units
+# clear at 3 reps instead of 4, which catches a paragraph-scale loop a whole
+# repeat (~1 KB of wasted generation) sooner. Short units are unaffected; for
+# them MIN_SPAN is the binding constraint anyway.
+LONG_UNIT = 400
+LONG_UNIT_MIN_REPS = 3
 # Fingerprint length: the tail slice whose nearest earlier occurrence reveals the
 # period. Must be short enough to sit inside one repeat of the smallest unit we
 # care about, but long enough that a chance match in ordinary text is unlikely.
@@ -48,10 +64,10 @@ def is_runaway_repetition(text: str) -> bool:
     Fingerprints the last `PROBE` chars and finds their nearest earlier
     occurrence; the gap is the loop's period. Reports a runaway only when that
     period is at most `MAX_UNIT`, the unit carries real (non-whitespace) content,
-    and it repeats at least `MIN_REPS` times across at least `MIN_SPAN`
-    characters. Deriving the period from the data (rather than scanning every
-    candidate length) keeps this cheap enough to call per token-batch even with a
-    wide `MAX_UNIT`.
+    and it repeats enough times (`reps_required`, which eases for long units)
+    across at least `MIN_SPAN` characters. Deriving the period from the data
+    (rather than scanning every candidate length) keeps this cheap enough to call
+    per token-batch even with a wide `MAX_UNIT`.
     """
     tail = text[-WINDOW:]
     n = len(tail)
@@ -72,4 +88,14 @@ def is_runaway_repetition(text: str) -> bool:
     while i >= 0 and tail[i:i + p] == unit:
         reps += 1
         i -= p
-    return reps >= MIN_REPS and reps * p >= MIN_SPAN
+    return reps >= reps_required(p) and reps * p >= MIN_SPAN
+
+
+def reps_required(period: int) -> int:
+    """How many verbatim repeats it takes to call a loop, given its unit size.
+
+    Long units need fewer: the evidence is the *volume* of byte-identical text,
+    and three reps of a 400-char block is already twice the duplication that four
+    reps of a 150-char one gives.
+    """
+    return LONG_UNIT_MIN_REPS if period >= LONG_UNIT else MIN_REPS
