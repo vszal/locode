@@ -288,3 +288,68 @@ async def test_absent_finish_reason_is_omitted():
     msg = await make_client(handler).complete(
         [{"role": "user", "content": "hi"}], "qwen14")
     assert "finish_reason" not in msg
+
+
+# --- the silent server (a load that dies in mlx_lm's generate thread) -------
+# 2026-08-02: gemma-4-12b-coder-8bit declared an unsupported model_type. The
+# load raised inside Thread-1 (_generate), so no headers were ever written, this
+# await sat there, and the whole turn's wallclock was spent on a spinner.
+
+from locode.model import client as client_mod
+from locode.model.client import ModelServerSilent
+
+
+async def _hang(req):
+    await asyncio.sleep(3600)
+    return httpx.Response(200)
+
+
+async def test_a_silent_server_is_reported_with_its_own_error(monkeypatch):
+    monkeypatch.setattr(client_mod, "_watch_server_log",
+                        _fast_watch("ValueError: Model type gemma4_unified "
+                                    "not supported."))
+    with pytest.raises(ModelServerSilent) as e:
+        await make_client(_hang).complete([{"role": "user", "content": "hi"}],
+                                          "gemmacoder12")
+    assert "gemma4_unified" in str(e.value)
+    assert "sent nothing back" in str(e.value)
+
+
+def _fast_watch(msg):
+    async def _watch(offset, poll=0.0):
+        await asyncio.sleep(0)
+        return msg
+    return _watch
+
+
+async def test_a_healthy_stream_is_untouched_by_the_watchdog(monkeypatch):
+    """The watchdog must never fire on a server that answers."""
+    monkeypatch.setattr(client_mod, "_watch_server_log", _fast_watch("boom"))
+
+    def handler(req):
+        return httpx.Response(200, content=sse(delta(content="fine")))
+
+    # The response is immediate, so `enter` wins the race even though the
+    # watchdog is armed and would report an error.
+    msg = await make_client(handler).complete(
+        [{"role": "user", "content": "hi"}], "qwen14")
+    assert msg["content"] == "fine"
+
+
+async def test_esc_now_cancels_while_the_model_is_still_loading():
+    """Before this, cancellation only began once the response existed, so Esc
+    did nothing during a 45s model load."""
+    tok = CancelToken()
+    tok.cancel()
+    with pytest.raises(CancelledByUser):
+        await make_client(_hang).complete([{"role": "user", "content": "hi"}],
+                                          "qwen14", cancel=tok)
+
+
+async def test_silence_with_no_logged_error_says_so(monkeypatch):
+    monkeypatch.setattr(client_mod, "_watch_server_log", _fast_watch(""))
+    with pytest.raises(ModelServerSilent) as e:
+        await make_client(_hang).complete([{"role": "user", "content": "hi"}],
+                                          "qwen14")
+    assert "logged no error" in str(e.value)
+    assert "still be loading" in str(e.value)

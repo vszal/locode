@@ -80,6 +80,62 @@ def find_mlx_bin(configured: str = "") -> str:
     return configured or "mlx_lm.server"
 
 
+def _mlx_interpreter(mlx_bin: str) -> str | None:
+    """The interpreter that owns mlx_lm, read from the launcher's shebang.
+
+    locode's own venv does not have mlx_lm installed — the server runs under
+    whatever python the `mlx_lm.server` console script points at — so an
+    in-process `find_spec` would report "unsupported" for every architecture.
+    Any doubt returns None, and the caller must then decline to judge.
+    """
+    try:
+        with open(mlx_bin, "rb") as fh:
+            first = fh.readline(512)
+    except OSError:
+        return None
+    if not first.startswith(b"#!"):
+        return None
+    parts = first[2:].strip().decode("utf-8", "replace").split()
+    if not parts:
+        return None
+    exe = parts[-1] if parts[0].endswith("env") and len(parts) > 1 else parts[0]
+    return exe if os.path.exists(exe) else None
+
+
+# Exit codes are the whole interface: 0 supported, 3 no such loader, 4 the
+# question could not be asked (mlx_lm missing from that interpreter, so
+# find_spec raises on the parent package rather than returning None). Anything
+# else — a crash, a timeout — is likewise "cannot tell".
+_ARCH_PROBE = (
+    "import importlib.util as u, sys\n"
+    "try:\n"
+    "    ok = u.find_spec('mlx_lm.models.' + sys.argv[1]) is not None\n"
+    "except Exception:\n"
+    "    sys.exit(4)\n"
+    "sys.exit(0 if ok else 3)\n")
+
+
+def arch_supported(model_type: str, mlx_bin: str) -> bool | None:
+    """Can the mlx_lm behind `mlx_bin` load this `model_type`?
+
+    True/False when the probe answered; **None when we could not tell** — no
+    interpreter, no model_type, a probe that crashed or timed out. The tri-state
+    is the point: a guard that guesses "unsupported" on a failed probe would
+    refuse models that work perfectly, which is worse than the hang it prevents.
+    """
+    if not model_type:
+        return None
+    interp = _mlx_interpreter(mlx_bin)
+    if interp is None:
+        return None
+    try:
+        rc = subprocess.run([interp, "-c", _ARCH_PROBE, model_type],
+                            capture_output=True, timeout=15).returncode
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return True if rc == 0 else (False if rc == 3 else None)
+
+
 _USE_PROFILE = object()  # sentinel: derive enable_thinking from the profile
 
 
@@ -246,6 +302,7 @@ class SingleGpuManager:
                 "or set [server].mlx_bin")
         profile = profile_for(model_id)
         self._check_memory_budget(model_id, profile)
+        self._check_arch_supported(model_id)
         override = lookup_thinking_override(self._cfg.thinking, model_id, alias)
         thinking = resolve_thinking(profile, override)
         argv = build_launch_argv(self._mlx_bin, model_id, self._host, self._port,
@@ -271,6 +328,36 @@ class SingleGpuManager:
         if not measured:
             return profile.prompt_cache_bytes
         return max(profile.prompt_cache_bytes, measured)
+
+    def _check_arch_supported(self, model_id: str) -> None:
+        """Refuse a model mlx_lm has no loader for, instead of hanging on it.
+
+        This failure is invisible from the outside and expensive: mlx_lm loads
+        lazily inside the *generate* thread, so an unsupported `model_type`
+        raises there, kills the thread, and leaves the HTTP request unanswered
+        forever while `/v1/models` keeps returning 200. locode then sits on the
+        spinner until the turn's wallclock runs out. Observed 2026-08-02 with
+        gemma-4-12b-coder-8bit, whose config.json declares `gemma4_unified`.
+
+        Silent unless the probe positively says "no loader" — see arch_supported.
+        """
+        cfg = _model_config(model_id)
+        if not cfg:
+            return
+        model_type = str(cfg.get("model_type") or "")
+        if arch_supported(model_type, self._mlx_bin) is not False:
+            return
+        raise RuntimeError(
+            f"refusing to load {model_id}: its config.json declares "
+            f"model_type {model_type!r}, and the mlx_lm behind {self._mlx_bin} "
+            f"has no loader for it (no mlx_lm.models.{model_type} module). "
+            "Loading it would fail inside the server's generate thread, which "
+            "answers nothing and would hang the turn rather than erroring. "
+            "If this repo is really a text-only quant mislabelled as "
+            "multimodal — check whether every tensor in "
+            "model.safetensors.index.json is language_model.* — patching the "
+            "cached config.json's model_type to the text architecture makes it "
+            "load; otherwise pick another model.")
 
     def _check_memory_budget(self, model_id: str, profile: Profile) -> None:
         """Refuse to launch a model that won't fit, instead of thrashing the box.

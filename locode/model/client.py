@@ -19,6 +19,7 @@ import httpx
 from locode.agent.cancel import (CancelToken, CancelledByUser,
                                  DeadlineExceeded)
 from locode.model import repetition
+from locode.server import logs as server_logs
 
 OnDelta = Callable[[str], Any]
 
@@ -39,6 +40,40 @@ class ModelServerError(RuntimeError):
         self.detail = detail
         super().__init__(f"model server returned {status}"
                          + (f": {detail}" if detail else ""))
+
+
+class ModelServerSilent(RuntimeError):
+    """The server accepted a request and then answered nothing, ever.
+
+    Distinct from ModelServerError, which at least carries a status: here there
+    is no response at all, because mlx_lm's load runs inside the generate thread
+    and a failure there kills the thread without writing a reply. httpx will
+    wait out its read timeout, and the agent loop will wait out the whole turn
+    — so the failure has to be detected from the server's log instead.
+    """
+
+    def __init__(self, seconds: float, diagnosis: str = ""):
+        self.seconds = seconds
+        self.diagnosis = diagnosis
+        super().__init__(
+            f"the model server accepted the request but sent nothing back "
+            f"after {seconds:.0f}s"
+            + (f" — its log says: {diagnosis}" if diagnosis else
+               " and logged no error; it may still be loading a large model"))
+
+
+async def _watch_server_log(offset: int, poll: float = 2.0) -> str:
+    """Wait until the server logs a fatal error, then return it.
+
+    Polls rather than tails because the failure window is seconds long and the
+    file is opened append-only by a separate process. Never returns on a healthy
+    server — the caller races this against the actual read and cancels it.
+    """
+    while True:
+        await asyncio.sleep(poll)
+        found = server_logs.fatal_since(offset)
+        if found:
+            return found
 
 
 async def _error_detail(r: httpx.Response) -> str:
@@ -133,8 +168,15 @@ class ModelClient:
         finish_reason: str | None = None
         chars_since_check = 0
 
+        # Everything appended to the server log from here on belongs to THIS
+        # request, which is what lets a dead generate thread be attributed.
+        log_mark = server_logs.mark()
+        started = time.monotonic()
+
         async with self._client() as c:
-            async with c.stream("POST", "/v1/chat/completions", json=body) as r:
+            stream = c.stream("POST", "/v1/chat/completions", json=body)
+            r = await _open_stream(stream, cancel, log_mark, started)
+            try:
                 if r.status_code >= 400:
                     # The body carries the ACTUAL cause and must be read before
                     # raising: on a streamed response nothing has been read yet,
@@ -205,6 +247,13 @@ class ModelClient:
                 finally:
                     if cancel_wait is not None and not cancel_wait.done():
                         cancel_wait.cancel()
+            finally:
+                # Replaces the `async with` this used to be: the stream is
+                # entered by hand so the wait for response headers can be raced
+                # against the log watchdog, but it must still be closed on every
+                # path — closing the connection is what tells the server to stop.
+                with contextlib.suppress(Exception):
+                    await stream.__aexit__(None, None, None)
 
         content = "".join(content_parts)
         if not content and reasoning_parts:
@@ -216,6 +265,48 @@ class ModelClient:
         if finish_reason:
             msg["finish_reason"] = finish_reason
         return msg
+
+
+async def _open_stream(stream, cancel: CancelToken | None, log_mark: int,
+                       started: float):
+    """Enter the streaming response, racing the wait for headers.
+
+    This wait is where the observed hang lived. mlx_lm writes no headers until
+    its generate thread produces something, so a load that dies in that thread
+    leaves this await pending until httpx's read timeout — ten minutes of
+    spinner, then a bare timeout that names nothing. Two things run alongside it:
+
+    - the cancel token, so Esc works during a long model load (it previously did
+      not: cancellation only started once the response existed);
+    - a watchdog on the server's log, which turns "silence" into the server's
+      own traceback within seconds.
+
+    Deliberately NOT a timeout. Prompt processing on a large context is legit-
+    imately silent for minutes, so any fixed budget either fires on healthy
+    slow prefill or is too long to help. The log is the signal that actually
+    distinguishes "still working" from "already dead".
+    """
+    enter = asyncio.ensure_future(stream.__aenter__())
+    watch = asyncio.ensure_future(_watch_server_log(log_mark))
+    waits = {enter, watch}
+    cancel_wait = asyncio.ensure_future(cancel.wait()) if cancel else None
+    if cancel_wait is not None:
+        waits.add(cancel_wait)
+    try:
+        done, _ = await asyncio.wait(waits, return_when=asyncio.FIRST_COMPLETED)
+        if enter in done:
+            return enter.result()
+        if cancel_wait is not None and cancel_wait in done:
+            raise CancelledByUser()
+        raise ModelServerSilent(time.monotonic() - started, watch.result())
+    finally:
+        for task in (watch, cancel_wait):
+            if task is not None and not task.done():
+                task.cancel()
+        if not enter.done():
+            enter.cancel()
+            with contextlib.suppress(BaseException):
+                await enter
 
 
 async def _next_line(line_iter, cancel: CancelToken | None, cancel_wait,

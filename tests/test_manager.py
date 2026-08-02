@@ -1,5 +1,6 @@
 import json
 import signal
+import types
 
 import pytest
 
@@ -738,3 +739,109 @@ async def test_remote_is_up_alias_trusts_served_list(monkeypatch):
     m = _remote_manager(monkeypatch, ["mlx-community/Qwen3-14B-4bit"])
     assert await m.is_up("qwen14") is True
     assert await m.is_up("qwen4i") is False
+
+
+# --- the unsupported-architecture preflight --------------------------------
+# Regression cover for 2026-08-02: an unpatched gemma-4-12b-coder-8bit declared
+# model_type "gemma4_unified", mlx_lm raised inside its generate THREAD, the
+# request was never answered, and locode span on the spinner for a whole turn.
+# /v1/models answered 200 throughout, so nothing looked wrong from outside.
+
+def test_interpreter_comes_from_the_launcher_shebang(tmp_path):
+    launcher = tmp_path / "mlx_lm.server"
+    launcher.write_bytes(b"#!/usr/bin/python3.11\nprint('hi')\n")
+    assert mod._mlx_interpreter(str(launcher)) in (None, "/usr/bin/python3.11")
+
+
+def test_interpreter_is_none_when_the_shebang_is_missing(tmp_path):
+    launcher = tmp_path / "mlx_lm.server"
+    launcher.write_bytes(b"not a script\n")
+    assert mod._mlx_interpreter(str(launcher)) is None
+
+
+def test_interpreter_is_none_when_the_launcher_is_absent(tmp_path):
+    assert mod._mlx_interpreter(str(tmp_path / "nope")) is None
+
+
+def test_the_probe_runs_for_real_and_declines_when_mlx_lm_is_absent(tmp_path):
+    """End-to-end through a real shebang and a real subprocess.
+
+    locode's own venv has no mlx_lm, so the honest answer here is None — the
+    probe must reach exit 4 (find_spec raised on the parent package) and NOT
+    mistake a missing mlx_lm for an unsupported architecture.
+    """
+    import sys
+    launcher = tmp_path / "mlx_lm.server"
+    launcher.write_bytes(f"#!{sys.executable}\n".encode())
+    assert mod._mlx_interpreter(str(launcher)) == sys.executable
+    assert mod.arch_supported("gemma4", str(launcher)) is None
+
+
+@pytest.mark.parametrize("rc, expected", [
+    (0, True),      # loader exists
+    (3, False),     # no such loader — the only refusal
+    (4, None),      # mlx_lm absent from that interpreter
+    (1, None),      # probe crashed
+    (2, None),      # anything else
+])
+def test_probe_exit_codes_map_to_the_tri_state(monkeypatch, rc, expected):
+    monkeypatch.setattr(mod, "_mlx_interpreter", lambda b: "/bin/interp")
+    monkeypatch.setattr(mod.subprocess, "run",
+                        lambda *a, **k: types.SimpleNamespace(returncode=rc))
+    assert mod.arch_supported("gemma4_unified", "/bin/mlx") is expected
+
+
+def test_a_probe_that_times_out_is_not_a_refusal(monkeypatch):
+    monkeypatch.setattr(mod, "_mlx_interpreter", lambda b: "/bin/interp")
+    def _slow(*a, **k):
+        raise mod.subprocess.TimeoutExpired("interp", 15)
+    monkeypatch.setattr(mod.subprocess, "run", _slow)
+    assert mod.arch_supported("gemma4", "/bin/mlx") is None
+
+
+def test_unknown_probe_result_never_blocks(monkeypatch):
+    """Any doubt must fall open — refusing a working model is the worse bug."""
+    monkeypatch.setattr(mod, "_mlx_interpreter", lambda b: None)
+    assert mod.arch_supported("gemma4_unified", "/bin/mlx_lm.server") is None
+    m = _mgr()
+    monkeypatch.setattr(mod, "_model_config",
+                        lambda mid: {"model_type": "gemma4_unified"})
+    m._check_arch_supported("org/whatever")  # must not raise
+
+
+def test_a_probe_that_crashes_is_not_a_refusal(monkeypatch):
+    monkeypatch.setattr(mod, "_mlx_interpreter", lambda b: "/bin/interp")
+    def _boom(*a, **k):
+        raise OSError("no such interpreter")
+    monkeypatch.setattr(mod.subprocess, "run", _boom)
+    assert mod.arch_supported("gemma4", "/bin/mlx_lm.server") is None
+
+
+def test_an_empty_model_type_is_not_a_refusal():
+    assert mod.arch_supported("", "/bin/mlx_lm.server") is None
+
+
+def test_unsupported_arch_is_refused_before_launch(monkeypatch):
+    m = _mgr()
+    monkeypatch.setattr(mod, "_model_config",
+                        lambda mid: {"model_type": "gemma4_unified"})
+    monkeypatch.setattr(mod, "arch_supported", lambda mt, b: False)
+    with pytest.raises(RuntimeError, match="gemma4_unified") as e:
+        m._check_arch_supported("mlx-community/gemma-4-12b-coder-8bit")
+    msg = str(e.value)
+    assert "no loader" in msg              # names the cause
+    assert "hang the turn" in msg          # names what it prevented
+    assert "language_model." in msg        # names the check that fixes it
+
+
+def test_supported_arch_passes(monkeypatch):
+    m = _mgr()
+    monkeypatch.setattr(mod, "_model_config", lambda mid: {"model_type": "gemma4"})
+    monkeypatch.setattr(mod, "arch_supported", lambda mt, b: True)
+    m._check_arch_supported("mlx-community/gemma-4-12b-coder-4bit")
+
+
+def test_an_uncached_model_is_not_judged(monkeypatch):
+    m = _mgr()
+    monkeypatch.setattr(mod, "_model_config", lambda mid: None)
+    m._check_arch_supported("org/not-downloaded-yet")
