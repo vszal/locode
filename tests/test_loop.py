@@ -2754,3 +2754,83 @@ async def test_a_named_deliverable_stays_with_the_deliverable_gate(tmp_path):
     reasons = [e.get("reason") for e in events if e.get("phase") == "nudge"]
     assert not any(r == "declared done without acting" for r in reasons)
     assert any("deliverable" in (r or "") for r in reasons)
+
+
+# --- done-on-repeated-verify: a success that locode was calling a failure ----
+# Measured shape (syntax-fix, gemmacoder12_4bit, build 79): fix the file, run
+# py_compile, watch it pass, re-run the identical check instead of saying so.
+# 0/10 clean finishes on runs that all scored 1.00. Rewording the check result
+# was tried first and moved nothing (build 80, reverted). The three negatives
+# below are the load-bearing half — a false "done" is worse than a false flail.
+
+async def test_reverified_green_edit_finishes_instead_of_flailing(tmp_path):
+    (tmp_path / "parser.py").write_text("def parse(line)\n    return line\n")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 2
+    cfg.permissions.tools["edit_file"] = "auto"
+    check = native_call("bash", cmd="python3 -m py_compile parser.py")
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("edit_file", path="./parser.py",
+                     old="def parse(line)", new="def parse(line):"),
+         check,          # green
+         check,          # ... and the model asks again instead of finishing
+         check],
+        FakeBash(""), cfg=cfg)
+    out = await loop.run_turn("fix the syntax error in parser.py")
+    assert "repeated the same tool call" not in out
+    assert "parser.py" in out and "passed" in out
+
+
+async def test_a_repeated_broken_edit_is_still_a_flail(tmp_path):
+    # Condition 1. An earlier green check must not license ending a turn whose
+    # edits are now going round in circles — that repeat is a real dead end.
+    (tmp_path / "parser.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 2
+    cfg.permissions.tools["edit_file"] = "auto"
+    bad = native_call("edit_file", path="./parser.py", old="NOT PRESENT", new="y")
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("edit_file", path="./parser.py", old="x = 1", new="x = 2"),
+         native_call("bash", cmd="python3 -m py_compile parser.py"),
+         bad, bad, bad],
+        FakeBash(""), cfg=cfg)
+    out = await loop.run_turn("fix parser.py")
+    assert "repeated the same tool call" in out
+
+
+async def test_a_green_check_with_no_landed_edit_is_still_a_flail(tmp_path):
+    # Condition 2. Every edit FAILED, so the check passes only because the file
+    # was never touched. There is no work to report and the turn must not claim
+    # any — this is the false-completion the gate exists to avoid.
+    (tmp_path / "parser.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 2
+    cfg.permissions.tools["edit_file"] = "auto"
+    check = native_call("bash", cmd="python3 -m py_compile parser.py")
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("edit_file", path="./parser.py", old="ABSENT", new="y"),
+         check, check, check],
+        FakeBash(""), cfg=cfg)
+    out = await loop.run_turn("fix parser.py")
+    assert "repeated the same tool call" in out
+
+
+async def test_a_verify_that_has_started_failing_is_still_a_flail(tmp_path):
+    # Condition 3. The edit landed, but the check is RED and the model is
+    # re-running it hoping for a different answer. Latest-wins is the point:
+    # "a verify passed at some point this turn" would wrongly finish here.
+    (tmp_path / "parser.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 2
+    cfg.permissions.tools["edit_file"] = "auto"
+    check = native_call("bash", cmd="python3 -m py_compile parser.py")
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("edit_file", path="./parser.py", old="x = 1", new="x = ("),
+         check, check, check],
+        FakeBash("SyntaxError: unexpected EOF", is_error=True), cfg=cfg)
+    out = await loop.run_turn("fix parser.py")
+    assert "repeated the same tool call" in out

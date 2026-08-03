@@ -199,6 +199,16 @@ class AgentLoop:
         # ...) exits cleanly, so a "the file compiles / runs fine" final answer
         # can be gated on the model having actually watched it pass.
         self._saw_verify_ok = False
+        # The two flags the done-on-repeated-verify exit needs, which the pair
+        # above deliberately can't provide because neither ever falls back to
+        # False. _landed_edit: a MUTATING edit actually succeeded (not merely was
+        # attempted) — without it, a turn whose every edit failed could still be
+        # called finished on the strength of a check that passed because the file
+        # was untouched. _last_verify_ok tracks the MOST RECENT verify rather than
+        # "any verify ever", so a check that has since started failing can't leave
+        # a stale success latched.
+        self._landed_edit = False
+        self._last_verify_ok = False
         open_task_nudges = 0
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
@@ -836,6 +846,43 @@ class AgentLoop:
                         else:
                             self._nudge_repeat(calls, unread)
                         continue
+                    # Not every repeat is a flail. The specific shape below is a
+                    # turn that SUCCEEDED and then failed to notice: the model
+                    # edited the file, ran a check, watched it pass — and re-ran
+                    # the identical check instead of saying so. Reporting that as
+                    # "repeated the same tool call without making progress" is
+                    # simply false; the progress was made, and locode is the one
+                    # misreading it. Measured on syntax-fix (gemmacoder12_4bit,
+                    # build 79): 0/10 clean finishes, every run scoring 1.00 —
+                    # ten fixed-and-verified files all reported as failures.
+                    #
+                    # Rewording the check's result to be less ambiguous was tried
+                    # first and did nothing (build 80, reverted — see ROADMAP
+                    # 4.4); this model re-verifies reflexively no matter what the
+                    # message says. So end the turn on the evidence instead of
+                    # waiting for the model to volunteer it.
+                    #
+                    # Three conditions, all required, because a false "done" is
+                    # far worse than a spurious flail report:
+                    #   1. the repeat is a VERIFY re-run — not a broken edit
+                    #      going round again, which is a genuine dead end;
+                    #   2. an edit actually LANDED (not just was attempted), so
+                    #      there is real work to report;
+                    #   3. the latest verify is green, so the code is passing NOW
+                    #      rather than having passed at some earlier point.
+                    if (self._landed_edit and self._last_verify_ok
+                            and all(c.name == "bash"
+                                    and _is_verify_bash(c.args.get("cmd", ""))
+                                    for c in calls)):
+                        edited = ", ".join(edit_tally) or "the file"
+                        self._on_event({
+                            "phase": "info",
+                            "text": "edit verified green and the check was "
+                                    "re-run unchanged — finishing"})
+                        return (f"Done: edited {edited}, and the check that was "
+                                f"run against it passed. (Ending here — the "
+                                f"check had already passed and was re-run "
+                                f"unchanged.)")
                     return self._stop("the model repeated the same tool call "
                                       "without making progress")
                 consecutive_malformed = 0  # progress made
@@ -1138,6 +1185,17 @@ class AgentLoop:
                 # nudge. is_error is the shell's rc!=0 signal, so a failing
                 # py_compile (SyntaxError) correctly leaves this False.
                 self._saw_verify_ok = True
+            if call.name == "bash" and _is_verify_bash(call.args.get("cmd", "")):
+                # Same signal, but latest-wins: a verify that has started failing
+                # must clear it. _saw_verify_ok is sticky by design (it answers
+                # "did this turn ever close the loop?"); the done-on-repeated-
+                # verify exit needs "is the code green RIGHT NOW?" instead.
+                self._last_verify_ok = not res.is_error
+            if call.name in _MUTATING_EDIT_TOOLS and not res.is_error:
+                # An edit that actually landed. Distinct from edit_tally, which
+                # counts attempts including the not_found/no-op failures — this
+                # is the "the workspace really did change" evidence.
+                self._landed_edit = True
             if getattr(res, "no_change", False):
                 # A no-change edit is a real error to the model but not a
                 # "same recurring code error" — keep it out of the error-stall
