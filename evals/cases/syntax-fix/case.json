@@ -1,0 +1,9 @@
+{
+  "id": "syntax-fix",
+  "track": "execute",
+  "description": "a three-line file whose def line is missing its colon; the smallest possible edit, which is exactly why a model that finishes without editing is so visible here",
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "replace_lines", "bash", "ls", "grep", "glob"],
+  "timeout": 180,
+  "extra_args": ["--max-iterations", "12", "--max-wallclock", "120"],
+  "weight": 1.0
+}

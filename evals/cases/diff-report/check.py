@@ -1,19 +1,19 @@
 """Checks for the diff-report case.
 
-Ported from the night battery (`evals/night/run_battery.py::_case_diff_report`),
-where it was the case that exposed the zero-action false completion lever #3
-targets: gemmacoder12, 2026-07-28, one iteration, zero tool calls, a
-self-terminated "answered", and `changes.py` still printing an empty line. It
-lives here too so `ab.py` can pair two agent versions on it.
+Ported from the night battery (`evals/night/run_battery.py::_case_diff_report`)
+so `ab.py` can pair two agent versions on it.
 
-⚠️ **It no longer discriminates.** Piloted 2026-08-02: gemmacoder12 (the *4bit*
-snapshot — the 8bit one that produced the original failure has an unpatched
-config.json and is too heavy to load safely here) scored 1.00 three times out of
-three, and so did qwen4i, a 4B model. Six runs, zero nudges, no zero-action
-finish. The case is kept because it is a clean, fast execute-track probe and
-because the partial-credit shape below is still diagnostic — but do not reach for
-it expecting to reproduce the false completion. That behaviour belonged to the
-8bit gemma, not to this task.
+⚠️ **This is not the zero-action case.** It was originally ported believing it
+was, on the strength of one gemmacoder12 run — and that reading was wrong twice
+over. It was not the 8bit snapshot (that model was only downloaded 2026-08-02;
+the alias resolved to the 4bit on the date in question), and diff-report is not
+where the pathology lives: a scan of all 514 recorded runs found zero
+diff-report runs that finished without a mutating action, against 10 of 22 for
+`syntax-fix__gemmacoder12`. Piloting agrees — 1.00 on three of three here for
+gemmacoder12 and the same for qwen4i, a 4B model, with zero nudges. **Use
+`evals/cases/syntax-fix` to reproduce the false completion.** This case is kept
+as a clean, fast execute-track probe whose partial-credit shape (below) is still
+diagnostic.
 
 The outcome is behavioural — run the script and read what it prints. The three
 expected lines are checked individually rather than as one boolean, because the
