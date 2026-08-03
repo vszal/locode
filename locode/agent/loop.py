@@ -1690,12 +1690,38 @@ _CHANGE_VERB_RE = re.compile(
 # nothing, so the blast radius is limited to turns that did no work at all.
 _CHANGE_WINDOW = 120
 
+# A NAMED directory, the other way a brief can point at what it wants changed:
+# "every handler in the notes directory", "the dead fixtures in the tests
+# directory". Used only by _asks_for_a_change — _expected_artifacts must stay
+# filename-only, since it compares its results against write/edit call paths and
+# a directory is not one.
+#
+# The determiner exclusion is the whole design. "this directory" occurs 6× across
+# the 37 battery prompts, always in a brief that is a QUESTION; admitting it
+# would arm the gate on any of those that uses a change verb within the window.
+# A determiner is not a name, so require an actual one.
+#
+# Two rejected alternatives, both measured on the same 37 prompts:
+#   - a slash-path token ("src/", "locode/agent") — its ONLY match in the whole
+#     corpus was "8080/api." out of a URL, i.e. a pure false anchor;
+#   - dropping the anchor and firing on any change verb — 34 of 37, including
+#     `already-correct`, the canonical must-stay-quiet case.
+# The shipped form adds `long-context-find` (1 of the 4 recorded escapees) and
+# regresses nothing.
+_DIR_ANCHOR_RE = re.compile(
+    r"\b(?!(?:this|that|the|a|an|its|your|our|current|same|other|each|every"
+    r"|working|parent|root)\b)([\w][\w\-]{0,40})"
+    r"\s+(?:director(?:y|ies)|folder|dir)\b",
+    re.IGNORECASE,
+)
+
 
 def _asks_for_a_change(user_text: str) -> bool:
     """Whether the request asks for the workspace to end up different.
 
-    Anchored on a file-like token with a change verb nearby, the same windowing
-    idiom `_expected_artifacts` uses. Requiring the filename is what keeps
+    Anchored on a file-like token — or a NAMED directory, see _DIR_ANCHOR_RE —
+    with a change verb nearby, the same windowing idiom `_expected_artifacts`
+    uses. Requiring a named target is what keeps
     "write a short summary of what this does" — a request whose deliverable is
     prose in the reply — from reading as a request to edit something. The cost
     is a narrow gate: a change request that names no file at all does not match,
@@ -1704,11 +1730,12 @@ def _asks_for_a_change(user_text: str) -> bool:
     fires on a question wastes a turn arguing with the model about whether it
     should have edited a file the user never asked it to touch.
     """
-    for m in _ARTIFACT_RE.finditer(user_text):
-        window = user_text[max(0, m.start() - _CHANGE_WINDOW):
-                           m.end() + _CHANGE_WINDOW]
-        if _CHANGE_VERB_RE.search(window):
-            return True
+    for rx in (_ARTIFACT_RE, _DIR_ANCHOR_RE):
+        for m in rx.finditer(user_text):
+            window = user_text[max(0, m.start() - _CHANGE_WINDOW):
+                               m.end() + _CHANGE_WINDOW]
+            if _CHANGE_VERB_RE.search(window):
+                return True
     return False
 
 

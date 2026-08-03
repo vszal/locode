@@ -2671,6 +2671,34 @@ def test_read_only_and_unanchored_requests_are_not_change_requests(text):
     assert not loop_mod._asks_for_a_change(text)
 
 
+@pytest.mark.parametrize("text", [
+    # The `long-context-find` brief, verbatim-shaped: a real change request that
+    # names its target as a DIRECTORY, so the filename-with-extension anchor
+    # could not see it. It was 1 of the 4 recorded gate escapees.
+    "Every handler function in the notes directory is supposed to add a "
+    "comment line reading FIXME unreviewed directly above its def line.",
+    "remove the dead fixtures from the tests directory",
+    "rename every fixture in the dst directory",
+])
+def test_a_named_directory_anchors_a_change_request(text):
+    assert loop_mod._asks_for_a_change(text)
+
+
+@pytest.mark.parametrize("text", [
+    # A determiner is not a name. "this directory" appears 6× across the two
+    # batteries in briefs that are questions, not change requests; treating it
+    # as an anchor would turn the gate on for any of them that happens to use a
+    # change verb within the window.
+    "what does this directory contain?",
+    "list the files in the current folder and explain what each one does",
+    # Still no anchor of any kind — a bare change verb must not be enough, or
+    # the gate fires on 34 of the 37 battery prompts including `already-correct`.
+    "fix whatever is broken",
+])
+def test_an_unnamed_directory_is_not_an_anchor(text):
+    assert not loop_mod._asks_for_a_change(text)
+
+
 async def test_declaring_done_without_acting_is_nudged(tmp_path):
     (tmp_path / "report.py").write_text("def f():\n    return 1\n")
     loop = make_loop(tmp_path, [
