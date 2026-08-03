@@ -1,0 +1,1115 @@
+{
+  "kind": "paired-ab",
+  "label": "lever3-syntaxfix",
+  "created": "2026-08-02 18:50:53",
+  "base_ref": "0b270bf",
+  "base_sha": "0b270bf",
+  "cand_desc": "/Users/vszalvay/Code/locode",
+  "pairs": [
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 1,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 2,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 3,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 4,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 5,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 6,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 7,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 8,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 9,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "syntax-fix",
+      "model": "gemmacoder12_4bit",
+      "repeat": 10,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    }
+  ],
+  "dropped": [],
+  "case_table": {
+    "syntax-fix": {
+      "n": 10,
+      "mean_delta": 0.0,
+      "base": 1.0,
+      "cand": 1.0
+    }
+  },
+  "analysis": {
+    "n_pairs": 10,
+    "n_effective": 0,
+    "n_dropped": 0,
+    "min_pairs": 6,
+    "mean_delta": 0.0,
+    "wins": 0,
+    "losses": 0,
+    "ties": 10,
+    "p": 1.0,
+    "status": "inconclusive",
+    "why": "only 0 informative pair(s) (10 ran, but 10 scored the same on both arms and a tie cannot move a sign-flip test); a sign-flip test needs 6 before any result can reach p<0.05 (its floor is 2/2^n = 2.000)"
+  },
+  "runs": [
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.3,
+        "model_seconds": 26.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 26.1,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r1__base-8kz1vmhx",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 25.1,
+        "model_seconds": 25.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 24.9,
+        "gen_chars": 1265,
+        "gen_chars_per_sec": 50.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 25.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r1__cand-9zv0lhfw",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 25.1,
+        "model_seconds": 25.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 24.9,
+        "gen_chars": 1265,
+        "gen_chars_per_sec": 50.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 25.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r2__cand-w9jda7au",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.2,
+        "model_seconds": 26.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 26.1,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r2__base-j7whfwrj",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.0,
+        "model_seconds": 25.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.9,
+        "gen_chars": 1385,
+        "gen_chars_per_sec": 53.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r3__base-h5e5c57l",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 2,
+          "edit_file": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.4,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "malformed": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 28.7,
+        "model_seconds": 28.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 28.6,
+        "gen_chars": 1531,
+        "gen_chars_per_sec": 53.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 28.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r3__cand-7iovqyok",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.3,
+        "model_seconds": 26.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 26.2,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r4__cand-cq6smh_q",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.2,
+        "model_seconds": 26.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 26.1,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r4__base-yzcnoo9d",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.3,
+        "model_seconds": 26.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 26.2,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r5__base-j84oe90p",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 25.1,
+        "model_seconds": 25.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.0,
+        "gen_chars": 1265,
+        "gen_chars_per_sec": 50.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 25.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r5__cand-8w2stei_",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 25.4,
+        "model_seconds": 25.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.2,
+        "gen_chars": 1265,
+        "gen_chars_per_sec": 50.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 25.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r6__cand-dfdbms42",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 25.2,
+        "model_seconds": 25.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.1,
+        "gen_chars": 1265,
+        "gen_chars_per_sec": 50.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 25.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r6__base-78waepme",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.4,
+        "model_seconds": 26.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 26.3,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r7__base-r3qrfrw8",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.0,
+        "model_seconds": 25.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.9,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 55.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r7__cand-99oxuc3n",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 25.9,
+        "model_seconds": 25.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.8,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 55.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r8__cand-dha0v55p",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.0,
+        "model_seconds": 25.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.9,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r8__base-zo_x68u1",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 9,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.1,
+        "model_seconds": 26.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.9,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r9__base-ilxhnl8d",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 9,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 24.7,
+        "model_seconds": 24.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 24.6,
+        "gen_chars": 1229,
+        "gen_chars_per_sec": 49.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 24.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r9__cand-rnob9thh",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 10,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 24.8,
+        "model_seconds": 24.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 24.7,
+        "gen_chars": 1265,
+        "gen_chars_per_sec": 51.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 24.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r10__cand-kj1kyiza",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "syntax-fix",
+      "track": "execute",
+      "model": "gemmacoder12_4bit",
+      "repeat": 10,
+      "score": 1.0,
+      "checks": {
+        "compiles": true,
+        "parse_works": true,
+        "kept_the_body": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "bash": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 26.4,
+        "model_seconds": 26.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 26.2,
+        "gen_chars": 1421,
+        "gen_chars_per_sec": 54.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 26.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-syntax-fix__gemmacoder12_4bit__r10__base-1ncqyjlk",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    }
+  ],
+  "summary": {
+    "overall_score": 1.0,
+    "clean_finish_rate": 0.0,
+    "total_nudges": 20,
+    "total_iterations": 140,
+    "nudge_histogram": {
+      "repeated call": 19,
+      "malformed": 1
+    },
+    "n_runs": 20,
+    "n_valid": 20,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 53.1,
+    "gen_chars": 27366,
+    "rows": {
+      "syntax-fix::gemmacoder12_4bit": {
+        "case": "syntax-fix",
+        "track": "execute",
+        "model": "gemmacoder12_4bit",
+        "n": 20,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "iterations_mean": 7,
+        "nudges_mean": 1,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 26.0,
+        "gen_rate_mean": 53.1,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "syntax-fix": 1.0
+    }
+  }
+}
