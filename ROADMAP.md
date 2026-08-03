@@ -786,6 +786,31 @@ the lived experience.*
     those cases scored 1.000 across all reps on both arms, so no firing landed
     on a run that had not actually succeeded. The three-condition gate holds
     outside the case it was built on.
+    **Residual, mined from the same 48 runs: all 7 remaining non-clean candidate
+    endings are repeat-stops on EDITS, not verify re-runs**, so build 81
+    correctly stayed out of them. Three are `e2e-spec-to-code` (the 3.1
+    capability wall), two `exec-stall-trap`, one `exec-from-plan`. The seventh,
+    `diff-report` r1, is a **second instance of the same success-reported-as-
+    failure class**: edit lands → `python3 changes.py` prints the correct
+    `added/modified/removed` → the model re-submits the identical edit → the
+    tool answers "This edit is ALREADY DONE" → repeat-stop, on a run that scored
+    1.00.
+    **Deliberately NOT extended to cover it.** The tempting generalization is to
+    let an "already done" edit repeat satisfy condition 1 alongside a verify
+    re-run. The blocker is condition 3: on syntax-fix the green verify is
+    `py_compile`, which proves the actual goal, whereas here it is a bare
+    `python3 changes.py`, whose exit 0 proves only that the script did not
+    raise — it says nothing about the output being right. That is precisely the
+    weak-evidence trap build 80 was reverted for, and `diff-report` is the case
+    whose documented pathology IS false completion (a zero-tool-call self-
+    terminate with silent wrong output, Rounds 42–43). Shipping a new completion
+    path into that case on the evidence of one run would repeat the build-80
+    mistake. Closing it needs a predicate that separates "a checker passed" from
+    "a script exited", plus its own A/B.
+    Also examined and left alone: `_CHANGE_VERB_RE` has no "copy". No prompt in
+    the 37-case corpus exercises it, so adding it would be an unmeasured
+    widening — and a missing verb fails in the SAFE direction (the gate stays
+    quiet, i.e. today's behaviour), while a bad addition fires on questions.
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
