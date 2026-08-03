@@ -743,6 +743,37 @@ the lived experience.*
     (`_saw_verify_ok`), end the turn as done with a truthful reason instead of
     as a flail. Unbuilt — it changes turn-ending semantics, so it needs its own
     A/B and an explicit OK.
+  - **Update 2026-08-02 (build 81, SHIPPED): the recommended lever above, built
+    and measured — clean-finish 0/10 → 10/10 on syntax-fix.** The repeat guard
+    treated every repeat as a dead end; one shape isn't. When the repeat is a
+    VERIFY re-run, an edit actually LANDED, and the LATEST verify is green, the
+    turn ended as done instead of as a flail. **Paired A/B (`doneverify`, base
+    68bb85a vs live, gemmacoder12_4bit, r=10): base 0/10 clean, cand 10/10,
+    mean iterations 7.0 on both, score 1.00 on both arms — the work was always
+    correct, only the reporting was wrong.** Transcript-verified rather than
+    taken from the metric: read → `py_compile` RED → edit lands → `py_compile`
+    green → identical re-run → repeat nudge → the new exit. That first red
+    verify is why the flag is latest-wins; `_saw_verify_ok` is sticky and would
+    have been the wrong signal. Two new flags, both needed because neither
+    existing one can fall back to False: `_landed_edit` (a mutating edit
+    SUCCEEDED, vs edit_tally which counts attempts including not_found
+    failures) and `_last_verify_ok`. +4 tests, three of them the negatives —
+    a repeated broken edit, a green check with no landed edit, and a verify
+    that has started failing all still repeat-stop.
+    *Scope note: this fixes locode misreporting a success, not the model's
+    reflex to re-verify. Iterations are unchanged; the model still burns the
+    same three checks. The remaining win would be getting it to stop after the
+    first green one, which build 80 showed is not reachable by wording.*
+  - **Update 2026-08-02 (build 82): directory-named change requests.** See the
+    commit — `_asks_for_a_change` now also anchors on a NAMED directory,
+    closing 1 of the 4 gate escapees with zero regressions across the 37-prompt
+    sweep. Rejected on measurement: slash-paths (only corpus match was
+    `8080/api.`) and the no-anchor variant (34/37, incl. `already-correct`).
+    **Still open: 3 escapees remain**, all briefs that name no target at all by
+    design (`locate-symptom`, `add-json-flag`, `keep-tests-green` — "the prompt
+    names a symptom, not a file"). Closing those means dropping the anchor,
+    which the sweep shows is not safe. Also unfixed: `_CHANGE_VERB_RE` has no
+    "copy".
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
