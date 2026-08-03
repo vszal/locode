@@ -42,11 +42,20 @@ are user-visible and waste whole generations.*
     conclusive and waiting for a 4th burns another ~1 KB. The real block is
     pinned as a fixture, plus an invariant test that the window can always hold
     `MIN_REPS` units at `MAX_UNIT`. +6 tests; all prior negatives still pass.
-- `[ ]` **1.2 Large-file EDIT truncation** — salvage today covers
-  `write_file`/`append_file` only; a truncated `edit_file` of a big span still
-  loses everything (the e2e/qwencoder14 wallclock death at ~20.4k chars).
-  Salvaging a half-formed `new` is unsafe. Try **steering big edits toward small
-  `old` snippets** before building a bespoke tool.
+- `[x]` **1.2 Large-file EDIT truncation — the steering worked; do NOT build the
+  bespoke tool.** Salvage still covers `write_file`/`append_file` only, and a
+  truncated `edit_file` of a big span would still lose everything — but that span
+  no longer occurs. The recommended lever (steer big edits toward small `old`
+  snippets) is already in `EditFile.description`: *"Keep `old` to the SMALLEST
+  unique snippet … make several small edit_file calls instead of one giant one."*
+  **Measured 2026-08-02 across every recorded battery run: 525 `edit_file` calls,
+  `old` median 33 chars, p90 152, MAX 344, and zero calls above 1500.** Args are
+  logged verbatim (`loop.py` `phase: "run"` passes `call.args` unmodified), so
+  this is a real distribution, not a logging artifact. A bespoke
+  salvage-a-half-formed-`new` tool would be dead code against this pool.
+  Caveat: this measures the local models on battery-sized files; a genuine
+  large-file refactor could still reach the limit, so reopen on evidence rather
+  than on principle.
 - `[~]` **1.3 The one-line-off edit loop** — "repeated the same tool call"
   dominated r12 nudges (42 of 107). **Diagnosis (2026-07-24, r12 event logs):
   33% of all edit_file calls fail.** Breakdown of the 74 failures and whether

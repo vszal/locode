@@ -2627,9 +2627,34 @@ async def test_partly_failing_batch_does_not_count(tmp_path):
     "refactor parser.py so it stops using globals",
     "config.yaml needs updating to point at the new host",
     "rename the helper in tools.py",
+    # The shape that motivated widening _CHANGE_WINDOW to 120 (build 78): the
+    # brief names the file first, describes the bug for a full sentence, and
+    # only then says what to do. This is the verbatim `two-bugs` eval prompt,
+    # whose two recorded zero-mutation false completions the gate could not see
+    # at the old 80-char window — 120 characters separate "stats.py" from "Fix".
+    ("stats.py has two separate bugs. In the total function the loop subtracts "
+     "each value instead of adding it. In the average function there is a stray "
+     "plus one that makes the result wrong. Fix both so that total of 1, 2, 3 "
+     "is 6 and average of 1, 2, 3 is 2.0."),
 ])
 def test_change_requests_are_recognised(text):
     assert loop_mod._asks_for_a_change(text)
+
+
+def test_the_window_stops_short_of_the_nothing_to_fix_case():
+    """The `already-correct` eval prompt must stay quiet at the shipped window.
+
+    It is the canonical false-positive risk for this gate: a request that names
+    a file and uses the word "fix", but only conditionally ("fix it only if it
+    is actually wrong"), so a model that verifies and correctly changes nothing
+    is RIGHT. It survives at 120 and trips at 200, which is what bounds the
+    widening — pin it so a future bump has to confront this case.
+    """
+    text = ('palindrome.py has an is_palindrome function that should ignore '
+            'case, spaces, and punctuation. Verify it correctly returns True '
+            'for "A man, a plan, a canal: Panama" and False for "hello", and '
+            'fix it only if it is actually wrong.')
+    assert not loop_mod._asks_for_a_change(text)
 
 
 @pytest.mark.parametrize("text", [

@@ -745,6 +745,32 @@ class AgentLoop:
                     # and says the file already does what was asked, that answer
                     # is returned. The gate's claim is only that "I did nothing"
                     # deserves to be said twice before it is believed.
+                    #
+                    # What this gate is actually worth, measured over all 514
+                    # recorded battery runs (build 78). Filtering for the real
+                    # trigger — zero MUTATING actions on a change-asking case,
+                    # self-terminated rather than stopped by a budget or repeat
+                    # guard — leaves 14 genuine false completions. Against those:
+                    #
+                    #   the build-50 verify gate above ... 8
+                    #   this gate at the old 80 window ... 8  (the very same 8)
+                    #   this gate at 120 ................ 10
+                    #
+                    # So as originally shipped it earned nothing: every run it
+                    # caught, the narrower claim-based gate had already caught,
+                    # and after build 50 landed the pathology stopped recurring
+                    # (in ab_verifygate2 the controls went 4/5 zero-mutation and
+                    # the treatments 0/5). Widening the window is what gives it
+                    # an independent job — the two `two-bugs` runs mutate nothing
+                    # AND assert nothing, so no claim regex can ever see them.
+                    #
+                    # 4 of the 14 still escape both gates, all for one reason:
+                    # _ARTIFACT_RE demands a filename with an extension, and
+                    # these briefs name a DIRECTORY ("every handler in the notes
+                    # directory ... add a comment above its def line"). Closing
+                    # that is a real change to what counts as an artifact, not a
+                    # constant bump — do not attempt it without the same kind of
+                    # false-positive sweep that justified the 120.
                     if (wants_change and not expected_artifacts
                             and not acted and not nudged_zero_change):
                         nudged_zero_change = True
@@ -1590,7 +1616,21 @@ _CHANGE_VERB_RE = re.compile(
 # How far a change verb may sit from the file it acts on. Both directions:
 # "fix the bug in report.py" puts the verb before, "report.py needs fixing"
 # after.
-_CHANGE_WINDOW = 80
+#
+# 80 -> 120 (build 78), measured, not guessed. A real brief names the file once
+# up front and then spends a sentence describing the bug before it ever says
+# what to do: "stats.py has two separate bugs. In the total function the loop
+# subtracts each value instead of adding it. ... Fix both" puts 120 characters
+# between the filename and "Fix". At 80 the gate could not see that request at
+# all, which is why the two recorded `two-bugs` false completions sailed through
+# it. Swept over every prompt in both eval batteries (32 cases): 80 recognises
+# 12 of 23 change requests, 120 recognises 19, and NEITHER fires on the
+# read-only cases (`already-correct`, whose "fix it only if it is actually
+# wrong" must not trip a gate, stays quiet at both). 200 does trip it, so the
+# widening stops well short of that. Raising this only ever makes the gate
+# consider MORE turns; it still cannot fire unless the turn also mutated
+# nothing, so the blast radius is limited to turns that did no work at all.
+_CHANGE_WINDOW = 120
 
 
 def _asks_for_a_change(user_text: str) -> bool:
