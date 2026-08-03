@@ -712,6 +712,37 @@ the lived experience.*
     unbuilt/unapproved; needs explicit user OK before building.** Also reworded
     the insert-const case (harness-only) to remove a "comma-space" literal-string
     trap that produced a false-negative qythos9 signal. (LOG Rounds 42–43.)
+  - **Update 2026-08-02 (build 80, BUILT → MEASURED → REVERTED): rewording the
+    silent-rc0 message does NOT buy a clean finish. Do not retry this lever.**
+    Hypothesis: on syntax-fix the model fixes the file, runs `py_compile`, gets
+    `_EMPTY_OK` ("ran fine but printed nothing… if it was a query, nothing
+    matched"), reads that as *no confirmation*, re-runs the identical command,
+    and dies to the repeat guard — so a verify-specific message ("the check
+    PASSED… this is confirmed: do not re-run it… say what you changed and
+    finish") should convert those into clean finishes. Built it as a second
+    sentinel selected by a token predicate, with the loop's `_is_verify_bash`
+    delegating to the same shell-tool function (single source of truth).
+    **Paired A/B (`verifyok-msg`, base 68bb85a vs live, gemmacoder12_4bit,
+    syntax-fix, r=10): clean-finish base 1/10 → cand 0/10, mean iterations 6.9 →
+    7.0, all 20 runs scored 1.00 (10 ties, paired test structurally
+    INCONCLUSIVE — the effect isn't in the score).** The new text *was* served
+    (confirmed verbatim in the candidate event logs) and the model re-ran the
+    identical `python3 -m py_compile parser.py` anyway. Wording is not the
+    binding constraint; this model re-verifies reflexively regardless of how
+    unambiguous the result is. Reverted rather than shipped: zero measured
+    benefit, and the predicate matched bare `python`/`python3`, which would have
+    told a model that a *buggy* `python3 changes.py` (rc 0, no output — verified
+    by hand on diff-report's seed) had PASSED and it should finish. That is a
+    false-completion generator aimed at the exact case built to catch false
+    completions.
+    **What the run did expose, and the recommended next lever:** these turns are
+    *successes mis-reported as failures*. The file is fixed, the compile is
+    green, and locode ends the turn with "the model repeated the same tool call
+    without making progress." The fix is in the repeat guard, not the message:
+    when it fires on a turn that has **mutated** and holds a **green verify**
+    (`_saw_verify_ok`), end the turn as done with a truthful reason instead of
+    as a flail. Unbuilt — it changes turn-ending semantics, so it needs its own
+    A/B and an explicit OK.
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
