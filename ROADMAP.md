@@ -774,6 +774,18 @@ the lived experience.*
     names a symptom, not a file"). Closing those means dropping the anchor,
     which the sweep shows is not safe. Also unfixed: `_CHANGE_VERB_RE` has no
     "copy".
+  - **Update 2026-08-02 (build 83, full-battery regression check): clean-finish
+    42% → 71% suite-wide, zero false completions.** Build 81 changed turn-ending
+    semantics on the evidence of ONE case, so the point of this sweep was the
+    downside, not more upside. Paired A/B over all 8 cases (`b83-regression`,
+    base 68bb85a vs live, gemmacoder12_4bit, r=3, 48 runs): **no score
+    regression** — W4/L3/T17, mean delta +0.019, sign-flip p=0.67, i.e. the arms
+    are indistinguishable on score, which is the expected and desired result for
+    a reporting fix. **Clean-finish 10/24 → 17/24.** The new exit fired on 5
+    runs (3 syntax-fix, 2 exec-bugfix) and **every one scored 1.00** — both
+    those cases scored 1.000 across all reps on both arms, so no firing landed
+    on a run that had not actually succeeded. The three-condition gate holds
+    outside the case it was built on.
 
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
