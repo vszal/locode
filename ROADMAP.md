@@ -812,6 +812,121 @@ the lived experience.*
     widening — and a missing verb fails in the SAFE direction (the gate stays
     quiet, i.e. today's behaviour), while a bad addition fires on questions.
 
+## Milestone 5 — Competitive teardown (2026-08-06)
+
+Source teardowns of Aider, Cline/Roo, OpenHands and SWE-agent, read from source
+rather than docs. Two standing rules for everything in this section: a finding
+only lands with a measurement **on our corpus**, and nothing here is credited
+until it survives an A/B. Two candidates were already declined on measurement
+(5.7) — that ratio is expected, not a failure.
+
+### The measurement that reframed the milestone
+
+Before the teardowns, the corpus was mined for what actually kills our turns.
+**Byte-identical `old == new` edits are the single largest failure mode we
+have**, and they match exactly what the user reports seeing live:
+
+- 309 of 1842 `edit_file` calls (16.8%); 137 of 651 runs hit at least one.
+- 108 of those 137 resent it **after** being told not to; 94 resent a
+  byte-for-byte identical call (same path, same text).
+- Clean finish **52% → 18%**. Repeat-stop deaths **40% → 69%**. This one
+  pathology causes **94 of the 260 repeat-stop deaths in the corpus (36%)**.
+- The rejection already names `replace_lines`, which structurally cannot no-op.
+  Across all 309 no-op edits the model took that advice **once**; only 10 of the
+  137 runs ever called it. The most common next action, **79 times**, is another
+  no-op edit.
+- **Not our parser.** Clean JSON, single-quoted, raw-newline, trailing-junk and
+  tab-vs-space payloads all keep `old` and `new` distinct.
+
+- `[x]` **5.1 Redact a rejected no-op call from history (build 87).** The
+  mechanism behind the numbers above: a rejected call stays in history verbatim
+  as `[assistant: the call][user: the error]`, so by the third attempt the model
+  is reading three worked examples of the call we are asking it to stop making.
+  Build 80 already settled that rewording the rejection does not move this
+  (clean-finish 1/10 → 0/10), so the lever is mechanical — delete the example
+  instead of arguing with it. **SWE-agent reached the same design
+  independently:** its `max_requeries` loop puts a rejected action into a
+  temporary history that is never persisted to the real trajectory. A one-line
+  marker replaces the fence rather than deleting it, because an assistant turn
+  that falls silent before a "Tool results:" message is incoherent history and
+  native tool-callers answer it by narrating an intent and then stopping.
+  Behind `agent.redact_noop_calls`. +7 tests. **A/B `b87-noop-redact` pending**
+  (exec-bugfix + exec-stall-trap × qwencoder14, r=5 — the two strongest
+  reproducers at 69% and 43% of runs affected).
+
+### Confirmed feature gaps
+
+- `[ ]` **5.2 No project-instructions file.** locode reads none — no
+  `AGENTS.md` / `CLAUDE.md` / `.locoderules` equivalent — while every competitor
+  has one, and the emerging `AGENTS.md` convention is shared across several.
+  `build_system_prompt` already takes an unused `extra` parameter, so the seam
+  exists and nothing is passed to it. This is exactly the steering a 9B model
+  needs, and locode currently ignores its own `AGENTS.md`. Highest-value gap.
+- `[ ]` **5.3 Undefined-name linting on edited Python.** We `compile()`, which
+  catches syntax only. **Both** Aider and SWE-agent additionally run flake8
+  restricted to fatal codes — Aider `E9,F821,F823,F831,F406,F407,F7xx`,
+  SWE-agent `F821,F822,F831,E111,E112,E113,E999,E902` — deliberately excluding
+  style noise so the loop never nags about PEP8. F821 (undefined name) targets
+  our documented 3.1 wall precisely: code that *parses but is wrong*. Needs a
+  decision on the flake8 dependency (stdlib-first policy); a `compile()`-plus-
+  `symtable` approximation may cover most of it without a new dep.
+- `[ ]` **5.4 No checkpoint / undo.** Cline keeps a shadow git repo and can
+  restore workspace files, task state, or both. locode has no way to revert a
+  botched agent run. Ranked below 5.2/5.3 because git already covers the
+  careful user, but it is the most-requested safety net in this class of tool.
+- `[!]` **5.5 Architect/editor split.** Aider runs one model to reason in prose,
+  then a **second, cheaper** model to convert that prose into edits — decoupling
+  "can reason about the change" from "can emit exact-match diff syntax". That
+  split is exactly where our local models fail, and locode already has the
+  multi-alias machinery to do it. Needs a decision: it doubles model residency,
+  and the memory guard (build 69) says two resident models do not fit in 24 GB.
+  Possible as sequential load/unload; costs a model swap per turn.
+- `[ ]` **5.6 Nudge budget is unbounded and unshared.** Aider caps *all*
+  reflection at `max_reflections = 3` across edit-apply, lint and test failures
+  combined, and skips lint/test feedback entirely when the edit itself failed.
+  OpenHands nudges once at threshold−1, **de-dupes the nudge per error id**, and
+  hard-stops one repeat later. locode has ~10 independent nudge counters that
+  can compound — the user's dead session burned **5 nudges in 12 iterations**.
+  Worth a shared ceiling and per-cause de-duplication.
+
+### Declined on measurement (do not retry without new evidence)
+
+- `[x]` **5.7a Steering models to whole-function rewrites.** Aider measured a
+  **30–50% increase in editing errors** when they disabled "high level diff"
+  prompting, which is a strong result — but it **does not transfer**. On our
+  corpus the no-op edits have *longer* `old` blocks (median 77 chars) than the
+  successful ones (median 49). Their pathology was GPT-4-turbo *laziness*
+  (omitting code); ours is a copy attractor. Different failure, opposite fix.
+- `[x]` **5.7b Switching edit format to unified diff.** Aider's famous udiff
+  result is a narrow historical fix for `gpt-4-turbo`, auto-selected only on
+  that model-name match; every modern model in their settings table routes back
+  to SEARCH/REPLACE. No reason to change our format.
+- Also noted: Aider **deleted** their fuzzy matcher six days after shipping it
+  (commit `00512e3d1`, "no fuzy matching, stronger prompt for whitespace") and
+  it has been dead code for three years. We keep a fuzzy tier at 0.8 — worth an
+  audit that it is genuinely human-gated on every path, but their retreat was
+  from an *ungated* matcher, so this is not yet a reason to remove ours.
+
+### Worth stealing, not yet scheduled
+
+- **Say what already worked.** On a partial failure Aider names the blocks that
+  succeeded and instructs "Don't re-send them." locode says nothing about what
+  landed, so a model re-deriving a batch can undo its own good work.
+- **Window the file viewer.** SWE-agent swept this and it is non-linear in both
+  directions: 30 lines 14.3%, **100 lines 18.0%**, 400 lines 17.0%, **whole file
+  12.7%** — full-file dumps were the *worst* viewer variant they tested.
+  locode's `read_file` returns the whole file by default. Tempting, but this is
+  external evidence on a 2024 model and a default change touching every flow —
+  it needs its own A/B before we believe it here.
+- **Consolidate actions, don't fragment them.** SWE-agent's search ablation:
+  one action returning all results 18.0% vs. iterative next/prev 12.0% (−6.0).
+  Argues against ever splitting a locode tool into finer steps.
+- **Blocklist bare interactive commands.** SWE-agent blocks `python`, `bash`,
+  `vim`, `less` etc. as *exact* matches so the model cannot strand itself in a
+  REPL. locode's bash tool has no such guard.
+
+---
+
 ## Milestone 3 — Weakest-case quality
 - `[x]` **3.1 e2e-spec-to-code** — weakest case on both models, unmoved 5+
   rounds. **Diagnosed 2026-07-24 (r13 event logs + per-check tally).** The
