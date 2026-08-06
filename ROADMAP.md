@@ -1131,8 +1131,52 @@ headless, where nobody can decline".
 
   Also corrected the confidence wording: below 0.5 it says "No close match" and
   labels the region as merely the most similar, instead of asserting a match it
-  doesn't have. 967 passed. **Not yet A/B'd** — it needs its own sweep, and on
-  the b88 evidence expect the turn-ending stats to move before the score does.
+  doesn't have. 967 passed.
+
+  **Graded — `b90-editwindow`** (base `52f0ed5`, r=5 × qwencoder14 on the three
+  cases that actually generate not-found edits: exec-bugfix, e2e-spec-to-code,
+  exec-stall-trap). Score INCONCLUSIVE again (−0.0223, p=0.5, 13/15 tied).
+
+  The raw turn-ending table looked *mixed* — exec-bugfix clean-finish 1/5 → 4/5
+  but exec-stall-trap 3/5 → 1/5 — and reading it at face value would have been
+  wrong in both directions. **What settles it is exposure: did the changed code
+  path actually fire in each run?**
+
+  Matching the *triggering condition* (`"not found in"`, which both arms emit)
+  rather than the new wording gives the apples-to-apples table:
+
+  | case | exposed base / cand | clean-finish (all) | **clean among EXPOSED** |
+  |---|---|---|---|
+  | exec-bugfix | 5/5 · 5/5 | 1/5 → 4/5 | **1/5 → 4/5** |
+  | exec-stall-trap | 1/5 · 1/5 | 3/5 → 1/5 | **1/1 → 1/1** |
+  | e2e-spec-to-code | 1/5 · 0/5 | 0/5 → 0/5 | 0/1 → n/a |
+
+  **exec-stall-trap's "regression" vanishes under exposure: on the runs that
+  actually reached the changed code it is 1/1 on both arms, identical.** The
+  entire 3/5 → 1/5 swing is among runs that never hit a not-found edit — two of
+  its four candidate repeat-stops never called `edit_file` at all, and its
+  r1/r2/r5 trajectories are near-identical across arms, forking on a coin-flip
+  around iteration 3. The change could not have caused what it never touched.
+
+  exec-bugfix is the real result: **fully exposed on both arms**, so the
+  1/5 → 4/5 is measured on a like-for-like subset, and it carries the predicted
+  mechanism in its edit counts — 3→2, 5→1, 4→2, 4→2, i.e. **fewer retries
+  because the model finally gets copyable text**. That is the causal story, not
+  just a better outcome number. e2e is a near-null control (1 exposed run
+  total across 10).
+
+  *The honest caveat, and it is the interesting one:* exec-bugfix's **score is
+  identical on both arms (0.500)** while its clean finishes went 1/5 → 4/5. Same
+  shape as b88. Two changes now have bought turn-endings without buying
+  correctness, which stops being a coincidence: the model is being un-stuck and
+  still not converting. **That conversion gap is the next thing to attack**, and
+  neither more guard-relaxation nor better edit feedback will close it.
+
+  *Methodology worth keeping:* exposure-filtering is the fix for `ab.py`'s
+  weakness at n=5. Intent-to-treat over 5 runs is mostly noise when only some
+  runs touch the changed path; asking "did this run even reach the code?" turned
+  a mixed, uninterpretable table into three clear verdicts. Shipped as
+  `armstats.py --exposure` (build 91) so the next A/B gets it for free.
 - `[ ]` **5.9b Checkpoint / undo.** Both have one and locode has none. Note the
   two designs differ and Cline's own docs describe Roo's: Cline actually uses
   `git stash create` inside the real repo, parked at a private
