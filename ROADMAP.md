@@ -850,18 +850,48 @@ have**, and they match exactly what the user reports seeing live:
   marker replaces the fence rather than deleting it, because an assistant turn
   that falls silent before a "Tool results:" message is incoherent history and
   native tool-callers answer it by narrating an intent and then stopping.
-  Behind `agent.redact_noop_calls`. +7 tests. **A/B `b87-noop-redact` pending**
-  (exec-bugfix + exec-stall-trap × qwencoder14, r=5 — the two strongest
-  reproducers at 69% and 43% of runs affected).
+  Behind `agent.redact_noop_calls`. +7 tests.
+
+  **A/B `b87-noop-redact` graded** (exec-bugfix + exec-stall-trap × qwencoder14,
+  r=5). Score `+0.0001, p=1.0` — INCONCLUSIVE, and correctly so: 7 of 10 pairs
+  tied, which is the expected reading for a change that alters how a turn ends
+  rather than what it produces. On turn-endings:
+
+  | case | clean finish | repeat-stops | "repeated call" nudges |
+  |---|---|---|---|
+  | exec-bugfix | 0/5 → 0/5 | 5 → 5 | 7 → 5 |
+  | exec-stall-trap | 2/5 → **4/5** | 3 → **1** | 6 → **1** |
+
+  The split was predicted before the run: `exec-bugfix` is 82% the 5.8 fault,
+  which this lever does not touch, so flat there was the expected outcome rather
+  than a refutation. `exec-stall-trap` moved on all three measures. At n=5 the
+  clean-finish jump is two runs — suggestive, not established; the nudge counts
+  (6 → 1) are the larger event sample and agree. **Kept on**, to be re-measured
+  at higher n once 5.8a's effect is separated out.
 
 ### Confirmed feature gaps
 
-- `[ ]` **5.2 No project-instructions file.** locode reads none — no
-  `AGENTS.md` / `CLAUDE.md` / `.locoderules` equivalent — while every competitor
-  has one, and the emerging `AGENTS.md` convention is shared across several.
-  `build_system_prompt` already takes an unused `extra` parameter, so the seam
-  exists and nothing is passed to it. This is exactly the steering a 9B model
-  needs, and locode currently ignores its own `AGENTS.md`. Highest-value gap.
+- `[x]` **5.2 Project-instructions file (build 89).** `locode/context.py` walks
+  the git root down to cwd, nearest file last so the most specific wins, and
+  renders into `build_system_prompt`'s `extra` seam — which had existed unused
+  since it was written. Read once at construction: the system prompt is stable
+  and first, so the prompt cache reuses it for the session at one prefill.
+  Defaults, all reversible under `[context]`: `AGENTS.md` and `LOCODE.md`, with
+  a hard 8000-char budget spent in file order (a local model has ~32K tokens;
+  an unbounded file would spend it before the conversation starts, and `0`
+  disables). **`CLAUDE.md` deliberately excluded** — it is another tool's file
+  and silently absorbing another vendor's instructions is a surprise, not a
+  feature; one config line adds it. Outside a git repo only cwd is consulted so
+  a stray `~/AGENTS.md` cannot leak in, and root detection tests `.git`
+  *existence* rather than `is_dir` because a worktree's `.git` is a file and the
+  eval harness runs agents in worktrees. +18 tests.
+
+  Caught in review and worth remembering: `Config._merge_toml` names every
+  section explicitly, so the new `[context]` block was silently ignored — the
+  defaults read back correctly while no override took. Pinned by a test, plus
+  one asserting `config.toml.example` has not drifted from the dataclass.
+  No A/B: inert on the eval corpus, whose workspaces are `mkdtemp` dirs with no
+  instruction files. Its value shows on real repos.
 - `[ ]` **5.3 Undefined-name linting on edited Python.** We `compile()`, which
   catches syntax only. **Both** Aider and SWE-agent additionally run flake8
   restricted to fatal codes — Aider `E9,F821,F823,F831,F406,F407,F7xx`,
@@ -959,7 +989,7 @@ Reproduced as a unit test before touching anything
 landing, each followed by the same test command — dead after `bash` had run
 **twice**, with `# fix 1` through `# fix 4` sitting in the file.
 
-- `[ ]` **5.8a Reset the repeat streak when the workspace moved.** A repeat is
+- `[x]` **5.8a Reset the repeat streak when the workspace moved (build 88).** A repeat is
   only a repeat if nothing changed between the two calls. Track a monotonic
   count of edits that actually **landed** (`loop.py:1212` already distinguishes
   landed from attempted — `_landed_edit` is the right signal but is sticky, so
@@ -995,10 +1025,17 @@ landing, each followed by the same test command — dead after `bash` had run
   with `consecutiveMistakeLimit`); locode already has them separate
   (`max_repeat_calls` vs `max_error_stall`), which this argues we should keep.
 
-- Also worth noting for expectations: the in-flight `b87-noop-redact` A/B runs
-  on `exec-bugfix` and `exec-stall-trap`, whose repeat-stop deaths are 82% and
-  51% *this* fault. A flat result there is the predicted outcome, not a refutation
-  of 5.1.
+  **Shipped** as `agent.repeat_resets_on_landed_edit` (default on; off restores
+  the old behaviour for an A/B). `_landed_edits` counts edits that actually
+  landed, `sig_mut_mark` records the count each signature last ran at, and the
+  streak resets when it has advanced. 944 passed; the three tests are
+  `test_retesting_after_a_real_edit_is_not_a_repeat` (the reproduction),
+  `test_retesting_with_nothing_in_between_still_stops` and
+  `test_a_repeated_identical_edit_still_counts_as_a_repeat` (the two guards that
+  must survive). **A/B `b88-verify-after-change` running** — exec-bugfix +
+  e2e-spec-to-code × qwencoder14, r=5, the 82% and 68% cases. Expect the score
+  to move here, unlike 5.1: turns that previously died mid-debugging now get to
+  finish, which changes the artifact and not just the ending. Grade on both.
 
 ### 5.9 Cline / Roo teardown
 
