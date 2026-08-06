@@ -268,6 +268,21 @@ class WebConfig:
 
 
 @dataclass
+class ContextConfig:
+    # Repository instruction files folded into the system prompt, read from the
+    # git root down to cwd so the nearest one has the last word. CLAUDE.md is
+    # deliberately absent: it belongs to another tool, and silently absorbing
+    # another vendor's instructions is a surprise, not a feature — add it here
+    # if you want it. See locode/context.py.
+    instruction_files: list[str] = field(
+        default_factory=lambda: ["AGENTS.md", "LOCODE.md"])
+    # Hard character budget for the rendered block. A local model has ~32K
+    # tokens of context; an unbounded instructions file would spend it before
+    # the conversation starts. 0 disables the feature entirely.
+    max_instruction_chars: int = 8000
+
+
+@dataclass
 class UIConfig:
     markdown: bool = True       # line-buffered markdown styling of answers (TTY+color)
     spinner: bool = True        # animated wait indicator for model load / first token
@@ -282,6 +297,7 @@ class Config:
     permissions: PermissionsConfig = field(default_factory=PermissionsConfig)
     editor: EditorConfig = field(default_factory=EditorConfig)
     web: WebConfig = field(default_factory=WebConfig)
+    context: ContextConfig = field(default_factory=ContextConfig)
     ui: UIConfig = field(default_factory=UIConfig)
     aliases: dict[str, str] = field(default_factory=dict)  # extends the built-in table
     # Per-model reasoning override: alias or model-id substring -> "on" | "off"
@@ -305,6 +321,7 @@ class Config:
         _assign(self.agent, raw.get("agent", {}))
         _assign(self.editor, raw.get("editor", {}))
         _assign(self.web, raw.get("web", {}))
+        _assign(self.context, raw.get("context", {}))
         _assign(self.ui, raw.get("ui", {}))
         perms = raw.get("permissions", {})
         # Per-tool keys live flat in [permissions] alongside the list keys.

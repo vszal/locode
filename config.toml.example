@@ -194,6 +194,20 @@ fetch_allowlist = [
 fetch_max_bytes = 5000000
 fetch_timeout = 20
 
+[context]                 # the repository's own house rules, in the system prompt
+# Instruction files read from the git root down to the working directory, so the
+# nearest one has the last word. Outside a git repo only the working directory
+# is consulted, so a stray ~/AGENTS.md cannot leak into unrelated sessions.
+# CLAUDE.md is deliberately NOT in the default: it belongs to another tool, and
+# silently absorbing another vendor's instructions is a surprise. Add it here if
+# you want it read.
+instruction_files = ["AGENTS.md", "LOCODE.md"]
+# Hard character budget for the rendered block, spent in file order so a
+# repo-wide file is never starved by a verbose subdirectory one. A local model
+# has ~32K tokens of context and an unbounded instructions file would spend it
+# before the conversation starts. Set 0 to disable the feature entirely.
+max_instruction_chars = 8000
+
 [ui]                      # interactive REPL polish (TTY only; honors $NO_COLOR)
 markdown = true            # line-buffered markdown styling of answers
 spinner  = true            # animated wait indicator for model load / first token

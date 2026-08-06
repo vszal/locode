@@ -20,6 +20,7 @@ from locode.agent.cancel import (CancelToken, CancelledByUser,
                                  DeadlineExceeded)
 from locode.agent.compact import compact_history, estimate_chars
 from locode.agent.messages import build_system_prompt, tool_results_block
+from locode.context import load_project_instructions
 from locode.agent.plan import Plan
 from locode.model import toolparse
 from locode.model.profiles import profile_for
@@ -132,8 +133,19 @@ class AgentLoop:
         # Calls in the last batch whose result changed nothing; _run_calls resets
         # it per batch. Initialised here so the loop can read it unconditionally.
         self._noop_calls: list = []
+        # The repo's own house rules, if it has any. Read once here rather than
+        # per turn: the system prompt is stable and sits first, so the server's
+        # prompt cache reuses it for the whole session and this costs a single
+        # prefill. A cwd change mid-session therefore does not re-read them —
+        # acceptable while /cwd is rare, and the alternative is invalidating the
+        # cache on every turn.
+        budget = config.context.max_instruction_chars
+        extra = load_project_instructions(
+            cwd, tuple(config.context.instruction_files),
+            budget) if budget else ""
         self.history: list[dict[str, Any]] = [
-            {"role": "system", "content": build_system_prompt(registry, cwd),
+            {"role": "system",
+             "content": build_system_prompt(registry, cwd, extra),
              "kind": "system"}
         ]
 
