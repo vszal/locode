@@ -970,10 +970,77 @@ died at 12 iterations with "1 file changed".
   definition means no edit landed in between — so the reset does not apply and
   that exit is untouched.
 
+  **Independently corroborated by Cline.** Its loop detector
+  (`sdk/packages/core/src/runtime/safety/loop-detection.ts`,
+  `softThreshold: 3, hardThreshold: 5`) keys on the same signature we do — tool
+  name plus sorted-JSON args — but counts identical **consecutive** calls. An
+  intervening edit breaks their streak *by construction*; ours is cumulative
+  across the turn and survives any amount of real work in between. Same
+  conclusion, reached from their design and from our corpus separately. Cline
+  also keeps loop detection and the mistake limit as independent knobs (6 vs.
+  soft-3/hard-5) where Roo couples them (`ToolRepetitionDetector` is constructed
+  with `consecutiveMistakeLimit`); locode already has them separate
+  (`max_repeat_calls` vs `max_error_stall`), which this argues we should keep.
+
 - Also worth noting for expectations: the in-flight `b87-noop-redact` A/B runs
   on `exec-bugfix` and `exec-stall-trap`, whose repeat-stop deaths are 82% and
   51% *this* fault. A flat result there is the predicted outcome, not a refutation
   of 5.1.
+
+### 5.9 Cline / Roo teardown
+
+Read from each repo's current `main` (Cline is actively developed and mid-rewrite
+into `apps/` + `sdk/packages/`; Roo Code, its fork, was **archived read-only
+2026-05-15**, so its absence of any post-May feature is not a design choice).
+
+**Fuzzy matching is now a three-way retreat, and locode is the outlier.**
+- Cline's shipped default editor (`sdk/.../executors/editor.ts`) does a plain
+  exact substring replace with **no fuzzy tier at all**, erroring unless there
+  is exactly one match. Its Levenshtein matcher (`apply-patch-parser.ts`, ≥0.66)
+  is `enableApplyPatch: false` in **both** the act and plan presets.
+- Roo's `MultiSearchReplaceDiffStrategy` keeps a fuzzy path but defaults
+  `fuzzyThreshold = 1.0` — **exact only** — with a buffered ±40-line middle-out
+  search around the declared start line.
+- Aider deleted its fuzzy matcher six days after shipping it (5.7b).
+
+So all three ship exact-by-default while locode runs a 0.8 fuzzy tier. Ours is
+human-gated, which is the material difference from Aider's ungated one — but
+this now deserves the audit named in 5.7b, and the question is no longer
+"should we remove it" but "is the gate airtight on every path, including
+headless, where nobody can decline".
+
+- `[ ]` **5.9a Show the file on a failed match.** Roo's diff failure returns the
+  ±40-line window of *actual current content* plus the best fuzzy candidate it
+  found, and tells the model to re-read. locode's `_not_found_help` explains the
+  failure but does not hand back the surrounding text, so the model must spend a
+  `read_file` round-trip — or guess again, which is how no-op edits start. This
+  is the highest-value item from this teardown after 5.8a, and it composes with
+  the "say what already worked" note below.
+- `[ ]` **5.9b Checkpoint / undo.** Both have one and locode has none. Note the
+  two designs differ and Cline's own docs describe Roo's: Cline actually uses
+  `git stash create` inside the real repo, parked at a private
+  `refs/cline/checkpoints/...` ref, once per turn, with a rollback-protected
+  restore transaction. Roo uses a genuinely separate shadow `.git` with
+  `core.worktree` pointed at the workspace, and its restore is a bare
+  `clean -fd` + `reset --hard` with no safety stash. If we build this, Cline's
+  in-repo-stash-plus-private-ref is the safer of the two and needs no second
+  repo to keep in sync.
+- `[ ]` **5.9c Grace retry on a no-tool-use reply.** Roo increments its mistake
+  counter only on the **second** consecutive turn that produces no tool call
+  (`Task.ts:3489`) — the first is a silent retry. Same family of fix as 5.8a:
+  do not spend a strike on a single stumble.
+
+Not adopting: Roo's 5-mode system (`architect`/`code`/`ask`/`debug`/
+`orchestrator`, tool-group + file-regex bundles) — materially richer than a
+plan/act binary but a large permission surface, and locode has no mode concept
+to hang it on. Roo's tree-sitter "folded file context" (dedup repeated reads
+down to signatures during condensation) is interesting for our context budget
+but is a whole subsystem; parked.
+
+Worth stealing cheaply: Cline's plan-mode `command-guard.ts` keeps a
+`BLOCKED_COMMANDS` set (rm, mv, dd, chmod, truncate, …) that rejects mutating
+shell commands *before* approval rather than trusting the prompt — the same
+instinct as SWE-agent's interactive-command blocklist below.
 
 ### Worth stealing, not yet scheduled
 
