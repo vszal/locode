@@ -946,6 +946,19 @@ This is the mechanical explanation for "repeating and stalling out is the norm",
 and for the reported transcript that produced a *correct* prose diagnosis and
 died at 12 iterations with "1 file changed".
 
+**Scale.** Stop reasons across all 662 logged runs: 51% self-terminate cleanly,
+**41% die on the repeat guard**, and *every other cause is ≤1%*. Combining that
+with the 53% false-positive rate, roughly **22% of all runs — better than one in
+five — are killed by this bug.** Note the second line of that table:
+`edits kept hitting the same error` fired **8 times (1%)**. The net that keys on
+the right signal almost never gets to run, because the call-identity guard trips
+first: it stops at two identical results and the error net needs three.
+
+Reproduced as a unit test before touching anything
+(`test_retesting_after_a_real_edit_is_not_a_repeat`): four *distinct* edits, all
+landing, each followed by the same test command — dead after `bash` had run
+**twice**, with `# fix 1` through `# fix 4` sitting in the file.
+
 - `[ ]` **5.8a Reset the repeat streak when the workspace moved.** A repeat is
   only a repeat if nothing changed between the two calls. Track a monotonic
   count of edits that actually **landed** (`loop.py:1212` already distinguishes
