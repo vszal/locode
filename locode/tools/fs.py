@@ -81,13 +81,15 @@ def _tolerant_spans(text: str, old: str, replace_all: bool):
     return [_span_for(lines, offsets, s, span) for s in starts]
 
 
-def _fuzzy_span(text: str, old: str, threshold: float = 0.8):
-    """Best similarity match for `old` when exact/whitespace matching fails (a
-    paraphrased line, a tab→spaces line-number, minor drift). Returns
-    (start, end, ratio) only when one block is clearly best and above
-    `threshold`; None otherwise. Single-region only (never for replace_all)."""
-    lines = text.split("\n")
-    old_lines = _old_block(old)
+def _best_block(lines: list[str], old_lines: list[str]):
+    """Scan the file for the region most similar to `old`, with NO threshold.
+
+    Returns (start_index, best_ratio, runner_up_ratio) or None when there is
+    nothing to score against. Two callers with opposite needs share this:
+    `_fuzzy_span` applies the accept/ambiguity gate on top and only edits when
+    it passes, while `_not_found_help` wants the raw winner — on a failed match
+    the model needs to be shown where the text most likely lives *precisely
+    when* the ratio was too low to act on."""
     span = len(old_lines)
     if not old_lines or span > len(lines):
         return None
@@ -95,7 +97,6 @@ def _fuzzy_span(text: str, old: str, threshold: float = 0.8):
     if not old_key.strip():
         return None
     file_keys = [_match_key(l) for l in lines]
-    offsets = _line_offsets(lines)
     sm = difflib.SequenceMatcher(autojunk=False)
     sm.set_seq2(old_key)
     best_r, best_s, second_r = 0.0, None, 0.0
@@ -106,9 +107,26 @@ def _fuzzy_span(text: str, old: str, threshold: float = 0.8):
             best_r, best_s, second_r = r, s, best_r
         elif r > second_r:
             second_r = r
-    if best_s is None or best_r < threshold or best_r - second_r < 0.05:
+    if best_s is None:
+        return None
+    return best_s, best_r, second_r
+
+
+def _fuzzy_span(text: str, old: str, threshold: float = 0.8):
+    """Best similarity match for `old` when exact/whitespace matching fails (a
+    paraphrased line, a tab→spaces line-number, minor drift). Returns
+    (start, end, ratio) only when one block is clearly best and above
+    `threshold`; None otherwise. Single-region only (never for replace_all)."""
+    lines = text.split("\n")
+    old_lines = _old_block(old)
+    hit = _best_block(lines, old_lines)
+    if hit is None:
+        return None
+    best_s, best_r, second_r = hit
+    if best_r < threshold or best_r - second_r < 0.05:
         return None  # below bar, or too ambiguous to auto-pick
-    start, end = _span_for(lines, offsets, best_s, span)
+    offsets = _line_offsets(lines)
+    start, end = _span_for(lines, offsets, best_s, len(old_lines))
     return start, end, best_r
 
 
@@ -220,22 +238,62 @@ _TRY_REPLACE_LINES = (
 )
 
 
-def _not_found_help(text: str, old: str, path: Path) -> str:
+_HELP_WINDOW = 12      # lines of real file content shown each side of the region
+_HELP_MAX_LINES = 60   # ... but never flood the reply with a whole file
+
+
+def _not_found_help(text: str, old: str, path: Path, *,
+                    window: int = _HELP_WINDOW) -> str:
+    """The reply when `old` didn't match — always hands back the file's ACTUAL
+    text around the likeliest region.
+
+    A model told only "not found" has two moves: spend a `read_file`
+    round-trip, or guess again — and guessing again is how the no-op edit loops
+    start. Showing real content is what turns the retry into a copy. Two
+    deliberate choices: the block is located by scoring `old` as a *block*
+    (`_best_block`, the same scan the fuzzy tier uses) rather than by its first
+    line alone, which is unreliable when that line is something generic like a
+    bare `return`; and it is printed VERBATIM and unnumbered, because this same
+    message tells the model not to put line-number prefixes in `old`, so it has
+    to be able to copy straight out of what we show it."""
     lines = text.split("\n")
-    first = next((l for l in _norm_nl(old).split("\n") if l.strip()), "")
-    key = _match_key(first)
+    old_lines = _old_block(old)
+    idx = span = None
+    confident = False
+    hit = _best_block(lines, old_lines)
+    if hit is not None:
+        idx, ratio, _second = hit
+        span, confident = len(old_lines), ratio >= 0.5
+    else:
+        # `old` outruns the file, or is blank once normalized — fall back to its
+        # first content line so we still point somewhere useful.
+        first = next((l for l in _norm_nl(old).split("\n") if l.strip()), "")
+        key = _match_key(first)
+        if key:
+            keyed = [_match_key(l) for l in lines]
+            cand = difflib.get_close_matches(key, keyed, n=1, cutoff=0.4)
+            if cand:
+                idx, span, confident = keyed.index(cand[0]), 1, True
     snippet = ""
-    if key:
-        keyed = [_match_key(l) for l in lines]
-        cand = difflib.get_close_matches(key, keyed, n=1, cutoff=0.4)
-        if cand:
-            idx = keyed.index(cand[0])
-            # Show the nearby lines VERBATIM so the model can copy an exact `old`
-            # on its next attempt instead of guessing again.
-            lo, hi = max(0, idx - 1), min(len(lines), idx + 2)
-            block = "\n".join(lines[lo:hi])
-            snippet = (f" The nearest text is around line {idx + 1} — copy from "
-                       f"here exactly:\n{block}")
+    if idx is not None:
+        lo = max(0, idx - window)
+        hi = min(len(lines), idx + span + window)
+        block, tail = lines[lo:hi], ""
+        if len(block) > _HELP_MAX_LINES:
+            tail = f"\n… ({len(block) - _HELP_MAX_LINES} more lines)"
+            block = block[:_HELP_MAX_LINES]
+        lead = ("The closest match is" if confident
+                else "No close match. The most similar region is")
+        snippet = (f" {lead} at lines {lo + 1}-{lo + len(block)} — this is what "
+                   "the file ACTUALLY contains there. Copy your `old` out of it "
+                   "verbatim:\n" + "\n".join(block) + tail)
+    else:
+        # Nothing scored above zero: `old` doesn't resemble ANY region. That is
+        # a different failure from "close but drifted" and deserves a different
+        # instruction — it usually means the wrong file, or one already changed.
+        snippet = (" NOTHING in this file resembles `old` — you are probably "
+                   "editing the wrong file, or it has already changed. Re-read "
+                   "it with read_file before trying again.")
     return (f"`old` not found in {path} ({len(lines)} lines). Copy the target text "
             "EXACTLY as it appears in the file — do NOT include read_file's "
             "line-number prefixes — or add more surrounding context to pin it down."

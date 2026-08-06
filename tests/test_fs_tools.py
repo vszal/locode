@@ -373,9 +373,64 @@ def test_not_found_help_shows_verbatim_snippet_and_caveat():
     msg = fs._not_found_help("import os\ndef handle_click(self):\n    pass\n",
                              "def handle_clik(self):", Path("c.py"))
     assert "line-number prefixes" in msg
-    assert "around line 2" in msg
+    assert "lines 1-4" in msg                  # the window, not just one line
     assert "def handle_click(self):" in msg   # verbatim, copyable
     assert "    pass" in msg                   # includes a line of context
+
+
+def test_best_block_scores_the_whole_block_not_just_the_first_line():
+    # "    return None" appears twice, so anchoring on `old`'s FIRST line lands
+    # on the earlier one. Only the second line of the block disambiguates.
+    text = ("def alpha():\n    return None\n\n"
+            "def beta():\n    return None\n    log('beta done')\n")
+    old = ["    return None", "    log('beta dnoe')"]   # typo in line 2
+    start, ratio, _second = fs._best_block(text.split("\n"), old)
+    assert start == 4          # the beta block, not the alpha one at index 1
+    assert ratio > 0.8
+
+
+def test_not_found_help_points_at_the_block_matched_region():
+    from pathlib import Path
+    text = ("def alpha():\n    return None\n\n"
+            "def beta():\n    return None\n    log('beta done')\n")
+    msg = fs._not_found_help(text, "    return None\n    log('beta dnoe')",
+                             Path("c.py"))
+    assert "log('beta done')" in msg      # the real text, ready to copy
+    assert "The closest match is" in msg
+
+
+def test_not_found_help_shows_a_wide_window_of_real_content():
+    from pathlib import Path
+    lines = ["pass"] * 60
+    lines[5], lines[19] = "MARKER_FAR", "MARKER_ABOVE"
+    lines[30] = "def compute_totals(rows):"
+    lines[41] = "MARKER_BELOW"
+    msg = fs._not_found_help("\n".join(lines), "def compute_totls(rows):",
+                             Path("c.py"))
+    # A window either side of the match, not the old +/-1 sliver.
+    assert "MARKER_ABOVE" in msg
+    assert "MARKER_BELOW" in msg
+    assert "MARKER_FAR" not in msg         # ... but not the whole file
+
+
+def test_not_found_help_caps_a_huge_window():
+    from pathlib import Path
+    lines = [f"line_{i}" for i in range(200)]
+    old = "\n".join(f"line_{i}" for i in range(50, 130)).replace("line_60",
+                                                                 "line_6O")
+    msg = fs._not_found_help("\n".join(lines), old, Path("c.py"))
+    assert "more lines)" in msg
+    assert msg.count("\nline_") <= fs._HELP_MAX_LINES
+
+
+def test_not_found_help_says_so_when_nothing_resembles_the_target():
+    # Zero similarity anywhere is a different failure from "close but drifted":
+    # it means the wrong file, so the model is told to re-read rather than
+    # handed a region that would only mislead it.
+    from pathlib import Path
+    msg = fs._not_found_help("alpha\nbravo\ncharlie\n", "zzzzzzzz", Path("c.py"))
+    assert "NOTHING in this file resembles" in msg
+    assert "read_file" in msg
 
 
 async def test_move_file_renames(ctx, tmp_path):

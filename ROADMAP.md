@@ -1099,13 +1099,40 @@ this now deserves the audit named in 5.7b, and the question is no longer
 "should we remove it" but "is the gate airtight on every path, including
 headless, where nobody can decline".
 
-- `[ ]` **5.9a Show the file on a failed match.** Roo's diff failure returns the
+- `[x]` **5.9a Show the file on a failed match (build 90).** Roo's diff failure returns the
   ±40-line window of *actual current content* plus the best fuzzy candidate it
   found, and tells the model to re-read. locode's `_not_found_help` explains the
   failure but does not hand back the surrounding text, so the model must spend a
   `read_file` round-trip — or guess again, which is how no-op edits start. This
   is the highest-value item from this teardown after 5.8a, and it composes with
   the "say what already worked" note below.
+
+  **Shipped (build 90).** `_not_found_help` was worse than the entry assumed:
+  it showed a **3-line** sliver (`idx-1 … idx+2`), and only when a fuzzy match
+  on `old`'s **first line alone** cleared 0.4 — so when the model was most lost
+  it got no file content at all. Three changes:
+  1. Extracted `_best_block`, the ungated version of the block scan already
+     inside `_fuzzy_span`, and pointed the failure message at it. Matching now
+     scores `old` as a **block** instead of by its first line, which matters
+     whenever that line is generic (`return None`, a bare brace) — pinned by
+     `test_best_block_scores_the_whole_block_not_just_the_first_line`, where
+     first-line keying anchors on the wrong one of two identical lines.
+  2. Widened the window to ±12 lines (`_HELP_WINDOW`), capped at 60
+     (`_HELP_MAX_LINES`) so a large `old` can't flood the reply. Kept
+     **verbatim and unnumbered** on purpose: the same message tells the model
+     not to put line-number prefixes in `old`, so the block has to be
+     copy-ready. Roo's ±40 was not adopted — ours is a copy target, theirs a
+     reference, and 60 lines of context is already ~600 tokens.
+  3. New third branch found while testing: when **nothing** scores above zero,
+     `_best_block` returns None and the old code silently showed nothing. That
+     is a distinct failure — wrong file, or one already changed — so it now
+     says so and tells the model to `read_file`, rather than handing back a
+     region that would only mislead.
+
+  Also corrected the confidence wording: below 0.5 it says "No close match" and
+  labels the region as merely the most similar, instead of asserting a match it
+  doesn't have. 967 passed. **Not yet A/B'd** — it needs its own sweep, and on
+  the b88 evidence expect the turn-ending stats to move before the score does.
 - `[ ]` **5.9b Checkpoint / undo.** Both have one and locode has none. Note the
   two designs differ and Cline's own docs describe Roo's: Cline actually uses
   `git stash create` inside the real repo, parked at a private
