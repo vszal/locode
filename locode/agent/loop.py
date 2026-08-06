@@ -129,6 +129,9 @@ class AgentLoop:
         # from both the hard deadline and the slow-progress ratio. Reset each
         # run_turn(); accumulated in _ask().
         self._wallclock_pause = 0.0
+        # Calls in the last batch whose result changed nothing; _run_calls resets
+        # it per batch. Initialised here so the loop can read it unconditionally.
+        self._noop_calls: list = []
         self.history: list[dict[str, Any]] = [
             {"role": "system", "content": build_system_prompt(registry, cwd),
              "kind": "system"}
@@ -925,6 +928,16 @@ class AgentLoop:
                             edit_tally[base] = edit_tally.get(base, 0) + 1
                 error_sig, result_sig, no_change, all_errored, all_noinfo = \
                     await self._run_calls(calls)
+                # Lift a call that changed nothing back out of the history it was
+                # just written into, before the model can read it as an example of
+                # what to emit next. The assistant message is the one appended
+                # above, two back from here (the tool results went on after it).
+                if self._noop_calls and self._cfg.agent.redact_noop_calls:
+                    for msg in reversed(self.history):
+                        if msg.get("kind") == "assistant":
+                            msg["content"] = redact_noop_calls(
+                                msg["content"], calls, self._noop_calls)
+                            break
                 # Headless only: an ASK tool nobody can approve is refused for
                 # the whole session, so a model still trying after this many
                 # refusals is not going to stop on its own. Interactively the
@@ -1104,6 +1117,7 @@ class AgentLoop:
                           plan=self.plan)
         results: list[tuple[str, str]] = []
         error_parts: list[str] = []
+        self._noop_calls: list = []
         no_change = False
         ran = errored = noinfo = 0
         for call in calls:
@@ -1197,6 +1211,9 @@ class AgentLoop:
                 # is the "the workspace really did change" evidence.
                 self._landed_edit = True
             if getattr(res, "no_change", False):
+                # Remembered (not just counted) so the loop can lift this call
+                # back out of history — see redact_noop_calls.
+                self._noop_calls.append(call)
                 # A no-change edit is a real error to the model but not a
                 # "same recurring code error" — keep it out of the error-stall
                 # signal; the no-change streak handles it (sooner, and with the
@@ -2014,6 +2031,54 @@ def _forgive_nudged_verifies(repeat_streaks: dict, nudged_repeat: set,
         nudged_repeat.discard(sig)
         forgiven_counts[sig] = forgiven_counts.get(sig, 0) + 1
     return len(stale)
+
+
+# Every ```tool fence in an assistant message, so a rejected call can be lifted
+# back out of the history it was already written into.
+_TOOL_FENCE_RE = re.compile(r"```tool\b.*?```", re.S)
+
+
+def redact_noop_calls(content: str, calls, noop_calls: list) -> str:
+    """Rewrite an assistant message so the tool calls that changed NOTHING are no
+    longer quotable, leaving the surviving calls and the model's own prose intact.
+
+    Why this exists, and why it is not another nudge. A rejected call is appended
+    to history verbatim — [assistant: the call][user: the error] — so by the third
+    attempt the model is reading three worked examples of itself making the exact
+    call we are asking it to stop making. The instruction is one sentence of
+    prose; the demonstration is the whole transcript, and the transcript wins.
+    Measured over the 651-run corpus: 16.8% of all edit_file calls are a
+    byte-identical `old == new`, and of the 137 runs that hit one, 108 resent it
+    AFTER being told not to. Their clean-finish rate is 18% against a 52% suite
+    baseline, and they account for 94 of the 260 repeat-stop deaths.
+
+    Build 80 already established that rewording the rejection does not move this
+    (clean-finish 1/10 -> 0/10), so the lever has to be mechanical: delete the
+    example instead of arguing with it. SWE-agent reached the same design from the
+    other side — its requery loop puts a rejected action in a temporary history
+    that is never persisted to the real trajectory.
+
+    A one-line marker replaces the fence rather than deleting it outright. An
+    assistant turn that falls silent and is followed by a "Tool results:" message
+    is incoherent history, and native tool-callers respond to it by narrating an
+    intent and then stopping (the same failure the call-preserving branch above
+    was written to avoid). The marker keeps the turn's shape — an attempt was
+    made, it was refused — while removing the JSON that can be copied."""
+    if not noop_calls:
+        return content
+    # Identity, not name: a batch can hold two edit_file calls where only one was
+    # a no-op, and dropping the sibling that actually landed would erase a real
+    # action from the record.
+    dropped = {id(c) for c in noop_calls}
+    keep = [c for c in calls if id(c) not in dropped]
+    prose = _TOOL_FENCE_RE.sub("", content).strip()
+    marker = "\n".join(
+        f"[{c.name}: rejected — this call changed nothing, so it is not "
+        "repeated here]" for c in noop_calls)
+    parts = [p for p in (prose, marker) if p]
+    if keep:
+        parts.append(_render_calls_as_fenced(keep))
+    return "\n".join(parts)
 
 
 def _render_calls_as_fenced(calls) -> str:

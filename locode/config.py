@@ -143,6 +143,13 @@ class AgentConfig:
     # The garbage reply is discarded, not kept, so each retry costs only a fresh
     # generation; a few is enough to shake most models out of the attractor.
     max_repetition_aborts: int = 3
+    # Drop a tool call that changed NOTHING out of the resent history, replacing
+    # it with a one-line "rejected" marker (agent/loop.py:redact_noop_calls).
+    # A rejected call otherwise stays in history verbatim, so a model on its
+    # third attempt is reading three worked examples of the call we are telling
+    # it to stop making — and the demonstration beats the instruction. Off
+    # switches the behaviour back for an A/B.
+    redact_noop_calls: bool = True
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing

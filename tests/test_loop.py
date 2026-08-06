@@ -2862,3 +2862,92 @@ async def test_a_verify_that_has_started_failing_is_still_a_flail(tmp_path):
         FakeBash("SyntaxError: unexpected EOF", is_error=True), cfg=cfg)
     out = await loop.run_turn("fix parser.py")
     assert "repeated the same tool call" in out
+
+
+# --- build 87: a rejected no-op call is lifted back out of history ----------
+# The pathology, measured over the 651-run corpus: 16.8% of edit_file calls are
+# a byte-identical old==new, 108 of the 137 runs that hit one resent it after
+# being told not to, and those runs clean-finish 18% against a 52% baseline.
+# Build 80 settled that rewording the rejection doesn't move it, so the lever is
+# to stop showing the model a worked example of the call it must not repeat.
+
+def _mk_call(name, **args):
+    from locode.tools.base import ToolCall
+    return ToolCall(name=name, args=args, source="fenced")
+
+
+def test_redact_drops_the_fence_but_keeps_the_prose_and_marks_the_attempt():
+    call = _mk_call("edit_file", path="a.py", old="x = 1", new="x = 1")
+    content = ('I will fix the assignment.\n'
+               '```tool\n{"name": "edit_file", "args": {"old": "x = 1"}}\n```')
+    out = loop_mod.redact_noop_calls(content, [call], [call])
+    assert "```tool" not in out          # nothing left to copy
+    assert '"old"' not in out
+    assert "I will fix the assignment." in out   # reasoning survives
+    assert "edit_file: rejected" in out          # the turn still has a shape
+
+
+def test_redact_keeps_a_sibling_call_that_actually_landed():
+    dud = _mk_call("edit_file", path="a.py", old="x", new="x")
+    good = _mk_call("read_file", path="b.py")
+    content = ('```tool\n{"name": "edit_file", "args": {}}\n```\n'
+               '```tool\n{"name": "read_file", "args": {}}\n```')
+    out = loop_mod.redact_noop_calls(content, [dud, good], [dud])
+    assert "read_file" in out and "```tool" in out
+    assert "edit_file: rejected" in out
+    # The surviving fence must be the read, not the rejected edit.
+    assert '"name": "read_file"' in out
+    assert out.count("```tool") == 1
+
+
+def test_redact_is_a_no_op_when_nothing_was_rejected():
+    call = _mk_call("read_file", path="a.py")
+    content = '```tool\n{"name": "read_file", "args": {}}\n```'
+    assert loop_mod.redact_noop_calls(content, [call], []) == content
+
+
+def test_two_same_named_calls_only_redact_the_one_that_no_opped():
+    # Identity, not name: dropping the sibling would erase a real action.
+    dud = _mk_call("edit_file", path="a.py", old="x", new="x")
+    landed = _mk_call("edit_file", path="b.py", old="y", new="z")
+    content = ('```tool\n{"name": "edit_file", "args": {"path": "a.py"}}\n```\n'
+               '```tool\n{"name": "edit_file", "args": {"path": "b.py"}}\n```')
+    out = loop_mod.redact_noop_calls(content, [dud, landed], [dud])
+    assert '"path": "b.py"' in out
+    assert '"path": "a.py"' not in out
+
+
+async def test_a_no_op_edit_leaves_no_copyable_call_in_history(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 1"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("fix a.py")
+    assistants = [m for m in loop.history if m.get("kind") == "assistant"]
+    redacted = [m for m in assistants if "rejected" in m["content"]]
+    assert redacted, "the no-op call was never redacted"
+    assert '"old"' not in redacted[0]["content"]
+    # And the tool result still tells the model what happened.
+    joined = "\n".join(m["content"] for m in loop.history)
+    assert "identical" in joined
+
+
+async def test_redaction_is_off_when_the_config_says_so(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    cfg.agent.redact_noop_calls = False
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 1"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("fix a.py")
+    joined = "\n".join(m["content"] for m in loop.history
+                       if m.get("kind") == "assistant")
+    assert '"old"' in joined          # the call is still quotable
+    assert "rejected —" not in joined
