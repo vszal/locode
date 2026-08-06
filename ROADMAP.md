@@ -1032,10 +1032,50 @@ landing, each followed by the same test command — dead after `bash` had run
   `test_retesting_after_a_real_edit_is_not_a_repeat` (the reproduction),
   `test_retesting_with_nothing_in_between_still_stops` and
   `test_a_repeated_identical_edit_still_counts_as_a_repeat` (the two guards that
-  must survive). **A/B `b88-verify-after-change` running** — exec-bugfix +
-  e2e-spec-to-code × qwencoder14, r=5, the 82% and 68% cases. Expect the score
-  to move here, unlike 5.1: turns that previously died mid-debugging now get to
-  finish, which changes the artifact and not just the ending. Grade on both.
+  must survive).
+
+  **Graded 2026-08-06 — `b88-verify-after-change`** (exec-bugfix +
+  e2e-spec-to-code × qwencoder14, r=5, the 82% and 68% cases).
+
+  *Score: INCONCLUSIVE, and my prediction was wrong.* I expected the score to
+  move here unlike 5.1, on the reasoning that a turn which gets to finish
+  changes the artifact and not just the ending. It didn't: `+0.0200`, p=1.0,
+  **9 of 10 pairs tied**, 1 informative. Longer survival is evidently not
+  sufficient for a better artifact — the model uses the extra turns without
+  converting them. Worth remembering the next time a mechanical fix tempts a
+  score prediction.
+
+  *Turn endings: the fix works, and works by the predicted mechanism.*
+
+  | | base | cand |
+  |---|---|---|
+  | **exec-bugfix** clean-finish | 0/5 | **2/5** |
+  | exec-bugfix repeat-stops | 5 | 3 |
+  | exec-bugfix iters / mutations | 9.6 / 5.6 | 12.4 / 7.4 |
+  | **e2e** clean-finish | 0/5 | 0/5 |
+  | e2e repeat-stops | 5 | **2** |
+  | e2e `error unchanged` stops | 0 | **3** |
+  | e2e iters / mutations | 25.4 / 16.4 | 22.8 / 17.2 |
+
+  exec-bugfix is the headline: it was **flat at 0/5 under build 87** because
+  82% of its deaths were this fault, and it moves the moment the fault is
+  fixed. Runs now last longer and edit more, which is what "stopped killing
+  them mid-debug" should look like.
+
+  e2e's clean-finish does not move, but its **stop reasons transfer exactly as
+  designed**: repeat-stops 5→2 and the honest error-text net picks up 3. That
+  net fired **8 times in 662 runs** before this change because the call-identity
+  guard was stopping at two and stealing every case. Those runs still fail —
+  but they now fail for a real reason instead of a false one, which is the
+  precondition for diagnosing them. e2e also spent *fewer* iterations (25.4→
+  22.8) for *more* mutations, and its nudges cleared out entirely: `unverified
+  edits` 4→0, `repeated edit` 3→0, `edit changed nothing` 2→0.
+
+  *Caveat, stated plainly:* n=5 per arm, so exec-bugfix's 0/5→2/5 is two runs.
+  Directionally consistent with the diagnosis and with the stop-reason transfer
+  (which is the stronger evidence, being a mechanism and not a count), but not
+  established. The ~22%-of-all-runs scale claim in 5.8 still deserves a
+  higher-n confirmation before it is treated as banked.
 
 ### 5.9 Cline / Roo teardown
 
@@ -1091,6 +1131,72 @@ Worth stealing cheaply: Cline's plan-mode `command-guard.ts` keeps a
 `BLOCKED_COMMANDS` set (rm, mv, dd, chmod, truncate, …) that rejects mutating
 shell commands *before* approval rather than trusting the prompt — the same
 instinct as SWE-agent's interactive-command blocklist below.
+
+### 5.10 Reading `CLAUDE.md` as a first-class option
+
+Requested 2026-08-06, with the stated worry: *"I worry the local LLM may choke
+on Claude specific instructions."* Build 89 deliberately shipped
+`instruction_files = ["AGENTS.md", "LOCODE.md"]` and left `CLAUDE.md` out, on
+the grounds that silently absorbing another tool's instruction file is the
+wrong default. Nothing needs building to *enable* it — adding `"CLAUDE.md"` to
+`context.instruction_files` works today, and the opt-in half of
+`test_claude_md_is_not_read_by_default` already pins that path. So this item is
+about the two things around it: whether the worry is real, and what breaks when
+you do turn it on.
+
+**The worry is mostly not borne out — measured, 2026-08-06.** Scanned all six
+`*/CLAUDE.md` under `~/Code` for content a local model cannot act on:
+
+| Pattern | Hits across 6 repo `CLAUDE.md` |
+|---|---|
+| Claude Code tool names (`TodoWrite`, `WebFetch`, `Task`, …) | **0** |
+| subagent / delegation | 2 (both in locode's own) |
+| slash commands | 1 |
+| MCP / hooks | **0** |
+| model routing (Opus/Haiku/Sonnet) | 10 (9 in locode's own) |
+
+Repo-level `CLAUDE.md` is overwhelmingly ordinary project prose — build
+commands, conventions, architecture. **Zero** Claude-Code tool names in the
+whole corpus, which was the specific hazard worth fearing: naming a nonexistent
+tool in the system prompt is the classic way to induce hallucinated tool calls,
+and our parser is deliberately tolerant enough to try to honor one. The
+Claude-specific material that does exist concentrates in the *global*
+`~/.claude/CLAUDE.md` (delegation tiers, model routing, the Resend email
+workflow) — which locode never reads, because `find_instruction_files` walks
+repo-root → cwd and stops. And the single most Claude-flavored file in the
+sample is **locode's own `AGENTS.md`, which we already load by default**, with
+no observed harm. The concern is legitimate in principle but the corpus does
+not show the failure mode.
+
+**What the scan did surface is a real defect, and it is ours.** In **4 of the 6**
+repos that have both files, `CLAUDE.md` is a **symlink to `AGENTS.md`**
+(gke-custom-compute-class-examples, locode, skills, vsz_zzzz). `context.py`
+dedupes nothing — no `realpath`, no `samefile`, no inode check — so adding
+`CLAUDE.md` to the list today injects **the identical text twice** and burns
+double the 8000-char budget on it. That is a bug regardless of this feature,
+since a user can hit it with any two aliased names.
+
+- `[ ]` **5.10a Dedupe instruction files by resolved identity.** Resolve each
+  candidate and skip one already loaded. Prerequisite for 5.10b; worth doing
+  even if we never enable `CLAUDE.md`.
+- `[ ]` **5.10b Make `CLAUDE.md` a documented option, not a list edit.**
+  Ship it commented-out in `config.toml.example` with the tradeoff stated in
+  place, so it is discoverable without reading `context.py`. Leave the default
+  off — the argument for that was never the choke risk, it is that another
+  vendor's file should be opted into, and the measurement above doesn't change
+  it.
+- `[ ]` **5.10c Only then consider defaulting it on**, and only behind the
+  standing Milestone 5 rule: a finding lands with a measurement **on our
+  corpus** and nothing is credited until it survives an A/B. Note the honest
+  obstacle — eval workspaces are `mkdtemp` dirs with no instruction files in
+  them, so 5.2 shipped without an A/B and this one cannot get a real number
+  until the harness can seed a repo-shaped fixture. That fixture is the actual
+  blocker here, not the config line.
+- `[ ]` **5.10d Size, not vocabulary, is the likelier failure.** The largest
+  `CLAUDE.md` in the sample is 11,397 chars against an 8,000-char budget, so it
+  truncates mid-document. Truncating instruction prose at a byte offset can cut
+  a sentence in half; if we start ingesting more files, prefer dropping a whole
+  file to slicing one, and say which in the marker.
 
 ### Worth stealing, not yet scheduled
 
