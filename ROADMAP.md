@@ -907,6 +907,74 @@ have**, and they match exactly what the user reports seeing live:
   audit that it is genuinely human-gated on every path, but their retreat was
   from an *ungated* matcher, so this is not yet a reason to remove ours.
 
+### 5.8 The repeat guard kills the debugging loop (the real "stalls are the norm")
+
+Chasing the residual after 5.1 turned up a far bigger fault than the no-op edit,
+and it is **ours, not the model's**. Measured over the same corpus (656 event
+logs), asking not "which runs contain a repeat" but "which call was being
+repeated at the moment the run died":
+
+| repeated call at death | runs | share |
+|---|---|---|
+| `bash` | 212 | **80%** |
+| `edit_file` | 22 | 8% |
+| `update_plan` | 15 | 6% |
+| `read_file` | 11 | 4% |
+| `write_file` / `replace_lines` | 4 | 2% |
+
+The dominant killer is not a broken edit going round again — it is the model
+**re-running its test command**. And of the 578 consecutive identical `bash`
+pairs, **475 (82%) had a mutating call in between** and 71% returned *different*
+output. That is not a flail; that is edit → test → edit → test, the correct
+debugging loop.
+
+The bug is in the streak rule at `loop.py:958-964`. A repeat resets only when
+`result_sig` changes, so two rounds whose test output happens to be
+byte-identical — fix one of two bugs, or fix something masked by an earlier
+failure — climb to a streak of 2 (`max_repeat_calls - 1`) and the run is nudged,
+then stopped, *with real edits sitting between the two calls*. Scoring the
+terminal pair of every repeat-stop death:
+
+- **140 of 265 (53%) had a mutating edit land between the last two identical
+  calls** — the model was re-verifying a change we told it to make, and we
+  killed it for "repeating the same tool call without making progress".
+- Per case: `exec-bugfix` **56/68 (82%)**, `e2e-spec-to-code` **50/73 (68%)**,
+  `exec-stall-trap` 24/47 (51%). `syntax-fix` 4/55 — its deaths are genuine.
+- The other 125 (47%) had nothing in between and are real no-progress loops.
+
+This is the mechanical explanation for "repeating and stalling out is the norm",
+and for the reported transcript that produced a *correct* prose diagnosis and
+died at 12 iterations with "1 file changed".
+
+- `[ ]` **5.8a Reset the repeat streak when the workspace moved.** A repeat is
+  only a repeat if nothing changed between the two calls. Track a monotonic
+  count of edits that actually **landed** (`loop.py:1212` already distinguishes
+  landed from attempted — `_landed_edit` is the right signal but is sticky, so
+  it needs a counter), record the count each signature last ran at, and reset
+  the streak when it has advanced. Restrict the reset to batches that are not
+  themselves mutating, or the existing `repeated_edit` exception — which
+  deliberately counts a repeated edit even when its echo shifts — would reset
+  itself and be defeated.
+
+  **Why this does not remove the safety net.** Three independent stops survive,
+  and the first is better-targeted than the guard being relaxed:
+  `max_error_stall = 3` keys on the **error text**, so an edit-then-retest loop
+  whose failure never changes still dies after three identical failures, while
+  a failure that *does* change is real progress and correctly resets;
+  `max_consecutive_errors` catches nothing-succeeding; `max_iterations = 50` and
+  the wallclock bound the rest. The outcome is the right signal for "stuck"; the
+  call identity never was.
+
+  Note the interaction to preserve: the done-on-repeated-verify finish
+  (`loop.py:876`) requires the check to have been "re-run unchanged", which by
+  definition means no edit landed in between — so the reset does not apply and
+  that exit is untouched.
+
+- Also worth noting for expectations: the in-flight `b87-noop-redact` A/B runs
+  on `exec-bugfix` and `exec-stall-trap`, whose repeat-stop deaths are 82% and
+  51% *this* fault. A flat result there is the predicted outcome, not a refutation
+  of 5.1.
+
 ### Worth stealing, not yet scheduled
 
 - **Say what already worked.** On a partial failure Aider names the blocks that
