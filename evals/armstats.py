@@ -56,9 +56,32 @@ MUTATING = {"write_file", "append_file", "edit_file", "replace_lines",
 
 
 def _blank() -> dict:
-    return {"n": 0, "clean": 0, "iters": 0, "mut": 0, "exposed": 0,
-            "exposed_clean": 0,
+    return {"n": 0, "clean": 0, "done": 0, "gaveup": 0, "landed": 0,
+            "iters": 0, "mut": 0, "exposed": 0, "exposed_clean": 0,
+            "exposed_done": 0,
             "nudges": collections.Counter(), "stops": collections.Counter()}
+
+
+EDITING = {"write_file", "append_file", "edit_file", "replace_lines",
+           "move_file"}
+
+
+def _landed_edits(ev: list[dict]) -> int:
+    """Edits that actually SUCCEEDED — a non-error result for an editing call.
+
+    Needed because a self-terminated run is not automatically a finished one:
+    the model can reply "I cannot make progress" and end the turn, which
+    produces no `stopped` event and used to score as a clean finish. Requiring
+    at least one landed edit separates finishing from giving up. `bash` is
+    excluded deliberately — running the tests is not progress on the task."""
+    n, pending = 0, None
+    for e in ev:
+        if e.get("phase") == "run" and e.get("name") in EDITING:
+            pending = True
+        elif e.get("phase") == "result" and pending:
+            n += not e.get("error")
+            pending = None
+    return n
 
 
 def _matcher(pattern: str | None):
@@ -87,15 +110,25 @@ def collect(label: str, by_case: bool = False,
         a["iters"] += sum(e.get("phase") == "iteration" for e in ev)
         a["mut"] += sum(e.get("phase") == "run" and e.get("name") in MUTATING
                         for e in ev)
+        landed = _landed_edits(ev)
+        a["landed"] += landed
         stops = [e.get("reason") for e in ev if e.get("phase") == "stopped"]
         clean = not stops
-        if clean:
-            a["clean"] += 1          # self-terminated: the model chose to finish
+        # A run that self-terminates having changed NOTHING did not finish the
+        # task, it surrendered — see _landed_edits. Counting those as clean is
+        # how b90 first read as a 1/5 -> 4/5 win when every run left the tests
+        # red. `done` is the honest numerator; `clean` is kept only so old
+        # numbers stay comparable.
+        done = clean and landed > 0
+        a["clean"] += clean
+        a["done"] += done
+        a["gaveup"] += clean and not done
         if hit is not None:
             fired = any(e.get("phase") == "result" and hit(e.get("content") or "")
                         for e in ev)
             a["exposed"] += fired
             a["exposed_clean"] += fired and clean
+            a["exposed_done"] += fired and done
         for s in stops:
             a["stops"][str(s)[:44]] += 1
         for e in ev:
@@ -121,16 +154,18 @@ def main() -> None:
         if not a["n"]:
             continue
         name = " · ".join(key)
-        print(f"{name}: n={a['n']}  clean-finish={a['clean']}/{a['n']}"
-              f" ({a['clean'] / a['n']:.0%})  mean-iters={a['iters'] / a['n']:.1f}"
-              f"  mean-mutations={a['mut'] / a['n']:.1f}")
+        print(f"{name}: n={a['n']}  DONE={a['done']}/{a['n']}"
+              f" ({a['done'] / a['n']:.0%})  gave-up={a['gaveup']}"
+              f"  stopped={a['n'] - a['clean']}"
+              f"  mean-iters={a['iters'] / a['n']:.1f}"
+              f"  mean-landed-edits={a['landed'] / a['n']:.1f}")
         if exposure:
             ex = a["exposed"]
-            # clean-finish AMONG exposed runs — the only subset that can be
-            # evidence about the change. "n/a" when nothing fired: that is a
-            # negative control, not a zero.
-            among = f"{a['exposed_clean']}/{ex}" if ex else "n/a"
-            print(f"     exposed={ex}/{a['n']}  clean-among-exposed={among}")
+            # DONE among exposed runs — the only subset that can be evidence
+            # about the change. "n/a" when nothing fired: a negative control,
+            # not a zero.
+            among = f"{a['exposed_done']}/{ex}" if ex else "n/a"
+            print(f"     exposed={ex}/{a['n']}  done-among-exposed={among}")
         if a["nudges"]:
             print(f"     nudges={dict(a['nudges'])}")
         if a["stops"]:

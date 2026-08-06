@@ -1165,18 +1165,61 @@ headless, where nobody can decline".
   just a better outcome number. e2e is a near-null control (1 exposed run
   total across 10).
 
-  *The honest caveat, and it is the interesting one:* exec-bugfix's **score is
-  identical on both arms (0.500)** while its clean finishes went 1/5 → 4/5. Same
-  shape as b88. Two changes now have bought turn-endings without buying
-  correctness, which stops being a coincidence: the model is being un-stuck and
-  still not converting. **That conversion gap is the next thing to attack**, and
-  neither more guard-relaxation nor better edit feedback will close it.
+  ### ⚠️ RETRACTED (build 92) — the above reads the wrong metric
 
-  *Methodology worth keeping:* exposure-filtering is the fix for `ab.py`'s
-  weakness at n=5. Intent-to-treat over 5 runs is mostly noise when only some
-  runs touch the changed path; asking "did this run even reach the code?" turned
-  a mixed, uninterpretable table into three clear verdicts. Shipped as
-  `armstats.py --exposure` (build 91) so the next A/B gets it for free.
+  **Everything above this line credits a win that did not happen.** Chasing
+  why exec-bugfix's score stayed at 0.500 while "clean finishes" went 1/5 → 4/5
+  turned up the reason: **`clean finish` was defined as "no `stopped` event",
+  which counts the model GIVING UP as success.** A representative
+  "clean-finishing" candidate run ends with:
+
+  > *"I cannot make progress based on the information provided. The tool calls
+  > have consistently failed, and I do not have enough context to determine the
+  > correct course of action. Please provide more details or clarify the issue."*
+
+  Zero landed edits, tests still red. Re-graded on **DONE** (self-terminated
+  **and** at least one edit actually landed), the real b90 result is:
+
+  | exec-bugfix (5/5 exposed both arms) | base | cand |
+  |---|---|---|
+  | DONE | **1/5** | **0/5** |
+  | gave up | 0 | **4** |
+  | mean landed edits | 0.4 | **0.0** |
+  | mean iterations | 13.0 | 7.8 |
+
+  The wide window **caused surrender**. The baseline kept working the problem
+  for 13 iterations; the candidate quit after 7 having changed nothing. The
+  "fewer edits = more efficient" reading was exactly backwards — it was fewer
+  edits because it stopped trying. The variant log rules out my wrong-file
+  branch: all five runs saw the plain window message. Best guess is that 60
+  lines of code inside an *error* reads to a 14B model as a listing to discuss
+  rather than a target to copy from.
+
+  **b88 re-graded on DONE survives**: exec-bugfix 0/5 → 2/5 with **zero**
+  surrenders in either arm. That result stands.
+
+  `[x]` **Acted on (build 92).** `_HELP_WINDOW` back to 1 (the prior 3-line
+  behaviour). **Kept**, because neither was implicated and both are better
+  targeting at any width: block-level location via `_best_block`, and the
+  wrong-file branch. The width stays a parameter so re-testing a smaller value
+  is a one-line edit — the hypothesis is still live, just unproven at 12.
+
+  ### Two lessons, both about instruments
+
+  1. **`clean finish` was measuring the wrong thing, and had been all along.**
+     Fixed in `armstats.py` (build 92): `DONE` requires a landed edit, and
+     `gave-up` is now its own column. Any earlier conclusion in this file that
+     leans on clean-finish counts is suspect and should be re-derived — the
+     b88 and b90 numbers above have been.
+  2. **Exposure-filtering (build 91) is still right and still necessary** —
+     it correctly killed the phantom exec-stall-trap regression. But it is not
+     sufficient: it tells you *which runs* count, not whether the *metric*
+     means what you think. I got the right subset and then read a broken number
+     over it.
+
+  *Standing rule, earned twice now:* before crediting any A/B win, open one
+  winning run and read what the model actually did. Both retractions this
+  session came from a summary statistic that looked good.
 - `[ ]` **5.9b Checkpoint / undo.** Both have one and locode has none. Note the
   two designs differ and Cline's own docs describe Roo's: Cline actually uses
   `git stash create` inside the real repo, parked at a private

@@ -373,7 +373,7 @@ def test_not_found_help_shows_verbatim_snippet_and_caveat():
     msg = fs._not_found_help("import os\ndef handle_click(self):\n    pass\n",
                              "def handle_clik(self):", Path("c.py"))
     assert "line-number prefixes" in msg
-    assert "lines 1-4" in msg                  # the window, not just one line
+    assert "lines 1-3" in msg                  # the window, not just one line
     assert "def handle_click(self):" in msg   # verbatim, copyable
     assert "    pass" in msg                   # includes a line of context
 
@@ -399,15 +399,21 @@ def test_not_found_help_points_at_the_block_matched_region():
     assert "The closest match is" in msg
 
 
-def test_not_found_help_shows_a_wide_window_of_real_content():
+def test_not_found_help_window_is_conservative_by_default():
+    # Build 90 widened this to 12 and it measured HARMFUL -- the model
+    # surrendered rather than copied. Pin the narrow default so a future
+    # widening has to be a deliberate, re-measured change.
+    assert fs._HELP_WINDOW == 1
+
+
+def test_not_found_help_can_show_a_wide_window_on_request():
     from pathlib import Path
     lines = ["pass"] * 60
     lines[5], lines[19] = "MARKER_FAR", "MARKER_ABOVE"
     lines[30] = "def compute_totals(rows):"
     lines[41] = "MARKER_BELOW"
     msg = fs._not_found_help("\n".join(lines), "def compute_totls(rows):",
-                             Path("c.py"))
-    # A window either side of the match, not the old +/-1 sliver.
+                             Path("c.py"), window=12)
     assert "MARKER_ABOVE" in msg
     assert "MARKER_BELOW" in msg
     assert "MARKER_FAR" not in msg         # ... but not the whole file

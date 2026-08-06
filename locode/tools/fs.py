@@ -238,8 +238,24 @@ _TRY_REPLACE_LINES = (
 )
 
 
-_HELP_WINDOW = 12      # lines of real file content shown each side of the region
-_HELP_MAX_LINES = 60   # ... but never flood the reply with a whole file
+# Lines of real file content shown each side of the located region.
+#
+# This was 12 in build 90 and is 1 again as of build 92, because the wide
+# window MEASURED HARMFUL. On b90-editwindow's only fully-exposed case
+# (exec-bugfix, 5/5 runs hit it) qwencoder14 went from 0 to 4 surrenders out of
+# 5 — replying "I cannot make progress... I do not have enough context" and
+# ending the turn, having landed zero edits. The baseline kept working the
+# problem for 13 iterations; the wide-window arm quit after 7. A 60-line code
+# block inside an ERROR seems to read to a 14B model as a listing to discuss
+# rather than a target to copy from.
+#
+# Kept as a parameter, not inlined, because the hypothesis is still live — the
+# right width may just be smaller. `_not_found_help(..., window=N)` takes it,
+# so an A/B is a one-line edit. What is NOT reverted: block-level location
+# (`_best_block`) and the wrong-file branch, which are better targeting at any
+# width and were not implicated.
+_HELP_WINDOW = 1
+_HELP_MAX_LINES = 60   # ... and never flood the reply with a whole file
 
 
 def _not_found_help(text: str, old: str, path: Path, *,
