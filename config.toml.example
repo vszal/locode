@@ -82,6 +82,11 @@ max_repetition_aborts = 3
 # history verbatim, so a model on its third attempt is reading three worked
 # examples of the call we are telling it to stop making. Set false to A/B it.
 redact_noop_calls = true
+# Reset a call's repeat streak when an edit LANDED since it last ran — the model
+# is verifying a change, not spinning. Off restores the pre-build-88 behaviour,
+# where re-running a test between two real edits counted as a repeat whenever the
+# output happened not to move. Leave on unless you are A/B-ing it.
+repeat_resets_on_landed_edit = true
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 max_nochange_edits = 2          # redirect/bail if edits keep changing nothing

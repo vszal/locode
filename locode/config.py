@@ -150,6 +150,12 @@ class AgentConfig:
     # it to stop making — and the demonstration beats the instruction. Off
     # switches the behaviour back for an A/B.
     redact_noop_calls: bool = True
+    # Reset a call's repeat streak when an edit LANDED since it last ran: the
+    # model is verifying a change, not spinning. Off restores the pre-build-88
+    # behaviour, where re-running a test between two real edits counted as a
+    # repeat whenever the output happened not to move — which ended 41% of all
+    # logged runs, over half of them wrongly. Leave this on unless A/B-ing it.
+    repeat_resets_on_landed_edit: bool = True
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing

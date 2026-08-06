@@ -2951,3 +2951,93 @@ async def test_redaction_is_off_when_the_config_says_so(tmp_path):
                        if m.get("kind") == "assistant")
     assert '"old"' in joined          # the call is still quotable
     assert "rejected —" not in joined
+
+
+# --- [verify-after-change] the repeat guard vs. the debugging loop -----------
+# Measured over 656 eval logs (ROADMAP 5.8): of the runs killed by the repeat
+# guard, 80% were repeating `bash` — the model re-running its tests — and 82% of
+# consecutive identical bash pairs had a landed edit in between. 140 of 265
+# repeat-stop deaths (82% on exec-bugfix) were the model re-verifying a change we
+# asked it to make. The streak only reset on a changed result, so two rounds
+# whose test output happened not to move were fatal no matter how much real work
+# sat between them.
+
+def make_cycling_loop_with_bash(tmp_path, scripted, bash, cfg=None):
+    """make_loop_with_bash, but the script CYCLES — the only way to express an
+    edit/retest alternation rather than a period-1 stall."""
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    reg.register(UpdatePlan())
+    reg.register(bash)
+    cfg = cfg or Config()
+    cfg.permissions.tools["bash"] = "auto"
+    cfg.permissions.tools["append_file"] = "auto"
+    return AgentLoop(CyclingClient(scripted), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path))
+
+
+def _stop_reason(events):
+    stops = [e["reason"] for e in events if e.get("phase") == "stopped"]
+    return stops[0] if stops else None
+
+
+async def test_retesting_after_a_real_edit_is_not_a_repeat(tmp_path):
+    """Distinct edits that all LAND, each followed by the same test command.
+
+    Before this fix the turn died after the test had run exactly twice, with
+    four separate edits sitting in the file — reported to the user as "repeated
+    the same tool call without making progress", which was simply false.
+    """
+    (tmp_path / "app.py").write_text("x = 1\n")
+    events = []
+    loop = make_cycling_loop_with_bash(
+        tmp_path,
+        [c for i in range(1, 9) for c in
+         (native_call("append_file", path="app.py", content=f"# fix {i}\n"),
+          native_call("bash", cmd="pytest -q"))],
+        FakeBash("1 failed, 2 passed in 0.10s", is_error=True))
+    loop._on_event = events.append
+    await loop.run_turn("fix the failing test")
+
+    reason = _stop_reason(events)
+    assert reason != "the model repeated the same tool call without making progress"
+    # It still stops — but through the net that keys on the ERROR TEXT, which is
+    # the honest signal for "your edits aren't changing the failure".
+    assert reason == "edits kept hitting the same error without making progress"
+    # ...and only after the failure had genuinely recurred, not after two runs.
+    runs = [e.get("name") for e in events if e.get("phase") == "run"]
+    assert runs.count("bash") >= 3
+
+
+async def test_retesting_with_nothing_in_between_still_stops(tmp_path):
+    """The guard must keep firing on a true no-progress loop: same check, same
+    output, no edit between the calls. 47% of the corpus deaths are this, and
+    they are correct."""
+    events = []
+    loop = make_loop_with_bash(
+        tmp_path, [native_call("bash", cmd="pytest -q")],
+        FakeBash("1 failed in 0.10s", is_error=True))
+    loop._on_event = events.append
+    await loop.run_turn("run the tests")
+    assert _stop_reason(events) is not None
+    runs = [e.get("name") for e in events if e.get("phase") == "run"]
+    assert len(runs) < 6          # bails quickly, doesn't grind to the cap
+
+
+async def test_a_repeated_identical_edit_still_counts_as_a_repeat(tmp_path):
+    """The reset is restricted to non-mutating batches on purpose. A repeated
+    edit is the case the existing `repeated_edit` exception exists for — letting
+    it reset itself (it does, after all, land a change every time) would defeat
+    the guard exactly where it earns its keep."""
+    (tmp_path / "app.py").write_text("x = 1\n")
+    events = []
+    cfg = Config()
+    cfg.permissions.tools["append_file"] = "auto"
+    loop = make_loop_with_bash(
+        tmp_path, [native_call("append_file", path="app.py", content="# f\n")],
+        FakeBash("unused"), cfg=cfg)
+    loop._on_event = events.append
+    await loop.run_turn("fix app.py")
+    assert _stop_reason(events) == ("the model repeated the same tool call "
+                                    "without making progress")

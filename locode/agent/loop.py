@@ -212,6 +212,11 @@ class AgentLoop:
         # a stale success latched.
         self._landed_edit = False
         self._last_verify_ok = False
+        # [verify-after-change] A monotonic count of the edits that landed.
+        # _landed_edit answers "did anything succeed this turn?"; the repeat
+        # guard needs "has the workspace moved SINCE this call last ran?", and a
+        # flag that never falls back to False cannot answer that.
+        self._landed_edits = 0
         open_task_nudges = 0
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
@@ -239,7 +244,20 @@ class AgentLoop:
         # only counts a repeat when the result is unchanged too. Without that,
         # interleaving-immunity would misfire on ordinary work: running the same
         # test command between three different edits is progress, not a stall.
+        #
+        # That result check was not enough, and the gap it left was locode's
+        # single biggest failure mode. A test command re-run between two real
+        # edits frequently prints the IDENTICAL failure — you fixed one of two
+        # bugs, or your fix sits behind an earlier one — so the streak grew
+        # anyway and the turn died at two runs, before max_error_stall (which
+        # needs three) could weigh in. Measured over 662 eval logs: 41% of all
+        # runs ended on this guard, and 53% of those had an edit land between
+        # the last two identical calls. See sig_mut_mark below and ROADMAP 5.8.
         repeat_streaks: dict[tuple, tuple[str, int]] = {}
+        # The landed-edit count each signature was last RUN at. Lets the guard
+        # ask "did the workspace move since this exact call last ran?" — the
+        # question the result comparison was standing in for.
+        sig_mut_mark: dict[tuple, int] = {}
         # Did a given signature's result CHANGE while it was being repeated? True
         # only for the duplicating-edit case (identical replace_lines "succeeding"
         # with a new diff each time) — not a plain no-op repeat (constant result).
@@ -807,6 +825,23 @@ class AgentLoop:
                 # waste.
                 batch_sig = tuple(_call_sig(c) for c in calls)
                 seen_result, seen_streak = repeat_streaks.get(batch_sig, (None, 0))
+                # [verify-after-change] A repeat is only a repeat if the
+                # workspace stood still. If an edit LANDED since this signature
+                # last ran, re-running it is verification, not repetition —
+                # whatever its output says. Restricted to batches that don't
+                # themselves mutate: a repeated edit lands a change every time,
+                # so letting it clear its own mark would defeat the repeated_edit
+                # exception below exactly where that exception earns its keep.
+                # The genuine stall — retesting with nothing changed in between —
+                # is untouched, and so is the done-on-repeated-verify exit, whose
+                # precondition is a check "re-run unchanged".
+                if (seen_streak
+                        and self._cfg.agent.repeat_resets_on_landed_edit
+                        and not any(c.name in _MUTATING_EDIT_TOOLS for c in calls)
+                        and self._landed_edits > sig_mut_mark.get(
+                            batch_sig, self._landed_edits)):
+                    seen_streak = 1
+                    repeat_streaks[batch_sig] = (seen_result, 1)
                 # [first-repeat-plan-finish] A redundant (already-seen) update_plan
                 # on a plan whose tasks are ALL done is a weak model signalling
                 # completion the only way it knows — re-stating its finished plan
@@ -963,6 +998,9 @@ class AgentLoop:
                 repeat_streaks[batch_sig] = (
                     result_sig,
                     seen_streak + 1 if (same_result or repeated_edit) else 1)
+                # Recorded AFTER the batch ran, so it counts this batch's own
+                # edits — see the [verify-after-change] check above.
+                sig_mut_mark[batch_sig] = self._landed_edits
                 # A subtler stuck signature than an identical *call*: the model
                 # varies its edits each turn (so the repeat detector never fires)
                 # yet the resulting ERROR is byte-for-byte the same every time —
@@ -1210,6 +1248,7 @@ class AgentLoop:
                 # counts attempts including the not_found/no-op failures — this
                 # is the "the workspace really did change" evidence.
                 self._landed_edit = True
+                self._landed_edits += 1
             if getattr(res, "no_change", False):
                 # Remembered (not just counted) so the loop can lift this call
                 # back out of history — see redact_noop_calls.
