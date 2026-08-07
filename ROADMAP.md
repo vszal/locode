@@ -2235,6 +2235,61 @@ therefore the post-ambiguous landing rate (33% baseline) and the
 invented-old+`replace_all` share (63%)** — not the resend rate, which was never
 the problem.
 
+### 5.21 The stall, decomposed — half of it is edit-landing (2026-08-07)
+
+Measured while the b97 sweep ran, and the most useful thing in this milestone:
+a taxonomy of the user's *"repeating and stalling out is the norm"*, built from
+what happens **between two consecutive pytest runs that print the identical
+failing assertion**. 144 such gaps across the b87+ archive (104 runs):
+
+| between two identical test failures | n | share |
+|---|---|---|
+| the model tried to edit and **every attempt failed** | 71 | 49% |
+| **no edit was attempted at all** | 43 | 30% |
+| an edit **landed** and the failure did not move | 30 | 21% |
+
+**Half of every stall episode is the edit not landing.** Across those 71 gaps
+the failure kinds are ambiguous-match 65, not-found 64, no-op 53 — which is
+builds 96, 97 and 88 respectively. This is the measurement that justifies the
+whole edit-landing line of work, retroactively and better than the sizing I
+originally gave any of them: the model is not mostly confused about the bug, it
+is mostly unable to express the change.
+
+The 30 "landed and it didn't help" gaps are the genuine reasoning failure, and
+they are **capability-bound** — the same wall as 3.1 (own_tests_pass 0/12 across
+model sizes). Worth knowing that ROADMAP 5.13c proposed a message for exactly
+this bucket: it is the *smallest* of the three, and the one least likely to
+respond to better wording. **De-prioritise 5.13c accordingly.**
+
+**The 43 "no edit attempted" gaps are a new and cheap finding.** Broken down by
+what the model did instead:
+
+- **21× `pytest` → `update_plan` → `pytest`** — ticks its plan checklist, then
+  re-runs the suite without having touched a file.
+- **19× `pytest` → `pytest`, nothing in between at all** — the identical command
+  re-issued against an unchanged tree, necessarily producing the identical
+  output.
+- 3× a read or an `ls` in between.
+
+So **40 of 43 are "re-ran the tests without changing anything"**. That is not a
+reasoning failure and not an editing failure; it is the model not noticing that
+nothing on disk has changed. It is also the cheapest lever left, and unlike a
+prompt tweak it can be stated as a fact rather than advice: when a `bash`
+command is byte-identical to the immediately preceding one **and no file has
+been modified since it last ran**, append that to the result — the output is
+unchanged because the tree is unchanged, so a file must be edited before any
+test result can differ.
+
+Candidate **build 98**, scoped deliberately narrowly: it must key on a real
+mtime/hash check, not on the command string alone (a legitimately repeated
+command after a successful edit must stay silent), and it must be advisory text
+on a successful result, never an error — the same shape as the build-22 syntax
+warning, which is the precedent for this kind of inline note.
+
+Ranking after this measurement: **edit-landing (96/97) > the unchanged-tree
+re-run (98, 40 events) > 5.18 reindent (14) > 5.13c (30 events but
+capability-bound)**.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced
