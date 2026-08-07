@@ -1595,6 +1595,47 @@ redirect it. That is the next thing to design, and it wants the 5.11d elision
 diagnostic under it, since a `old`-not-found miss and a landed-but-useless edit
 are different situations that currently read the same to the model.
 
+#### 5.13d The residual is smaller than 5.13c claims — do not build the fix
+
+Went to specify that lever and measured it first. Three hypotheses, all dead:
+
+1. *"The stall nudge rarely fires."* It fires in 26 of the 65 runs my scan
+   called a stall — 40%. Suspicious, so:
+2. *"`error_sig` keys on exact content, and pytest's duration line resets the
+   streak."* Wrong. Of 471 consecutive failing-bash pairs, **40% are
+   byte-identical** — matching the nudge rate almost exactly — and **zero**
+   become identical only after normalising timings, temp paths, or addresses.
+   The signature is not being defeated by volatile output.
+3. *"Then the failure identity is stable while the bytes move."* Also wrong. Of
+   the 281 byte-different pairs, **2** share a failure identity. 86 are plainly
+   different failures and the rest have no extractable identity.
+
+A representative "different" pair:
+
+```
+- E   ImportError: cannot import name 'title_case' from 'textkit'
++ E   ImportError: cannot import name 'dedupe_spaces' from 'textkit'
+```
+
+That is *progress* — one function fixed, the next one up. My stall scan counted
+it as a repeat because it keyed on the first `\w*Error` token within 60
+characters, which collapses every `ImportError:` into one bucket.
+
+**So the same-error stall detector is calibrated about right**, and the "278
+genuine edit → still red → same edit again" figure above is inflated by the
+same coarse-signature error. `max_error_stall = 3` on byte-identical output is
+firing when it should and staying quiet when the error is genuinely moving.
+
+Do not build the signature-normalisation fix. What remains worth asking is
+narrower: when the error *is* byte-identical three times, the nudge fires a
+median of 5 tool calls after the stall began — but that number came from the
+same bad scan and needs re-deriving before anyone acts on it.
+
+Third measurement today to refute a lever I had reasoned my way into from
+reading code (with 5.19a and the whitespace tier). Recording the pattern, not
+just the result: **mechanism justifies a fix, frequency justifies its rank, and
+only measurement supplies frequency.**
+
 ### 5.14 The A/B harness had no noise floor, and nearly sold a false win ✅
 
 The most important result of 2026-08-07, and it is about the instrument.
