@@ -91,6 +91,21 @@ class Registry:
             keys.update((t.schema.get("properties") or {}).keys())
         return keys
 
+    def signatures(self) -> dict[str, tuple[frozenset[str], frozenset[str]]]:
+        """Per-tool ``(required, accepted)`` argument-key sets.
+
+        The tolerant parser uses these to recover a tool call whose JSON is
+        well-formed but carries no `name` — a real and dominant weak-model
+        failure (all 24 unnamed fenced objects in the b93 sweep were
+        `{"tasks": [...]}`, an `update_plan` missing its name, which killed 8
+        of 24 runs). A key set that only ONE tool can accept identifies it.
+        """
+        sigs: dict[str, tuple[frozenset[str], frozenset[str]]] = {}
+        for t in self._tools.values():
+            props = frozenset((t.schema.get("properties") or {}).keys())
+            sigs[t.name] = (frozenset(t.schema.get("required") or ()), props)
+        return sigs
+
     def specs(self) -> list[dict[str, Any]]:
         """OpenAI-style `tools` array for the model request / system prompt."""
         return [

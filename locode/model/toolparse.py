@@ -51,6 +51,17 @@ _DEFAULT_ARG_KEYS = frozenset({
 })
 
 
+# name -> (required arg keys, accepted arg keys). See Registry.signatures().
+_Signatures = dict[str, tuple[frozenset[str], frozenset[str]]]
+
+# Shown when a fenced object carries no name and its keys don't identify one
+# tool. Names the missing field rather than just calling the block unparseable —
+# a bare "missing a name" got re-emitted byte-identically three times in a row.
+_NO_NAME_HELP = (
+    'tool object missing a name: put the tool name in a "name" field, as '
+    '{"name": "<tool>", "args": {...}}')
+
+
 @dataclass
 class ParseOutcome:
     calls: list[ToolCall] = field(default_factory=list)
@@ -65,6 +76,7 @@ def extract(
     message: dict[str, Any],
     known_names: Iterable[str] | None = None,
     known_arg_keys: Iterable[str] | None = None,
+    tool_signatures: _Signatures | None = None,
 ) -> ParseOutcome:
     known = set(known_names) if known_names is not None else None
     arg_keys = set(known_arg_keys) if known_arg_keys else set(_DEFAULT_ARG_KEYS)
@@ -92,7 +104,8 @@ def extract(
         parsed, err = _loads(block)
         if err is None:
             for obj in _as_objects(parsed):
-                call, cerr = _coerce_obj(obj, "fenced", known)
+                call, cerr = _coerce_obj(obj, "fenced", known,
+                                         signatures=tool_signatures)
                 if call:
                     out.calls.append(call)
                 elif cerr:
@@ -214,15 +227,29 @@ def _coerce_native(tc: dict[str, Any], known: set[str] | None):
     return ToolCall(name=name, args=args, id=tc.get("id", ""), source="native"), None
 
 
-def _coerce_obj(obj: Any, source: str, known: set[str] | None, strict: bool = False):
+def infer_tool_name(arg_keys: Iterable[str], signatures: _Signatures) -> str | None:
+    """Name the tool a nameless call must have meant, from its argument keys.
+
+    A tool is a candidate when the object's keys are all keys it accepts AND it
+    carries every argument that tool requires. The answer counts only when
+    exactly ONE tool qualifies — `{"tasks": [...]}` is unmistakably
+    `update_plan`, while `{"path": "x"}` could be read_file or ls and stays
+    unresolved. Conservative on purpose: a wrong guess RUNS the wrong tool,
+    which is far worse than the nudge it replaces.
+    """
+    keys = frozenset(arg_keys)
+    if not keys:
+        return None
+    hits = [n for n, (req, props) in signatures.items()
+            if keys <= props and req <= keys]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _coerce_obj(obj: Any, source: str, known: set[str] | None,
+                strict: bool = False, signatures: _Signatures | None = None):
     if not isinstance(obj, dict):
         return None, None
     name = next((obj[k] for k in _NAME_KEYS if isinstance(obj.get(k), str)), None)
-    if not name:
-        return None, None if strict else "tool object missing a name"
-    if known is not None and name not in known:
-        # In strict (salvage) mode an unknown name is just not-a-call, silently.
-        return None, None if strict else f"unknown tool {name!r}"
     args_key = next((k for k in _ARG_KEYS if k in obj), None)
     if args_key is not None:
         raw_args = obj[args_key]
@@ -233,6 +260,20 @@ def _coerce_obj(obj: Any, source: str, known: set[str] | None, strict: bool = Fa
         raw_args = {k: v for k, v in obj.items()
                     if k not in _STRUCTURAL_KEYS and k != "id"}
     args, err = _loads_args(raw_args)
+
+    if not name:
+        # No name — but the argument keys may still identify the tool beyond
+        # doubt. Only from an explicit tool fence (never in strict salvage mode,
+        # where a bare object in prose is more likely to be data than a call).
+        if strict or signatures is None or err:
+            return None, None if strict else _NO_NAME_HELP
+        name = infer_tool_name(args, signatures)
+        if not name:
+            return None, _NO_NAME_HELP
+        source = f"{source}+inferred"
+    if known is not None and name not in known:
+        # In strict (salvage) mode an unknown name is just not-a-call, silently.
+        return None, None if strict else f"unknown tool {name!r}"
     if err:
         return None, f"bad arguments for {name!r}: {err}"
     return ToolCall(name=name, args=args, id=str(obj.get("id", "")), source=source), None

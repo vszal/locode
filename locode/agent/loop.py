@@ -537,7 +537,8 @@ class AgentLoop:
                     self._nudge_repetition()
                     continue
                 outcome = toolparse.extract(msg, self._registry.names(),
-                                            self._registry.arg_names())
+                                            self._registry.arg_names(),
+                                            self._registry.signatures())
                 calls = outcome.calls
 
                 # A large document written as one write_file truncates at the

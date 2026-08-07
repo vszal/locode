@@ -409,3 +409,116 @@ def test_salvage_targets_the_truncated_call_after_a_complete_one():
             '"content": "' + "w" * 800)
     call = salvage_truncated_write(body, WRITE_KNOWN, WRITE_ARGS)
     assert call is not None and call.args["path"] == "b.md"
+
+
+# --- name inference from argument keys (build 94) ---------------------------
+# All 24 unnamed fenced objects in the b93 sweep were `{"tasks": [...]}` — an
+# update_plan missing its name. The parser nudged, the model re-emitted the
+# identical bytes, and 8 of 24 runs died "unparseable". These cover the
+# recovery and, more importantly, its refusals.
+
+from locode.model.toolparse import infer_tool_name  # noqa: E402
+from locode.tools import build_registry  # noqa: E402
+
+SIGS = build_registry().signatures()
+ALL = set(SIGS)
+
+
+def _fenced(body: str) -> dict:
+    return {"content": f"```json\n{body}\n```"}
+
+
+def test_the_update_plan_call_that_killed_eight_runs():
+    msg = _fenced('{"tasks": ["[x] run pytest", "[>] fix textkit.py"]}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert not out.malformed
+    assert len(out.calls) == 1
+    c = out.calls[0]
+    assert c.name == "update_plan"
+    assert c.args == {"tasks": ["[x] run pytest", "[>] fix textkit.py"]}
+    assert c.source == "fenced+inferred"
+
+
+def test_an_unnamed_edit_is_inferred_from_path_old_new():
+    msg = _fenced('{"path": "a.py", "old": "x = 1", "new": "x = 2"}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["edit_file"]
+    assert out.calls[0].args["old"] == "x = 1"
+
+
+def test_optional_keys_still_infer():
+    msg = _fenced('{"path": "a.py", "old": "x", "new": "y", "replace_all": true}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["edit_file"]
+
+
+def test_a_nested_args_envelope_without_a_name_is_inferred():
+    msg = _fenced('{"args": {"cmd": "pytest -q"}}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["bash"]
+
+
+def test_an_ambiguous_key_set_is_refused():
+    # {"path"} fits both read_file and ls — guessing would run the wrong tool.
+    msg = _fenced('{"path": "a.py"}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert not out.calls
+    assert out.malformed and "missing a name" in out.malformed[0]
+
+
+def test_write_and_append_stay_ambiguous():
+    msg = _fenced('{"path": "a.py", "content": "hello"}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert not out.calls
+
+
+def test_a_missing_required_argument_blocks_inference():
+    # `new` alone is in edit_file and replace_lines, but satisfies neither.
+    msg = _fenced('{"new": "x = 2"}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert not out.calls
+
+
+def test_a_foreign_key_blocks_inference():
+    # Real JSON data that happens to be fenced must not become a call.
+    msg = _fenced('{"cmd": "pytest", "shell": "zsh"}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert not out.calls
+
+
+def test_an_empty_object_is_not_a_call():
+    out = extract(_fenced("{}"), ALL, tool_signatures=SIGS)
+    assert not out.calls
+
+
+def test_inference_is_off_without_signatures():
+    msg = _fenced('{"tasks": ["a"]}')
+    out = extract(msg, ALL)
+    assert not out.calls and out.malformed
+
+
+def test_bare_json_in_prose_is_never_inferred():
+    # Tier-3 salvage stays name-only: unfenced prose JSON is usually data.
+    msg = {"content": 'Here is the plan:\n{"tasks": ["[ ] do it"]}\n'}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert not out.calls
+
+
+def test_an_explicit_name_always_wins_over_inference():
+    msg = _fenced('{"name": "ls", "path": "src"}')
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["ls"]
+    assert out.calls[0].source == "fenced"
+
+
+def test_the_nudge_says_how_to_fix_it():
+    out = extract(_fenced('{"path": "a.py"}'), ALL, tool_signatures=SIGS)
+    assert '"name"' in out.malformed[0]
+
+
+def test_infer_tool_name_directly():
+    assert infer_tool_name(["tasks"], SIGS) == "update_plan"
+    assert infer_tool_name(["cmd"], SIGS) == "bash"
+    assert infer_tool_name(["src", "dst"], SIGS) == "move_file"
+    assert infer_tool_name(["pattern"], SIGS) is None      # glob or grep
+    assert infer_tool_name([], SIGS) is None
