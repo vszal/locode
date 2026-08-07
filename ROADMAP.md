@@ -2290,6 +2290,61 @@ Ranking after this measurement: **edit-landing (96/97) > the unchanged-tree
 re-run (98, 40 events) > 5.18 reindent (14) > 5.13c (30 events but
 capability-bound)**.
 
+### 5.22 The escape hatches never miss, and the model rarely takes them
+
+Follows 5.21's finding that half of all stalling is edit-landing. If the
+`edit_file` retry is where runs die, the question is what the *alternative*
+routes are worth. Measured over b87+, taking each `` `old` not found`` event and
+the next edit attempt of any kind — 124 events, 4 turn-ends:
+
+| route taken after a miss | attempts | landed |
+|---|---|---|
+| retry `edit_file` | 87 (73%) | 32 — **36%** |
+| switch to `replace_lines` | 16 (13%) | 16 — **100%** |
+| switch to `write_file` | 17 (14%) | 17 — **100%** |
+
+**Thirty-three attempts on the two escape hatches, thirty-three landings, zero
+failures.** And the model reaches for one only 27% of the time; nearly
+three-quarters of the time it retries the tool that just failed, at a bit over
+one-in-three.
+
+The per-sweep split is stable, not one outlier: `edit_file` recovery runs
+0/9, 4/15, 5/17, 5/17, 8/17 across b93–b95, while `replace_lines` is 16/16 and
+`write_file` 17/17 pooled.
+
+**The confound, stated up front.** This is not a randomised comparison — the
+model chooses the route. It plausibly reaches for `replace_lines` precisely
+when it already knows the line number, i.e. on the cases it understands, so
+some of that 100% is selection rather than the tool being better. What the
+selection story cannot explain away is the *absence of a single failure* in 33
+tries: whatever causes the model to pick a hatch, picking one has never yet
+been a wasted call, while the default route wastes two calls in three.
+
+**Supersedes a number in 5.16a.** That entry says "retrying `edit_file` after a
+miss landed 0 of 64, in every cell". Under the definition used here — next
+edit attempt of any kind, landed = the result is not not-found/ambiguous/no-op/
+error — the figure is 32 of 87. The two do not reconcile and I cannot recover
+5.16a's exact predicate, so **treat the 0/64 as withdrawn** and this table as
+the live one. The qualitative claim 5.16a was making (retrying `edit_file` is a
+bad bet) survives, and the corrected number still says it.
+
+**One suggestive thing, flagged and not claimed.** In the b96 sweep, not-found
+events fell to 13 (from 22, 23, 26, 26 on the same case and model in b93–b95)
+and `edit_file` recovery rose to 10/12. Both point the way build 96 intended.
+Both arms are pooled and n=12; per the standing rule this is a hypothesis for a
+future sweep, not evidence.
+
+**Candidate build 99 (the editing path continues here).** The not-found message
+already ends with `_TRY_REPLACE_LINES`, which mentions `replace_lines` as a
+fallback for text that is "hard to reproduce exactly" — a footnote, conditioned
+on the model diagnosing its own problem. The data says it should be the
+headline, and that we can do better than advice: we already locate the closest
+region to compute the snippet, so we can hand over **the line number itself** —
+"the closest text is at lines N–M; `replace_lines` with start=N is the reliable
+move here." That converts the 100%-landing route from something the model has
+to think of into something it only has to accept. Rank it against build 98
+(40 events) — this population is 87 events, so it likely goes first.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced
