@@ -775,3 +775,113 @@ async def test_replace_lines_still_fixes_a_broken_file(ctx, tmp_path):
     res = await fs.ReplaceLines().run(
         {"path": "c.py", "start": 2, "end": 2, "new": "    x = 1"}, ctx)
     assert res.ok and (tmp_path / "c.py").read_text() == "def f():\n    x = 1\n"
+
+
+# --- read-before-edit gate (build 93) --------------------------------------
+#
+# The gate refuses a content-anchored edit to a file the model has never read.
+# It is opt-in at the ToolContext level: `seen_files=None` (the `ctx` fixture
+# above, and every tool constructed without a loop) behaves exactly as before,
+# which is what keeps the ~770 tests preceding this section honest.
+
+
+@pytest.fixture
+def gated(tmp_path):
+    """A ToolContext with the gate ARMED and nothing seen yet."""
+    return ToolContext(cwd=str(tmp_path), seen_files=set())
+
+
+async def test_gate_is_off_when_seen_files_is_none(ctx, tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    res = await fs.EditFile().run(
+        {"path": "a.py", "old": "x = 1", "new": "x = 2"}, ctx)
+    assert res.ok and (tmp_path / "a.py").read_text() == "x = 2\n"
+
+
+async def test_edit_file_blocked_on_an_unread_file(gated, tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    res = await fs.EditFile().run(
+        {"path": "a.py", "old": "x = 1", "new": "x = 2"}, gated)
+    assert res.is_error and "have NOT read" in res.content
+    assert "read_file" in res.content
+    # And critically: nothing happened to the file.
+    assert (tmp_path / "a.py").read_text() == "x = 1\n"
+
+
+async def test_read_file_unlocks_the_edit(gated, tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    assert (await fs.ReadFile().run({"path": "a.py"}, gated)).ok
+    res = await fs.EditFile().run(
+        {"path": "a.py", "old": "x = 1", "new": "x = 2"}, gated)
+    assert res.ok and (tmp_path / "a.py").read_text() == "x = 2\n"
+
+
+async def test_a_windowed_read_still_unlocks_the_edit(gated, tmp_path):
+    # The gate is a floor against editing text the model never saw, not a
+    # guarantee it saw the right part — a partial read counts.
+    (tmp_path / "a.py").write_text("\n".join(f"L{i}" for i in range(1, 50)))
+    assert (await fs.ReadFile().run(
+        {"path": "a.py", "offset": 1, "limit": 2}, gated)).ok
+    res = await fs.EditFile().run(
+        {"path": "a.py", "old": "L40", "new": "L99"}, gated)
+    assert res.ok
+
+
+async def test_write_file_counts_as_having_seen_it(gated, tmp_path):
+    assert (await fs.WriteFile().run(
+        {"path": "a.py", "content": "x = 1\n"}, gated)).ok
+    res = await fs.EditFile().run(
+        {"path": "a.py", "old": "x = 1", "new": "x = 2"}, gated)
+    assert res.ok and (tmp_path / "a.py").read_text() == "x = 2\n"
+
+
+async def test_append_file_does_not_count_as_having_seen_it(gated, tmp_path):
+    # Appending tells the model what it added and nothing about the lines
+    # above, so it must not unlock an anchored edit.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    assert (await fs.AppendFile().run(
+        {"path": "a.py", "content": "y = 2\n"}, gated)).ok
+    res = await fs.EditFile().run(
+        {"path": "a.py", "old": "x = 1", "new": "x = 3"}, gated)
+    assert res.is_error and "have NOT read" in res.content
+
+
+async def test_gate_defers_to_plain_no_such_file(gated):
+    # A nonexistent path gets the clearer error, not "go read it first".
+    res = await fs.EditFile().run(
+        {"path": "nope.py", "old": "a", "new": "b"}, gated)
+    assert res.is_error and "no such file" in res.content
+    assert "have NOT read" not in res.content
+
+
+async def test_gate_runs_after_missing_argument_validation(gated, tmp_path):
+    # A malformed call should be told it is malformed; "read the file first"
+    # would send the model off to fix the wrong thing.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    res = await fs.EditFile().run({"path": "a.py", "old": "x = 1"}, gated)
+    assert res.is_error and "have NOT read" not in res.content
+
+
+async def test_replace_lines_blocked_on_an_unread_file(gated, tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "a.py", "start": 1, "end": 1, "new": "x = 2"}, gated)
+    assert res.is_error and "have NOT read" in res.content
+    assert (tmp_path / "a.py").read_text() == "x = 1\n"
+
+
+async def test_replace_lines_unlocked_by_read(gated, tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    assert (await fs.ReadFile().run({"path": "a.py"}, gated)).ok
+    res = await fs.ReplaceLines().run(
+        {"path": "a.py", "start": 1, "end": 1, "new": "x = 2"}, gated)
+    assert res.ok and (tmp_path / "a.py").read_text() == "x = 2\n"
+
+
+async def test_seen_is_keyed_per_file(gated, tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    (tmp_path / "b.py").write_text("y = 1\n")
+    assert (await fs.ReadFile().run({"path": "a.py"}, gated)).ok
+    res = await fs.EditFile().run(
+        {"path": "b.py", "old": "y = 1", "new": "y = 2"}, gated)
+    assert res.is_error and "have NOT read" in res.content

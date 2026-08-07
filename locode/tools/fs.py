@@ -316,6 +316,36 @@ def _not_found_help(text: str, old: str, path: Path, *,
             + snippet + _TRY_REPLACE_LINES)
 
 
+def _mark_seen(ctx: ToolContext, p: Path) -> None:
+    """Record that the model has now seen this file's contents."""
+    if ctx.seen_files is not None:
+        ctx.seen_files.add(str(p))
+
+
+def _unseen_help(ctx: ToolContext, p: Path) -> "ToolResult | None":
+    """Refuse a content-anchored edit to a file the model has never read.
+
+    The measured root cause behind the edit-failure loops (b90 corpus,
+    exec-bugfix): the model reconstructs the target function from a pytest
+    traceback and edits from memory, so `old` never matches anything. Across
+    all 10 runs of both arms it landed at most ONE successful edit and fixed
+    none of the three seeded bugs; one run went pytest, pytest, edit, edit with
+    no read_file at all. Every downstream lever — better failure messages, a
+    wider window, a laxer repeat guard — was treating a symptom of this.
+
+    A read costs one iteration. The guess-loop cost five to seven and ended in
+    surrender. Returns None when the gate is off, the file was already seen, or
+    it doesn't exist (in which case the plain "no such file" is clearer)."""
+    if ctx.seen_files is None or str(p) in ctx.seen_files or not p.exists():
+        return None
+    return ToolResult(
+        f"You have NOT read {p} yet, so you cannot know the exact text it "
+        "contains. Call read_file on it FIRST, then copy `old` verbatim from "
+        "what read_file returns. Do not reconstruct the code from a traceback, "
+        "from the tests, or from memory — text you did not copy is why edits "
+        "fail to match.", is_error=True)
+
+
 def _edit_snippet(before: str, after: str, *, context: int = 3,
                   max_lines: int = 24) -> str:
     """A line-numbered view of the region an edit changed, in read_file's format.
@@ -448,6 +478,10 @@ class ReadFile:
         body = "\n".join(f"{offset + i:>6}\t{ln}" for i, ln in enumerate(chosen))
         if truncated:
             body += "\n… (truncated)"
+        # A truncated or windowed read still counts: the gate is a floor
+        # against editing text the model never saw, not a guarantee that it saw
+        # the right part.
+        _mark_seen(ctx, p)
         return ToolResult(body or "(empty file)")
 
 
@@ -596,6 +630,11 @@ class WriteFile:
             p.write_text(args["content"], "utf-8")
         except OSError as e:
             return ToolResult(f"cannot write {p}: {e}", is_error=True)
+        # Authoring the whole body counts as seeing it — the model has the exact
+        # text it just sent, so a follow-up edit_file is anchored, not guessed.
+        # Only write_file earns this; append_file does not, because the model
+        # knows what it added and nothing about the lines above it.
+        _mark_seen(ctx, p)
         n = args["content"].count("\n") + 1
         return ToolResult(f"wrote {p} ({n} lines)" + _syntax_warning(p, args["content"]))
 
@@ -724,6 +763,8 @@ class EditFile:
                 f"edit_file is missing the required `{missing}` field. Provide "
                 "both `old` (the exact text to replace) and `new` (the replacement "
                 "text, which must DIFFER from `old`).", is_error=True)
+        if (blocked := _unseen_help(ctx, p)) is not None:
+            return blocked
         old, new = args["old"], args["new"]
         try:
             text = p.read_text("utf-8")
@@ -876,6 +917,12 @@ class ReplaceLines:
 
     async def run(self, args: dict, ctx: ToolContext) -> ToolResult:
         p = _resolve(ctx, args["path"])
+        # Gated before anything else: `start`/`end` are meaningless unless they
+        # were copied from a read_file of THIS file. A line number invented from
+        # a traceback is the same guess edit_file makes with `old`, minus the
+        # exact-match check that would have caught it.
+        if (blocked := _unseen_help(ctx, p)) is not None:
+            return blocked
         try:
             text = p.read_text("utf-8")
         except FileNotFoundError:

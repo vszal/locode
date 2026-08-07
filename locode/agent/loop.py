@@ -125,6 +125,12 @@ class AgentLoop:
         # who says "ok, do step 3 now" is continuing the same plan, and throwing
         # it away between turns would make the loop forget what it agreed to.
         self.plan = Plan()
+        # Files whose contents the model has actually seen (read_file, or
+        # write_file where it authored them). Session-scoped for the same reason
+        # as the plan: history carries across turns, so a read in turn 1 is
+        # still in the model's context in turn 2. Handed to every ToolContext;
+        # see _run_calls and tools/fs.py's read-before-edit gate.
+        self._seen_files: set[str] = set()
         # Wallclock time spent inside confirm() this turn — waiting on the human
         # to approve/deny a tool call isn't the model's fault, so it's excluded
         # from both the hard deadline and the slow-progress ratio. Reset each
@@ -154,11 +160,21 @@ class AgentLoop:
 
     def reset_context(self) -> None:
         self.history = self.history[:1]  # keep the system prompt
+        self._forget_seen()
+
+    def _forget_seen(self) -> None:
+        """Drop the read-before-edit record. Called whenever history is cut
+        down: the gate's premise is that the file's text is still IN the
+        model's context, and once the read_file result has been dropped that is
+        no longer true. Costs one re-read per file the model resumes editing,
+        which is exactly the trade the gate is built on."""
+        self._seen_files.clear()
 
     def set_history(self, history: list[dict[str, Any]]) -> None:
         """Replace the conversation history wholesale (e.g. resuming a saved
         session). Copied so the caller's list isn't aliased into the loop."""
         self.history = list(history)
+        self._forget_seen()
 
     def compact(self) -> str:
         """Explicit /compact: same structural rules as auto-compact (see
@@ -166,6 +182,7 @@ class AgentLoop:
         threshold. Returns a short human-readable report."""
         self.history, report = compact_history(
             self.history, keep_recent=self._cfg.agent.compact_keep_recent)
+        self._forget_seen()
         return report
 
     async def run_turn(self, user_text: str) -> str:
@@ -371,7 +388,10 @@ class AgentLoop:
                     new_chars = estimate_chars(self.history)
                     if new_chars != history_chars:
                         # Compaction just deleted evidence from the context, so
-                        # re-reading it is no longer repetition (_forgive_rereads).
+                        # re-reading it is no longer repetition (_forgive_rereads)
+                        # — and by the same token no longer "seen" for the
+                        # read-before-edit gate.
+                        self._forget_seen()
                         forgiven = _forgive_rereads(repeat_streaks, nudged_repeat,
                                                     forgiven_rereads)
                         self._on_event({"phase": "info",
@@ -1162,9 +1182,18 @@ class AgentLoop:
         them byte-identical, before the repeat guard finally ended the turn with
         nothing diagnosed. Empty output was the answer (the prefix is wrong) and
         nothing in the harness could say so."""
+        # `seen_files` is session-scoped, not per-turn, and is passed as None
+        # when the gate is off so the tools take their pre-build-93 path
+        # untouched. Session scope matches history retention: the read the model
+        # is relying on is still in its context, and _forget_seen() clears the
+        # set on every path that cuts history down (reset, /compact, auto-
+        # compact) so the two can't drift apart.
         ctx = ToolContext(cwd=self._cwd, cancel=self.cancel,
                           confirm=self._confirm, select=self._select,
-                          plan=self.plan)
+                          plan=self.plan,
+                          seen_files=(self._seen_files
+                                      if self._cfg.agent.require_read_before_edit
+                                      else None))
         results: list[tuple[str, str]] = []
         error_parts: list[str] = []
         self._noop_calls: list = []

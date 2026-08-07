@@ -87,6 +87,13 @@ redact_noop_calls = true
 # where re-running a test between two real edits counted as a repeat whenever the
 # output happened not to move. Leave on unless you are A/B-ing it.
 repeat_resets_on_landed_edit = true
+# Refuse edit_file/replace_lines on a file the model has NEVER read this session
+# (write_file counts — it authored the body). The measured root cause behind the
+# edit-failure loops: the model reconstructs the target from a pytest traceback
+# and edits from memory, so `old` matches nothing and it spends five to seven
+# iterations guessing before giving up. One read costs one iteration. Set false
+# to restore the pre-build-93 behaviour or to A/B it.
+require_read_before_edit = true
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 max_nochange_edits = 2          # redirect/bail if edits keep changing nothing

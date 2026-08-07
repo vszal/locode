@@ -676,6 +676,7 @@ async def test_nochange_edit_nudged_then_recovers(tmp_path):
     cfg.agent.max_nochange_edits = 2
     cfg.agent.max_repeat_calls = 99   # isolate the no-change path
     loop = make_loop(tmp_path, [
+        native_call("read_file", path="a.txt"),   # read-before-edit gate
         native_call("edit_file", path="a.txt", old="a", new="a"),
         native_call("edit_file", path="a.txt", old="b", new="b"),
         {"role": "assistant", "content": "Let me run the compiler to find the real line."},
@@ -700,6 +701,7 @@ async def test_single_nochange_edit_is_tolerated(tmp_path):
     cfg = Config()
     cfg.agent.max_nochange_edits = 2
     loop = make_loop(tmp_path, [
+        native_call("read_file", path="a.txt"),   # read-before-edit gate
         native_call("edit_file", path="a.txt", old="x", new="x"),   # no-op
         native_call("edit_file", path="a.txt", old="hello", new="world"),  # real
         {"role": "assistant", "content": "done"},
@@ -723,6 +725,7 @@ async def test_nochange_edit_bails_when_ignored(tmp_path):
     cfg.agent.max_repeat_calls = 99
     cfg.agent.max_iterations = 25
     loop = make_loop(tmp_path, [
+        native_call("read_file", path="a.txt"),   # read-before-edit gate
         native_call("edit_file", path="a.txt", old="a", new="a"),
         native_call("edit_file", path="a.txt", old="b", new="b"),
         native_call("edit_file", path="a.txt", old="c", new="c"),
@@ -2799,7 +2802,8 @@ async def test_reverified_green_edit_finishes_instead_of_flailing(tmp_path):
     check = native_call("bash", cmd="python3 -m py_compile parser.py")
     loop = make_loop_with_bash(
         tmp_path,
-        [native_call("edit_file", path="./parser.py",
+        [native_call("read_file", path="./parser.py"),  # read-before-edit gate
+         native_call("edit_file", path="./parser.py",
                      old="def parse(line)", new="def parse(line):"),
          check,          # green
          check,          # ... and the model asks again instead of finishing
@@ -2923,7 +2927,8 @@ async def test_a_no_op_edit_leaves_no_copyable_call_in_history(tmp_path):
     cfg.permissions.tools["edit_file"] = "auto"
     loop = make_loop(
         tmp_path,
-        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 1"),
+        [native_call("read_file", path="./a.py"),  # read-before-edit gate
+         native_call("edit_file", path="./a.py", old="x = 1", new="x = 1"),
          {"role": "assistant", "content": "done"}],
         cfg=cfg)
     await loop.run_turn("fix a.py")
@@ -2943,7 +2948,8 @@ async def test_redaction_is_off_when_the_config_says_so(tmp_path):
     cfg.agent.redact_noop_calls = False
     loop = make_loop(
         tmp_path,
-        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 1"),
+        [native_call("read_file", path="./a.py"),  # read-before-edit gate
+         native_call("edit_file", path="./a.py", old="x = 1", new="x = 1"),
          {"role": "assistant", "content": "done"}],
         cfg=cfg)
     await loop.run_turn("fix a.py")
@@ -3041,3 +3047,91 @@ async def test_a_repeated_identical_edit_still_counts_as_a_repeat(tmp_path):
     await loop.run_turn("fix app.py")
     assert _stop_reason(events) == ("the model repeated the same tool call "
                                     "without making progress")
+
+
+# --- read-before-edit gate, loop wiring (build 93) --------------------------
+
+
+async def test_loop_refuses_an_edit_to_a_file_never_read(tmp_path):
+    # The measured failure this gate exists for: the model reconstructs the
+    # target from a traceback and edits from memory. Here the `old` even
+    # MATCHES — the edit would have landed. It is still refused, because the
+    # model had no way to know the text was right.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("fix a.py")
+    assert (tmp_path / "a.py").read_text() == "x = 1\n"
+    assert any("have NOT read" in m.get("content", "") for m in loop.history)
+
+
+async def test_loop_lets_the_edit_through_after_a_read(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("read_file", path="./a.py"),
+         native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("fix a.py")
+    assert (tmp_path / "a.py").read_text() == "x = 2\n"
+    assert not any("have NOT read" in m.get("content", "") for m in loop.history)
+
+
+async def test_the_gate_can_be_switched_off(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    cfg.agent.require_read_before_edit = False
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("fix a.py")
+    assert (tmp_path / "a.py").read_text() == "x = 2\n"
+
+
+async def test_a_read_in_an_earlier_turn_still_counts(tmp_path):
+    # Session-scoped, not turn-scoped: history carries across turns, so the
+    # read_file result is still in the model's context in turn 2.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("read_file", path="./a.py"),
+         {"role": "assistant", "content": "read it"},
+         native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("look at a.py")
+    await loop.run_turn("now fix it")
+    assert (tmp_path / "a.py").read_text() == "x = 2\n"
+
+
+async def test_resetting_context_forgets_what_was_read(tmp_path):
+    # The gate's premise is that the file's text is still IN the model's
+    # context. Once history is cut down, that is no longer true.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("read_file", path="./a.py"),
+         {"role": "assistant", "content": "read it"},
+         native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("look at a.py")
+    loop.reset_context()
+    await loop.run_turn("now fix it")
+    assert (tmp_path / "a.py").read_text() == "x = 1\n"
+    assert any("have NOT read" in m.get("content", "") for m in loop.history)

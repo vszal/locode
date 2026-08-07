@@ -48,6 +48,11 @@ class ToolContext:
     confirm: Callable[..., Any] | None = None  # permission/editor hook
     select: Callable[..., Any] | None = None   # model-initiated multiple-choice
     plan: Any = None               # agent.plan.Plan — the turn's task list
+    # Paths whose contents the model has actually seen this session, owned by
+    # the loop so it survives across iterations. `None` disables the
+    # read-before-edit gate entirely — which is the default here, so a tool
+    # constructed without a loop (every unit test) behaves as it always did.
+    seen_files: set[str] | None = None
 
 
 @runtime_checkable

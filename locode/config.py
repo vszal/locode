@@ -156,6 +156,16 @@ class AgentConfig:
     # repeat whenever the output happened not to move — which ended 41% of all
     # logged runs, over half of them wrongly. Leave this on unless A/B-ing it.
     repeat_resets_on_landed_edit: bool = True
+    # Refuse edit_file/replace_lines on a file the model has NEVER read this
+    # session (write_file counts as reading — it authored the body). The
+    # measured root cause behind the edit-failure loops: on the b90 exec-bugfix
+    # corpus the model reconstructed the target function from a pytest traceback
+    # and edited from memory, so `old` matched nothing; across all 10 runs of
+    # both arms it landed at most ONE successful edit and fixed none of the
+    # three seeded bugs. One read costs one iteration; the guess-loop cost five
+    # to seven and ended in surrender. Off restores the pre-build-93 behaviour
+    # for an A/B.
+    require_read_before_edit: bool = True
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing
