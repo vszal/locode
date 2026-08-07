@@ -1644,6 +1644,61 @@ An A/B without an A/A for its setup is not evidence. Every "IMPROVED" verdict
 in this ROADMAP predates the floor and should be re-read with that in mind
 before being built on — none of them were calibrated.
 
+### 5.15 The syntax guard was sending models to fix text that was correct (build 95) ✅
+
+Mining the 818-run archive for *how the turn ended* — the same method that
+found 5.13 — the repeat-stop deaths in the current architecture (b87 onward,
+167 runs, 68 repeat-stopped) break down as:
+
+| deaths | shape |
+|---|---|
+| 16 | `bash` repeated, command errored |
+| 14 | `read_file` re-read after edits |
+| **12** | **`edit` refused by our own syntax guard, then resent identically** |
+| 9 | `edit` — `old` not found |
+| 8 | `edit` landed, check still red |
+| 6 | `read_file` re-read, never edited |
+| 2 | `bash` repeated, tests red |
+
+Two things worth saying about that table before the finding. First, the
+no-op-edit death the user reported (`new` identical to `old`) **does not appear
+in it** — build 87 closed it, and the archive-wide counts that still show 35 of
+them are all pre-b87. Second, `bash: SILENT-OK` (re-running `py_compile` after
+it succeeded silently) is likewise absent after b87; build 88 closed it. Both
+are regression columns now, not tasks.
+
+**The finding.** Every guard rejection ended with the same sentence: *"Your
+`new` text is malformed — most often an unmatched bracket or paren, or a broken
+indent."* It is not always true. Locating the supplied span in each archived
+rejection: **31 of the 58 knowable cases broke OUTSIDE the supplied text**, and
+in every one of those the error was at exactly the first line after it.
+
+`b87-noop-redact/exec-bugfix r4` is the canonical shape. The model issued
+`replace_lines 8-28` with a complete, correct, 13-line `word_wrap`. Its text
+was valid Python. But the block being replaced ran past line 20, so its tail
+was stranded and the candidate file read `unexpected indent` at line 21. We
+told the model its function was malformed. It re-read the file, looked at the
+function, correctly concluded nothing was wrong with it, and sent the identical
+edit again — twice — until the repeat guard ended the turn at 155s.
+
+The model behaved correctly at every step. locode misdiagnosed, and the repeat
+guard then punished the model for trusting us.
+
+**Shipped (build 95, commit b04ac6d, 1021 tests).** `_changed_span` recovers the
+supplied lines from the common prefix/suffix of before-vs-after, which works for
+`edit_file` and `replace_lines` alike without threading their different
+arguments into the guard. When the error line falls outside that span the
+message now says the error is *not* in the supplied text, gives the line it is
+actually on, states that the replaced region ended mid-block, renders the
+junction with both ends marked, names the apparent extent of the leftover tail,
+and says plainly that resending the same text will not fix it. When the break
+genuinely is inside the supplied text, the old message is correct and unchanged.
+
+Measurement pending — `b95-seam`, exec-bugfix, 8 pairs. Per 5.14 this setup has
+a noise floor (k=2, floor 0.281), so the score delta must clear 0.563 to claim
+anything; the load-bearing read will be `armstats --exposure "would introduce a
+SyntaxError"`, which is the triggering condition both arms emit.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced
