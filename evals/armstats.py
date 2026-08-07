@@ -57,6 +57,7 @@ MUTATING = {"write_file", "append_file", "edit_file", "replace_lines",
 
 def _blank() -> dict:
     return {"n": 0, "clean": 0, "done": 0, "gaveup": 0, "landed": 0,
+            "verified": 0, "falsedone": 0, "unverifiable": 0,
             "iters": 0, "mut": 0, "exposed": 0, "exposed_clean": 0,
             "exposed_done": 0,
             "nudges": collections.Counter(), "stops": collections.Counter()}
@@ -82,6 +83,28 @@ def _landed_edits(ev: list[dict]) -> int:
             n += not e.get("error")
             pending = None
     return n
+
+
+_PASSED = re.compile(r"\b\d+ passed\b")
+_FAILED = re.compile(r"\b\d+ (?:failed|error)")
+
+
+def _ended_green(ev: list[dict]) -> bool | None:
+    """Did the run's LAST test command report everything passing?
+
+    `done` (self-terminated with a landed edit) is still too generous: b94's r7
+    declared "All planned tasks are complete" with the suite at F....F..FF...
+    and was counted a win. Same failure as `clean` counting surrender — one
+    level down. Returns None when the run never ran a test, which is not a
+    pass and not a fail, only unverifiable.
+    """
+    for e in reversed(ev):
+        if e.get("phase") != "result" or e.get("name") != "bash":
+            continue
+        c = e.get("content") or ""
+        if _PASSED.search(c) or _FAILED.search(c):
+            return bool(_PASSED.search(c)) and not _FAILED.search(c)
+    return None
 
 
 def _matcher(pattern: str | None):
@@ -123,6 +146,10 @@ def collect(label: str, by_case: bool = False,
         a["clean"] += clean
         a["done"] += done
         a["gaveup"] += clean and not done
+        green = _ended_green(ev)
+        a["verified"] += done and green is True
+        a["falsedone"] += done and green is False
+        a["unverifiable"] += done and green is None
         if hit is not None:
             fired = any(e.get("phase") == "result" and hit(e.get("content") or "")
                         for e in ev)
@@ -154,7 +181,10 @@ def main() -> None:
         if not a["n"]:
             continue
         name = " · ".join(key)
-        print(f"{name}: n={a['n']}  DONE={a['done']}/{a['n']}"
+        print(f"{name}: n={a['n']}  VERIFIED={a['verified']}/{a['n']}"
+              f" ({a['verified'] / a['n']:.0%})"
+              f"  [false-done={a['falsedone']} untested={a['unverifiable']}]"
+              f"  DONE={a['done']}/{a['n']}"
               f" ({a['done'] / a['n']:.0%})  gave-up={a['gaveup']}"
               f"  stopped={a['n'] - a['clean']}"
               f"  mean-iters={a['iters'] / a['n']:.1f}"
