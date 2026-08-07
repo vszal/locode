@@ -1,0 +1,961 @@
+{
+  "kind": "paired-ab",
+  "label": "b95-seam",
+  "created": "2026-08-07 06:09:08",
+  "base_ref": "b04ac6d^",
+  "base_sha": "ceb42aa",
+  "cand_desc": "/Users/vszalvay/Code/locode",
+  "pairs": [
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "base": 1.0,
+      "cand": 0.25,
+      "delta": -0.75
+    },
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "base": 0.5,
+      "cand": 1.0,
+      "delta": 0.5
+    },
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 3,
+      "base": 1.0,
+      "cand": 0.5,
+      "delta": -0.5
+    },
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 4,
+      "base": 0.5,
+      "cand": 0.5,
+      "delta": 0.0
+    },
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 5,
+      "base": 0.5,
+      "cand": 0.5,
+      "delta": 0.0
+    },
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 6,
+      "base": 0.5,
+      "cand": 1.0,
+      "delta": 0.5
+    },
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 7,
+      "base": 0.5,
+      "cand": 0.5,
+      "delta": 0.0
+    },
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 8,
+      "base": 0.5,
+      "cand": 1.0,
+      "delta": 0.5
+    }
+  ],
+  "dropped": [],
+  "case_table": {
+    "exec-bugfix": {
+      "n": 8,
+      "mean_delta": 0.0312,
+      "base": 0.625,
+      "cand": 0.6562
+    }
+  },
+  "analysis": {
+    "n_pairs": 8,
+    "n_effective": 5,
+    "n_dropped": 0,
+    "min_pairs": 6,
+    "mean_delta": 0.0312,
+    "wins": 3,
+    "losses": 2,
+    "ties": 3,
+    "p": 1.0,
+    "status": "inconclusive",
+    "why": "only 5 informative pair(s) (8 ran, but 3 scored the same on both arms and a tie cannot move a sign-flip test); a sign-flip test needs 6 before any result can reach p<0.05 (its floor is 2/2^n = 0.062)",
+    "calibrated": true,
+    "noise_floor": 0.2812,
+    "noise_floor_n": 2,
+    "noise_floor_required": 0.5624
+  },
+  "runs": [
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 24,
+        "tool_calls": 22,
+        "tool_calls_by_name": {
+          "bash": 6,
+          "update_plan": 2,
+          "read_file": 3,
+          "edit_file": 8,
+          "ls": 1,
+          "write_file": 1,
+          "append_file": 1
+        },
+        "tool_errors": 9,
+        "tool_error_rate": 0.409,
+        "nudges": 5,
+        "nudges_by_reason": {
+          "malformed": 3,
+          "unchanged": 1,
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 180.0,
+        "model_seconds": 177.6,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 177.6,
+        "gen_chars": 7581,
+        "gen_chars_per_sec": 42.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 180.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r1__base-_kuxjbuh",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.25,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": false,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 27,
+        "tool_calls": 27,
+        "tool_calls_by_name": {
+          "bash": 6,
+          "update_plan": 1,
+          "read_file": 5,
+          "edit_file": 11,
+          "ls": 1,
+          "write_file": 1,
+          "append_file": 2
+        },
+        "tool_errors": 15,
+        "tool_error_rate": 0.556,
+        "nudges": 6,
+        "nudges_by_reason": {
+          "malformed": 5,
+          "unchanged": 1
+        },
+        "stop_reason": "every tool call kept failing \u2014 the model could not find its footing",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 220.2,
+        "model_seconds": 217.6,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 217.5,
+        "gen_chars": 8244,
+        "gen_chars_per_sec": 37.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 220.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r1__cand-dsal4m2w",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 21,
+        "tool_calls": 19,
+        "tool_calls_by_name": {
+          "bash": 7,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 8
+        },
+        "tool_errors": 9,
+        "tool_error_rate": 0.474,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "malformed": 2,
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 153.7,
+        "model_seconds": 150.9,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 150.8,
+        "gen_chars": 6411,
+        "gen_chars_per_sec": 42.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 153.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r2__cand-n4db1hhd",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "update_plan": 3,
+          "read_file": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.375,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "repeated call": 1,
+          "announced intent": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 95.0,
+        "model_seconds": 93.9,
+        "plan_updates": 3,
+        "truncations": 0,
+        "gen_seconds": 93.9,
+        "gen_chars": 4814,
+        "gen_chars_per_sec": 51.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 95.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r2__base-d1oeqgt2",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 21,
+        "tool_calls": 19,
+        "tool_calls_by_name": {
+          "bash": 7,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 8
+        },
+        "tool_errors": 9,
+        "tool_error_rate": 0.474,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "malformed": 2,
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 149.0,
+        "model_seconds": 146.5,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 146.4,
+        "gen_chars": 6337,
+        "gen_chars_per_sec": 43.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 149.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r3__base-x33y6rqe",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 3,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 22,
+        "tool_calls": 20,
+        "tool_calls_by_name": {
+          "bash": 5,
+          "update_plan": 1,
+          "read_file": 3,
+          "edit_file": 8,
+          "ls": 1,
+          "write_file": 1,
+          "append_file": 1
+        },
+        "tool_errors": 11,
+        "tool_error_rate": 0.55,
+        "nudges": 6,
+        "nudges_by_reason": {
+          "malformed": 3,
+          "unchanged": 1,
+          "repeated call": 1,
+          "open plan tasks": 1
+        },
+        "stop_reason": "every tool call kept failing \u2014 the model could not find its footing",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 212.3,
+        "model_seconds": 209.8,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 209.7,
+        "gen_chars": 9563,
+        "gen_chars_per_sec": 45.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 212.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r3__cand-j4xcipzk",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 4,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 15,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 5,
+          "ls": 1,
+          "replace_lines": 1
+        },
+        "tool_errors": 8,
+        "tool_error_rate": 0.615,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "malformed": 3,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 110.4,
+        "model_seconds": 109.7,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 109.6,
+        "gen_chars": 3920,
+        "gen_chars_per_sec": 35.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 110.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r4__cand-xfpbopbi",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 4,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 15,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 5,
+          "ls": 1,
+          "replace_lines": 1
+        },
+        "tool_errors": 8,
+        "tool_error_rate": 0.615,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "malformed": 3,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 111.1,
+        "model_seconds": 110.4,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 110.4,
+        "gen_chars": 3920,
+        "gen_chars_per_sec": 35.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 111.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r4__base-rxlvxigh",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 5,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 15,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 5,
+          "ls": 1,
+          "replace_lines": 1
+        },
+        "tool_errors": 8,
+        "tool_error_rate": 0.615,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "malformed": 3,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 111.5,
+        "model_seconds": 110.8,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 110.7,
+        "gen_chars": 3920,
+        "gen_chars_per_sec": 35.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 111.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r5__base-vdxhzmrw",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 5,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 13,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "bash": 4,
+          "update_plan": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 6,
+        "tool_error_rate": 0.545,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "malformed": 2
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 114.8,
+        "model_seconds": 113.4,
+        "plan_updates": 3,
+        "truncations": 0,
+        "gen_seconds": 113.4,
+        "gen_chars": 4422,
+        "gen_chars_per_sec": 39.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 115.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r5__cand-8pp748il",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 25,
+        "tool_calls": 23,
+        "tool_calls_by_name": {
+          "bash": 9,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 10
+        },
+        "tool_errors": 11,
+        "tool_error_rate": 0.478,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "malformed": 2,
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 179.8,
+        "model_seconds": 176.4,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 176.3,
+        "gen_chars": 7232,
+        "gen_chars_per_sec": 41.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 179.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r6__cand-5wv953jc",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 6,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 15,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 5,
+          "ls": 1,
+          "replace_lines": 1
+        },
+        "tool_errors": 8,
+        "tool_error_rate": 0.615,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "malformed": 3,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 111.6,
+        "model_seconds": 110.9,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 110.8,
+        "gen_chars": 3920,
+        "gen_chars_per_sec": 35.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 111.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r6__base-hrvt5sbl",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 7,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "update_plan": 3,
+          "read_file": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.375,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "repeated call": 1,
+          "announced intent": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 94.6,
+        "model_seconds": 93.5,
+        "plan_updates": 3,
+        "truncations": 0,
+        "gen_seconds": 93.5,
+        "gen_chars": 4814,
+        "gen_chars_per_sec": 51.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 94.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r7__base-f2ixq_n0",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 7,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 23,
+        "tool_calls": 21,
+        "tool_calls_by_name": {
+          "bash": 7,
+          "update_plan": 1,
+          "read_file": 2,
+          "edit_file": 11
+        },
+        "tool_errors": 13,
+        "tool_error_rate": 0.619,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "malformed": 3,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 193.2,
+        "model_seconds": 190.7,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 190.6,
+        "gen_chars": 8781,
+        "gen_chars_per_sec": 46.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 193.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r7__cand-3jq8ll12",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 26,
+        "tool_calls": 24,
+        "tool_calls_by_name": {
+          "bash": 9,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 11
+        },
+        "tool_errors": 12,
+        "tool_error_rate": 0.5,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "malformed": 2,
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 183.1,
+        "model_seconds": 179.7,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 179.7,
+        "gen_chars": 7489,
+        "gen_chars_per_sec": 41.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 183.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r8__cand-uzow4620",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 8,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 15,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "update_plan": 2,
+          "read_file": 2,
+          "edit_file": 5,
+          "ls": 1,
+          "replace_lines": 1
+        },
+        "tool_errors": 8,
+        "tool_error_rate": 0.615,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "malformed": 3,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 111.0,
+        "model_seconds": 110.2,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 110.2,
+        "gen_chars": 3874,
+        "gen_chars_per_sec": 35.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 111.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r8__base-vnov34ny",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    }
+  ],
+  "summary": {
+    "overall_score": 0.641,
+    "clean_finish_rate": 0.5,
+    "total_nudges": 59,
+    "total_iterations": 299,
+    "nudge_histogram": {
+      "malformed": 39,
+      "unchanged": 3,
+      "open plan tasks": 6,
+      "repeated call": 9,
+      "announced intent": 2
+    },
+    "n_runs": 16,
+    "n_valid": 16,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 41.4,
+    "gen_chars": 95242,
+    "rows": {
+      "exec-bugfix::qwencoder14": {
+        "case": "exec-bugfix",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 16,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.641,
+        "score_min": 0.25,
+        "scores": [
+          1.0,
+          0.25,
+          1.0,
+          0.5,
+          1.0,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          1.0,
+          0.5,
+          0.5,
+          0.5,
+          1.0,
+          0.5
+        ],
+        "iterations_mean": 18.7,
+        "nudges_mean": 3.7,
+        "clean_finish_rate": 0.5,
+        "seconds_mean": 145.8,
+        "gen_rate_mean": 41.4,
+        "stop_reasons": [
+          "every tool call kept failing \u2014 the model could not find its footing",
+          "every tool call kept failing \u2014 the model could not find its footing",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress",
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "exec-bugfix": 1.0
+    }
+  },
+  "floor_key": "exec-bugfix|qwencoder14|r8",
+  "is_calibration": false
+}

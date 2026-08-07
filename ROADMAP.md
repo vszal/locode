@@ -1099,6 +1099,22 @@ this now deserves the audit named in 5.7b, and the question is no longer
 "should we remove it" but "is the gate airtight on every path, including
 headless, where nobody can decline".
 
+**Audit answered, 2026-08-07 (build 96): it is not.** Found by accident — two
+build-96 tests asserted `is_error` on an unmatched `old` and instead got
+`edited …, fuzzy ~86%`. `try_edit` labels tier 3 "fuzzy (human-gated)" at
+`fs.py:168`, but it returns plain `status="ok"` and `EditFile.run` writes the
+file. There is no gate *in the tool*. The only gate is the generic
+edit_file approval prompt — precisely what `--allow-tool edit_file` removes.
+So every eval run we have ever scored, and any headless user session, applies
+0.8-similarity fuzzy edits silently.
+
+That lands badly next to 5.17. The model *authors* `old` rather than quoting it
+(87 of 87), so the fuzzy tier is resolving invented search keys against real
+code whenever the invention happens to land within 0.8 of a line. When it
+misses, the model at least gets told. When it hits, we silently write `new`
+over a region the model never actually identified, and report success. This is
+the one edit path that can corrupt a file while looking green — see 5.19.
+
 - `[x]` **5.9a Show the file on a failed match (build 90).** Roo's diff failure returns the
   ±40-line window of *actual current content* plus the best fuzzy candidate it
   found, and tells the model to re-read. locode's `_not_found_help` explains the
@@ -1717,10 +1733,36 @@ junction with both ends marked, names the apparent extent of the leftover tail,
 and says plainly that resending the same text will not fix it. When the break
 genuinely is inside the supplied text, the old message is correct and unchanged.
 
-Measurement pending — `b95-seam`, exec-bugfix, 8 pairs. Per 5.14 this setup has
-a noise floor (k=2, floor 0.281), so the score delta must clear 0.563 to claim
-anything; the load-bearing read will be `armstats --exposure "would introduce a
-SyntaxError"`, which is the triggering condition both arms emit.
+#### 5.15a result — UNPROVEN, exposure zero
+
+`b95-seam`, exec-bugfix, qwencoder14, 8 pairs, base `ceb42aa`:
+
+```
+base 0.625   cand 0.656   delta +0.031
+pairs W3/L2/T3 — 5 informative · sign-flip p = 1.0
+noise floor +0.281 (k=2)          →  INCONCLUSIVE
+```
+
+The score is a null result, and the reason is not subtle. **The seam branch
+fired zero times, in either arm.** Five guard rejections happened across the 16
+runs (4 base, 1 cand) and every one of them was a genuine column-0 dedent, where
+build 95 deliberately keeps the old message. The changed code never executed.
+
+This is `b93` again, and the same discipline applies: the sweep cannot credit
+the change and cannot blame it. What justifies build 95 remains the archived
+evidence — 31 of 58 rejections broke outside the supplied text, and the message
+we sent about them was false.
+
+**Two numbers in that table I am explicitly not crediting**, recorded here
+because they are exactly the shape of the b94 mistake: the candidate arm landed
+**3.9 edits per run against the baseline's 1.4**, and verified 3/8 against 2/8.
+With zero exposure there is no mechanism by which build 95 could have caused
+either. Exposure was also asymmetric (4/8 base vs 1/8 cand), which makes the
+arms non-comparable on anything downstream of a guard rejection. Divergence,
+not effect.
+
+The eval case simply does not produce seam breaks often enough to measure this
+way. Testing it needs a case built to strand a block — noted, not built.
 
 ### 5.16 Why `old` misses — the dominant edit failure, classified (build 96 target)
 
@@ -1818,6 +1860,38 @@ the window fix in 5.16 as the highest-value editing lever. The 5.16 defect 1
 (advice text concatenated onto the copy-me block) still ships regardless — it
 is a formatting bug, not a hypothesis.
 
+#### 5.17a Shipped — build 96
+
+Three changes in `locode/tools/fs.py`:
+
+1. `_quoted_fraction(old, text)` — the share of `old`'s non-blank lines that
+   appear verbatim in the file. This is what separates an *invented* `old`
+   (scores 0) from an *elided* one (scores 1.0, every line real but the middle
+   dropped). The two need opposite advice and today get the same message.
+2. `_authored_old_note(old, new, text)` — fires only when `old` quotes nothing
+   real **and** is ≥0.75 similar to `new`, and leads the not-found reply with
+   the diagnosis: your two fields are N% identical, no line of `old` is in the
+   file, so you wrote the code you want into both; `old` is the search key, the
+   text in the file RIGHT NOW.
+3. The no-op message names the same misconception, since that path *is* the
+   degenerate case.
+
+Plus 5.16 defect 1: `_TRY_REPLACE_LINES` now leads with a newline instead of a
+space, so it stops fusing onto the last line of the block we just told the
+model to copy verbatim.
+
+**Validated against the archive before shipping**, which is what the threshold
+rests on: fires on all 88 nothing-quoted cases, silent on all 28 elisions and
+all 27 partly-quoted. One nothing-quoted case sat at 0.78, so the cut is 0.75
+rather than 0.80. A false positive costs nothing — the rest of the message is
+unchanged — and no successful edit reaches this path.
+
+10 tests (1031 total, green). Measurement not yet attempted; per 5.15a the
+exec-bugfix case is a poor instrument for a branch that fires rarely, and
+*this* branch should fire often — `old`-not-found is 187 events across 168
+runs. That makes it the first change in a while worth A/B-ing on exposure
+grounds. Not yet run.
+
 ### 5.18 `replace_lines` makes the model supply indentation that `edit_file` supplies for it
 
 Found while watching the `b95-seam` sweep: every guard rejection in it took the
@@ -1861,6 +1935,41 @@ a new liberty here; it is `edit_file`'s existing contract extended to the tool
 that lacks it.
 
 Ranked after 5.17 (154 events) but ahead of the elision work (28).
+
+### 5.19 The fuzzy tier's "human gate" does not exist on the path that matters
+
+Found while writing the build-96 tests (full account in the competitive-analysis
+section above, under 5.7b). `try_edit` comments tier 3 as "fuzzy (human-gated)"
+and then returns `status="ok"`; `EditFile.run` writes the file. The gate is the
+ordinary edit_file approval prompt, so it is present interactively and **absent
+in every headless run** — including every eval sweep we have scored.
+
+Why this is worse than it looks in isolation: 5.17 establishes that the model
+composes `old` rather than copying it. A composed `old` that happens to score
+≥0.8 against some real region gets `new` written over that region, silently,
+reported as `edited (fuzzy ~86%)`. The model never identified that text. The
+failure is invisible — it does not error, it does not stall, and a run can pass
+its tests while carrying an edit nobody chose.
+
+I am deliberately not changing this in build 96. It is a behavior change to the
+edit path with real blast radius, it needs its own measurement, and bundling it
+into a message-wording build would make both unreadable. Options, cheapest
+first:
+
+1. **Make the gate real.** Return a distinct status from tier 3 and require
+   `ctx.confirm`; with no confirm available, decline and fall through to
+   `_not_found_help`. Headless runs then behave like every competitor's
+   exact-only default. This is the honest reading of what the comment already
+   claims.
+2. **Raise the threshold** toward Roo's 1.0 / Cline's off-by-default. Cheap,
+   but picks a number without evidence.
+3. **Keep it, and say so** in the success message — "matched at ~86%
+   similarity, verify this is the line you meant" — so at least it is visible.
+
+Option 1 is the one to measure, and the A/B is well-posed for once: the
+baseline is what we have been shipping, and exposure is high. Worth checking
+first whether fuzzy applications in the archive were mostly right or mostly
+wrong — that measurement is free and decides between 1 and 3.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 

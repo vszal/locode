@@ -231,8 +231,14 @@ def _match_locations(text: str, old: str, limit: int = 6) -> str:
 # collapse to `old == new`). The escape hatch is replace_lines, which needs only
 # the line NUMBER, not the bytes. Appended to the not-found / no-op errors so the
 # model switches tools instead of re-guessing the same `old`.
+#
+# Leads with a NEWLINE, not a space (build 96): at the not-found call site this
+# is concatenated onto the end of a verbatim code block the model is told to
+# copy out of, so a leading space made the block's last line read
+# `    current = [word] If the target text is hard to reproduce…` — advice
+# fused to the very text we asked it to reproduce exactly.
 _TRY_REPLACE_LINES = (
-    " If the target text is hard to reproduce EXACTLY — it has backslashes, "
+    "\nIf the target text is hard to reproduce EXACTLY — it has backslashes, "
     "quotes, or unusual whitespace — stop guessing at `old`: use replace_lines "
     "instead, giving the line NUMBER (from read_file) rather than the text."
 )
@@ -258,8 +264,58 @@ _HELP_WINDOW = 1
 _HELP_MAX_LINES = 60   # ... and never flood the reply with a whole file
 
 
+def _quoted_fraction(old: str, text: str) -> float:
+    """What share of `old`'s non-blank lines appear verbatim (stripped) in the file.
+
+    Separates two failures that both end in "not found" and need opposite advice:
+    an `old` the model INVENTED scores 0, while an elided `old` — every line real
+    but the boring middle dropped — scores 1.0 and must not be told it made the
+    text up.
+    """
+    lines = [l.strip() for l in old.split("\n") if l.strip()]
+    if not lines:
+        return 0.0
+    hay = {l.strip() for l in text.split("\n")}
+    return sum(l in hay for l in lines) / len(lines)
+
+
+def _authored_old_note(old: str, new: str, text: str) -> str:
+    """The diagnosis for an `old` that is a draft of `new` rather than a quote.
+
+    Measured over the whole b87+ corpus: of the 87 single-line misses where the
+    model had already read the file, **87** had `old` closer to its own `new`
+    (median 0.97) than to any line in the file (0.67). Not one exception. The
+    model writes its intended replacement into both fields and then tweaks one,
+    iterating `< width` / `<= width` / `+ 1 <= width` while using that invented
+    text as the search key, so nothing ever matches and nothing ever lands.
+
+    Telling it to "copy the target text exactly" does not reach this — the model
+    believes it already did. The misconception has to be named.
+
+    Only fires when `old` quotes NOTHING real, so an elision keeps its own
+    advice. Validated against the archive: fires on all 88 nothing-quoted cases,
+    silent on all 28 elisions and all 27 partly-quoted. The 0.75 threshold is
+    the lowest observed nothing-quoted similarity (0.78) with margin. A false
+    positive costs nothing — the rest of the message is unchanged — and this
+    path is never reached by an edit that succeeded.
+    """
+    if not old.strip() or not new.strip():
+        return ""
+    if _quoted_fraction(old, text) > 0:
+        return ""
+    ratio = difflib.SequenceMatcher(None, old.strip(), new.strip()).ratio()
+    if ratio < 0.75:
+        return ""
+    return (f"Your `old` and `new` are {ratio:.0%} identical, and no line of "
+            "`old` appears in the file — so you have written the code you WANT "
+            "into both fields. `old` is not a draft of the fix: it is the search "
+            "key, the text that is in the file RIGHT NOW, copied character for "
+            "character. Put the file's existing text in `old` and your corrected "
+            "version in `new`. ")
+
+
 def _not_found_help(text: str, old: str, path: Path, *,
-                    window: int = _HELP_WINDOW) -> str:
+                    window: int = _HELP_WINDOW, new: str = "") -> str:
     """The reply when `old` didn't match — always hands back the file's ACTUAL
     text around the likeliest region.
 
@@ -310,8 +366,9 @@ def _not_found_help(text: str, old: str, path: Path, *,
         snippet = (" NOTHING in this file resembles `old` — you are probably "
                    "editing the wrong file, or it has already changed. Re-read "
                    "it with read_file before trying again.")
-    return (f"`old` not found in {path} ({len(lines)} lines). Copy the target text "
-            "EXACTLY as it appears in the file — do NOT include read_file's "
+    return (_authored_old_note(old, new, text)
+            + f"`old` not found in {path} ({len(lines)} lines). Copy the target "
+            "text EXACTLY as it appears in the file — do NOT include read_file's "
             "line-number prefixes — or add more surrounding context to pin it down."
             + snippet + _TRY_REPLACE_LINES)
 
@@ -863,8 +920,11 @@ class EditFile:
                 "test or traceback names the wrong line and what is wrong with "
                 "it), then submit an edit whose `new` carries that correction. If "
                 "this line is already correct, the bug is on a DIFFERENT line — "
-                "stop editing this one and look elsewhere. Do NOT resend this "
-                "same no-op edit." + _TRY_REPLACE_LINES,
+                "stop editing this one and look elsewhere. Writing the same text "
+                "into both fields is the signature of drafting your intended "
+                "replacement in `old` as well as `new`: `old` must be the text "
+                "the file contains NOW, and `new` the text you want instead. Do "
+                "NOT resend this same no-op edit." + _TRY_REPLACE_LINES,
                 is_error=True, no_change=True)
         replace_all = bool(args.get("replace_all"))
 
@@ -908,7 +968,7 @@ class EditFile:
                 "it. Move on to the next step, or if the task is done, finish.",
                 no_change=True)
         if status == "not_found":
-            return ToolResult(_not_found_help(text, old, p), is_error=True)
+            return ToolResult(_not_found_help(text, old, p, new=new), is_error=True)
         if status == "noop":
             return ToolResult(
                 "This edit changed NOTHING: `old` matched, but after "

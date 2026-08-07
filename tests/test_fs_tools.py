@@ -988,3 +988,94 @@ async def test_seam_diagnosis_leaves_the_file_untouched(ctx, tmp_path):
     await fs.ReplaceLines().run(
         {"path": "m.py", "start": 2, "end": 3, "new": "    return 0"}, ctx)
     assert (tmp_path / "m.py").read_text() == src
+
+
+# --- `old` is a search key, not a draft of `new` (build 96) ---
+#
+# 87 of 87 single-line `old`-not-found cases in the b87+ corpus had `old` closer
+# to the model's own `new` (median 0.97) than to any line in the file it had
+# just read (0.67). The model writes its intended replacement into both fields.
+# The no-op edit is the same bug with an empty tweak. See ROADMAP 5.17.
+
+def test_quoted_fraction_counts_lines_present_in_the_file():
+    text = "def f():\n    return 1\n"
+    assert fs._quoted_fraction("    return 1", text) == 1.0
+    assert fs._quoted_fraction("    return 2", text) == 0.0
+    assert fs._quoted_fraction("def f():\n    return 2", text) == 0.5
+
+
+def test_quoted_fraction_of_blank_old_is_zero():
+    assert fs._quoted_fraction("   \n\n", "x = 1\n") == 0.0
+
+
+def test_authored_note_fires_when_old_is_a_draft_of_new():
+    text = "def f(w):\n    elif current_len + 1 + len(w) < w:\n"
+    note = fs._authored_old_note(
+        "current = [w] if current_len + len(w) < w else [w]",
+        "current = [w] if current_len + len(w) + 1 <= w else [w]", text)
+    assert "identical" in note and "search key" in note
+
+
+def test_authored_note_is_silent_on_an_elision():
+    # Every line real and in order, middle dropped — the model quoted, it did
+    # not invent, and it must not be told otherwise.
+    text = "a = 1\nb = 2\nc = 3\nd = 4\n"
+    assert fs._authored_old_note("a = 1\nd = 4", "a = 1\nd = 5", text) == ""
+
+
+def test_authored_note_is_silent_when_old_and_new_differ_a_lot():
+    # Invented `old`, but not a draft of `new` — that is the wrong-file shape,
+    # which the existing "nothing resembles `old`" branch already answers.
+    text = "alpha\nbravo\n"
+    assert fs._authored_old_note("zzzzzzzz", "completely different text", text) == ""
+
+
+def test_authored_note_is_silent_without_a_new():
+    text = "alpha\nbravo\n"
+    assert fs._authored_old_note("zzzz", "", text) == ""
+
+
+async def test_not_found_reply_names_the_old_is_new_confusion(ctx, tmp_path):
+    (tmp_path / "m.py").write_text(
+        "def f(width):\n    if current_len + 1 + len(word) < width:\n        pass\n")
+    # The corpus shape: `old` is ~0.6 from the closest real line (so no tier
+    # matches it) but ~0.97 from the model's own `new`.
+    res = await fs.EditFile().run(
+        {"path": "m.py",
+         "old": "    current = [word] if current_len + len(word) < width else [word]",
+         "new": "    current = [word] if current_len + len(word) + 1 <= width else [word]"},
+        ctx)
+    assert res.is_error
+    assert "search key" in res.content
+    assert "RIGHT NOW" in res.content
+
+
+async def test_the_elision_reply_does_not_accuse_the_model_of_inventing(ctx, tmp_path):
+    (tmp_path / "m.py").write_text("a = 1\nb = 2\nc = 3\nd = 4\n")
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1\nd = 4", "new": "a = 1\nd = 5"}, ctx)
+    assert res.is_error
+    assert "search key" not in res.content
+
+
+async def test_the_copy_me_block_is_not_run_into_by_the_advice(ctx, tmp_path):
+    # 5.16 defect 1: _TRY_REPLACE_LINES was concatenated with a leading space
+    # onto the last line of a block the model is told to copy verbatim.
+    (tmp_path / "m.py").write_text(
+        "def f():\n    alpha = 1\n    bravo = 2\n    return alpha\n")
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "    total_width = 1",
+         "new": "    total_width = 2"}, ctx)
+    assert res.is_error
+    assert " If the target text is hard to reproduce" not in res.content
+    assert "\nIf the target text is hard to reproduce" in res.content
+
+
+async def test_no_op_message_names_the_same_misconception(ctx, tmp_path):
+    # The degenerate case of 5.17 — the tweak between the two fields came out
+    # empty, so the key matches and the edit changes nothing.
+    (tmp_path / "m.py").write_text("x = 1\n")
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "x = 1", "new": "x = 1"}, ctx)
+    assert res.is_error
+    assert "both fields" in res.content
