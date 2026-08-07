@@ -87,8 +87,75 @@ async def test_edit_file_ambiguous_lists_match_locations(ctx, tmp_path):
     (tmp_path / "c.py").write_text("x = 1\ny = 2\nx = 1\nz = 3\nx = 1\n")
     res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
     assert res.is_error
-    assert "line 1:" in res.content and "line 3:" in res.content and "line 5:" in res.content
+    assert ("match at line 1" in res.content and "match at line 3" in res.content
+            and "match at line 5" in res.content)
     assert (tmp_path / "c.py").read_text() == "x = 1\ny = 2\nx = 1\nz = 3\nx = 1\n"
+
+
+# --- an ambiguous match must show what SEPARATES the sites (build 97) ---
+#
+# 125 ambiguous-match events across 37% of b87+ runs; 43 were answered by
+# resending the identical `old`. The old message listed `line N: <first line of
+# old>` per site, which renders byte-identically for every site by
+# construction. See ROADMAP 5.20.
+
+async def test_ambiguous_shows_the_lines_around_each_match(ctx, tmp_path):
+    (tmp_path / "c.py").write_text(
+        "before_one\nx = 1\nafter_one\n\nbefore_two\nx = 1\nafter_two\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
+    assert res.is_error
+    # The distinguishing context, not just the model's own search text echoed back.
+    for ctxline in ("before_one", "after_one", "before_two", "after_two"):
+        assert ctxline in res.content, ctxline
+
+
+async def test_ambiguous_sites_are_not_byte_identical(ctx, tmp_path):
+    # The actual defect: every listed site used to render the same characters.
+    (tmp_path / "c.py").write_text(
+        "alpha\nx = 1\nbravo\n\ncharlie\nx = 1\ndelta\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
+    blocks = res.content.split("── match at line ")[1:]
+    assert len(blocks) == 2
+    assert blocks[0] != blocks[1]
+
+
+async def test_ambiguous_marks_which_line_is_the_match(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("alpha\nx = 1\nbravo\ncharlie\nx = 1\ndelta\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
+    assert "   2 |> x = 1" in res.content
+    assert "   1 |  alpha" in res.content
+
+
+async def test_ambiguous_tells_the_model_not_to_resend(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("a\nx = 1\nb\nc\nx = 1\nd\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
+    assert "same way" in res.content
+    assert "replace_lines" in res.content and "replace_all" in res.content
+
+
+async def test_ambiguous_caps_the_number_of_sites_shown(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("".join(f"pad{i}\nx = 1\n" for i in range(9)))
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
+    assert res.content.count("── match at line ") == fs._AMBIG_SITES
+    assert f"and {9 - fs._AMBIG_SITES} more" in res.content
+
+
+async def test_ambiguous_handles_a_multiline_old(ctx, tmp_path):
+    (tmp_path / "c.py").write_text(
+        "head\na = 1\nb = 2\ntail\n\nhead2\na = 1\nb = 2\ntail2\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "a = 1\nb = 2", "new": "a = 9\nb = 9"}, ctx)
+    assert res.is_error
+    # both lines of the match marked, at both sites, with their own context
+    assert res.content.count("|> a = 1") == 2
+    assert res.content.count("|> b = 2") == 2
+    assert "head" in res.content and "tail2" in res.content
+
+
+async def test_ambiguous_near_the_file_edges_does_not_crash(ctx, tmp_path):
+    (tmp_path / "c.py").write_text("x = 1\nx = 1\n")
+    res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
+    assert res.is_error and "match at line 1" in res.content
 
 
 async def test_edit_file_noop_is_refused_with_actionable_help(ctx, tmp_path):

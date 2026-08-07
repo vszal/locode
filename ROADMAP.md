@@ -1997,6 +1997,38 @@ exec-bugfix case is a poor instrument for a branch that fires rarely, and
 runs. That makes it the first change in a while worth A/B-ing on exposure
 grounds. Not yet run.
 
+**5.17b — the b96 A/B: INCONCLUSIVE, and do not read it as a win.**
+`b96-authored-old`, exec-bugfix, qwencoder14, r8 (16 runs). Score delta
+**−0.125** (base 0.656, cand 0.531), W1/L3/T4 → 4 informative pairs, sign-flip
+p=0.625, and the calibrated noise floor for this exact setup is ±0.281. Four
+informative pairs cannot reach p<0.05 under any arrangement (floor 2/2⁴), so
+the sign here carries no information either way.
+
+The endings (armstats, the measure that matters) lean *against* the candidate:
+VERIFIED 3/8 → 1/8, self-terminated-gave-up 3 → 0, stopped-by-repeat-guard
+1 → 6, iterations 14.2 → 21.0, edits landed 2.4 → 3.6.
+
+What is *not* ambiguous is exposure: **the branch fired, 7 of 7 cand not-found
+events carried the note** — the first real exposure in three builds (b93 and
+b95 were both 0%). Exposure was asymmetric though (7/8 cand runs vs 4/8 base),
+so even the ending counts are comparing unlike populations.
+
+Reading a trajectory (`r2__cand`, per methodology rule 3) explains the shape and
+is the useful output of this sweep. The note fired at 62.8 s and the model
+corrected *immediately* — it quoted a real file line and landed three edits
+(93.6 s, 99.7 s, 105.6 s). The run then died on a **different** failure: the now
+genuinely-quoted `old` matched 2 places, the ambiguous-match error came back,
+and the model resent it byte-identical twice before flailing into the repeat
+guard. The per-arm counts say the same thing: ambiguous-match events base 8 →
+cand 20, edits landed 17 → 26. An ambiguous `old` is *by construction* real file
+text, so build 96 moved the model from inventing `old` to quoting it, roughly
+2.5×, exactly as designed — and the higher iteration/stopped counts are what
+happens when a run that used to die early now survives to the next wall.
+
+Verdict: mechanism confirmed, score unproven, next bottleneck identified (5.20).
+Do not cite the −0.125 in either direction; do not re-run this case expecting
+resolution — 8 pairs cannot resolve a 0.281 floor.
+
 ### 5.18 `replace_lines` makes the model supply indentation that `edit_file` supplies for it
 
 Found while watching the `b95-seam` sweep: every guard rejection in it took the
@@ -2104,6 +2136,62 @@ corrected regardless; it is what sent me down this path.
 Standing lesson, since this is twice in one day: I flagged this as a live
 hazard from reading the code, and the archive said it has never happened.
 Mechanism first, measurement before priority.
+
+### 5.20 The ambiguous-match error showed the model nothing to choose with (build 97) ✅
+
+The wall build 96 uncovered (5.17b). Sized before building, per the standing
+rule: across the b87+ archive, **125 ambiguous-match events in 75 of 199 runs
+(37%)**, of which **43 were answered by resending a byte-identical `old`**, and
+the next call was `edit_file` again 117 times. In the b96 sweep alone: 28
+events in 12 of 16 runs (75%), 11 identical resends. That ranks it above the
+reindent work (5.18, 14 events), which is drafted and now deferred.
+
+The message was self-defeating. Verbatim from the sweep:
+
+```
+`old` appears 2 times in …/textkit.py, so it is not clear which one to change.
+Either add more surrounding lines to `old` so it matches exactly ONE place, or
+pass replace_all to change every one. The matches are at:
+  line 23: current = [word]
+  line 30: current = [word]
+```
+
+Every listed site is byte-identical **by construction** — `_match_locations`
+echoed the model's own search text back once per match. So the reply told the
+model to "add more surrounding lines" while showing it no surrounding lines and
+no basis for preferring line 23 over line 30. Resending unchanged is close to
+the rational response to that message.
+
+**Build 97** rewrites `_match_locations` to render each site with the real lines
+around it and a `>` marker on the matched span:
+
+```
+  ── match at line 6 ──
+     5 |          if current_len + len(word) < width:
+     6 |>             current = [word]
+     7 |              current_len = len(word)
+  ── match at line 10 ──
+     9 |              lines.append(" ".join(current))
+    10 |>             current = [word]
+    11 |      return lines
+```
+
+and rewrites the surrounding prose to say plainly that resending will fail
+identically, then offer three concrete moves: extend `old` with a
+distinguishing line *copied from what is shown*; use `replace_lines` with that
+match's line number; or pass `replace_all` if every occurrence really is meant.
+
+`_AMBIG_SITES = 4` and `_AMBIG_WINDOW = 1` are named constants, not inlined, so
+the width is A/B-able. Both are deliberately small: **build 90 measured a wide
+context window to be actively harmful** — a large block inside an error message
+reads to a 14B model as a listing to discuss rather than text to copy. Four
+sites at one line of context is ~12 lines.
+
+7 new tests plus one pre-existing test updated (it asserted the old `line N:`
+format); **1038 total, green**. Not yet A/B-ed — and per 5.17b, the exec-bugfix
+r8 instrument cannot resolve it. Exposure is the thing to check first, and the
+triggering condition both arms emit is "appears N times", never the new
+wording.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 

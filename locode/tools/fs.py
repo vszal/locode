@@ -165,7 +165,12 @@ def try_edit(text: str, old: str, new: str, replace_all: bool):
         if updated == text:                           # indent-only "change" -> no change
             return None, note, "noop", len(spans)
         return updated, note, "ok", len(spans)
-    if not replace_all:                               # tier 3: fuzzy (human-gated)
+    # Tier 3: fuzzy. NOT gated on anything — this returns a plain "ok" and the
+    # caller writes it, same as an exact match (the old "(human-gated)" comment
+    # here was simply false, and cost an investigation; ROADMAP 5.19). Left
+    # ungated on measurement: 29 fuzzy applies in the whole archive, median
+    # similarity 100%, minimum 85%, none at all since b87.
+    if not replace_all:
         fz = _fuzzy_span(text, old)
         if fz is not None:
             a, b, ratio = fz
@@ -206,22 +211,48 @@ def _same_content(a: str, b: str) -> bool:
         [_match_key(l) for l in _old_block(b)]
 
 
-def _match_locations(text: str, old: str, limit: int = 6) -> str:
-    """List where `old` occurs, as `line N: <first line of the match>`, so a
-    model that matched several places can add context to pin the one it means.
-    Capped at `limit` so a pattern that appears everywhere can't flood the reply."""
-    first = old.split("\n", 1)[0]
-    out, start, shown = [], 0, 0
+# Matches rendered in full before the rest collapse to a count, and real lines
+# shown each side of one. Both deliberately small: build 90 measured a WIDE
+# context window actively harmful (a big block inside an error reads to a 14B
+# model as a listing to discuss rather than text to copy), and four sites at one
+# line of context is ~12 lines. Named, not inlined, so the width is A/B-able.
+_AMBIG_SITES = 4
+_AMBIG_WINDOW = 1
+
+
+def _match_locations(text: str, old: str, *, limit: int = _AMBIG_SITES,
+                     window: int = _AMBIG_WINDOW) -> str:
+    """Show every place `old` matches, WITH the lines around it.
+
+    This used to list `line N: <first line of old>` per match — which is
+    byte-identical for every entry by construction, since it echoed the model's
+    own search text back once per site and said nothing about what separates
+    them. A real example: `line 23: current = [word]` / `line 30: current =
+    [word]`. The message then told the model to "add more surrounding lines"
+    while showing it no surrounding lines, so it had nothing to choose with.
+    43 of the 125 archived ambiguous matches were answered by resending the
+    identical `old` (ROADMAP 5.20).
+
+    Capped at `limit` so a pattern that appears everywhere can't flood the reply.
+    """
+    lines = text.split("\n")
+    span = len(old.split("\n"))
+    out, start, shown, total = [], 0, 0, text.count(old)
     while shown < limit:
         i = text.find(old, start)
         if i < 0:
             break
-        line_no = text.count("\n", 0, i) + 1
-        out.append(f"  line {line_no}: {first.strip()[:100]}")
+        first = text.count("\n", 0, i) + 1
+        lo = max(1, first - window)
+        hi = min(len(lines), first + span - 1 + window)
+        out.append(f"  ── match at line {first} ──")
+        for n in range(lo, hi + 1):
+            hit = first <= n <= first + span - 1
+            out.append(f"  {n:>4} |{'>' if hit else ' '} {lines[n - 1]}")
         start = i + max(1, len(old))
         shown += 1
-    if text.count(old) > shown:
-        out.append(f"  … and {text.count(old) - shown} more")
+    if total > shown:
+        out.append(f"  … and {total - shown} more")
     return "\n".join(out)
 
 
@@ -938,9 +969,15 @@ class EditFile:
         if status == "ambiguous":
             return ToolResult(
                 f"`old` appears {count} times in {p}, so it is not clear which "
-                "one to change. Either add more surrounding lines to `old` so it "
-                "matches exactly ONE place, or pass replace_all to change every "
-                "one. The matches are at:\n" + _match_locations(text, old),
+                "one to change. Here is each place it matches, WITH THE LINES "
+                "AROUND IT — those lines differ, and that is what lets you pick "
+                "one:\n" + _match_locations(text, old) +
+                "\n\nResending the same `old` will fail in exactly the same way. "
+                "Do ONE of these instead: extend `old` with a distinguishing "
+                "line from just above or below the match you want (copied "
+                "verbatim from what is shown); or use replace_lines with that "
+                "match's line number; or pass replace_all if you really do mean "
+                "to change every occurrence.",
                 is_error=True)
         # `old` didn't produce a real change (it's not in the file, or a tolerant/
         # fuzzy match landed on a line that's byte-identical to `new`). Two shapes
