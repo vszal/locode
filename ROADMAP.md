@@ -1818,6 +1818,50 @@ the window fix in 5.16 as the highest-value editing lever. The 5.16 defect 1
 (advice text concatenated onto the copy-me block) still ships regardless — it
 is a formatting bug, not a hypothesis.
 
+### 5.18 `replace_lines` makes the model supply indentation that `edit_file` supplies for it
+
+Found while watching the `b95-seam` sweep: every guard rejection in it took the
+"your `new` is malformed" branch, correctly. The model had sent
+
+```
+replace_lines path=textkit.py start=23 end=25
+new: current = [word]
+     current_len = len(word)
+     elif current_len + len(word) < width:
+```
+
+with all three lines flush at **column 0**, replacing lines that live two levels
+deep inside a function. Python reports `expected an indented block` at line 23,
+which is the first line of the supplied text, so build 95 correctly declines to
+blame the seam. The message is accurate and the model still cannot act on it.
+
+Sizing it over the b87+ corpus, `replace_lines` guard rejections only:
+
+| events | shape |
+|---|---|
+| 14 | indentation error **on the first supplied line**, `new` starting at column 0 |
+| 16 | indentation error elsewhere in the supplied text |
+| 22 | other syntax error |
+
+27% of `replace_lines` rejections are this one thing: the model writes the block
+with its own *relative* indentation and expects the tool to place it.
+
+**That expectation is not unreasonable — it is what our other editing tool
+does.** `edit_file` preserves each matched line's original indentation (it says
+so in its own no-op message). `replace_lines` demands absolute indentation and
+gives no hint that it differs. The model is being punished for a consistency gap
+in our API.
+
+**Target.** On a `replace_lines` rejection, if re-indenting every line of `new`
+by the indentation of the first line being replaced makes the file parse, apply
+that and say plainly what was done and by how much. If it still does not parse,
+fall back to the current message plus the specific observation that `new`
+started at column 0 while the replaced region is indented. Auto-reindent is not
+a new liberty here; it is `edit_file`'s existing contract extended to the tool
+that lacks it.
+
+Ranked after 5.17 (154 events) but ahead of the elision work (28).
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced
