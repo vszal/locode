@@ -1520,8 +1520,57 @@ Open follow-ons:
   call into history would teach the format instead of accepting it forever.
 - **b.** Inference is off in `salvage_truncated_write` and in tier-3 prose
   salvage. Revisit only with evidence from a sweep, not on principle.
-- **c.** Mine endings for the *other* stop reasons the same way. This one was
-  hiding in plain sight for 13 builds.
+- **c.** ✅ done below.
+
+#### 5.13c Mining every ending in the archive (771 runs, 2026-08-07)
+
+Same treatment applied to all `evals/results/*/events/*.jsonl`:
+
+```
+310  the model repeated the same tool call without making progress
+ 12  edits kept hitting the same error without making progress
+  8  the model kept emitting unparseable tool calls     <- 5.13, all in b93
+  5  budget: max iterations reached
+  5  the tools this task needs are not available
+  5  the model repeated the same reply without making progress
+ ~20 budget: wallclock (mostly the void sweep)
+```
+
+**Repeat-stop is 85% of all endings.** "Repeating and stalling out is the norm"
+is not an impression, it is the shape of the entire corpus. What is being
+repeated at the moment of death:
+
+```
+128 bash    95 edit_file    36 read_file    27 update_plan
+ 16 replace_lines     7 write_file     1 ls
+```
+
+Two questions worth asking of that, and the answers point *away* from the
+guard, which is why this is written up as a negative result:
+
+**Is it firing on legitimate re-verification?** 113 of the 128 bash cases had a
+mutating tool succeed *between* the identical calls — the model edited, then
+re-ran `pytest -q`, which is the correct loop and looks identical every time by
+construction. But comparing the outputs kills the theory: the dominant shape is
+"2 distinct outputs of 3 identical calls" (60 runs) — the output moved once and
+then stopped moving. The model edited and the test result did not change. The
+guard is firing on a **real** stall, one iteration after the evidence arrives.
+Do not loosen it.
+
+**Is it killing finished work?** 17 runs were stopped as "repeating" when the
+last test run was fully green — task complete, reported as failure. Real bug,
+and **already fixed**: last occurrence is `b83`, and b87/b88/b90/b93/b94 have
+zero between them (the build-88 verify-after-change work closed it). Recorded
+so nobody re-fixes it; `green-when-killed` is a column worth keeping in any
+future mining pass as a regression check.
+
+So the residual 278 are genuine: **edit → still red → same edit again.** The
+lever is not the repeat guard and not the parser. It is what the model is told
+when an edit lands and the error does not move — currently a bare "error
+unchanged across edits" nudge (74 in the archive) that evidently does not
+redirect it. That is the next thing to design, and it wants the 5.11d elision
+diagnostic under it, since a `old`-not-found miss and a landed-but-useless edit
+are different situations that currently read the same to the model.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
