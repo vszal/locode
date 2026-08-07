@@ -2334,16 +2334,72 @@ and `edit_file` recovery rose to 10/12. Both point the way build 96 intended.
 Both arms are pooled and n=12; per the standing rule this is a hypothesis for a
 future sweep, not evidence.
 
-**Candidate build 99 (the editing path continues here).** The not-found message
-already ends with `_TRY_REPLACE_LINES`, which mentions `replace_lines` as a
-fallback for text that is "hard to reproduce exactly" — a footnote, conditioned
-on the model diagnosing its own problem. The data says it should be the
-headline, and that we can do better than advice: we already locate the closest
-region to compute the snippet, so we can hand over **the line number itself** —
-"the closest text is at lines N–M; `replace_lines` with start=N is the reliable
-move here." That converts the 100%-landing route from something the model has
-to think of into something it only has to accept. Rank it against build 98
-(40 events) — this population is 87 events, so it likely goes first.
+**5.22a — the 36% was hiding a 2%/67% split, and it reconciles 5.16a.** Before
+building anything on the table above I tested the obvious alternative
+explanation: maybe the hatches aren't special, and what actually separates a
+recovery is whether the model *looked at the file again* first. Re-cut the same
+124 events on whether any `read_file`/`grep`/`glob` intervened before the next
+edit attempt:
+
+| route after a miss | attempts | landed |
+|---|---|---|
+| `edit_file`, **no re-read** — retry from memory | 41 | 1 — **2%** |
+| `edit_file`, **after a re-read** | 46 | 31 — **67%** |
+| `replace_lines`, no re-read | 16 | 16 — **100%** |
+| `write_file`, no re-read | 17 | 17 — **100%** |
+
+**Retrying `edit_file` from memory after a miss is 1 for 41.** That is the real
+shape of the failure, and it is worse than any aggregate I have quoted. It also
+**reconciles 5.16a's "0 of 64"**: that figure was measuring this population, not
+the one in 5.22's table. The finding was right and the number was close; what
+was missing was the variable that produces it. I am leaving 5.22's withdrawal
+note standing, because 0/64 and 1/41 are still not the same count, but the
+qualitative claim is now confirmed with its mechanism attached.
+
+The two hatches need no re-read to work, because neither asks the model to
+reproduce text it cannot see. That is the whole story in one line: **after a
+miss, any route that does not require quoting from memory lands; the one that
+does, does not.**
+
+Note also what this says about **build 93** (`require_read_before_edit`, 5.11c,
+shelved as UNPROVEN at zero exposure): its premise is exactly this gap, and the
+correlational support is now strong. The gate never fired in its sweeps, so it
+remains unproven as *implemented* — but it is no longer a hypothesis in search
+of evidence.
+
+**Candidate build 99, revised by 5.22a.** The not-found message currently names
+one action — "copy your `old` out of it verbatim", i.e. retry `edit_file`, the
+2% route when done from memory — and buries `replace_lines` in
+`_TRY_REPLACE_LINES` behind a self-diagnosis the model cannot make ("if the
+target text is hard to reproduce EXACTLY"). Build 96's lesson applies: advice
+gated on the model correctly diagnosing itself does not reach it.
+
+We already compute the line numbers to cut the snippet, so 99 adds no
+information — it re-ranks the routes and fills in the arguments:
+
+1. **`replace_lines` with `start=N, end=M`**, stated as a concrete call, no
+   `old` required. Only when `_best_block` was confident and the block was not
+   truncated — a wrong line number is worse than none.
+2. **Re-read, then edit** — the 67% route, named as a route rather than left
+   implicit.
+3. Say plainly that re-sending an `old` composed from memory is the one move
+   that does not work.
+
+A narrower version of build 93 also becomes well-founded here: rather than a
+blanket read-before-edit gate, require a re-read only for a content-anchored
+edit **to a file that just returned not-found**. That targets the 41-attempt,
+2%-landing population precisely and leaves every other edit alone.
+
+**Ship 99 with the 5.18 reindent rescue**, which is why that deferral now
+reverses. 5.18 was ranked at 14 events as a standalone fix; build 99
+deliberately moves traffic onto `replace_lines`, whose undocumented demand for
+absolute indentation is what 5.18 fixes. Promoting a route without its safety
+net converts a not-found miss into a syntax-guard rejection and calls it
+progress. Grade the pair on the not-found recovery rate (2% from memory, 67%
+after a re-read) **and** on the `replace_lines` syntax-guard rejection rate,
+which must not rise.
+
+Ranking: **99 + 5.18 (87 events) > 98 (40 events)**.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
