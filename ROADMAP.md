@@ -2139,12 +2139,12 @@ Mechanism first, measurement before priority.
 
 ### 5.20 The ambiguous-match error showed the model nothing to choose with (build 97) ✅
 
-The wall build 96 uncovered (5.17b). Sized before building, per the standing
-rule: across the b87+ archive, **125 ambiguous-match events in 75 of 199 runs
-(37%)**, of which **43 were answered by resending a byte-identical `old`**, and
-the next call was `edit_file` again 117 times. In the b96 sweep alone: 28
-events in 12 of 16 runs (75%), 11 identical resends. That ranks it above the
-reindent work (5.18, 14 events), which is drafted and now deferred.
+The wall build 96 uncovered (5.17b). Sized before building — but see **5.20a
+below: the sizing I shipped this on was partly wrong**, and the corrected
+numbers make a stronger case, not a weaker one. Correct figures: **124
+ambiguous-match events across 74 of 104 b87+ runs (71%)**, after which the next
+edit attempt lands only **33% of the time**. It outranks the reindent work
+(5.18, 14 events), which is drafted and deferred.
 
 The message was self-defeating. Verbatim from the sweep:
 
@@ -2192,6 +2192,48 @@ format); **1038 total, green**. Not yet A/B-ed — and per 5.17b, the exec-bugfi
 r8 instrument cannot resolve it. Exposure is the thing to check first, and the
 triggering condition both arms emit is "appears N times", never the new
 wording.
+
+**5.20a — correcting my own sizing (self-audit, same day).** I shipped 5.20
+claiming "43 of 125 answered by resending a byte-identical `old`". Re-measured
+under a stated definition — for each ambiguous event, find the next
+`edit_file`/`replace_lines`/`write_file` call and compare its `old` and `path`
+to the failed one — the true count is **5 of 124**. The 43 does not reproduce
+and I cannot reconstruct what produced it; treat it as withdrawn. This is
+methodology rule 7 turned on my own justification, and the third such
+correction in two days.
+
+The event count and the run coverage survive, and are worse than I said: **124
+events across 74 of 104 runs — 71%**, not 37%.
+
+What the corrected classification shows is a *different and more interesting*
+failure. Of the 117 `edit_file` calls that follow an ambiguous error:
+
+| next `edit_file` after "appears N times" | n | share |
+|---|---|---|
+| a **NEW, invented** `old` **+ `replace_all`** | 74 | 63% |
+| the same `old` + `replace_all` | 38 | 32% |
+| resent byte-identical | 5 | 4% |
+
+and the whole population lands only **41 of 122 (33%)**.
+
+So the model almost never sits still — it reaches for `replace_all` **96% of the
+time** (112/117), and in *most* of those it has also rewritten `old` into
+something that then comes back "not found". That is the old message read
+literally: it offered exactly two routes, "add more surrounding lines" or
+"pass replace_all", while showing no surrounding lines. With nothing real to
+extend from, "add more surrounding lines" can only mean *invent* more — which
+is precisely the 5.17 authoring bug, re-triggered by our own error text — and
+`replace_all` is the one route that needs no information the model doesn't
+have. It is also the dangerous one: it changes every occurrence, including the
+ones that were correct.
+
+Build 97 is the right fix for *this* reading too, and more squarely so: showing
+the real neighbouring lines is what makes "extend `old`" possible without
+inventing, and adding `replace_lines` as a third named route gives a precise
+alternative to the blunt one. **The metric to grade the b97 sweep on is
+therefore the post-ambiguous landing rate (33% baseline) and the
+invented-old+`replace_all` share (63%)** — not the resend rate, which was never
+the problem.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
