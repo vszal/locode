@@ -1439,6 +1439,90 @@ So the corpus has at least three distinct edit-miss mechanisms and only one is
 addressed by lever 1. Quantify the mix across the finished sweep before
 building anything.
 
+#### 5.11c result — the gate is unproven, not proven (graded 2026-08-06)
+
+`armstats b93-readfirst --by-case --exposure "have NOT read"`, reading **DONE
+and gave-up**, over 6 pairs per case:
+
+| case | arm | DONE | gave-up | mean iters | mean landed edits |
+|---|---|---|---|---|---|
+| exec-bugfix | base | 1/6 | 0 | 10.5 | 1.5 |
+| exec-bugfix | cand | 0/6 | 0 | 10.5 | 1.3 |
+| exec-stall-trap | base | 0/6 | 6 | 5.0 | 0.0 |
+| exec-stall-trap | cand | 0/6 | 6 | 5.0 | 0.0 |
+
+`ab.py`: 12 pairs, W1/L2/T9, mean delta −0.0417, p=0.75, INCONCLUSIVE.
+
+**`exposed = 0/6`. The gate never fired once in this sweep.** No candidate run
+contains "have NOT read": in every run that got as far as editing, the model
+called `read_file` first on its own. The exec-stall-trap columns are
+byte-identical across arms, which is what a genuine no-op looks like.
+
+So: **neither confirmed nor refuted.** The 1/6 → 0/6 is a single run of noise
+on a change that did not execute. Do not cite this sweep as evidence in either
+direction. The gate stays in (it is correct-by-construction, costs nothing when
+the model already reads, is behind `require_read_before_edit`, and *did* do its
+job in the void sweep) but it is **not** credited with an improvement, and
+5.11's premise — that blind editing is the root cause under 5.8/5.9 — is
+downgraded: on this corpus the model mostly reads first already.
+
+The sweep's real yield is 5.13, which is an order of magnitude larger.
+
+### 5.13 The parser, not the editor, was killing the runs (build 94) ✅
+
+Mining the same 24 runs for *why* turns ended:
+
+```
+total "missing a name" nudges : 16
+runs that DIED unparseable    : 8 of 24  (4 base + 4 cand, all exec-bugfix)
+unnamed fenced-JSON objects, by top-level key set:
+    24  ('tasks',)
+```
+
+**Two thirds of exec-bugfix runs in both arms died at iteration 4**, after a
+single `bash` call, on this — the same 983 bytes emitted three times:
+
+````
+```json
+{
+  "tasks": [
+    "[x] Run initial pytest to identify failing tests",
+    "[>] Fix the identified bugs in textkit.py",
+    "[ ] Re-run pytest to verify all tests pass"
+  ]
+}
+```
+````
+
+An `update_plan` call with no `name` field. The parser said "tool object
+missing a name", the model — which had no reason to read that as being about a
+field it had never emitted — reproduced its output verbatim, and the repeat
+guard ended the turn. Nothing to do with edit matching. It dwarfs every effect
+measured in 5.11, and it was invisible until the endings were mined, because
+`clean-finish` and score deltas both count a dead turn as an ending like any
+other.
+
+`tasks` is a key no other tool has. **Shipped in build 94:** a nameless fenced
+object resolves to the tool that both accepts every key present and has all of
+its required arguments — *if exactly one tool qualifies*. `Registry.signatures()`
+supplies the key sets. Deliberate refusals: `{"path"}` (read_file or ls),
+`{"path","content"}` (write_file or append_file), any object with a key no tool
+declares, and bare JSON in prose outside a tool fence — data far more often
+than a call there. A wrong inference *runs the wrong tool*, so unique-or-nothing
+is the whole design. The fallback nudge now names the missing field.
+
+Verified against the exact reply that killed those runs: unparseable before,
+`update_plan` after. 998 tests pass. A/B running as `b94-infername`.
+
+Open follow-ons:
+- **a.** History still records the model's nameless block verbatim, so it keeps
+  emitting the malformed shape (which now works). Rendering the *normalized*
+  call into history would teach the format instead of accepting it forever.
+- **b.** Inference is off in `salvage_truncated_write` and in tier-3 prose
+  salvage. Revisit only with evidence from a sweep, not on principle.
+- **c.** Mine endings for the *other* stop reasons the same way. This one was
+  hiding in plain sight for 13 builds.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced
