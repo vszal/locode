@@ -1864,9 +1864,34 @@ copy that text produces a landed edit essentially never. For contrast, the
 at all and tells the model to re-read — is followed by a landing edit 11 times
 in 35 (31%).
 
-The comparison is confounded (the no-snippet branch means wrong-file, an easier
-recovery) so 31% vs 0% is not a clean effect. What is not confounded is the
-zero. A remedy that has never once worked in 39 runs does not get widened.
+**Correction, same session — the snippet is not the variable.** The 64/35 split
+above and the edit_file/replace_lines split of the same 99 events are both
+64/35, which is a coincidence I initially read as one effect. Cross-tabulating
+them separates it:
+
+| shown a snippet? | next tool | landed | failed | |
+|---|---|---:|---:|---|
+| yes | `edit_file` | 0 | 48 | 0% |
+| yes | `replace_lines` | 0 | 16 | 0% |
+| no | `edit_file` | 0 | 16 | 0% |
+| no | `replace_lines` | **11** | 8 | **57%** |
+
+The real finding is sharper and it is about the tool, not the snippet:
+**retrying `edit_file` after an `old`-not-found landed 0 times out of 64, in
+every cell.** Whether we showed the file's text made no difference to it. The
+one cell that ever recovers is `replace_lines` on the wrong-file branch, and
+that is confounded — "nothing here resembles `old`" often means an earlier edit
+already changed the file, where line numbers still work and text no longer
+does.
+
+So the honest claims are: widening the window is not supported (0/64 with the
+snippet, at two widths, plus build 90's measured harm), and **an `edit_file`
+retry immediately after a miss is worthless.** The second is the more
+actionable of the two and was not visible before this cross-tab.
+
+Caveat kept deliberately: this counts only the *immediately following* call.
+Runs do recover later, so "0/64" is not "these runs all failed" — it is "the
+next thing the model does is never the fix".
 
 This retires defect 2, and it retires the window as a lever generally — which
 also explains build 90, where a *wider* window measured actively harmful (0 →
