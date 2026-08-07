@@ -1378,6 +1378,67 @@ instead of reading burns the same budget faster and stops sooner — the exact
 shape of the b90 regression. If DONE drops while gave-up rises, that is the
 mechanism, and the fix is 5.11b (prevent the call) rather than reverting.
 
+`[ ]` **5.11d The gate WORKS and reveals the next failure: the model quotes a
+function without its docstring.** Read off `exec-bugfix r1 cand` while the
+sweep was still running — the whole point of opening a run instead of waiting
+for the table.
+
+The gate did its job exactly as designed. The model opened with the same blind
+`edit_file` the baseline used; it was refused, it called `read_file`, and it
+then quoted the *real* code back. Compare what it sent as `old` against the
+file:
+
+```
+old (19 lines)                    textkit.py
+  def word_wrap(text, width):       8  def word_wrap(text, width):
+                                    9      """Wrap `text` on word boundaries …
+                                   10
+                                   11-15  … five more lines of contract …
+                                   16      """
+      words = text.split()         17      words = text.split()
+      lines = []                   18      lines = []
+      current = []                 19      current = []
+```
+
+**Every single line of `old` is in the file.** The model copied accurately and
+dropped the 8-line docstring between the signature and the body, so the quote
+is not *contiguous* and exact match cannot fire. It is not hallucinating here —
+it is eliding, the way a person quoting a function in prose would.
+
+Why fuzzy did not rescue it, and why that is correct: the best-scoring region
+is the **body alone** starting at line 17 (18 of 19 lines align, ratio
+**0.962**), i.e. the winner is shifted off the signature. The runner-up is that
+same region shifted one line further, ratio **0.9605** — a gap of **0.0012**
+against the 0.05 ambiguity gate, so `_fuzzy_span` refuses. Accepting would have
+replaced the body while `new` re-supplied the `def` line, duplicating the
+signature. The ambiguity gate earned its keep. (Note for anyone tempted to
+loosen it: on a long span the runner-up is *always* the winner shifted by one
+line, so the gap is structurally tiny. That is a property of a sliding window,
+not evidence the gate is too strict.)
+
+What the model actually received for all of this was `` `old` not found in
+…/textkit.py (84 lines) `` plus the closest-region snippet. Correct, and
+useless — it does not name the mistake.
+
+Two levers fall out, in priority order:
+1. **Detect the elision and say so.** When every line of `old` appears in the
+   file *in order* but the matched region is longer, the diagnosis is exact:
+   "your `old` skips lines that are really in the file (probably a docstring or
+   comment). `old` must be a CONTIGUOUS verbatim block." Cheap to compute
+   (`difflib.SequenceMatcher` opcodes on the located region already give the
+   inserted lines) and it names the fix.
+2. **Ask for a smaller `old`.** The model quoted an entire 19-line function to
+   change two of its lines. A minimal `old` never spans a docstring and cannot
+   drift. This is a description change and therefore belongs with 5.11b, as its
+   own arm.
+
+The other two edits in that run are *not* this failure and should not be
+lumped in: `truncate` scored 0.642 with 2 lines genuinely absent, and
+`title_case` scored 0.42 — a real hallucination of the body, after reading it.
+So the corpus has at least three distinct edit-miss mechanisms and only one is
+addressed by lever 1. Quantify the mix across the finished sweep before
+building anything.
+
 ### Worth stealing, not yet scheduled
 
 - **Say what already worked.** On a partial failure Aider names the blocks that
