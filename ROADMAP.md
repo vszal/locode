@@ -1765,6 +1765,59 @@ returned 2):
 Neither is measured yet. Defect 1 needs no measurement — it is a formatting
 bug in text we instruct the model to copy verbatim.
 
+### 5.17 The model authors `old` instead of quoting it — one cause under both top failures
+
+The 5.16 table says 84 misses were "single-line `old`, absent from the file".
+That describes the symptom. The cause is measurable and it is unambiguous.
+
+For every single-line miss in the b87+ corpus where the file had been read
+(**87 cases**), compare the model's `old` against (a) the most similar real line
+in the file and (b) the model's own `new` in the same call:
+
+| | median similarity to `old` |
+|---|---|
+| best matching line actually in the file | 0.67 |
+| **the model's own `new` in the same call** | **0.97** |
+
+**87 of 87** — every single one — had `old` closer to its own `new` than to
+anything in the file. Zero exceptions.
+
+The model is not mis-copying the file. It is **writing its intended replacement
+into `old` as well as `new`**, then tweaking one of them. From `b94`:
+
+```
+sent as `old`:  current = [word] if current_len + len(word) < width else [word]
+actually there: elif current_len + 1 + len(word) < width:
+```
+
+and across successive calls in the same run the model iterates `< width`,
+`<= width`, `+ 1 <= width` — refining the code it wants while still using that
+invented text as the search key. It never matches, so nothing ever lands.
+
+**This unifies the two largest edit failures.** The no-op edit (`new` identical
+to `old`, 67 events, 81% of b94 runs) is the *degenerate case of the same bug*:
+when the tweak between the two fields happens to be empty, the search key does
+match, and the edit changes nothing. Same misconception, two different error
+messages, ~154 events between them. They have been counted and chased
+separately for six builds.
+
+The current messages both address the surface. "Copy the target text EXACTLY as
+it appears in the file" is true but generic, and the model believes it is doing
+that. Nothing tells it the specific thing that is wrong: that `old` is a search
+key describing the present, not a draft of the future.
+
+**Build 96 target.** When an edit fails to match and `old` is highly similar to
+`new`, name that directly — the two fields are ~N% identical, so the
+replacement was written into both; `old` must be text already in the file,
+copied character for character; here is the line you appear to be aiming at,
+verbatim; put that in `old` and your version in `new`. The same signal is
+available on the no-op path, where similarity is 1.00 by definition.
+
+Ranking note: this supersedes the elision work (5.11d lever 1, 28 events) and
+the window fix in 5.16 as the highest-value editing lever. The 5.16 defect 1
+(advice text concatenated onto the copy-me block) still ships regardless — it
+is a formatting bug, not a hypothesis.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced
