@@ -1966,10 +1966,39 @@ first:
 3. **Keep it, and say so** in the success message — "matched at ~86%
    similarity, verify this is the line you meant" — so at least it is visible.
 
-Option 1 is the one to measure, and the A/B is well-posed for once: the
-baseline is what we have been shipping, and exposure is high. Worth checking
-first whether fuzzy applications in the archive were mostly right or mostly
-wrong — that measurement is free and decides between 1 and 3.
+#### 5.19a Measured, same day — the alarm above is overstated
+
+I ran the free check before picking an option, and it moves this down the list.
+Every fuzzy application in the entire results archive:
+
+| | |
+|---|---|
+| applications, all sweeps ever | **29** |
+| similarity min / median / max | **85% / 100% / 100%** |
+| applications in the b87+ corpus (185 runs) | **0** |
+| last sweep containing one | r25 (build 41) |
+
+Nothing has ever been applied near the 0.80 floor; the median is an exact
+match that only missed tier 1 on whitespace. The tier is behaving as a
+typo/drift rescue, not a speculative rewrite, and it has not fired at all in
+the current architecture.
+
+**And the reason it stopped firing is 5.17.** An authored `old` sits ~0.67 from
+the closest real line — *below* the 0.8 bar — so the fuzzy tier cannot rescue
+it and the call falls through to `not_found`. That is exactly why there are 187
+not-found events and zero fuzzy applications. The two findings are the same
+fact seen from either side.
+
+So the corruption scenario is real as a mechanism and unobserved in practice.
+Revised call: **option 3** (name the similarity in the success message so a
+fuzzy apply is at least visible), low priority, and drop option 1 — making the
+gate real would change nothing measurable while removing a rescue that costs us
+nothing. The misleading `(human-gated)` comment at `fs.py:168` should be
+corrected regardless; it is what sent me down this path.
+
+Standing lesson, since this is twice in one day: I flagged this as a live
+hazard from reading the code, and the archive said it has never happened.
+Mechanism first, measurement before priority.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
