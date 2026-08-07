@@ -885,3 +885,106 @@ async def test_seen_is_keyed_per_file(gated, tmp_path):
     res = await fs.EditFile().run(
         {"path": "b.py", "old": "y = 1", "new": "y = 2"}, gated)
     assert res.is_error and "have NOT read" in res.content
+
+
+# --- the syntax guard points at the right text (build 95) ---
+#
+# The guard used to end every rejection with "Your `new` text is malformed".
+# In 31 of the 58 archived rejections whose span is knowable the break was
+# OUTSIDE the supplied text — always at the first line after it — so the model
+# was sent to re-inspect text that was fine and resent it byte-identical until
+# the repeat guard killed the turn.
+
+def test_changed_span_finds_the_supplied_lines():
+    before = "a\nb\nc\nd\n"
+    after = "a\nX\nY\nc\nd\n"
+    assert fs._changed_span(before, after) == (2, 3)
+
+
+def test_changed_span_of_a_pure_deletion_is_empty():
+    lo, hi = fs._changed_span("a\nb\nc\n", "a\nc\n")
+    assert hi < lo and lo == 2
+
+
+def test_changed_span_of_an_append():
+    assert fs._changed_span("a\n", "a\nb\n") == (2, 2)
+
+
+def test_stranded_run_stops_when_indent_returns():
+    lines = ["def f(x):", "    return 0", "        b = 2", "        c = 3",
+             "    return a"]
+    assert fs._stranded_run(lines, 3) == 4
+
+
+def test_stranded_run_of_a_single_line():
+    lines = ["def f(x):", "    return 0", "        b = 2", "    return a"]
+    assert fs._stranded_run(lines, 3) == 3
+
+
+async def test_break_after_the_supplied_text_blames_the_seam(ctx, tmp_path):
+    # The real b87 shape: a complete replacement that ends mid-block, stranding
+    # the tail of the code it replaced.
+    (tmp_path / "m.py").write_text(
+        "def f(x):\n    if x:\n        a = 1\n        b = 2\n    return a\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 2, "end": 3, "new": "    return 0"}, ctx)
+    assert res.is_error and "NOT applied" in res.content
+    assert "NOT inside the text you supplied" in res.content
+    assert "just after it" in res.content
+    # and it must NOT send the model back to text that is fine
+    assert "`new` text is malformed" not in res.content
+
+
+async def test_the_seam_message_shows_the_junction(ctx, tmp_path):
+    (tmp_path / "m.py").write_text(
+        "def f(x):\n    if x:\n        a = 1\n        b = 2\n    return a\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 2, "end": 3, "new": "    return 0"}, ctx)
+    assert "<- your text ends here" in res.content
+    assert "<- SyntaxError here" in res.content
+    assert "b = 2" in res.content
+
+
+async def test_the_seam_message_names_the_leftover_extent(ctx, tmp_path):
+    (tmp_path / "m.py").write_text(
+        "def f(x):\n    if x:\n        a = 1\n        b = 2\n        c = 3\n"
+        "    return a\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 2, "end": 3, "new": "    return 0"}, ctx)
+    assert "Lines 3-4 look like the leftover tail" in res.content
+
+
+async def test_the_seam_message_says_resending_will_not_help(ctx, tmp_path):
+    (tmp_path / "m.py").write_text(
+        "def f(x):\n    if x:\n        a = 1\n        b = 2\n    return a\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 2, "end": 3, "new": "    return 0"}, ctx)
+    assert "do not resend the same edit" in res.content.lower()
+
+
+async def test_a_genuinely_malformed_new_still_blames_new(ctx, tmp_path):
+    # The other half must not regress: when the break IS in the supplied text,
+    # the old message is the correct one.
+    (tmp_path / "m.py").write_text("def f():\n    return 1\n")
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "return 1", "new": "return ("}, ctx)
+    assert res.is_error
+    assert "`new` text is malformed" in res.content
+    assert "NOT inside the text you supplied" not in res.content
+
+
+async def test_the_seam_message_never_shows_a_phantom_trailing_line(ctx, tmp_path):
+    (tmp_path / "m.py").write_text(
+        "def f(x):\n    if x:\n        a = 1\n        b = 2\n    return a\n")
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 2, "end": 3, "new": "    return 0"}, ctx)
+    # 5 real lines; a 6th numbered empty line would be the trailing-newline artifact
+    assert "\n     6 |" not in res.content
+
+
+async def test_seam_diagnosis_leaves_the_file_untouched(ctx, tmp_path):
+    src = "def f(x):\n    if x:\n        a = 1\n        b = 2\n    return a\n"
+    (tmp_path / "m.py").write_text(src)
+    await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 2, "end": 3, "new": "    return 0"}, ctx)
+    assert (tmp_path / "m.py").read_text() == src

@@ -409,6 +409,60 @@ def _parses_py(text: str, path: Path) -> bool:
         return False
 
 
+def _changed_span(before: str, after: str) -> tuple[int, int]:
+    """1-based inclusive line span of `after` holding the text the edit supplied.
+
+    Found by trimming the common prefix and suffix, which works for every editing
+    tool without threading their differing arguments (old/new, start/end) down
+    here. When the edit was a pure deletion the span is empty and `hi < lo`, with
+    `lo` marking where the removed text used to begin.
+    """
+    b, a = before.split("\n"), after.split("\n")
+    p = 0
+    while p < len(b) and p < len(a) and b[p] == a[p]:
+        p += 1
+    s = 0
+    while (s < len(b) - p and s < len(a) - p
+           and b[len(b) - 1 - s] == a[len(a) - 1 - s]):
+        s += 1
+    return p + 1, len(a) - s
+
+
+def _stranded_run(lines: list[str], err_line: int) -> int:
+    """Last line of the indented run starting at `err_line` (1-based, inclusive).
+
+    Used only to say *how much* looks left over. The run is the maximal block of
+    lines at least as indented as the offending one, blanks included, which is
+    what the tail of a half-replaced function looks like.
+    """
+    def indent(s: str) -> int:
+        return len(s) - len(s.lstrip())
+
+    if not 1 <= err_line <= len(lines):
+        return err_line
+    base, end = indent(lines[err_line - 1]), err_line
+    for i in range(err_line, len(lines)):
+        if not lines[i].strip():
+            continue
+        if indent(lines[i]) < base:
+            break
+        end = i + 1
+    return end
+
+
+def _seam_window(lines: list[str], hi: int, err_line: int) -> str:
+    """Render the junction between the supplied text and what follows it."""
+    out = []
+    # A trailing newline leaves an empty final element; showing it as a numbered
+    # line is noise in a window whose whole job is to be read closely.
+    last = len(lines) - 1 if lines and not lines[-1].strip() else len(lines)
+    for n in range(max(1, min(hi, err_line) - 2), min(last, err_line + 2) + 1):
+        mark = ("   <- your text ends here" if n == hi else
+                "   <- SyntaxError here" if n == err_line else "")
+        out.append(f"  {n:>4} | {lines[n - 1]}{mark}")
+    return "\n".join(out)
+
+
 def _syntax_reject(path: Path, before: str, after: str) -> str | None:
     """A rejection message if this edit would turn PARSEABLE Python into a
     SyntaxError, else None. The guard behind it: a malformed edit (unmatched
@@ -426,20 +480,49 @@ def _syntax_reject(path: Path, before: str, after: str) -> str | None:
         return None
     if not _parses_py(before, path) or _parses_py(after, path):
         return None
+    lineno = None
     try:
         compile(after, str(path), "exec")
     except SyntaxError as e:
+        lineno = e.lineno
         where = f"line {e.lineno}" if e.lineno else "an unknown line"
         bad = (e.text or "").strip()
         detail = f"\n    {bad}" if bad else ""
         msg = e.msg
     except ValueError:
         where, detail, msg = "an unknown line", "", "invalid characters"
-    return (f"NOT applied — this edit would introduce a SyntaxError at {where}: "
-            f"{msg}.{detail}\nThe file is UNCHANGED (still the version you read). "
-            "Your `new` text is malformed — most often an unmatched bracket or "
-            "paren, or a broken indent. Re-read the file, correct `new`, and try "
-            "one more time. Do NOT resend the same broken edit.")
+
+    head = (f"NOT applied — this edit would introduce a SyntaxError at {where}: "
+            f"{msg}.{detail}\nThe file is UNCHANGED (still the version you read).")
+
+    # Where the break actually is decides what to tell the model, and getting
+    # this wrong is expensive. The old message blamed `new` unconditionally.
+    # Across the archived rejections whose span is knowable, 31 of 58 broke
+    # OUTSIDE the supplied text — always at the line immediately after it — so
+    # the model was sent to re-inspect text that was fine, found nothing wrong
+    # (correctly), and resent it byte-identical until the repeat guard killed
+    # the turn. 12 of 68 recent repeat-stop deaths start here.
+    lo, hi = _changed_span(before, after)
+    lines = after.split("\n")
+    if lineno and not (lo <= lineno <= hi):
+        last = _stranded_run(lines, lineno)
+        extent = (f"Lines {lineno}-{last} look like the leftover tail"
+                  if last > lineno else f"Line {lineno} looks like a leftover")
+        return (head + "\n\nThe error is NOT inside the text you supplied"
+                + (f" (lines {lo}-{hi})" if hi >= lo else "")
+                + f" — it is at line {lineno}, "
+                + ("just after it" if lineno > hi else "just before it") + ". "
+                "The region you replaced ended in the middle of a block, so part "
+                "of the old code is now stranded with nothing to attach to.\n\n"
+                + _seam_window(lines, hi, lineno)
+                + f"\n\n{extent} of the block you were replacing. Re-read the "
+                "file, then either extend the region so it covers that whole "
+                "block or include those lines in your replacement. Changing "
+                "only the text you already sent will NOT fix this — do not "
+                "resend the same edit.")
+    return (head + " Your `new` text is malformed — most often an unmatched "
+            "bracket or paren, or a broken indent. Re-read the file, correct "
+            "`new`, and try one more time. Do NOT resend the same broken edit.")
 
 
 class ReadFile:
