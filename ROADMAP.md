@@ -1439,6 +1439,66 @@ So the corpus has at least three distinct edit-miss mechanisms and only one is
 addressed by lever 1. Quantify the mix across the finished sweep before
 building anything.
 
+### 5.12 A dead serving thread is invisible to us for ten minutes a run
+
+Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced
+**22 ungraded runs out of 24**, all tagged `infrastructure`, each having burned
+the full 600 s wallclock. Archived at
+`evals/results/b93-readfirst-VOID-serverdead/`; it is not evidence of anything
+and must not be graded.
+
+Cause, from `~/.local/state/locode/mlx-server.log`:
+
+```
+Exception in thread Thread-1 (_generate):
+  File ".../mlx_lm/server.py", line 891, in _generate
+    r.logprobs[r.token].item(),
+ValueError: Slice indices must be 32-bit integers.
+Exception ignored in: <function BatchGenerator.__del__>
+  RuntimeError: [METAL] Command buffer execution failed: Insufficient Memory
+```
+
+An upstream `mlx_lm` bug killed the **generating** thread at 22:21:17. The OOM
+underneath it is the *cleanup* failing after the fact, not the trigger. The
+HTTP thread survived, so `/v1/models` kept answering **200** for the next four
+hours while every `POST /v1/chat/completions` was accepted and never served.
+Each locode run therefore sat at `assistant_start` until the wallclock killed
+it: `{"phase": "assistant_end", "chars": 0}` at `t=600.08`, then
+`{"phase": "error", "text": ""}`.
+
+**Three defects, all ours, in increasing order of how much they cost:**
+
+- `[ ]` **5.12a Readiness is measured on the wrong thread.** `/v1/models` is
+  served by the HTTP thread and stays green after the generate thread dies. A
+  real probe has to be a one-token completion. Build 77's `arch_supported()`
+  preflight catches a model that *cannot load*; nothing catches a server that
+  loaded fine and later lost its worker.
+- `[ ]` **5.12b The build-77 watchdog cannot see a server that was ALREADY
+  dead.** It races the wait for response headers against new bytes in
+  mlx-server.log, attributed **by byte offset from the start of the request** —
+  deliberately, so a previous run's traceback can't be blamed on this one. That
+  is right for the case it was built for and exactly wrong here: the fatal
+  traceback predates every one of the 22 requests, so the watchdog had nothing
+  to match. Wanted: when a request has produced **zero bytes** for N seconds,
+  widen the scan to the whole log since server start and name what it finds.
+  Note the tension with the byte-offset rule — the fix is a *second, later*
+  check with a different scope, not loosening the first.
+- `[ ]` **5.12c `{"phase": "error", "text": ""}`.** The run's entire diagnosis
+  was an empty string; `stdout/*.txt` contains the literal five characters
+  `[error]`. Whatever else changes, an infrastructure failure must say what
+  happened.
+- `[ ]` **5.12d `evals/ab.py` should abort a sweep that is producing nothing.**
+  It ground through 22 consecutive ungraded runs — **~3.7 hours** — before
+  reporting. k consecutive ungraded runs (k≈3) should stop the sweep and say
+  why. This is the cheapest fix here and would have saved the whole night.
+
+**Self-inflicted footnote, recorded so it isn't repeated.** The relaunch was
+then killed within seconds by a monitor *I* wrote to watch for this very
+traceback: it grepped `tail -400` of the log, matched the **stale** exception,
+and shot the sweep it was protecting. Anchor a log watch to the byte offset
+captured at launch — the same discipline build 77 already applies inside
+locode, which is a little pointed.
+
 ### Worth stealing, not yet scheduled
 
 - **Say what already worked.** On a partial failure Aider names the blocks that
