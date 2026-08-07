@@ -289,6 +289,10 @@ def print_ab_report(report: dict) -> int:
         for d in report["dropped"][:5]:
             print(f"             {d['case']} r{d['repeat']} — {d['why']}")
 
+    if a.get("calibrated"):
+        print(f"noise floor: {a['noise_floor']:+.4f} "
+              f"(largest of {a['noise_floor_n']} A/A run(s), identical code)")
+
     print(f"\n{_STATUS_LINE[a['status']]}")
     if a["why"]:
         print(f"   {a['why']}")
@@ -315,8 +319,9 @@ def _plan(cases, models, repeat):
 
 def run_ab(*, base_root: Path, cand_root: Path | None, cases, models,
            repeat: int, results_dir: Path, label: str, base_ref: str,
-           base_sha: str, keep: bool = True) -> dict:
+           base_sha: str, keep: bool = True, identical: bool = False) -> dict:
     roots = {"base": base_root, "cand": cand_root}
+    key = floor_key(cases, models, repeat)
     runs: list[RunResult] = []
     total = len(cases) * len(models) * repeat * 2
     n = 0
@@ -331,12 +336,97 @@ def run_ab(*, base_root: Path, cand_root: Path | None, cases, models,
             note = f"  [{r.invalid}]" if r.invalid else ""
             print(f"        {arm}: score={r.score:.2f} {r.seconds}s{note}",
                   flush=True)
-            _persist(results_dir, runs, label, base_ref, base_sha, cand_root)
-    return _persist(results_dir, runs, label, base_ref, base_sha, cand_root)
+            _persist(results_dir, runs, label, base_ref, base_sha, cand_root,
+                     key, identical)
+    report = _persist(results_dir, runs, label, base_ref, base_sha, cand_root,
+                      key, identical)
+    if identical and report["analysis"]["mean_delta"] is not None:
+        record_calibration(key, report["analysis"]["mean_delta"], label)
+    return report
+
+
+NOISE_FLOOR = Path(__file__).resolve().parent / "noise_floor.json"
+
+
+def floor_key(cases, models, repeat: int) -> str:
+    """Identity of an experimental setup, for looking up its A/A noise floor."""
+    return (",".join(sorted(c.id for c in cases)) + "|"
+            + ",".join(sorted(models)) + f"|r{repeat}")
+
+
+def _read_floor() -> dict:
+    try:
+        return json.loads(NOISE_FLOOR.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def record_calibration(key: str, mean_delta: float, label: str) -> None:
+    """Append one A/A observation to the checked-in noise floor."""
+    data = _read_floor()
+    row = data.setdefault(key, {"samples": [], "labels": []})
+    row["samples"].append(round(abs(mean_delta), 4))
+    row["labels"].append(label)
+    row["updated"] = time.strftime("%Y-%m-%d")
+    NOISE_FLOOR.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+
+def apply_noise_floor(analysis: dict, key: str) -> dict:
+    """Refuse to call a delta real when identical code has produced as much.
+
+    Earned on 2026-08-07: a b93-vs-b94 sweep read `+0.375, p=0.031, IMPROVED`,
+    and an A/A calibration of the SAME setup — identical code in both arms —
+    came back `+0.281, W5/L0`. Five n=8 samples of one build spanned 0.438 to
+    0.812. The sign-flip test was not wrong about the signs; it just cannot
+    know that this case's per-run score is coarse and heavy-tailed, so its
+    nominal p is far too generous at this sample size. The A/A number is the
+    only thing that knows.
+    """
+    row = _read_floor().get(key)
+    mean = analysis.get("mean_delta")
+    claims = analysis["status"] in ("improved", "regressed")
+    if not row or not row.get("samples") or mean is None:
+        analysis["calibrated"] = False
+        if claims:
+            analysis["status"] = "inconclusive"
+            analysis["why"] = (
+                "UNCALIBRATED — no A/A run has measured this setup's noise "
+                "floor, so nothing here says the delta is bigger than what "
+                "IDENTICAL code produces. That is not a technicality: the "
+                "sweep this gate was written for read +0.375 at p=0.031 and "
+                "an A/A of the same setup returned +0.281. Run "
+                "`--base HEAD --allow-identical` with the same -c/-m/-r, then "
+                "re-read this sweep.")
+        return analysis
+    floor = max(row["samples"])
+    k = len(row["samples"])
+    # A floor is only as good as the number of draws behind it, so demand a
+    # margin over it that shrinks as calibration accumulates: 2x the floor at
+    # k=2, 1.33x at k=6, approaching the floor itself once there are many. The
+    # multiplier is a judgement call, not a theorem — what is not negotiable is
+    # that a thin calibration has to buy a bigger effect.
+    required = floor * (1 + 2 / k)
+    analysis["calibrated"] = True
+    analysis["noise_floor"] = round(floor, 4)
+    analysis["noise_floor_n"] = k
+    analysis["noise_floor_required"] = round(required, 4)
+    if claims and abs(mean) <= required:
+        under = "does not clear" if abs(mean) <= floor else "clears"
+        analysis["status"] = "inconclusive"
+        analysis["why"] = (
+            f"delta {mean:+.4f} {under} the measured noise floor "
+            f"{floor:.4f} but falls short of the {required:.4f} required at "
+            f"k={k} calibration run(s) (identical code in both arms). The "
+            f"sign-flip p is not wrong about the signs; it cannot know this "
+            f"score is coarse enough that identical code has already produced "
+            f"a delta this big. Add pairs, or add A/A runs to tighten the "
+            f"floor.")
+    return analysis
 
 
 def _persist(results_dir: Path, runs: list[RunResult], label: str,
-             base_ref: str, base_sha: str, cand_root: Path | None) -> dict:
+             base_ref: str, base_sha: str, cand_root: Path | None,
+             key: str = "", identical: bool = False) -> dict:
     pairs, dropped = pair_runs(runs)
     report = {
         "kind": "paired-ab",
@@ -352,7 +442,19 @@ def _persist(results_dir: Path, runs: list[RunResult], label: str,
         "analysis": analyze(pairs, dropped),
         "runs": [asdict(r) for r in runs],
         "summary": summarize(runs),
+        "floor_key": key,
+        "is_calibration": identical,
     }
+    a = report["analysis"]
+    if identical:
+        # An A/A has no verdict to give — it MEASURES. Whatever delta it found
+        # is, by construction, noise, so say so and bank it.
+        a["status"] = "inconclusive"
+        a["why"] = (f"A/A calibration: both arms ran identical code, so this "
+                    f"delta of {a['mean_delta']:+.4f} IS the noise floor, not "
+                    f"a result. Recorded for {key or 'this setup'}.")
+    elif key:
+        apply_noise_floor(a, key)
     (results_dir / "ab.json").write_text(json.dumps(report, indent=2))
     return report
 
@@ -390,7 +492,8 @@ def main(argv=None) -> int:
     wt = Path(tempfile.mkdtemp(prefix="locode-ab-base-")) / "tree"
     base_sha = make_worktree(args.base, wt)
     try:
-        if tree_digest(wt) == tree_digest(cand_root) and not args.allow_identical:
+        identical = tree_digest(wt) == tree_digest(cand_root)
+        if identical and not args.allow_identical:
             print(f"!! both arms are the same code ({args.base} == the "
                   f"candidate tree). Every delta would be noise reported as a "
                   f"result. Pass --allow-identical to run it as an A/A "
@@ -405,7 +508,7 @@ def main(argv=None) -> int:
                         models=args.model, repeat=args.repeat,
                         results_dir=results_dir, label=label,
                         base_ref=args.base, base_sha=base_sha,
-                        keep=not args.clean)
+                        keep=not args.clean, identical=identical)
     finally:
         remove_worktree(wt)
         shutil.rmtree(wt.parent, ignore_errors=True)

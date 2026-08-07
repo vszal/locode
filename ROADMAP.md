@@ -1512,7 +1512,14 @@ than a call there. A wrong inference *runs the wrong tool*, so unique-or-nothing
 is the whole design. The fallback nudge now names the missing field.
 
 Verified against the exact reply that killed those runs: unparseable before,
-`update_plan` after. 998 tests pass. A/B running as `b94-infername`.
+`update_plan` after. 998 tests pass.
+
+**Kept on the mechanism, not on the A/B.** The `b94-infername` sweep read
+`+0.375, p=0.031, ✅ IMPROVED` and that verdict does not survive calibration —
+see 5.14. What justifies build 94 is narrower and does not need a sweep: the
+reply that ended those turns is in the archive, it parses correctly now and did
+not before, and in the one pair where the baseline actually died on it (r4) the
+candidate did not. Everything past that is unmeasured.
 
 Open follow-ons:
 - **a.** History still records the model's nameless block verbatim, so it keeps
@@ -1571,6 +1578,71 @@ unchanged across edits" nudge (74 in the archive) that evidently does not
 redirect it. That is the next thing to design, and it wants the 5.11d elision
 diagnostic under it, since a `old`-not-found miss and a landed-but-useless edit
 are different situations that currently read the same to the model.
+
+### 5.14 The A/B harness had no noise floor, and nearly sold a false win ✅
+
+The most important result of 2026-08-07, and it is about the instrument.
+
+`b94-infername` (build 93 vs build 94, exec-bugfix, qwencoder14, 8 pairs) read:
+
+```
+exec-bugfix   n=8   base 0.438   cand 0.812   delta +0.375
+pairs: 8 (W6/L0/T2) — 6 informative · sign-flip p 0.0312
+✅ IMPROVED — the candidate beat the baseline
+```
+
+Every gate this repo had was satisfied: enough pairs, alternating arm order,
+paired statistic, p under alpha, a clean 6-0. The exposure check is what
+started the unravelling — **only 1 of the 6 winning pairs had a baseline run
+that actually hit the parser bug.** Reading the r1 pair confirmed it: both arms
+issue the same first three calls, then diverge on sampling, and neither ever
+emits a nameless tool call.
+
+So: run the same sweep with **identical code in both arms**.
+
+| sweep | arms | delta | pairs |
+|---|---|---|---|
+| `b94-infername` | build 93 vs 94 | **+0.375** | W6/L0/T2, p=0.031 |
+| `b94-AA-noisefloor` | **94 vs 94** | **+0.281** | W5/L0/T3 |
+| `b94-AA2` | **94 vs 94** | +0.062 | W2/L2/T4 |
+
+Five independent n=8 samples of the *same build* (the b94 candidate arm plus
+both arms of both A/A runs) scored **0.812, 0.438, 0.719, 0.719, 0.781** —
+spread **0.375**, sd 0.149. The measured delta is exactly the spread identical
+code produces, and build 93's lone sample (0.438) is the minimum of build 94's
+own range.
+
+Two things were briefly suspected and are ruled out, recorded so they are not
+re-suspected: **arm ordering** (it alternates, and the candidate won from both
+positions in A/A #1) and **an environmental handicap on the worktree arm**
+(A/A #2 came back W2/L2 symmetric; `_agent_launcher.py` verifies the import
+root; nothing in `locode` reads its own source tree at runtime). There is no
+bias. There is just a noise floor nobody had ever measured, and A/A #1 drew a
+1-in-32 hand from it.
+
+Why the p-value did not protect us: the sign-flip test is correct about the
+signs, but the per-run score is coarse (0 / 0.25 / 0.5 / 1.0) and heavy-tailed
+on this case, so a handful of pairs flipping together is far likelier than the
+nominal 2/2ⁿ suggests. **Only an A/A run knows that.**
+
+**Shipped in `ab.py`:**
+- `evals/noise_floor.json`, checked in, keyed by `cases|models|repeat`. Any
+  sweep whose arms are byte-identical is auto-detected, reports no verdict
+  (it *is* the floor, by construction), and banks its |delta|.
+- A verdict of improved/regressed must now clear `floor × (1 + 2/k)` for `k`
+  calibration runs — 2× at k=2, 1.33× at k=6, approaching the floor as
+  evidence accumulates. The multiplier is a judgement call; that a thin
+  calibration must buy a bigger effect is not.
+- **An uncalibrated setup cannot report a win at all.** It returns
+  inconclusive and names the exact command to run. This is the part that would
+  have caught tonight.
+- 11 tests in `tests/test_ab.py`, including the literal +0.375-against-0.281
+  case. Re-reading `b94-infername` through the gate now yields INCONCLUSIVE.
+
+**Standing rule, added to the methodology list: calibrate before crediting.**
+An A/B without an A/A for its setup is not evidence. Every "IMPROVED" verdict
+in this ROADMAP predates the floor and should be re-read with that in mind
+before being built on — none of them were calibrated.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 

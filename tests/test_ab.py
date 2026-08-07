@@ -281,3 +281,107 @@ def test_run_result_defaults_arm_to_empty_so_old_results_still_load():
            "checks": {}, "metrics": {}, "returncode": 0, "timed_out": False,
            "seconds": 1.0, "workdir": "/tmp/x"}
     assert harness.RunResult(**raw).arm == ""
+
+
+# --- the A/A noise floor (2026-08-07) --------------------------------------
+# Earned the hard way: a real sweep read "+0.375, p=0.031, ✅ IMPROVED" and an
+# A/A calibration of the SAME setup — identical code in both arms — returned
+# +0.281. Five n=8 samples of one build spanned 0.438 to 0.812. The sign-flip
+# test is not wrong about the signs; it cannot know the score is coarse enough
+# that identical code already produces a delta that size.
+
+@pytest.fixture
+def floor(tmp_path, monkeypatch):
+    monkeypatch.setattr(ab, "NOISE_FLOOR", tmp_path / "noise_floor.json")
+    return tmp_path / "noise_floor.json"
+
+
+def _improved(delta):
+    return {"mean_delta": delta, "status": "improved", "why": ""}
+
+
+def test_an_uncalibrated_setup_cannot_claim_an_improvement(floor):
+    a = ab.apply_noise_floor(_improved(0.9), "k")
+    assert a["status"] == "inconclusive"
+    assert a["calibrated"] is False
+    assert "--allow-identical" in a["why"]
+
+
+def test_the_exact_result_that_prompted_this_gate_is_refused(floor):
+    ab.record_calibration("k", 0.2812, "aa1")
+    ab.record_calibration("k", 0.0625, "aa2")
+    a = ab.apply_noise_floor(_improved(0.375), "k")
+    assert a["status"] == "inconclusive"
+    assert a["noise_floor"] == 0.2812 and a["noise_floor_n"] == 2
+
+
+def test_a_delta_under_the_floor_is_refused(floor):
+    ab.record_calibration("k", 0.2812, "aa1")
+    a = ab.apply_noise_floor(_improved(0.2), "k")
+    assert a["status"] == "inconclusive"
+    assert "does not clear" in a["why"]
+
+
+def test_a_big_enough_delta_still_gets_through(floor):
+    ab.record_calibration("k", 0.2812, "aa1")
+    ab.record_calibration("k", 0.0625, "aa2")
+    assert ab.apply_noise_floor(_improved(0.9), "k")["status"] == "improved"
+
+
+def test_a_regression_is_gated_the_same_way(floor):
+    ab.record_calibration("k", 0.2812, "aa1")
+    ab.record_calibration("k", 0.0625, "aa2")
+    assert ab.apply_noise_floor(
+        {"mean_delta": -0.3, "status": "regressed", "why": ""},
+        "k")["status"] == "inconclusive"
+    assert ab.apply_noise_floor(
+        {"mean_delta": -0.9, "status": "regressed", "why": ""},
+        "k")["status"] == "regressed"
+
+
+def test_more_calibration_runs_relax_the_margin(floor):
+    for x in (0.2812, 0.0625):
+        ab.record_calibration("k", x, "aa")
+    assert ab.apply_noise_floor(_improved(0.375), "k")["status"] == "inconclusive"
+    for x in (0.10, 0.15, 0.09, 0.12):
+        ab.record_calibration("k", x, "aa")
+    a = ab.apply_noise_floor(_improved(0.375), "k")
+    assert a["noise_floor"] == 0.2812  # unchanged: still the largest draw
+    assert a["status"] == "improved"   # but 6 draws no longer demand 2x
+
+
+def test_a_non_claiming_status_is_left_alone(floor):
+    ab.record_calibration("k", 0.9, "aa")
+    a = ab.apply_noise_floor(
+        {"mean_delta": 0.01, "status": "no-difference", "why": "w"}, "k")
+    assert a["status"] == "no-difference" and a["why"] == "w"
+
+
+def test_calibration_records_absolute_values_and_accumulates(floor):
+    ab.record_calibration("k", -0.25, "aa1")
+    ab.record_calibration("k", 0.125, "aa2")
+    import json
+    row = json.loads(floor.read_text())["k"]
+    assert row["samples"] == [0.25, 0.125]
+    assert row["labels"] == ["aa1", "aa2"]
+
+
+def test_the_floor_is_keyed_per_setup(floor):
+    ab.record_calibration("exec-bugfix|m|r8", 0.05, "aa")
+    assert ab.apply_noise_floor(_improved(0.9), "e2e|m|r8")["calibrated"] is False
+    assert ab.apply_noise_floor(_improved(0.9), "exec-bugfix|m|r8")["status"] == "improved"
+
+
+def test_floor_key_is_stable_regardless_of_argument_order():
+    class C:
+        def __init__(self, i): self.id = i
+    a = ab.floor_key([C("b"), C("a")], ["z", "y"], 8)
+    b = ab.floor_key([C("a"), C("b")], ["y", "z"], 8)
+    assert a == b == "a,b|y,z|r8"
+
+
+def test_a_missing_mean_delta_is_not_treated_as_a_result(floor):
+    ab.record_calibration("k", 0.05, "aa")
+    a = ab.apply_noise_floor({"mean_delta": None, "status": "inconclusive",
+                              "why": ""}, "k")
+    assert a["status"] == "inconclusive"
