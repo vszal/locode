@@ -1312,6 +1312,72 @@ since a user can hit it with any two aliased names.
   a sentence in half; if we start ingesting more files, prefer dropping a whole
   file to slicing one, and say which in the marker.
 
+### 5.11 Read before edit — the root cause under 5.8/5.9 (build 93)
+
+`[x]` **5.11a Refuse a content-anchored edit to a file the model has never
+read.** Shipped build 93, commit `0748436`. **A/B `b93-readfirst` launched
+2026-08-06 against base `5cc7ef2`** (qwencoder14, exec-bugfix +
+exec-stall-trap, r=6); result recorded in 5.11c below.
+
+*Scope note:* the sweep was started with `e2e-spec-to-code` included and
+restarted without it. That case predominantly **creates** files with
+`write_file`, which the gate marks seen and never blocks, so it is the least
+exposed case in the corpus — and the slowest, meaning ten long runs would have
+elapsed before any signal on the question actually being asked. Run it later
+as a regression check (does the gate hurt a case it shouldn't touch?), not as
+evidence for the change.
+
+**Why this and not another nudge.** Found while retracting build 90, by doing
+the thing the retraction taught: opening the runs and reading them. Across all
+**10** exec-bugfix runs of *both* b90 arms, the model landed **at most one**
+successful edit and fixed **none** of the three seeded bugs — every run ends
+"3 failed". One candidate run went `bash pytest`, `bash pytest`, `edit_file`,
+`edit_file` with **no `read_file` at all**, reconstructing `word_wrap` from the
+pytest traceback. `old` matched nothing because it had never been copied from
+anything.
+
+That reframes builds 87–91. The better failure message (b89), the wider help
+window (b90, retracted), the laxer repeat guard (b88) are all *downstream* of a
+model editing text it has not seen. They compete to describe a miss more
+helpfully; none of them stop the miss. The economics are stark: one `read_file`
+costs one iteration, and the guess-loop it replaces cost five to seven and
+ended in surrender.
+
+**What shipped.** `edit_file` and `replace_lines` refuse a path not seen this
+session and name the fix ("call read_file on it FIRST, then copy `old`
+verbatim… text you did not copy is why edits fail to match"). `read_file`
+marks a file seen — a truncated or windowed read counts, because the gate is a
+floor against editing text the model never saw, not a guarantee it saw the
+right part. `write_file` counts (it authored the body); `append_file`
+deliberately does not (it knows what it added and nothing about the lines
+above). Session-scoped, cleared by `_forget_seen()` on `reset_context`,
+`/compact`, auto-compact and `set_history`, so the record can never outlive the
+read in the model's context. Off via `agent.require_read_before_edit = false`.
+
+`[ ]` **5.11b The description sentence, deliberately NOT bundled.** Telling
+`edit_file` "read the file first" in its own description would *prevent* the
+wasted iteration rather than punish it, and is probably additive. It is held
+back because tool-description wording has produced large measured swings in
+this repo before (the `write_file` size sentence, D44/D49/D51), and shipping
+both at once would leave the A/B unable to say which half worked. Run it as its
+own arm on top of whatever 5.11a scores.
+
+`[ ]` **5.11c Record the b93 result honestly.** Grade with
+`armstats b93-readfirst --by-case --exposure "have NOT read"` — reading **DONE
+and gave-up, never clean-finish** — and then *open a winning run and read it*
+before crediting anything. Note the exposure string matches the new message, so
+it selects candidate-arm runs that hit the gate and reports 0/n on the baseline
+by construction; it is a "did the change fire" check, not a paired filter. The
+paired comparison is the unfiltered per-case DONE table, because the gate is
+reachable in every run that edits at all.
+
+**The plausible way this loses.** The gate converts a *silent* failure into an
+*error*, and errors feed `max_consecutive_errors` (4) and the error-stall
+streak (3). A model that responds to the refusal by re-issuing the same edit
+instead of reading burns the same budget faster and stops sooner — the exact
+shape of the b90 regression. If DONE drops while gave-up rises, that is the
+mechanism, and the fix is 5.11b (prevent the call) rather than reverting.
+
 ### Worth stealing, not yet scheduled
 
 - **Say what already worked.** On a partial failure Aider names the blocks that
