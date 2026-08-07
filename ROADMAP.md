@@ -1845,6 +1845,45 @@ returned 2):
    it still could not copy an `old` that begins where it intended. The window
    should cover the model's first `old` line when that line exists in the file.
 
+#### 5.16a Defect 2 is not worth fixing — the snippet converts nothing
+
+Measured before building it, and the answer closes the whole line of work.
+
+For every b87+ not-found event where the reply **did** show real file content
+("this is what the file ACTUALLY contains there") and the model's very next
+call was another edit:
+
+```
+64 events, across 39 distinct runs (max 3 from any one run)
+edits that landed: 0
+```
+
+**Zero for sixty-four.** Handing a weak model the exact text and telling it to
+copy that text produces a landed edit essentially never. For contrast, the
+*other* branch — "NOTHING in this file resembles `old`", which shows no content
+at all and tells the model to re-read — is followed by a landing edit 11 times
+in 35 (31%).
+
+The comparison is confounded (the no-snippet branch means wrong-file, an easier
+recovery) so 31% vs 0% is not a clean effect. What is not confounded is the
+zero. A remedy that has never once worked in 39 runs does not get widened.
+
+This retires defect 2, and it retires the window as a lever generally — which
+also explains build 90, where a *wider* window measured actively harmful (0 →
+4 surrenders out of 5). Both results say the same thing: the snippet is not
+being read as a source to copy from.
+
+**And it is the strongest evidence yet for 5.17.** If the model were trying to
+quote and failing, more visible text would help; it demonstrably does not. The
+model is not copying at all — it is composing `old` from intent, which is
+exactly what 87 of 87 says. Build 96 bets on naming that misconception in
+words, because showing has been tried, at two widths, and does not work.
+
+That bet is now the thing under test in `b96-authored-old`, and this raises its
+stakes honestly: if words fail here too, the next move is structural (a tool
+that does not ask the model to reproduce text at all — line numbers, or an
+`old` we supply for confirmation) rather than another wording pass.
+
 Neither is measured yet. Defect 1 needs no measurement — it is a formatting
 bug in text we instruct the model to copy verbatim.
 
