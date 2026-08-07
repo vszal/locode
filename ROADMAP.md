@@ -1660,12 +1660,35 @@ found 5.13 — the repeat-stop deaths in the current architecture (b87 onward,
 | 6 | `read_file` re-read, never edited |
 | 2 | `bash` repeated, tests red |
 
-Two things worth saying about that table before the finding. First, the
-no-op-edit death the user reported (`new` identical to `old`) **does not appear
-in it** — build 87 closed it, and the archive-wide counts that still show 35 of
-them are all pre-b87. Second, `bash: SILENT-OK` (re-running `py_compile` after
-it succeeded silently) is likewise absent after b87; build 88 closed it. Both
-are regression columns now, not tasks.
+**Correction to a claim first made here and retracted the same session.** I
+initially read that table as showing the no-op edit (`new` identical to `old`)
+had been closed by build 87, because it no longer appears as a *terminal*
+signature. That was a classification artifact, not a fact: the table keys each
+run by the call it was repeating when it died, so a failure that fires
+repeatedly mid-run and then hands the kill to some other call vanishes from it.
+Counting **occurrences** instead of deaths, over the same 168 b87+ runs:
+
+| events | edit failure |
+|---|---|
+| **187** | **`old` not found** |
+| 67 | no-op — `new` identical to `old` (43 runs, 26%) |
+| ~90 | syntax-guard rejection |
+
+More than one `old`-not-found per run. And the no-op is not fading: the three
+b94 sweeps hit it in 39 of 48 runs (**81%**), far above b88/b90's ~10%, almost
+certainly because b94 runs survive past iteration 4 now and simply get more
+chances to reach it. The user's report of seeing four in one live session is
+consistent with these numbers, and my "build 87 closed it" was wrong.
+
+What build 87 *did* close is narrower and still true: a no-op edit is no longer
+the call a run dies repeating. `bash: SILENT-OK` (re-running `py_compile` after
+it succeeded silently) is genuinely absent after b87 — build 88 closed that one,
+and it is a regression column, not a task.
+
+**So the ranking of edit-landing work is: `old` not found (dominant), then the
+no-op, then the guard's misdiagnosis below.** The guard is what this build
+fixes because it is the one where locode is actively lying to the model; the
+other two are larger and are next.
 
 **The finding.** Every guard rejection ended with the same sentence: *"Your
 `new` text is malformed — most often an unmatched bracket or paren, or a broken
@@ -1698,6 +1721,49 @@ Measurement pending — `b95-seam`, exec-bugfix, 8 pairs. Per 5.14 this setup ha
 a noise floor (k=2, floor 0.281), so the score delta must clear 0.563 to claim
 anything; the load-bearing read will be `armstats --exposure "would introduce a
 SyntaxError"`, which is the triggering condition both arms emit.
+
+### 5.16 Why `old` misses — the dominant edit failure, classified (build 96 target)
+
+187 `old`-not-found events over 168 b87+ runs. Reconstructing the file each
+model was looking at from the last `read_file` in the same run and re-testing
+its `old` against it:
+
+| events | why the match failed |
+|---|---|
+| 84 | single-line `old`, absent from the file entirely |
+| 47 | the model never read the file in this run — nothing to compare |
+| 28 | **every line present, in order, but not contiguous** (elision) |
+| 28 | partial / mostly absent multi-line blocks |
+| 0 | whitespace-only differences |
+
+**Whitespace is not the problem.** Zero of 187 were leading/trailing, trailing
+per line, or interior indent-width mismatches. Any fuzzy-normalization tier
+aimed at whitespace would have bought nothing here, which is worth knowing
+before building one.
+
+The 28 elisions are the model writing `old` the way a person summarizes code —
+every line real and in the right order, with the boring middle dropped. That is
+ROADMAP 5.11d lever 1 and it is now sized: 15% of misses.
+
+**Two concrete defects found while reading the current message.** Replaying the
+archived b87 elision through today's `_not_found_help` (not b87's — the message
+has improved a lot since; it now returns 15 lines of real content where b87
+returned 2):
+
+1. **The advice text is jammed onto the last line of the block.** The message
+   says "Copy your `old` out of it verbatim:" and then ends
+   `…    current = [word] If the target text is hard to reproduce EXACTLY — …`.
+   `_TRY_REPLACE_LINES` is concatenated with a leading space and no newline. A
+   model doing exactly what it was told can copy that sentence into `old`. This
+   is a one-character fix and it is actively harmful today.
+2. **The window can exclude the line the model anchored on.** The located block
+   was lines 16-30; the model's `old` began at `def word_wrap(text, width):` on
+   line 8. It was shown a slice starting mid-docstring and ending mid-block, so
+   it still could not copy an `old` that begins where it intended. The window
+   should cover the model's first `old` line when that line exists in the file.
+
+Neither is measured yet. Defect 1 needs no measurement — it is a formatting
+bug in text we instruct the model to copy verbatim.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
