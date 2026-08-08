@@ -2916,6 +2916,27 @@ on 1.8 events/run — not a score, and not subject to 5.27's sizing problem.
 narration.** Every nudge must name a tool and demand a call. Grade the whole
 set on prose-only share; three of the eleven are above 25%.
 
+**How big a move counts.** Splitting the same table by arm gives a free A/A
+control, because 5.31 established that b107's two arms were *behaviourally
+identical* — the build-107 rescue fired once in 14 runs:
+
+| nudge | base (14 runs) | cand (14 runs) |
+|---|---|---|
+| same failure (2 runs in a row) | 14/25 = **56%** | 19/25 = **76%** |
+| open plan tasks | 6/26 = 23% | 6/21 = 29% |
+| repeated call | 5/15 = 33% | 6/16 = 38% |
+
+Twenty points of spread on the headline nudge, from nothing at all. At ~25
+events per arm the prose-only rate carries a **±20-point noise band**, so
+build 108 has to land under roughly **40%** to be distinguishable from its own
+base arm — and the base arm in *its own sweep* is the only fair comparator,
+not b107's pooled 66%.
+
+**Methodology 21: split any per-event rate by arm on a sweep where the arms
+were identical, and read the spread as the noise floor.** The archive hands
+these A/A controls out for free every time a lever turns out not to fire
+(5.30, 5.31); use them instead of guessing at significance.
+
 ### 5.31 The indentation lever is closed — its target event no longer exists (2026-08-08)
 
 `b107-indent` (r14, base build 105): the rescue fired **once** in 14 candidate
