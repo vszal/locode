@@ -106,13 +106,13 @@ def test_ties_do_not_count_toward_the_sample_size():
     assert ab.effective_pairs([0.5, 0.0, -0.25, 0.0, 0.0]) == 2
 
 
-def test_a_run_padded_with_ties_is_inconclusive_not_significant():
+def test_a_run_padded_with_ties_is_underpowered_not_significant():
     # The trap: 8 pairs, 5 unanimous wins, 3 ties. `n_pairs` clears _MIN_PAIRS,
     # but only 5 pairs moved and 2/2**5 = 0.0625 is above alpha — so the run
     # could not have produced a significant result no matter how it came out.
     a = ab.analyze(_pairs([0.5] * 5 + [0.0] * 3), [])
     assert a["n_pairs"] == 8 and a["n_effective"] == 5
-    assert a["status"] == "inconclusive"
+    assert a["status"] == "underpowered"
     assert "scored the same on both arms" in a["why"]
 
 
@@ -153,10 +153,50 @@ def test_noise_is_called_no_difference_not_improved():
     assert "not the same as equal" in a["why"]
 
 
-def test_too_few_pairs_is_inconclusive_however_clean_the_split():
+def test_too_few_pairs_is_underpowered_however_clean_the_split():
     a = ab.analyze(_pairs([1.0] * 4), [])
-    assert a["status"] == "inconclusive"
+    assert a["status"] == "underpowered"
     assert "4 informative pair" in a["why"]
+
+
+# --- 5.27: an underpowered design must not be reported as a finding ----------
+# The census that earned this: 3 of 22 archived sweeps ever reached _MIN_PAIRS
+# informative pairs, 1 ever reached p<alpha, 68% of all pairs tied. The common
+# case was a design that could not answer, printed under a word that reads as
+# an answer.
+
+def test_underpowered_says_how_many_runs_per_arm_it_would_have_needed():
+    # 8 pairs, 3 informative -> 6 * 8/3 = 16 runs per arm.
+    a = ab.analyze(_pairs([0.5, -0.5, 0.5] + [0.0] * 5), [])
+    assert a["status"] == "underpowered"
+    assert a["runs_needed"] == 16
+    assert "~16 runs per arm, not 8" in a["why"]
+
+
+def test_an_all_tied_sweep_is_called_out_as_possibly_saturated():
+    # syntax-fix: 0 of 33 pairs informative, every score 1.0 on both arms. No
+    # sample size fixes that, so the message must not suggest running more.
+    a = ab.analyze(_pairs([0.0] * 8), [])
+    assert a["status"] == "underpowered"
+    assert a["runs_needed"] is None
+    assert "SATURATED" in a["why"]
+    assert "runs per arm" not in a["why"]
+
+
+def test_underpowered_and_inconclusive_are_different_words():
+    assert ab._STATUS_LINE["underpowered"] != ab._STATUS_LINE["inconclusive"]
+    assert "could not have detected" in ab._STATUS_LINE["underpowered"]
+    # Both still mean "do not act on this", so both keep exit code 2.
+    assert ab._EXIT["underpowered"] == ab._EXIT["inconclusive"] == 2
+
+
+def test_an_underpowered_report_still_prints():
+    # _STATUS_LINE / _EXIT are keyed by status; a new status that isn't in both
+    # is a KeyError at the end of a multi-hour sweep.
+    report = {"label": "x", "base_ref": "r", "base_sha": "s", "cand_desc": "c",
+              "case_table": {}, "dropped": [],
+              "analysis": ab.analyze(_pairs([1.0] * 4), [])}
+    assert ab.print_ab_report(report) == 2
 
 
 def test_no_usable_pairs_is_inconclusive():

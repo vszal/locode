@@ -32,8 +32,16 @@ Usage
     python evals/ab.py --base v0.1.0 --cand /path/to/other/tree -m qythos9
 
 Exit codes mirror `harness.py compare`: 0 = no regression (improved, or no
-detectable difference), 1 = the candidate is worse, 2 = inconclusive, meaning
-the experiment did not answer the question and should be re-run bigger.
+detectable difference), 1 = the candidate is worse, 2 = the experiment did not
+answer the question — either `inconclusive` or, far more often, `underpowered`.
+
+A warning worth reading before you size a sweep (ROADMAP 5.27). Across the 22
+sweeps in the archive, 3 ever reached the 6 informative pairs below which
+p<0.05 is unattainable, exactly 1 ever reached p<0.05, and 68% of all 194 pairs
+tied outright. On `exec-bugfix`, the workhorse case, only 43% of pairs are
+informative — so settling anything on SCORE there takes ~14 runs per arm, and
+the -r 8 every sweep has used expects 3.4 informative against a threshold of 6.
+Grade on turn ENDINGS (`evals/armstats.py`) unless you have budgeted for that.
 """
 from __future__ import annotations
 
@@ -41,6 +49,7 @@ import argparse
 import hashlib
 import itertools
 import json
+import math
 import random
 import shutil
 import statistics
@@ -191,7 +200,15 @@ def effective_pairs(deltas: list[float]) -> int:
 
 def analyze(pairs: list[dict], dropped: list[dict]) -> dict:
     """Verdict on the paired deltas. `status` is one of improved / regressed /
-    no-difference / inconclusive."""
+    no-difference / underpowered / inconclusive.
+
+    `underpowered` and `inconclusive` are deliberately different words. A census
+    of all 22 sweeps in the archive (ROADMAP 5.27) found 3 that ever reached
+    _MIN_PAIRS informative pairs and exactly 1 that ever reached p<_ALPHA, with
+    68% of all 194 pairs tying — so the overwhelmingly common outcome was a
+    design that COULD NOT have detected any effect, printed under a word that
+    reads as a finding about the change. It is a finding about the sample.
+    """
     deltas = [p["delta"] for p in pairs]
     n = len(deltas)
     n_eff = effective_pairs(deltas)
@@ -213,6 +230,7 @@ def analyze(pairs: list[dict], dropped: list[dict]) -> dict:
         return out
     if n_eff < _MIN_PAIRS:
         # Stated as arithmetic, not as a hunch: the test cannot reach alpha here.
+        out["status"] = "underpowered"
         out["p"] = signflip_p(deltas)
         tied = "" if n_eff == n else (
             f" ({n} ran, but {n - n_eff} scored the same on both arms and a tie "
@@ -220,6 +238,19 @@ def analyze(pairs: list[dict], dropped: list[dict]) -> dict:
         out["why"] = (f"only {n_eff} informative pair(s){tied}; a sign-flip test "
                       f"needs {_MIN_PAIRS} before any result can reach "
                       f"p<{_ALPHA} (its floor is 2/2^n = {2 / 2 ** n_eff:.3f})")
+        # The actionable half: say how many runs per arm this observed
+        # informative rate would have needed. Without it the reader knows the
+        # sweep failed but not what a sweep that works would cost.
+        if n_eff:
+            out["runs_needed"] = math.ceil(_MIN_PAIRS * n / n_eff)
+            out["why"] += (f". At the observed rate ({n_eff}/{n} informative) "
+                           f"this design needs ~{out['runs_needed']} runs per "
+                           f"arm, not {n}")
+        else:
+            out["runs_needed"] = None
+            out["why"] += (". Every pair tied: this case may be SATURATED and "
+                           "carry no signal at any sample size — check whether "
+                           "both arms are scoring at the ceiling")
         return out
     p = signflip_p(deltas)
     out["p"] = round(p, 4)
@@ -257,9 +288,12 @@ _STATUS_LINE = {
     "improved": "✅ IMPROVED — the candidate beat the baseline",
     "regressed": "❌ REGRESSED — the candidate lost to the baseline",
     "no-difference": "➖ NO DETECTABLE DIFFERENCE",
+    "underpowered": "🚫 UNDERPOWERED — this design could not have detected "
+                    "an effect of ANY size",
     "inconclusive": "⚠️  INCONCLUSIVE — the experiment did not answer the question",
 }
-_EXIT = {"improved": 0, "no-difference": 0, "regressed": 1, "inconclusive": 2}
+_EXIT = {"improved": 0, "no-difference": 0, "regressed": 1, "inconclusive": 2,
+         "underpowered": 2}
 
 
 def print_ab_report(report: dict) -> int:
@@ -478,8 +512,11 @@ def main(argv=None) -> int:
     ap.add_argument("-m", "--model", action="append", required=True)
     ap.add_argument("-c", "--case", action="append")
     # Above _MIN_PAIRS on purpose: eval scores tie often, and a tie carries no
-    # information, so a run sized exactly at the floor lands on "inconclusive"
-    # the moment one pair comes out even.
+    # information, so a run sized exactly at the floor lands on "underpowered"
+    # the moment one pair comes out even. 8 is still not enough to settle
+    # anything on score — see the module docstring and ROADMAP 5.27 — it is the
+    # size at which the MECHANISM channel reads cleanly. Raise it deliberately
+    # when the score is the thing you intend to believe.
     ap.add_argument("-r", "--repeat", type=int, default=8)
     ap.add_argument("--label", default=None)
     ap.add_argument("--clean", action="store_true",
