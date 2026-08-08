@@ -2744,6 +2744,17 @@ Two names shown, the rest counted, so a 12-failure run doesn't paste a list.
 
 9 tests, 1091 total.
 
+**3. …and then the naming itself rendered badly (build 103).** ✅ Found by
+printing what the model *actually saw* on a live b102 run rather than by
+reading a unit test. Every failing test was in `test_textkit.py` and the
+filename was repeated inside every `file::test` id, so the one actionable
+token — *open `test_textkit.py`* — sat buried in a 140-character run-on.
+`_split_test_ids` now pulls out the shared file when all the ids have one; the
+note says the file once as the thing to **open** and the bare names as the
+thing to **read**. Mixed-file ids and the banner fallback render as before.
+Rendering only — no new information, no new trigger — so it ships alongside
+the next real lever rather than getting its own sweep. 5 tests, 1096 total.
+
 ### 5.25 Route-order audit of the remaining multi-option messages (5.20b applied)
 
 `_not_found_help` is ordered exactly backwards against the 5.22a measurements:
@@ -2823,6 +2834,85 @@ three. Recalibration re-queued as lever 0.
 
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
+
+### 5.27 The score channel cannot grade these changes — a census of 22 sweeps (2026-08-08)
+
+Every verdict since 5.24 has ended the same way: the mechanism moved a long
+way and the score said INCONCLUSIVE. I had been reading that as bad luck. It
+is not luck — it is the instrument. Measured over the whole archive
+(`ab.json` for every sweep that banked at least one pair; script kept at
+`$CLAUDE_JOB_DIR/tmp/power.py`):
+
+| | |
+|---|---|
+| sweeps with pairs | **22** |
+| sweeps that ever reached 6 informative pairs | **3** |
+| sweeps that ever reached p < 0.05 | **1** |
+| total pairs | 194 |
+| pairs where the two arms **tied** | **132 (68%)** |
+
+Six informative pairs is the *floor* for p<0.05 to be attainable at all under
+the sign-flip test: at n=6 a perfect 6–0 gives p=0.031, and 5–1 gives 0.219.
+So a sweep with five informative pairs cannot produce a significant result no
+matter how large the effect is. Three sweeps ever cleared that bar, and one of
+those (`b83-regression`, 7 informative) only did so by pooling 24 pairs across
+eight different cases, which is not one hypothesis. Of the two single-case
+sweeps that reached exactly 6, `b97-ambig` came back 1W/5L (p=0.219) and
+`b94-infername` came back **6W/0L, p=0.0312, +0.375** — the single credible
+score-channel result in the entire project, and it needed a clean sweep of
+every informative pair to get there.
+
+Per case, the informative rate and the runs-per-arm it implies:
+
+| case | pairs | informative | rate | runs/arm for 6 informative |
+|---|---|---|---|---|
+| `exec-bugfix` | 112 | 48 | 43% | **14** |
+| `exec-stall-trap` | 20 | 8 | 40% | 15 |
+| `e2e-spec-to-code` | 13 | 1 | 8% | 78 |
+| `exec-from-plan` | 4 | 2 | 50% | 12 |
+| `plan-doc` | 4 | 2 | 50% | 12 |
+| `design-doc` | 4 | 1 | 25% | 24 |
+| `syntax-fix` | **33** | **0** | **0%** | ∞ |
+| `diff-report` | 4 | 0 | 0% | ∞ |
+
+`exec-bugfix` is the workhorse — 112 of the 194 pairs — and **every sweep of
+it has run at `-r 8`, when the arithmetic says 14**. At r8 the expected
+informative count is 3.4; the threshold is 6. We have been running a test that
+usually *cannot* return an answer and then reporting the non-answer as
+"inconclusive", as though the change had been weighed and found wanting.
+
+`syntax-fix` is worse than underpowered: **0 of 33 pairs informative**, every
+single score 1.0 on both arms. It is saturated and carries no signal at all.
+`diff-report` likewise (0 of 4, all 1.0).
+
+**Decisions, taken now:**
+
+- `[x]` **The mechanism/endings channel is the PRIMARY instrument, not the
+  fallback.** `evals/armstats.py` (turn endings, VERIFIED) and the arm-split
+  mechanism grader are what a lever is judged on. The score becomes a
+  guardrail: it can still veto a change by moving *against* it past the noise
+  floor, but it can no longer be what earns a KEEP. This is what 5.24/5.24c
+  were already doing in practice; it is now the stated method.
+- `[x]` **Drop `syntax-fix` and `diff-report` from A/B sweeps.** 37 pairs of
+  pure cost. Keep them as regression smoke tests, where a score of 1.0 is
+  exactly the point.
+- `[ ]` **When a sweep is meant to settle something on score, run
+  `exec-bugfix` at `-r 14`, not `-r 8`.** At ~300 s/run that is ~2.3 h per
+  arm. Budget it deliberately or don't claim the channel.
+- `[ ]` **`ab.py` should say this itself.** It already reports `n_effective`;
+  it should also refuse to print a verdict word when `n_effective < min_pairs`
+  and instead say *"underpowered: N informative of M pairs; this design could
+  not have detected any effect"*. "Inconclusive" reads as evidence about the
+  change. It is evidence about the sample.
+
+Methodology rule 13: **an underpowered test does not return "no effect", it
+returns nothing — and the two must not be printed with the same word.**
+
+**Correction to an earlier note in this file:** I had recorded that one of the
+three threshold-reaching sweeps was an A/A. It was not; the A/A sweeps
+(`b94-AA-noisefloor`, `b94-AA2`, `b99-floor`, `b102-floor`) all landed below
+the bar, which is itself reassuring — the calibration runs behave like the
+real ones.
 
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
