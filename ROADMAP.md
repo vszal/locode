@@ -2966,6 +2966,14 @@ for `old` in the file:
 - **absent** → the model's `old` is not in the file at all, so it drafted its
   replacement into both fields. Keep today's message, trimmed, for this case.
 
+**The neighbouring message shows what "fixed" looks like.** The other frequent
+edit error — `old` appears more than once — names `replace_lines` and the line
+numbers, and in b108 it is followed by a **successful** `replace_lines` 20
+times out of 21. Same model, same runs, same tool: a message that names the
+next call and the argument to put in it recovers essentially always. The no-op
+message is the only edit error in the sweep whose follow-up action does not
+resolve it, and it is the only one whose leading diagnosis is usually false.
+
 Exposure 0.71/run in the current base arm (methodology 20 satisfied), so a
 14-run sweep sees ~10 events per arm. Grade on: the share of these events
 followed by a `replace_lines` re-apply of the same text (40% today), and on
