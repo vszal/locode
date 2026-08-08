@@ -3335,7 +3335,7 @@ def test_the_note_names_the_test_and_says_it_is_the_test():
     note = loop_mod._same_failure_note(1, ["tests/test_a.py::test_wrap"])
     # Build 103 splits the id: the file is the thing to open, the bare name is
     # the thing to read once it is open.
-    assert "Open `tests/test_a.py`" in note
+    assert "Call read_file on `tests/test_a.py` now" in note
     assert "`test_wrap`" in note
     assert "the TEST, not the source file" in note
 
@@ -3395,7 +3395,7 @@ async def test_no_event_when_the_failure_changes(tmp_path):
 def test_a_shared_file_is_named_once():
     note = loop_mod._same_failure_note(1, [
         "test_textkit.py::test_word_wrap", "test_textkit.py::test_truncate"])
-    assert "Open `test_textkit.py`" in note
+    assert "Call read_file on `test_textkit.py` now" in note
     assert "test_textkit.py::" not in note          # not repeated inside the ids
     assert "`test_word_wrap`, `test_truncate`" in note
 
@@ -3421,3 +3421,30 @@ def test_the_escalated_note_names_the_file():
 
 def test_split_returns_no_file_when_ids_are_mixed():
     assert loop_mod._split_test_ids(["a.py::t", "bare"]) == ("", ["a.py::t", "bare"])
+
+
+# --- build 108 / 5.32: the note must ask for a CALL, not a sentence ----------
+
+def test_the_first_note_demands_a_read_file_call():
+    note = loop_mod._same_failure_note(1, ["tests/test_a.py::test_wrap"])
+    assert "Call read_file on `tests/test_a.py` now" in note
+    assert "the next thing you send must be that read_file call" in note
+
+
+def test_the_first_note_no_longer_asks_for_a_sentence():
+    # 66% of these were answered with prose and no tool call because the note
+    # closed by asking for one (b107-indent, 50 events, median 246 chars).
+    note = loop_mod._same_failure_note(1, ["tests/test_a.py::test_wrap"])
+    assert "say in one sentence" not in note
+    assert "in one sentence" not in note
+
+
+def test_the_call_is_named_before_the_diagnosis():
+    note = loop_mod._same_failure_note(1, ["tests/test_a.py::test_wrap"])
+    assert note.index("read_file") < note.index("idea behind it")
+
+
+def test_the_escalated_note_is_unchanged_in_shape():
+    # It already converts 82%; build 108 does not touch it.
+    note = loop_mod._same_failure_note(3, ["tests/test_a.py::test_wrap"])
+    assert "Stop editing and open" in note

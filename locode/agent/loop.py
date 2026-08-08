@@ -2067,23 +2067,35 @@ def _same_failure_note(n: int, names: list[str] | None = None) -> str:
     to do something it had no identifier for, it substituted the nearest thing
     it already knew how to do.
 
-    Build 103 then says the shared file ONCE — see _split_test_ids."""
+    Build 103 then says the shared file ONCE — see _split_test_ids.
+
+    Build 108 stops ASKING FOR A SENTENCE. Measured over b107-indent, this note
+    at n<=1 was answered with prose and no tool call **66% of the time** (50
+    events, median 246 chars — about one sentence), because it closed with
+    "then say in one sentence what it expects versus what the code actually
+    produces". The model did precisely that and the turn died having called
+    nothing. The escalated branch below, which demands an action and invites no
+    narration, converts 82%; `unverified edits`, same shape, converts 100%. So
+    this branch now names the tool, puts the call first (methodology 9), and
+    says in as many words that the next thing it sends must BE that call. The
+    one-sentence diagnosis survives only as something to do *after* reading,
+    not as an alternative to reading. See ROADMAP 5.32."""
     names = names or []
     path, bare = _split_test_ids(names)
     which = _name_the_tests(bare if path else names)
     target = f"`{path}`" if path else which
     if n <= 1:
-        tail = f" and read {which}." if path else " and read what it asserts."
+        tail = f", and read {which}" if path else ", and read what it asserts"
         return (
             "\n\n⟳ SAME FAILURE as the previous test run — the same tests fail "
             "with the same errors. Whatever you changed since then did not "
-            "affect this. Do not record progress on it and do not re-send a "
-            "variation of the same edit: it is the idea behind the edit that is "
-            "wrong, not its wording.\n"
-            f"Open {target} — the TEST, not the source file you have been "
-            f"editing —{tail} Then say in one sentence what it expects versus "
-            "what the code actually produces, and make the next edit follow "
-            "from that sentence.")
+            "affect this.\n"
+            f"Call read_file on {target} now — the TEST, not the source file "
+            f"you have been editing{tail}. Do not answer this with an "
+            "explanation: the next thing you send must be that read_file call. "
+            "Then make your next edit follow from what the test asserts. Do "
+            "not re-send a variation of the edit that just failed — it is the "
+            "idea behind it that is wrong, not its wording.")
     return (f"\n\n⟳ SAME FAILURE — {n + 1} test runs in a row with identical "
             f"results. Nothing you have tried since the first one has changed "
             f"anything. Stop editing and open {target}.")
