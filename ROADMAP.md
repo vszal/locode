@@ -2608,6 +2608,82 @@ appears 6 times in the candidate arm (8% of its `edit_file` calls) and 0 times
 in base — the exact error the user reported from a live session. Base simply
 never got far enough to emit it. It is a real residual, not a regression.
 
+### 5.24b The model re-runs the tests, reads the same failure, and updates its plan
+
+The lever underneath 5.24, measured on `b99-routeorder` — the first sweep whose
+runs survive long enough to reach this state at all:
+
+| | |
+|---|---:|
+| failing test runs | 84 |
+| ...**identical to the immediately preceding test run** | **47 (56%)** |
+| runs containing at least one | **16/16** |
+
+And on the (landed edit → next test) transition: **63% leave the failure
+unchanged**, in 11 of 16 runs. What the model does next is the finding that
+shapes the fix — **23 of 37 times it calls `update_plan`**. It does bookkeeping.
+It ticks the task and moves on, because nothing in what it just read says the
+attempt failed to matter. Exactly **one** of 37 re-read a file.
+
+**Why the existing stall nudge doesn't cover this.** `_nudge_stall` already says
+close to the right thing and almost never fires: `error_sig` is the joined
+content of *every* errored call in the batch (`loop.py:1304`), so an edit error
+landing in the same iteration as a test failure produces a different key than
+the test failure alone. Measured on the same sweep: **97 distinct error
+signatures under that keying vs 37 real test-failure identities** — 2.6×
+fragmentation. It fired 8 times against 47 opportunities.
+
+I checked the obvious alternative first and it was **wrong**: I expected
+pytest's varying `in 0.42s` to be breaking byte-exact matching. It is not — 20
+of 68 consecutive failing results are already byte-identical, and normalising
+the duration changes nothing. The fragmentation is the batch join, not timing.
+
+**Build 100 (drafted).** Append the note to the *result*, not as a nudge: it is
+an observation about the very output the model is reading, and it is true the
+first time it happens rather than after a streak. Same shape as `_EMPTY_OK` and
+the build-22 syntax warning. Wording leads by closing off `update_plan` and then
+names re-reading the failing test, per methodology 9.
+
+**This also CLOSES 5.21's stat walk rather than deferring it.** That draft
+proposed proving the tree unchanged, and correctly warned an fs-only counter
+would lie whenever the model edits through bash. Dropped: *"this is the same
+failure as the previous run"* is a pure observation about two outputs we hold,
+always true when the identities match, needing no theory about the tree — and it
+covers 5.21's population (re-ran having changed nothing) and 5.24b's (changed
+something that didn't matter) in one sentence that cannot be false.
+
+**Validated before shipping, on the corpus, not by argument.** The identity
+function (progress line + failed test names + exception types; deliberately not
+byte-exact) over all **9,644** archived tool results: 1,958 identified as
+failing tests, **100% of them produced by a pytest command — zero false
+positives on any other command**, zero fires on a run reporting only passes,
+zero fires on a non-`bash` tool. It would annotate **692 times across 79 run
+files**. The largest measured exposure of any lever in this project.
+
+### 5.25 Route-order audit of the remaining multi-option messages (5.20b applied)
+
+`_not_found_help` is ordered exactly backwards against the 5.22a measurements:
+
+| position in the message | route | measured landing |
+|---|---|---:|
+| **1st (the lead sentence)** | "Copy the target text EXACTLY…" → retry `edit_file` from memory | **1/41 (2%)** |
+| 2nd (the snippet) | copy `old` out of the block shown | 31/46 (67%) |
+| **last**, gated on self-diagnosis | `replace_lines` | **16/16 (100%)** |
+| never named | `write_file` | 17/17 (100%) |
+
+The gate on the last route is the same defect build 96 fixed elsewhere: *"if the
+target text is hard to reproduce EXACTLY — it has backslashes, quotes, or
+unusual whitespace"* is a condition a model that believes its `old` was already
+exact will never match. The 100% route is both last and conditional; the 2%
+route leads.
+
+Correct order: `replace_lines` with the line numbers filled in (we already print
+them) → re-read then edit → copy-exactly last. Draft at
+`$CLAUDE_JOB_DIR/tmp/b99_draft.py`, still valid, renumber to build 101.
+
+**Ranked below build 100 on exposure**: 87 events archive-wide, and only 2 in
+the latest sweep — the candidate arm rarely reaches not-found any more.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced
