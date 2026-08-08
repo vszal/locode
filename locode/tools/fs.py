@@ -130,7 +130,143 @@ def _fuzzy_span(text: str, old: str, threshold: float = 0.8):
     return start, end, best_r
 
 
-def try_edit(text: str, old: str, new: str, replace_all: bool):
+def _span_base(text: str, a: int) -> int | None:
+    """Indent column of the line the span at offset `a` starts on.
+
+    None when `a` is not sitting immediately after pure leading whitespace —
+    the caller then leaves the model's text alone rather than guessing.
+    """
+    ls = text.rfind("\n", 0, a) + 1
+    lead = text[ls:a]
+    return len(lead) if lead == "" or lead.isspace() else None
+
+
+def _anchor_new(new: str, base: int | None) -> str:
+    """`new` with its first line stripped and every LATER line re-anchored.
+
+    The span the tolerant and fuzzy tiers replace begins after the matched
+    line's own indentation, so `new`'s first line must be stripped — which is
+    exactly what `new.lstrip(" \t")` did, and exactly all it did. The later
+    lines kept the column the model wrote them at, so a relative-indented
+    multi-line `new` came out dedented against its own first line: `if x:`
+    followed by a line no deeper than it. Then the syntax guard told the model
+    its text was malformed, when the text was fine and we had broken it — the
+    worst-converting message in the system, 38% of them followed immediately by
+    another, and 18 of 27 consecutive pairs resending the byte-identical `new`.
+    See ROADMAP 5.29.
+
+    Each later line keeps its indentation RELATIVE to the first, shifted onto
+    `base`. That is right for a `new` written wholly from column 0, and WRONG
+    for a `new` whose first line is dedented but whose later lines already
+    carry the file's own columns — both shapes exist, and nothing in the text
+    itself reliably tells them apart. So this is never applied on its own
+    judgement: `_pick_splice` uses it only as a rescue, when the strip-only
+    splice would turn parseable Python into a SyntaxError and this one would
+    not. Anything that lands today keeps landing byte-identically.
+
+    Falls back to the old strip-only behaviour, deliberately, when the shift is
+    not well defined: tabs anywhere in the indentation (a tab's width is not
+    ours to assume), a later line indented LESS than the first (the shift would
+    have to eat real characters), or no base column at all.
+    """
+    if base is None:
+        return new.lstrip(" \t")
+    lines = new.split("\n")
+    first_i = next((i for i, l in enumerate(lines) if l.strip()), None)
+    if first_i is None:
+        return new.lstrip(" \t")
+
+    def indent(l):
+        return l[:len(l) - len(l.lstrip())]
+
+    if any("\t" in indent(l) for l in lines if l.strip()):
+        return new.lstrip(" \t")
+    depth = len(indent(lines[first_i]))
+    if any(len(indent(l)) < depth for l in lines[first_i + 1:] if l.strip()):
+        return new.lstrip(" \t")
+    out = []
+    for i, l in enumerate(lines):
+        if not l.strip():
+            out.append("")
+        elif i <= first_i:
+            out.append(l.lstrip())
+        else:
+            out.append(" " * (base + len(indent(l)) - depth) + l.lstrip())
+    return "\n".join(out)
+
+
+# Says so in the result when the 5.29 rescue fired, both so the model knows we
+# moved its lines and so the eval archive can count how often this reaches.
+_REINDENTED = ", re-indented onto the matched block"
+
+
+def _splice(text: str, spans, new: str, anchored: bool) -> str:
+    """Apply `new` over every span, either strip-only or re-anchored."""
+    updated = text
+    for a, b in sorted(spans, reverse=True):
+        ins = (_anchor_new(new, _span_base(text, a)) if anchored
+               else new.lstrip(" \t"))
+        updated = updated[:a] + ins + updated[b:]
+    return updated
+
+
+def _indent_profile(lines) -> list[int] | None:
+    """Non-blank lines' indents relative to the first, or None if unreadable."""
+    body = [l for l in lines if l.strip()]
+    if not body or any("\t" in l[:len(l) - len(l.lstrip())] for l in body):
+        return None
+    depths = [len(l) - len(l.lstrip()) for l in body]
+    return [d - depths[0] for d in depths]
+
+
+def _frame_ok(text: str, a: int, b: int, old: str) -> bool:
+    """True when `old` reproduced the matched region's SHAPE, just dedented.
+
+    The rescue re-anchors `new` on the assumption that the model wrote it in
+    `old`'s coordinate frame and that `old`'s frame is the file's, shifted. That
+    holds only if `old`'s relative indents match the region it matched. When
+    they don't — a model that flattened a block spanning two depths, say — its
+    frame carries no information about where the later lines belong, and
+    guessing lands them at the wrong depth SILENTLY. Observed: a `return` that
+    sat outside a `for` came back inside it. A syntax rejection is the better
+    outcome there, so decline and let the guard speak.
+    """
+    ls = text.rfind("\n", 0, a) + 1
+    region = _indent_profile(text[ls:b].split("\n"))
+    return region is not None and region == _indent_profile(_old_block(old))
+
+
+def _pick_splice(text: str, spans, new: str, path, old: str = ""):
+    """The strip-only splice, unless it BREAKS the file and re-anchoring fixes it.
+
+    ROADMAP 5.29. A model writing a multi-line `new` usually writes it relative,
+    from column 0; the span tiers replace text starting after the matched line's
+    indentation, so only the first line was ever re-indented and the rest came
+    out dedented against it. The file then failed to parse and the syntax guard
+    told the model its text was malformed — it wasn't, we had broken it, and 18
+    of 27 consecutive rejections answered by resending the byte-identical `new`.
+
+    The other shape is real too (first line dedented, later lines already at the
+    file's absolute columns), and re-anchoring that one breaks an edit that works
+    today. Rather than guess between them from the text, decide on the outcome:
+    keep the strip-only result unless Python rejects it and the anchored result
+    parses. That makes this strictly a rescue — every edit that lands today
+    lands identically, and only a file we were about to corrupt changes hands.
+    """
+    plain = _splice(text, spans, new, False)
+    if path is None or getattr(path, "suffix", "") != ".py":
+        return plain, False
+    if _parses_py(plain, path) or not _parses_py(text, path):
+        return plain, False   # already fine, or the file was broken before us
+    if not all(_frame_ok(text, a, b, old) for a, b in spans):
+        return plain, False
+    anchored = _splice(text, spans, new, True)
+    if anchored != plain and _parses_py(anchored, path):
+        return anchored, True
+    return plain, False
+
+
+def try_edit(text: str, old: str, new: str, replace_all: bool, path=None):
     """Resolve an edit across all matching tiers. Returns
     (updated_text|None, note, status, count) with status in
     {'ok', 'ambiguous', 'not_found', 'empty_old', 'noop'}. Shared by edit_file and
@@ -154,14 +290,13 @@ def try_edit(text: str, old: str, new: str, replace_all: bool):
         return text.replace(old, new), "", "ok", count
     # Span replacements start AFTER the line's original indentation (which is
     # preserved), so drop any leading indentation the model put on `new`'s first
-    # line — otherwise the two stack and the line is double-indented.
-    new_ins = new.lstrip(" \t")
+    # line — otherwise the two stack and the line is double-indented. When that
+    # leaves the LATER lines of a multi-line `new` dedented into a SyntaxError,
+    # `_pick_splice` rescues them onto the matched column (5.29).
     spans = _tolerant_spans(text, old, replace_all)   # tier 2: whitespace-tolerant
     if spans is not None:
-        updated = text
-        for a, b in sorted(spans, reverse=True):
-            updated = updated[:a] + new_ins + updated[b:]
-        note = ", whitespace-tolerant"
+        updated, fixed = _pick_splice(text, spans, new, path, old)
+        note = ", whitespace-tolerant" + (_REINDENTED if fixed else "")
         if updated == text:                           # indent-only "change" -> no change
             return None, note, "noop", len(spans)
         return updated, note, "ok", len(spans)
@@ -174,8 +309,9 @@ def try_edit(text: str, old: str, new: str, replace_all: bool):
         fz = _fuzzy_span(text, old)
         if fz is not None:
             a, b, ratio = fz
-            updated = text[:a] + new_ins + text[b:]
-            note = f", fuzzy ~{round(ratio * 100)}%"
+            updated, fixed = _pick_splice(text, [(a, b)], new, path, old)
+            note = (f", fuzzy ~{round(ratio * 100)}%"
+                    + (_REINDENTED if fixed else ""))
             if updated == text:
                 return None, note, "noop", 1
             return updated, note, "ok", 1
@@ -1017,7 +1153,7 @@ class EditFile:
                 is_error=True, no_change=True)
         replace_all = bool(args.get("replace_all"))
 
-        updated, note, status, count = try_edit(text, old, new, replace_all)
+        updated, note, status, count = try_edit(text, old, new, replace_all, p)
         if status == "empty_old":
             return ToolResult(
                 "`old` is empty, so there is nothing to replace. To ADD text, "

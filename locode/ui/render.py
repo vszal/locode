@@ -443,7 +443,8 @@ def _proposed_change(name: str, args: dict, cwd: str) -> tuple[str, str, str] | 
     # exactly what will be written (incl. whitespace-tolerant / fuzzy matches).
     from locode.tools.fs import try_edit
     after, _note, status, _count = try_edit(
-        before, args.get("old", ""), args.get("new", ""), bool(args.get("replace_all")))
+        before, args.get("old", ""), args.get("new", ""),
+        bool(args.get("replace_all")), path)
     if status != "ok" or after is None:
         return None
     return str(path), before, after

@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from locode.tools import fs
 from locode.tools.base import ToolContext
@@ -1377,3 +1378,128 @@ def test_the_noop_paths_are_untouched():
     # _TRY_REPLACE_LINES is dropped from the CONFIDENT not-found path only; the
     # two no-op call sites have no located block and nothing to fill in.
     assert "hard to reproduce EXACTLY" in fs._TRY_REPLACE_LINES
+
+
+# --- build 106 / 5.29: a multi-line `new` keeps its shape when spliced -------
+
+def test_a_relative_multiline_new_is_rescued():
+    # The reproduced bug: `new` written relative from column 0, spliced into an
+    # indented block, lost its shape and the model was told ITS text was bad.
+    text = ("def wrap(text, width):\n"
+            "    lines = []\n"
+            "    if current:\n"
+            '        lines.append(" ".join(current))\n'
+            "    return lines\n")
+    old = "if current:\n    lines.append(' '.join(current))\nreturn lines"
+    new = "if current:\n    lines.append(x)\n    lines.append(y)\nreturn lines"
+    upd, _note, status, _n = fs.try_edit(text, old, new, False, Path("m.py"))
+    assert status == "ok"
+    compile(upd, "m.py", "exec")          # the whole point
+
+
+def test_an_absolute_later_line_is_left_alone():
+    # The OTHER real shape: first line dedented, later lines already at the
+    # file's own columns. The strip-only splice is correct here, so the rescue
+    # must not fire — this is the regression the anchor could have caused.
+    text = "class A:\n    x = 1\n    y = 2\n"
+    upd, _n, status, _c = fs.try_edit(text, "x = 1\ny = 2",
+                                      "x = 99\n    y = 2", False, Path("m.py"))
+    assert status == "ok" and upd == "class A:\n    x = 99\n    y = 2\n"
+
+
+def test_the_rescue_needs_a_python_path():
+    # No path (the diff preview's old signature, or a non-.py file): status quo.
+    text = "def f():\n    if x:\n        p()\n"
+    old, new = "if x:\n    p()", "if x:\n    p()\n    q()"
+    plain, _n, status, _c = fs.try_edit(text, old, new, False)
+    assert status == "ok" and "    if x:\n    p()" in plain   # unrescued
+    txt, _n2, _s2, _c2 = fs.try_edit(text, old, new, False, Path("m.txt"))
+    assert txt == plain
+
+
+def test_the_rescue_stays_out_of_an_already_broken_file():
+    # The file did not parse before the edit, so we cannot read a SyntaxError
+    # after it as evidence of anything. Leave the model's text alone.
+    text = "def f(:\n    if x:\n        p()\n"
+    upd, _n, status, _c = fs.try_edit(text, "if x:\n    p()",
+                                      "if x:\n    p()\n    q()", False,
+                                      Path("m.py"))
+    assert status == "ok" and "    if x:\n    p()\n    q()" in upd
+
+
+def test_the_rescue_reaches_the_fuzzy_tier():
+    text = ("def f():\n"
+            "    if ready:\n"
+            "        run()\n")
+    # `old` drifts enough to miss the tolerant tier but still match fuzzily.
+    upd, note, status, _c = fs.try_edit(text, "if ready :\n    run( )",
+                                        "if ready:\n    run()\n    log()",
+                                        False, Path("m.py"))
+    assert status == "ok" and "fuzzy" in note
+    compile(upd, "m.py", "exec")
+
+
+def test_an_absolute_multiline_new_is_unchanged_by_the_anchor():
+    # A model that already wrote the file's own columns must get byte-identical
+    # output to the pre-106 behaviour.
+    assert fs._anchor_new("    a = 1\n    b = 2", 4) == "a = 1\n    b = 2"
+
+
+def test_the_anchor_shifts_the_later_lines_onto_the_base():
+    assert fs._anchor_new("a = 1\n    b = 2", 8) == "a = 1\n            b = 2"
+
+
+def test_the_anchor_keeps_blank_lines_empty():
+    assert fs._anchor_new("a = 1\n\n    b = 2", 4) == "a = 1\n\n        b = 2"
+
+
+def test_the_anchor_declines_on_tabs():
+    assert fs._anchor_new("a = 1\n\tb = 2", 4) == "a = 1\n\tb = 2"
+
+
+def test_the_anchor_declines_when_a_later_line_is_shallower():
+    # Shifting would have to cut into real characters, so leave it alone.
+    assert fs._anchor_new("    a = 1\nb = 2", 8) == "a = 1\nb = 2"
+
+
+def test_the_anchor_is_a_no_op_on_a_single_line():
+    assert fs._anchor_new("    a = 1", 8) == "a = 1"
+
+
+def test_span_base_reports_the_indent_column():
+    text = "def f():\n    a = 1\n"
+    assert fs._span_base(text, text.index("a = 1")) == 4
+
+
+def test_span_base_declines_mid_line():
+    text = "def f():\n    a = 1\n"
+    assert fs._span_base(text, text.index("= 1")) is None
+
+
+def test_the_exact_tier_is_untouched():
+    text = "def f():\n    a = 1\n    b = 2\n"
+    upd, _n, status, _c = fs.try_edit(text, "    a = 1\n    b = 2",
+                                      "    a = 9\n    b = 8", False,
+                                      Path("m.py"))
+    assert status == "ok" and upd == "def f():\n    a = 9\n    b = 8\n"
+
+
+def test_replace_all_rescues_each_span_at_its_own_depth():
+    text = ("def f():\n    if x:\n        p()\n"
+            "def g():\n        if x:\n            p()\n")
+    upd, _n, status, _c = fs.try_edit(text, "if x:\n    p()",
+                                      "if x:\n    p()\n    q()", True,
+                                      Path("m.py"))
+    assert status == "ok"
+    compile(upd, "m.py", "exec")
+
+
+def test_the_rescued_edit_actually_lands_through_edit_file(tmp_path):
+    import asyncio
+    (tmp_path / "w.py").write_text("def f():\n    if x:\n        p()\n")
+    ctx = ToolContext(cwd=str(tmp_path))
+    res = asyncio.run(fs.EditFile().run(
+        {"path": "w.py", "old": "if x:\n    p()",
+         "new": "if x:\n    p()\n    q()"}, ctx))
+    assert res.ok, res.content
+    compile((tmp_path / "w.py").read_text(), "w.py", "exec")
