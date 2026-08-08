@@ -2874,6 +2874,71 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.28 The ambiguous-match message is SOLVED — take it off the lever list (2026-08-08)
+
+It was queued as "the largest remaining message target" (11 events in the 5.25
+census, 20 by b101). That ranking counted **exposure and called it failure**.
+Measured on what actually happens after one fires, across `b99-routeorder` and
+`b101-samefail`, all arms — 42 ambiguous messages:
+
+| what the model did next | n |
+|---|---:|
+| **called `replace_lines`** — and it succeeded, every time | **32 (76%)** |
+| `write_file` (also succeeded) | 3 |
+| ended the turn | 4 |
+| `bash` / `ls` | 3 |
+| **re-sent the same `old`** | **0** |
+| **produced a syntax error** | **0** |
+
+Zero re-sends, against the 43-of-125 that motivated 5.20 in the first place.
+This is the best-performing error message in the system, and it earns its keep
+by doing exactly what build 105 now does for not-found: name `replace_lines`
+first, with the line numbers already in front of the model.
+
+**And the b97 detour was more instructive than its verdict recorded.** b97 is
+filed as "won its own metric and killed every run"; the mechanism was never
+named. It is this — b97's message led with *"extend `old` with a distinguishing
+line from just above or below the match you want (copied verbatim from what is
+shown)"*, and `_match_locations` renders those lines **numbered and prefixed**:
+
+```
+  ── match at line 23 ──
+    22 |          if not current:
+    23 |>             current = [word]
+```
+
+The model did as it was told, stripped the `NN |` gutter, and could not tell
+which of the remaining spaces were the gutter's padding and which were the
+code's indentation. It sent `old` = `"if not current:\n    current = [word]"`
+— dedented — the tolerant matcher accepted it, and `new` went in at the wrong
+column. **SyntaxError.** Then it looped on that.
+
+The counts, per arm:
+
+| sweep / arm | ambiguous | syntax rejections | ambiguous → syntax |
+|---|---:|---:|---:|
+| b97 base | 17 | 1 | 1 |
+| **b97 cand** | 12 | **20** | **8** |
+| b99 cand | 11 | 4 | **0** |
+| b101 base / cand | 11 / 20 | 16 / 3 | **0 / 0** |
+
+Build 98's reorder did not merely change which route was taken — it **deleted a
+downstream failure mode**, 8 → 0, and has kept it at zero across 31 further
+ambiguous events. That is the strongest evidence 5.20b has.
+
+Two things carried forward:
+
+- **`_match_locations` still renders a numbered gutter**, and the message still
+  offers "extend `old`" as its *last* route. That is survivable only because
+  nothing takes that route any more. If the extend route is ever promoted
+  again, the gutter has to go first — print verbatim and unnumbered, the way
+  `_not_found_help` does, and state the line number in prose beside the block.
+  Recorded here so the trap is not re-entered rather than fixed pre-emptively
+  on a route with zero traffic (methodology 7).
+- **Methodology 15: rank levers by what follows the message, not by how often
+  it fires.** Exposure says where to look; the next action says whether there
+  is anything to fix.
+
 ### 5.27 The score channel cannot grade these changes — a census of 22 sweeps (2026-08-08)
 
 Every verdict since 5.24 has ended the same way: the mechanism moved a long
