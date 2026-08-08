@@ -2684,6 +2684,37 @@ them) → re-read then edit → copy-exactly last. Draft at
 **Ranked below build 100 on exposure**: 87 events archive-wide, and only 2 in
 the latest sweep — the candidate arm rarely reaches not-found any more.
 
+### 5.26 No A/A calibration has been able to FINISH since the floor was added (build 100) ✅
+
+The `b99-floor` recalibration died 40 minutes in, after run 1 of 16:
+
+```
+[1/16] exec-bugfix · qwencoder14 · r1 · base…
+        base: score=0.25 480.3s
+  File "evals/ab.py", line 453, in _persist
+    a["why"] = (f"A/A calibration: both arms ran identical code, so this "
+TypeError: unsupported format string passed to NoneType.__format__
+```
+
+`_persist` runs after **every** run for checkpointing, so its first call happens
+with one run banked and **no complete pair** — `mean_delta` is `None` there, and
+the A/A branch formatted it unconditionally. Any A/A therefore crashes on its
+own first run, every time, and always has since that branch landed.
+
+That is the answer to a question standing since 5.14: **why does the only
+calibrated setup have just 2 samples?** Not because calibration is expensive —
+because it has been impossible. The 0.2812 floor rests entirely on the two
+samples that predate this call site, and every "clears the floor" judgement in
+this document has been resting on them.
+
+Fixed: say *"no complete pair yet"* when there is no delta. 3 tests
+(`tests/test_ab.py`, 45 total) covering the A/A checkpoint, the complete A/A
+pair, and the ordinary A/B checkpoint, since the same call site serves all
+three. Recalibration re-queued as lever 0.
+
+Noticed only because I read the log rather than trusting the process-exit
+notification — a sweep that exits does not mean a sweep that ran.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced

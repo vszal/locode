@@ -450,9 +450,19 @@ def _persist(results_dir: Path, runs: list[RunResult], label: str,
         # An A/A has no verdict to give — it MEASURES. Whatever delta it found
         # is, by construction, noise, so say so and bank it.
         a["status"] = "inconclusive"
-        a["why"] = (f"A/A calibration: both arms ran identical code, so this "
-                    f"delta of {a['mean_delta']:+.4f} IS the noise floor, not "
-                    f"a result. Recorded for {key or 'this setup'}.")
+        # _persist runs after EVERY run for checkpointing, so the first call
+        # happens with one run banked and no complete pair — mean_delta is None
+        # there. Formatting it unconditionally crashed the sweep on run 1, which
+        # meant no A/A could ever finish: the standing 0.2812 floor rests on the
+        # 2 samples that predate this call site. Say "no pair yet" instead.
+        delta = a.get("mean_delta")
+        a["why"] = (
+            (f"A/A calibration: both arms ran identical code, so this delta of "
+             f"{delta:+.4f} IS the noise floor, not a result. Recorded for "
+             f"{key or 'this setup'}.")
+            if delta is not None else
+            (f"A/A calibration in progress for {key or 'this setup'}: no "
+             f"complete pair yet, so there is no delta to record."))
     elif key:
         apply_noise_floor(a, key)
     (results_dir / "ab.json").write_text(json.dumps(report, indent=2))

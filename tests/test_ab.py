@@ -385,3 +385,35 @@ def test_a_missing_mean_delta_is_not_treated_as_a_result(floor):
     a = ab.apply_noise_floor({"mean_delta": None, "status": "inconclusive",
                               "why": ""}, "k")
     assert a["status"] == "inconclusive"
+
+
+# --- an A/A must survive its own first checkpoint (build 100) --------------
+# _persist runs after EVERY run so a killed sweep keeps its partial results.
+# The first call therefore has one run banked and no complete pair, and the
+# A/A branch formatted mean_delta (None) unconditionally: every A/A sweep died
+# on run 1 with a TypeError. That is why the standing 0.2812 floor rests on 2
+# samples — no calibration had been able to finish since this call site landed.
+
+def test_an_aa_checkpoint_survives_having_no_complete_pair(tmp_path):
+    report = ab._persist(tmp_path, [_run(arm="base")], "l", "ref", "sha", None,
+                         key="k", identical=True)
+    a = report["analysis"]
+    assert a["mean_delta"] is None
+    assert a["status"] == "inconclusive"
+    assert "no complete pair yet" in a["why"]
+
+
+def test_a_complete_aa_pair_still_reports_the_delta(tmp_path):
+    runs = [_run(arm="base", score=0.5), _run(arm="cand", score=1.0)]
+    report = ab._persist(tmp_path, runs, "l", "ref", "sha", None,
+                         key="k", identical=True)
+    a = report["analysis"]
+    assert a["mean_delta"] == 0.5
+    assert "IS the noise floor" in a["why"]
+
+
+def test_a_partial_ab_checkpoint_also_survives(tmp_path):
+    # The non-identical path reaches apply_noise_floor with the same None.
+    report = ab._persist(tmp_path, [_run(arm="cand")], "l", "ref", "sha", None,
+                         key="k", identical=False)
+    assert report["analysis"]["mean_delta"] is None
