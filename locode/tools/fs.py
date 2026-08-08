@@ -364,6 +364,22 @@ def _already_applied(text: str, new: str) -> bool:
     return _tolerant_spans(text, new, False) is not None
 
 
+def _first_line_of(text: str, old: str):
+    """1-based line number where `old` starts in `text`, or None if absent.
+
+    Exact first, then whitespace-tolerant with `replace_all` so a block that
+    occurs several times still counts as PRESENT — the question here is "does
+    the file already read this way", not "which one would we edit".
+    """
+    off = text.find(old)
+    if off < 0:
+        spans = _tolerant_spans(text, old, True)
+        if not spans:
+            return None
+        off = spans[0][0]
+    return text.count("\n", 0, off) + 1
+
+
 def _same_content(a: str, b: str) -> bool:
     """True when `a` and `b` differ only in per-line whitespace or a copied
     read_file line-number prefix — the indent-only case edit_file can't serve.
@@ -1165,18 +1181,37 @@ class EditFile:
         except OSError as e:
             return ToolResult(f"cannot read {p}: {e}", is_error=True)
         if old == new:
+            # build 110 (ROADMAP 5.34). This used to be ONE message, headed "you
+            # drafted your replacement into both fields". Reconstructed against
+            # the edits that had already landed in the same run, 18 of 20 were
+            # nothing of the kind: the model was re-sending a change that had
+            # ALREADY been applied, so `old` was sitting right there in the file.
+            # Told it had submitted a broken edit, it went hunting for a way to
+            # force the same text in again — and the old suffix handed it one
+            # (`replace_lines`), after which the file still didn't change and the
+            # run died on "edits kept hitting the same error". The two cases are
+            # distinguishable without any history: if `old` is in the file, the
+            # edit is REDUNDANT, not malformed. Answer them separately, and give
+            # the redundant one the non-error "already done" treatment its
+            # siblings below already get.
+            at = _first_line_of(text, old)
+            if at is not None:
+                return ToolResult(
+                    f"This edit is ALREADY DONE: `old` and `new` are the same "
+                    f"text, and {p} already contains it (line {at}). Nothing to "
+                    "change — the file already reads the way this edit asks for. "
+                    "Do NOT resend it, do NOT revert it, and do NOT switch to "
+                    "line-number edits to force it in. If something is still "
+                    "failing, the cause is on a DIFFERENT line: run the tests "
+                    "again to see the CURRENT failure and read the line it names "
+                    "before editing anything.", no_change=True)
             return ToolResult(
-                "This edit does NOTHING: `new` is identical to `old`. To change "
-                "the file, `new` must be DIFFERENT text — put the corrected code "
-                "there. If you are fixing a bug, re-read the exact failure (the "
-                "test or traceback names the wrong line and what is wrong with "
-                "it), then submit an edit whose `new` carries that correction. If "
-                "this line is already correct, the bug is on a DIFFERENT line — "
-                "stop editing this one and look elsewhere. Writing the same text "
-                "into both fields is the signature of drafting your intended "
-                "replacement in `old` as well as `new`: `old` must be the text "
-                "the file contains NOW, and `new` the text you want instead. Do "
-                "NOT resend this same no-op edit." + _TRY_REPLACE_LINES,
+                "This edit does NOTHING: `new` is identical to `old`, and that "
+                f"text is not in {p} at all — you put your intended replacement "
+                "in BOTH fields. `old` must be the text the file contains NOW "
+                "(copy it from read_file), and `new` the corrected text you want "
+                "instead. Re-read the file, then resend with the two fields "
+                "DIFFERENT." + _TRY_REPLACE_LINES,
                 is_error=True, no_change=True)
         replace_all = bool(args.get("replace_all"))
 

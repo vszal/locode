@@ -159,16 +159,51 @@ async def test_ambiguous_near_the_file_edges_does_not_crash(ctx, tmp_path):
     assert res.is_error and "match at line 1" in res.content
 
 
-async def test_edit_file_noop_is_refused_with_actionable_help(ctx, tmp_path):
-    # old == new does nothing; the biggest unrecovered edit failure in eval. The
-    # message must push the model to a corrected `new` or to look elsewhere,
-    # not just restate the rejection.
-    (tmp_path / "c.py").write_text("value = compute()\n")
+# --- old == new splits two ways (build 110, ROADMAP 5.34) -------------------
+#
+# One message used to cover both, headed "you drafted your replacement into both
+# fields". Reconstructed against the edits already landed in the same run, 18 of
+# 20 were re-sends of a change that HAD already been applied — so `old` was
+# still in the file, the "malformed edit" diagnosis was false, and the
+# replace_lines suffix invited the model to force in text the file already had.
+
+async def test_edit_file_noop_with_old_present_reads_as_already_done(ctx, tmp_path):
+    # `old` is in the file: the edit is redundant, not broken. Non-error, in the
+    # same "already done" family as the two re-submit paths above, so the model
+    # moves on instead of hunting for a way to re-apply it.
+    (tmp_path / "c.py").write_text("a = 0\nvalue = compute()\n")
     res = await fs.EditFile().run(
         {"path": "c.py", "old": "value = compute()", "new": "value = compute()"}, ctx)
-    assert res.is_error
-    assert "identical" in res.content.lower() or "does nothing" in res.content.lower()
-    assert "different" in res.content.lower()
+    assert res.ok and res.no_change
+    assert "already done" in res.content.lower()
+    assert "line 2" in res.content            # names where it already reads that way
+    assert "replace_lines" not in res.content  # must not offer a way to force it in
+    assert (tmp_path / "c.py").read_text() == "a = 0\nvalue = compute()\n"
+
+
+async def test_edit_file_noop_already_done_is_found_at_a_shifted_indent(ctx, tmp_path):
+    # The re-send usually comes back dedented (the model retypes the line rather
+    # than copying it), so presence has to be whitespace-tolerant or the run
+    # falls into the wrong branch on the commonest shape of the right case.
+    (tmp_path / "c.py").write_text("class A:\n    def f(self):\n        return 42\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "return 42", "new": "return 42"}, ctx)
+    assert res.ok and res.no_change
+    assert "already done" in res.content.lower() and "line 3" in res.content
+
+
+async def test_edit_file_noop_with_old_absent_still_names_the_drafting_error(ctx, tmp_path):
+    # `old` is nowhere in the file, so the model really did put its intended
+    # replacement in both fields. This one stays an error and keeps the
+    # replace_lines route, which is a genuine way out here.
+    (tmp_path / "c.py").write_text("value = compute()\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "value = recompute()", "new": "value = recompute()"},
+        ctx)
+    assert res.is_error and res.no_change
+    assert "does nothing" in res.content.lower()
+    assert "both fields" in res.content.lower()
+    assert "replace_lines" in res.content
     assert (tmp_path / "c.py").read_text() == "value = compute()\n"
 
 
@@ -1148,12 +1183,14 @@ async def test_the_copy_me_block_is_not_run_into_by_the_advice(ctx, tmp_path):
 
 async def test_no_op_message_names_the_same_misconception(ctx, tmp_path):
     # The degenerate case of 5.17 — the tweak between the two fields came out
-    # empty, so the key matches and the edit changes nothing.
+    # empty, so the key matches and the edit changes nothing. Build 110: this
+    # diagnosis only holds when `old` is NOT in the file; when it is, the edit
+    # is redundant rather than malformed (see the pair of tests below).
     (tmp_path / "m.py").write_text("x = 1\n")
     res = await fs.EditFile().run(
-        {"path": "m.py", "old": "x = 1", "new": "x = 1"}, ctx)
+        {"path": "m.py", "old": "y = 2", "new": "y = 2"}, ctx)
     assert res.is_error
-    assert "both fields" in res.content
+    assert "both fields" in res.content.lower()
 
 
 # --- the ambiguous reply must lead with replace_lines, not with extending

@@ -2936,9 +2936,12 @@ async def test_a_no_op_edit_leaves_no_copyable_call_in_history(tmp_path):
     redacted = [m for m in assistants if "rejected" in m["content"]]
     assert redacted, "the no-op call was never redacted"
     assert '"old"' not in redacted[0]["content"]
-    # And the tool result still tells the model what happened.
+    # And the tool result still tells the model what happened. `old` is in the
+    # file here, so build 110 answers "already done" rather than calling the
+    # edit malformed — redaction has to keep working on that non-error branch
+    # too, or the model copies the dud call straight back out of its own turn.
     joined = "\n".join(m["content"] for m in loop.history)
-    assert "identical" in joined
+    assert "ALREADY DONE" in joined
 
 
 async def test_redaction_is_off_when_the_config_says_so(tmp_path):
