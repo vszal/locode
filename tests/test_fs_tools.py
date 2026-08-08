@@ -1146,3 +1146,117 @@ async def test_no_op_message_names_the_same_misconception(ctx, tmp_path):
         {"path": "m.py", "old": "x = 1", "new": "x = 1"}, ctx)
     assert res.is_error
     assert "both fields" in res.content
+
+
+# --- the ambiguous reply must lead with replace_lines, not with extending
+#     `old` (build 98). Build 97 showed the model takes whichever route is
+#     named first: it went 0 -> 22 multi-line `old` values and 1 -> 20
+#     syntax-guard refusals, and took replace_lines zero times. ROADMAP 5.20b.
+
+async def test_ambiguous_names_replace_lines_before_the_other_routes(ctx, tmp_path):
+    (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+    res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
+    assert res.is_error
+    body = res.content
+    assert body.index("replace_lines") < body.index("replace_all")
+    assert body.index("replace_lines") < body.index("Extending `old`")
+
+
+async def test_ambiguous_warns_that_extending_means_rewriting_the_block(ctx, tmp_path):
+    (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+    res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
+    assert "WHOLE extended block" in res.content
+
+
+async def test_ambiguous_still_shows_the_surrounding_lines(ctx, tmp_path):
+    # Build 97's rendering is kept — not-found went to zero in its sweep.
+    (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+    res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
+    assert "match at line 1" in res.content and "match at line 3" in res.content
+
+
+# --- replace_lines rescues a block sent at the wrong column (build 98 / 5.18) ---
+
+def test_reindent_shifts_a_block_right():
+    assert fs._reindent_to("a = 1\nb = 2", 4) == "    a = 1\n    b = 2"
+
+
+def test_reindent_preserves_relative_structure():
+    assert fs._reindent_to("if x:\n    y = 1", 8) == "        if x:\n            y = 1"
+
+
+def test_reindent_leaves_blank_lines_empty():
+    assert fs._reindent_to("a = 1\n\nb = 2", 2) == "  a = 1\n\n  b = 2"
+
+
+def test_reindent_refuses_a_left_shift_that_would_cut_code():
+    assert fs._reindent_to("        a = 1\nb = 2", 4) is None
+
+
+def test_reindent_right_shift_is_not_blocked_by_a_shallow_line():
+    assert fs._reindent_to("  a = 1\nb = 2", 4) == "    a = 1\n  b = 2"
+
+
+def test_reindent_of_blank_new_is_none():
+    assert fs._reindent_to("\n  \n", 4) is None
+
+
+def test_reindent_that_changes_nothing_is_none():
+    assert fs._reindent_to("    a = 1", 4) is None
+
+
+def test_indent_of_out_of_range_is_zero():
+    assert fs._indent_of("a = 1\n", 99) == 0
+
+
+async def test_replace_lines_rescues_a_column_zero_block(ctx, tmp_path):
+    src = ("def f(words):\n"
+           "    out = []\n"
+           "    for word in words:\n"
+           "        out.append(word)\n"
+           "        total = len(word)\n"
+           "    return out\n")
+    (tmp_path / "m.py").write_text(src)
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 4, "end": 5,
+         "new": "out.append(word)\ntotal = len(word) + 1"}, ctx)
+    assert res.ok, res.content
+    assert "Indentation adjusted" in res.content
+    body = (tmp_path / "m.py").read_text()
+    assert "        total = len(word) + 1" in body
+    compile(body, "m.py", "exec")
+
+
+async def test_replace_lines_still_refuses_a_genuinely_broken_block(ctx, tmp_path):
+    src = "def f():\n    a = 1\n    return a\n"
+    (tmp_path / "m.py").write_text(src)
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 2, "end": 2, "new": "    a = (1"}, ctx)
+    assert res.is_error
+    assert (tmp_path / "m.py").read_text() == src
+
+
+async def test_a_correctly_indented_replace_lines_is_untouched(ctx, tmp_path):
+    src = "def f():\n    a = 1\n    return a\n"
+    (tmp_path / "m.py").write_text(src)
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+    res = await fs.ReplaceLines().run(
+        {"path": "m.py", "start": 2, "end": 2, "new": "    a = 2"}, ctx)
+    assert res.ok
+    assert "Indentation adjusted" not in res.content
+    assert (tmp_path / "m.py").read_text() == "def f():\n    a = 2\n    return a\n"
+
+
+def test_the_column_hint_names_the_mismatch():
+    src = "def f():\n    if x:\n        a = 1\n    return a\n"
+    assert "column 8" in fs._column_hint(src, 3, "a = (1")
+
+
+def test_the_column_hint_is_silent_when_the_column_is_right():
+    src = "def f():\n    a = 1\n"
+    assert fs._column_hint(src, 2, "    a = (1") == ""

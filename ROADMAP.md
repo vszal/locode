@@ -2401,6 +2401,80 @@ which must not rise.
 
 Ranking: **99 + 5.18 (87 events) > 98 (40 events)**.
 
+### 5.20b Build 97 worked, and made everything worse — the order of the routes is the lever (build 98) ✅
+
+The b97 A/B is the clearest result this project has produced, and it is a
+**regression**. `b97-ambig`, exec-bugfix, qwencoder14, r8:
+
+- score delta **−0.3125** (base 0.781, cand 0.469), W1/L5/T2, **6 informative
+  pairs**, sign-flip **p=0.0625**, against a calibrated floor of 0.2812. First
+  time a delta has exceeded the floor. It exceeds it downward.
+- endings: **VERIFIED 5/8 → 0/8**, DONE 6/8 → 0/8, stopped 2/8 → **8/8**, mean
+  landed edits 4.4 → 1.2. Exposure symmetric: 8/8 runs both arms.
+
+And on its own target metric, build 97 **succeeded**:
+
+| after an ambiguous match | base | cand |
+|---|---|---|
+| next edit landed | 8/17 (47%) | 8/11 (**72%**) |
+| invented `old` + `replace_all` | 9/17 (52%) | **0/11** |
+| `` `old` not found`` events, whole run | 7 | **0** |
+
+Zero not-founds in the candidate arm. The model stopped inventing text
+entirely. The mechanism counts say why, and they are not subtle:
+
+| | base | cand |
+|---|---|---|
+| `edit_file` calls with a **multi-line `old`** | **0** | **22** |
+| **syntax-guard refusals** | **1** | **20** |
+| syntax warning on a saved file | 8 | 24 |
+
+**The model did exactly what the message told it to, and that was the problem.**
+Build 97 offered three routes — extend `old`, use `replace_lines`, use
+`replace_all` — and listed extending first. The model took it essentially every
+time and took `replace_lines` **zero** times. Extending `old` across lines means
+`new` must now be a correct multi-line replacement, and qwencoder14 cannot write
+one: the syntax guard refused 20 of them, the model re-sent, and 8 of 8 runs
+died on the repeat guard. Checked and ruled out: not one `old` carried a
+line-number gutter copied from the new rendering, so the format itself is clean.
+
+Read the trajectory (`r1__cand`) and it is one motion: ambiguous at 36.5 s →
+extend `old` to two lines at 41.8 s → syntax-guard refusal → identical resend →
+refusal → `write_file` the whole file → SyntaxError → spiral.
+
+**The lesson, and it is the generalisable one: the route named first is the
+route taken.** Not the route best argued, not the one marked reliable — the
+first. That is a much sharper version of what 5.22a inferred correlationally,
+and here it is causal, from a controlled comparison where only the message
+changed. It also means every multi-option error message in this codebase is
+making a choice on the model's behalf whether or not its author realised it.
+
+**Build 98** keeps build 97's rendering — the surrounding-lines block is what
+drove not-found to zero, and that part is unambiguously good — and reorders the
+routes:
+
+1. **`replace_lines` with `start`/`end` from the match list**, stated as a
+   concrete call, single line, no `old` to disambiguate. First, because it is
+   the only route with no authoring burden.
+2. `replace_all` if every occurrence really should change.
+3. Extending `old` **last, with its cost stated**: `new` must then contain the
+   whole extended block, "and that is where this edit usually breaks."
+
+Shipped in the same change, per 5.22a: **the 5.18 reindent rescue**. Build 98
+deliberately pushes traffic onto `replace_lines`, which silently demands
+absolute indentation while `edit_file` supplies it. `_reindent_to` shifts a
+`new` whose first non-blank line sits at the wrong column, but *only* after the
+literal text has already failed `_syntax_reject`, so no currently-succeeding
+edit can take the path; when it rescues, the result says so; when it cannot,
+`_column_hint` names the specific column mismatch. The tool description now
+states the absolute-indentation contract. 16 tests, **1054 total, green**.
+
+**Do not re-run the b97 configuration.** The question it answered is settled.
+The open question is whether reordering recovers the base arm's 5/8 VERIFIED
+while keeping the 0 not-founds — that is what the next sweep must show, and it
+must be graded on **both** (a repeat of the 47%→72% landing win alongside 0/8
+VERIFIED would mean the same trap with a different first route).
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced

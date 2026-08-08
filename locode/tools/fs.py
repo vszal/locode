@@ -973,11 +973,17 @@ class EditFile:
                 "AROUND IT — those lines differ, and that is what lets you pick "
                 "one:\n" + _match_locations(text, old) +
                 "\n\nResending the same `old` will fail in exactly the same way. "
-                "Do ONE of these instead: extend `old` with a distinguishing "
-                "line from just above or below the match you want (copied "
-                "verbatim from what is shown); or use replace_lines with that "
-                "match's line number; or pass replace_all if you really do mean "
-                "to change every occurrence.",
+                "The reliable fix is replace_lines: pick the match you want and "
+                "call replace_lines with start and end set to ITS line number "
+                "from the list above (start=end for a single line), passing only "
+                "the replacement line as `new`, indented to the same column. No "
+                "`old` is involved, so there is nothing to disambiguate.\n"
+                "If every occurrence really should change, pass replace_all "
+                "instead.\n"
+                "Extending `old` upward or downward to make it unique also "
+                "works, but only do it if the two lines above are genuinely "
+                "different: `new` must then contain the WHOLE extended block, "
+                "rewritten correctly, and that is where this edit usually breaks.",
                 is_error=True)
         # `old` didn't produce a real change (it's not in the file, or a tolerant/
         # fuzzy match landed on a line that's byte-identical to `new`). Two shapes
@@ -1060,6 +1066,61 @@ def try_replace_lines(text: str, start, end, new: str):
     return out, "ok"
 
 
+def _indent_of(text: str, line_no: int) -> int:
+    """Indent column of a 1-based line; 0 when out of range or blank."""
+    lines = text.split("\n")
+    if not 1 <= line_no <= len(lines):
+        return 0
+    line = lines[line_no - 1]
+    return len(line) - len(line.lstrip()) if line.strip() else 0
+
+
+def _reindent_to(new: str, column: int) -> str | None:
+    """`new` shifted so its first non-blank line starts at `column`.
+
+    Returns None when the shift is not expressible — a left shift deeper than
+    some line's own indentation would eat real characters — or when there is
+    nothing to anchor on, or when it would change nothing. None always means
+    "leave the model's text alone", never "this is fine".
+
+    Blank lines stay empty rather than being padded with trailing spaces.
+    """
+    lines = new.split("\n")
+    first = next((l for l in lines if l.strip()), None)
+    if first is None:
+        return None
+    delta = column - (len(first) - len(first.lstrip()))
+    if delta == 0:
+        return None
+    out = []
+    for line in lines:
+        if not line.strip():
+            out.append("")
+        elif delta > 0:
+            out.append(" " * delta + line)
+        elif len(line) - len(line.lstrip()) < -delta:
+            return None                      # would cut into the code itself
+        else:
+            out.append(line[-delta:])
+    return "\n".join(out)
+
+
+def _column_hint(text: str, start: int, new: str) -> str:
+    """Named when the reindent could NOT rescue it and the shape still looks
+    like the column mistake — better than leaving the model with a bare
+    'would introduce a SyntaxError'."""
+    col = _indent_of(text, start)
+    first = next((l for l in new.split("\n") if l.strip()), "")
+    got = len(first) - len(first.lstrip())
+    if col > 0 and got < col:
+        return (f"\n\nNote: your `new` starts at column {got}, but line {start} "
+                f"is indented to column {col}. replace_lines replaces WHOLE "
+                f"LINES, so `new` must carry its own absolute indentation. "
+                f"(edit_file is different — it keeps the matched line's indent "
+                f"for you.) Re-send with each line indented to where it belongs.")
+    return ""
+
+
 class ReplaceLines:
     name = "replace_lines"
     description = (
@@ -1074,6 +1135,9 @@ class ReplaceLines:
         "inclusive "
         "line numbers exactly "
         "as read_file prints them (do NOT include the number prefixes in `new`). "
+        "`new` must carry ABSOLUTE indentation: it replaces whole lines, so each "
+        "line needs the leading spaces it will have in the file — unlike "
+        "edit_file, which preserves the matched line's existing indent for you. "
         "`new` is the replacement text for that whole range; an empty string "
         "deletes the range, but only reach for that on a SINGLE hard-to-match "
         "line and re-read immediately before the call. CRITICAL: line numbers go "
@@ -1140,9 +1204,27 @@ class ReplaceLines:
                 "same replacement and do NOT revert it. Move on to the next step, "
                 "or if the task is done, finish.",
                 no_change=True)
+        reindented = None
         broke = _syntax_reject(p, text, updated)
         if broke:
-            return ToolResult(broke, is_error=True)
+            # The 5.18 rescue. Only ever attempted when the literal text ALREADY
+            # failed the guard, so an edit that would have succeeded cannot take
+            # this path. `replace_lines` swaps whole lines and therefore needs
+            # absolute indentation, while `edit_file` supplies the matched line's
+            # indent — a difference nothing in the description used to state.
+            # Shipped with build 98's promotion of replace_lines rather than on
+            # its own: sending more traffic to this tool without the rescue would
+            # convert not-found misses into guard rejections (ROADMAP 5.22a).
+            fixed = _reindent_to(new, _indent_of(text, start))
+            if fixed is not None:
+                shifted, st2 = try_replace_lines(text, start, end, fixed)
+                if (st2 == "ok" and shifted is not None and shifted != text
+                        and _syntax_reject(p, text, shifted) is None):
+                    updated, new, broke = shifted, fixed, None
+                    reindented = _indent_of(text, start)
+            if broke:
+                return ToolResult(broke + _column_hint(text, start, new),
+                                  is_error=True)
         try:
             p.write_text(updated, "utf-8")
         except OSError as e:
@@ -1151,6 +1233,11 @@ class ReplaceLines:
         body = f"replaced lines {start}–{min(end, n)} in {p}"
         if snippet:
             body += "\nThe file now reads (changed region):\n" + snippet
+        if reindented is not None:
+            body += (f"\n(Indentation adjusted: your `new` was placed at column "
+                     f"{reindented} to match the code it replaced. replace_lines "
+                     f"takes ABSOLUTE indentation — include the leading spaces "
+                     f"next time, or use edit_file, which re-indents for you.)")
         return ToolResult(body + _syntax_warning(p, updated))
 
 
