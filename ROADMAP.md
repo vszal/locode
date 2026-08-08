@@ -2943,7 +2943,7 @@ Three readings, in descending order of how much they change:
    row)` fired 45 times across both A/A arms and was answered with prose **0
    times**. Both arms contain build 108, so 0% is exactly what it predicts —
    and 45 events at 0% is a far stronger statement than the 18 that earned the
-   verdict.
+   verdict — 63 counting b108's own candidate arm.
 3. **"VERIFIED 0/14 → 7/14" was optimistic.** Identical code reproduces that
    metric at 3/14 and 4/14, so it swings ~1 in 14 at this sample size and 7 is
    the high end of the post-108 range. The honest statement is the three-arm
@@ -2956,22 +2956,33 @@ headline number.** The A/A was launched to calibrate the *score*, and it did.
 The thing it actually corrected was the mechanism metric the verdict was built
 on, which nobody had thought to question because it moved so far.
 
-**And it names the next prose lever.** Split by nudge, the A/A's prose-only
-rates are:
+**And it names the next prose lever** — but only once the arms are split.
+Reading the A/A whole gave `same failure (3 runs in a row)` 65% prose-only and
+`error unchanged across edits` 74%; splitting by arm gives 45%/89% and
+55%/100% on n of 9 to 11. Methodology 21 exists for exactly this and I did not
+apply it. Pooling instead over every arm running build ≥108 — the population
+has to match, since level 1 converting is what changes who reaches level 3
+(methodology 24) — gives the real figures, with pre-108 alongside:
 
-| nudge | events | prose-only |
-|---|---|---|
-| `same failure (2 runs in a row)` | 45 | 0 (0%) |
-| `same failure (3 runs in a row)` | 20 | 13 (**65%**) |
-| `error unchanged across edits` | 19 | 14 (**74%**) |
-| `open plan tasks` | 16 | 0 (0%) |
+| nudge | pre-108 | post-108 | what the post-108 acters called |
+|---|---|---|---|
+| `same failure (2 runs in a row)` | 12/21 = 57% | **0/63 = 0%** | 63× `read_file` |
+| `same failure (3 runs in a row)` | 4/17 = 24% | 16/28 = **57%** | 11× `read_file` |
+| `error unchanged across edits` | 1/13 = 8% | 17/26 = **65%** | 8× `read_file` |
 
-Both escalated branches read far worse here than they did pre-108 (24% and 8%
-in the b107 census), and that is not a regression — it is **selection**. With
-the level-1 note converting, the runs that still reach level 3 are the ones
-build 108 could not save, so the escalated branches now face a strictly harder
-population. They are the top prose-only offenders in the system and the
-methodology-19 successors to build 108. Do not read their pre-108 rates.
+Three things fall out of that table:
+
+- **Build 108 is stronger than the verdict claimed.** 0 prose replies in 63
+  events across three independent arms, every one of them answered with the
+  named call. Not 0/18.
+- **The escalated branches are the successors**, at 57% and 65% — worse than
+  they read pre-108, which is selection rather than regression, but not the
+  65%/74% the unsplit read gave.
+- **They are already asking for the wrong tool.** `_nudge_stall` names
+  `write_file`, and got 11 of them pre-108 — and **zero** post-108. Every
+  post-108 response that acted at all, on either escalated nudge, called
+  `read_file`: 19 for 19. What a working answer looks like is identical at
+  every level; only the wording differs, and only the level-1 wording lands.
 
 **Methodology 22: fix the first steer in a cascade, not the loudest one.** The
 loudest nudges in the b107 census were symptoms of a run that had already gone
@@ -2982,6 +2993,60 @@ finish): the top edit failure among them is *"This edit does NOTHING: `new` is
 identical to `old`"*, 10 events. Across the whole sweep it runs 0.71/run in
 both arms, and `old` appearing more than once runs another 0.64–1.14/run. This
 becomes 5.34.
+
+### 5.35 The escalated nudges are the level-1 note before build 108 (2026-08-08)
+
+Queued behind `b110-alreadydone`. The two worst-converting steers left in the
+system, `same failure (3 runs in a row)` (57% prose-only) and `error unchanged
+across edits` (65%), are not a new problem. They are the **same** problem build
+108 solved, in the same two messages that were never updated with it.
+
+Put the level-1 note and the level-3 one side by side:
+
+> **level 1 (build 108, 0/63 prose):** …Call read_file on \`test_x.py\` **now**
+> — the TEST, not the source file you have been editing, and read what it
+> asserts. **Do not answer this with an explanation: the next thing you send
+> must be that read_file call.** Then make your next edit follow from what the
+> test asserts.
+
+> **level 3 (untouched):** ⟳ SAME FAILURE — 4 test runs in a row with identical
+> results. Nothing you have tried since the first one has changed anything.
+> **Stop editing and open** \`test_x.py\`.
+
+Level 3 leads with two sentences of diagnosis, never names a tool ("open" is
+not a call), and has no clause forbidding an explanation. That is precisely the
+pre-108 shape, which measured 57% prose-only — and level 3 measures 57% today.
+
+`_nudge_stall` ("error unchanged") is worse, because it contains two explicit
+invitations to write prose:
+
+> …**reason about WHY the error happens**, then rewrite the entire function in
+> one shot with write_file instead of another small edit_file swap. **If you
+> genuinely cannot fix it, say so in plain text now.**
+
+Methodology 19 says a steer that asks for narration is answered with narration.
+This one asks twice, and buries its tool name behind five sentences. 65%.
+
+**The census says what to name.** Of every post-108 response to either
+escalated nudge that produced a call at all, **19 out of 19 were `read_file`** —
+zero `write_file`, despite `_nudge_stall` explicitly asking for one (it got 11
+pre-108, and none since). A working answer looks the same at every level. Only
+the wording differs, and only build 108's wording lands.
+
+**Build 111, when the sweep clears.** Apply the recipe to both, with one
+deliberate difference: at level 3 the model has *already* read the test, so
+re-issuing level 1 verbatim would order it to redo the thing that just failed.
+Keep the imperative frame and the no-explanation clause, and move the target —
+name the **source function under the failing assertion**, read whole, rather
+than the test file again. Drop `write_file` from `_nudge_stall`, since nothing
+has called it since build 108. Keep its "if you genuinely cannot fix it" escape
+hatch (level 3 is where a genuinely stuck run should be allowed to stop) but
+place it last and gate it on having made the call first — today it sits where a
+struggling model reads it as the easier of two options.
+
+Grade on prose-only per arm for both nudges against the post-108 baselines
+above (57% and 65%, n=28 and n=26 — so a 14-run sweep sees ~9 and ~8 per arm,
+which is thin; pool the two nudges when reading it), and on VERIFIED.
 
 ### 5.34 "This edit does NOTHING" is the wrong diagnosis 90% of the time (2026-08-08)
 
