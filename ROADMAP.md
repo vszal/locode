@@ -2930,21 +2930,69 @@ sub-case. 26 of 27 consecutive pairs carry the identical error line.
 - 134 whose originating call is recoverable; **129 (96%) have a multi-line
   `new` whose first line sits at column 0** — the exact fingerprint.
 
-**Build 106** re-anchors `new`: the first line is stripped as before, and every
-later line keeps its indentation *relative to that first line*, shifted onto
-the matched span's base column. When the model already wrote absolute
-indentation the shift is zero and the output is byte-identical, so a correct
-`new` cannot be made worse. It declines — falling back to strip-only — on tabs
-in the indentation, on a later line shallower than the first (the shift would
-eat real characters), and when the span does not begin after pure whitespace.
-The exact tier is untouched: a byte-exact `old` means `new` is already in the
-file's coordinates. Draft at `$CLAUDE_JOB_DIR/tmp/b106_draft.py`.
+**Build 106 (shipped `f038a9e`)** re-anchors `new`: the first line is stripped
+as before, and every later line keeps its indentation *relative to that first
+line*, shifted onto the matched span's base column.
+
+**Two things the draft got wrong, both caught by running it:**
+
+1. *Re-anchoring unconditionally BREAKS edits that work today.* Four existing
+   tests failed immediately. There is a second real `new` shape — first line
+   dedented, later lines already carrying the file's absolute columns — and
+   nothing in the text tells the two apart (both have a column-0 first line, so
+   the 96% fingerprint above does not discriminate). So the anchor is not
+   applied on its own judgement. `_pick_splice` keeps the strip-only result
+   **unless it turns parseable Python into a SyntaxError and the anchored one
+   parses**. That makes this strictly a rescue: every edit that lands today
+   lands byte-identically, and only a file we were about to corrupt changes
+   hands. It needs the path (`.py` only) so `try_edit` and the diff preview
+   both take one now.
+
+2. *A rescue can be worse than a rejection.* Run live, the repro above **landed**
+   — with `return lines` moved from column 4 to column 8, i.e. inside the `for`
+   loop it used to sit outside. Silent. The model's `old` had flattened a block
+   spanning two depths, so its frame said nothing about where the last line
+   belonged. `_frame_ok` now requires that `old` reproduced the matched
+   region's *shape* (relative indents equal after dedent) before trusting it,
+   and that repro is back to being rejected — correctly.
+
+Still declines, as drafted, on tabs in the indentation, on a later line
+shallower than the first, and when the span does not begin after pure
+whitespace. The exact tier is untouched: a byte-exact `old` means `new` is
+already in the file's coordinates. The result says `, re-indented onto the
+matched block` when the rescue fires — the model is told we moved its lines,
+and the eval archive can count the reach directly.
+
+**Measured reach (replay, `$CLAUDE_JOB_DIR/tmp/replay106b.py`).** Every archived
+`edit_file` syntax rejection, replayed against build 106 from the case seed
+forward (the event log *clips* tool results, so read_file cannot reconstruct
+file state — the first replay attempt read as 65 "unknown" and 19 "not found"
+purely from that, and would have said the fix has no reach in the current
+sweeps):
+
+| | |
+|---|---|
+| rescued | **87** |
+| still rejected | 1 |
+| unmeasurable (replay state drifted) | 46 |
+
+**87 of the 88 judgeable cases (99%)**, and the frame check costs almost
+nothing on the real population — every rescue had a multi-line `old`. By sweep:
+b99-routeorder 32, b90-editwindow 22, b97-ambig 16, b99-smoke 9, b87 6, b88 2.
 
 **And unlike 5.25, this one can be swept.** 56 events across both arms of the
-last two sweeps. Target metric: syntax rejections per run and the 38% repeat
-share. Endings must not fall (methodology 8). Watch the no-op rate — a `new`
-that now lands could expose an already-applied state that used to read as a
-syntax error.
+last two sweeps. `b106-indent` launched against `--base e95c979` (build 105),
+`exec-bugfix`, r8 — a clean single-variable experiment. Target metric: syntax
+rejections per run and the 38% repeat share. Endings must not fall (methodology
+8). Watch the no-op rate — a `new` that now lands could expose an
+already-applied state that used to read as a syntax error.
+
+**Methodology 16: run the fix against the archive before spending GPU on it.**
+The replay took ten minutes, found both defects' blast radius, and turned "56
+events of exposure" into "87 rescues, 99% of what can be judged". It also
+caught its own first version being wrong — a reconstruction that silently
+degraded to nothing was reporting a *result*, not a failure (methodology 13
+again, in a new place).
 
 ### 5.28 The ambiguous-match message is SOLVED — take it off the lever list (2026-08-08)
 
