@@ -9,6 +9,7 @@ crucially, *never raises* on bad model output — a malformed attempt becomes a
 Priority (fallback tiers, not a union, to avoid double-executing the same call):
   1. native `tool_calls`
   2. fenced ```tool / ```tool_call / ```json blocks
+  2b. a fence tagged with the TOOL NAME itself (```update_plan) holding bare args
   3. best-effort salvage of a bare top-level JSON object naming a known tool
 """
 
@@ -37,6 +38,10 @@ _FENCE_OPEN_RE = re.compile(
     r"```(?:tool_call|tool|json)[ \t]*\r?\n",
     re.IGNORECASE,
 )
+# A fence whose language tag is the TOOL NAME — ```update_plan holding bare
+# `{"tasks": [...]}`. Matched only against the LIVE tool names (see
+# _named_tool_fences), so a ```python or ```diff illustration is never opened.
+_NAMED_FENCE_RE = re.compile(r"```([A-Za-z_][\w.-]*)[ \t]*\r?\n")
 _NAME_KEYS = ("name", "tool", "function")
 _ARG_KEYS = ("args", "arguments", "parameters", "input")
 # Structural keys that name the call/args envelope — never treated as arguments.
@@ -131,6 +136,26 @@ def extract(
             out.calls.append(call)
         else:
             out.malformed.append(f"unparseable tool block: {err}")
+    # --- tier 2b: the tool name used AS the fence tag -------------------
+    # Runs before the return below so a recovered call beats a sibling block's
+    # nudge. Silent on failure: a tag-named fence whose body isn't JSON is prose,
+    # not a broken call, and must not be reported malformed (or executed).
+    if known:
+        for tag, block in _named_tool_fences(content, known):
+            before = len(out.calls)
+            parsed, ferr = _loads(block)
+            objs = _as_objects(parsed) if ferr is None else _iter_json_objects(block)
+            for obj in objs:
+                call, _ = _coerce_obj(_with_fence_name(obj, tag), "fence-tag",
+                                      known, strict=True,
+                                      signatures=tool_signatures)
+                if call:
+                    out.calls.append(call)
+            if len(out.calls) == before:
+                call = _loose_tool_call(block, known, arg_keys, default_name=tag)
+                if call is not None:
+                    out.calls.append(call)
+
     if out.calls or (fenced_seen and out.malformed):
         return out
 
@@ -334,6 +359,50 @@ def _fence_blocks(content: str) -> Iterable[str]:
         pos = close + 3
 
 
+def _named_tool_fences(content: str, known: set[str]) -> Iterable[tuple[str, str]]:
+    """Yield (tool_name, body) for each fence tagged with a live tool's name.
+
+    Models routinely put the tool name where Markdown expects a language tag and
+    the bare arguments inside — ```update_plan holding `{"tasks": [...]}`. Every
+    other tier misses it: the tag is not an envelope tag, and the body names no
+    tool, so a perfectly well-formed call is read as the turn's final answer and
+    the run ends. Measured at 46 of the archive's turn-ending messages and 20 of
+    20 across the two b98 sweeps, which is what made them unmeasurable (5.23).
+
+    Only tags that ARE known tool names are opened. That keeps _closing_fence —
+    which tracks JSON string state — off ```python bodies it cannot track, and
+    keeps the scan from ever looking at an illustrative code block.
+    """
+    pos = 0
+    while True:
+        m = _NAMED_FENCE_RE.search(content, pos)
+        if not m:
+            return
+        if m.group(1).lower() not in known:
+            pos = m.end()          # not a tool fence: step over the tag only
+            continue
+        close = _closing_fence(content, m.end())
+        if close is None:
+            return                 # unclosed (truncated) — left for the nudge
+        yield m.group(1).lower(), content[m.end():close]
+        pos = close + 3
+
+
+def _with_fence_name(obj: Any, name: str) -> Any:
+    """Supply the fence tag's tool name to a call object that has none.
+
+    The tag only ever fills a gap. When the body DOES name a tool the body wins:
+    the 13 archived ```bash fences each carry a correct {"name": "edit_file", …}
+    inside, where the tag is just a wrong guess at the language.
+    """
+    if not isinstance(obj, dict):
+        return obj
+    if any(isinstance(obj.get(k), str) for k in _NAME_KEYS):
+        return obj
+    inner = next((obj[k] for k in _ARG_KEYS if k in obj), obj)
+    return {"name": name, "args": inner}
+
+
 def _closing_fence(content: str, i: int) -> int | None:
     """Index of the ``` that closes a fenced body starting at i, or None if the
     body is never closed. A ``` is only a closer when it lies OUTSIDE the string
@@ -395,15 +464,19 @@ _UNESCAPE = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\",
 
 
 def _loose_tool_call(block: str, known: set[str] | None,
-                     arg_keys: set[str]) -> ToolCall | None:
+                     arg_keys: set[str],
+                     default_name: str | None = None) -> ToolCall | None:
     """Recover a tool call from a block whose strict JSON failed because the model
     left quotes/newlines unescaped inside code-bearing string values. Anchors on
     the known argument keys to find where each value ends; never raises, returns
-    None when it can't confidently identify a known tool."""
+    None when it can't confidently identify a known tool.
+
+    `default_name` is the fence tag's tool name (tier 2b) — used only when the
+    block itself names no tool, so a body-supplied name always wins."""
     nm = _NAME_RE.search(block)
-    if not nm:
+    name = nm.group(1) if nm else default_name
+    if name is None:
         return None
-    name = nm.group(1)
     if known is not None and name not in known:
         return None
     args: dict[str, Any] = {}

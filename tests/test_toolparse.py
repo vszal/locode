@@ -522,3 +522,111 @@ def test_infer_tool_name_directly():
     assert infer_tool_name(["src", "dst"], SIGS) == "move_file"
     assert infer_tool_name(["pattern"], SIGS) is None      # glob or grep
     assert infer_tool_name([], SIGS) is None
+
+
+# --- the tool name used AS the fence tag (build 99 / ROADMAP 5.23) ----------
+# ```update_plan holding bare `{"tasks": [...]}`. Not an envelope tag and the
+# body names no tool, so every tier missed it and the turn ENDED on what looked
+# like prose. 46 of the archive's turn-ending messages, and 20 of 20 across both
+# b98 sweeps — which is what made those sweeps unmeasurable.
+
+
+def test_a_fence_tagged_with_the_tool_name_is_a_call():
+    msg = {"content": '```update_plan\n{"tasks": ["[x] a", "[>] b"]}\n```'}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert len(out.calls) == 1
+    assert out.calls[0].name == "update_plan"
+    assert out.calls[0].args == {"tasks": ["[x] a", "[>] b"]}
+    assert out.calls[0].source == "fence-tag"
+
+
+def test_the_exact_shape_that_ended_the_b98_runs():
+    msg = {"content": (
+        '```update_plan\n{"tasks": [\n'
+        '    "[x] Run initial tests with `python3 -m pytest -q`",\n'
+        '    "[>] Fix the bug in `word_wrap` function"\n]}\n```')}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["update_plan"]
+    assert len(out.calls[0].args["tasks"]) == 2
+
+
+def test_the_body_name_beats_the_fence_tag():
+    # The 13 archived ```bash fences each hold a correct edit_file call; the tag
+    # is only a bad guess at the language and must not override it.
+    msg = {"content": ('```bash\n{"name": "edit_file", "args": '
+                       '{"path": "p.py", "old": "a", "new": "b"}}\n```')}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["edit_file"]
+    assert out.calls[0].args["path"] == "p.py"
+
+
+def test_a_shell_snippet_in_a_bash_fence_is_not_executed():
+    # The one genuinely dangerous tag: ```bash is also the commonest Markdown
+    # language tag. A non-JSON body is prose, and stays prose.
+    out = extract({"content": "Run this:\n```bash\npytest -q\n```"}, ALL,
+                  tool_signatures=SIGS)
+    assert out.calls == [] and out.malformed == []
+
+
+def test_an_illustrative_python_fence_is_untouched():
+    out = extract({"content": '```python\nx = {"tasks": ["a"]}\n```'}, ALL,
+                  tool_signatures=SIGS)
+    assert out.calls == [] and out.malformed == []
+
+
+def test_a_python_fence_does_not_swallow_a_following_tool_fence():
+    # Non-tool tags are stepped over by the tag alone, never opened — so an
+    # unbalanced quote inside them cannot run _closing_fence past a real call.
+    msg = {"content": ('```python\ns = "unbalanced\n```\n\n'
+                       '```update_plan\n{"tasks": ["a"]}\n```')}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["update_plan"]
+
+
+def test_a_tag_named_fence_with_unescaped_code_is_recovered_loosely():
+    msg = {"content": ('```edit_file\n{"path": "p.py", "old": "print("hi")", '
+                       '"new": "print("bye")"}\n```')}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["edit_file"]
+    assert out.calls[0].args["path"] == "p.py"
+
+
+def test_an_unclosed_tag_named_fence_is_left_for_the_nudge():
+    msg = {"content": '```update_plan\n{"tasks": ["a"]}'}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert out.calls == []
+
+
+def test_two_tag_named_fences_both_fire():
+    msg = {"content": ('```update_plan\n{"tasks": ["a"]}\n```\n'
+                       '```bash\n{"cmd": "pytest -q"}\n```')}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["update_plan", "bash"]
+
+
+def test_a_native_call_still_wins_over_a_tag_named_fence():
+    msg = {"content": '```update_plan\n{"tasks": ["a"]}\n```',
+           "tool_calls": [{"function": {"name": "ls", "arguments": '{"path":"."}'}}]}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["ls"]
+
+
+def test_a_recovered_tag_fence_beats_a_sibling_blocks_nudge():
+    # Tier 2b runs before the malformed early-return, so one bad ```json block
+    # does not bury a perfectly good tag-named call in the same message.
+    msg = {"content": ('```json\n{"path": "a.py"}\n```\n'
+                       '```update_plan\n{"tasks": ["a"]}\n```')}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert [c.name for c in out.calls] == ["update_plan"]
+
+
+def test_args_nested_under_the_tag_are_unwrapped():
+    msg = {"content": '```update_plan\n{"args": {"tasks": ["a"]}}\n```'}
+    out = extract(msg, ALL, tool_signatures=SIGS)
+    assert out.calls[0].args == {"tasks": ["a"]}
+
+
+def test_an_unknown_tag_is_not_a_tool_even_with_a_json_body():
+    out = extract({"content": '```plan\n{"tasks": ["a"]}\n```'}, ALL,
+                  tool_signatures=SIGS)
+    assert out.calls == []

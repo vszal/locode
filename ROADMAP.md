@@ -2475,6 +2475,83 @@ while keeping the 0 not-founds — that is what the next sweep must show, and it
 must be graded on **both** (a repeat of the 47%→72% landing win alongside 0/8
 VERIFIED would mean the same trap with a different first route).
 
+### 5.23 The model named the tool in the fence tag and we called it prose (build 99) ✅
+
+**Found while trying to read the b98 sweep, which measured nothing.**
+`b98-routeorder` returned delta +0.000, **0 informative pairs**, both arms
+identical at 4.0 iterations, 0 landed edits, gave-up 8/8, zero exposure — from
+the *same base commit* that had produced 22.2 iterations and 5/8 VERIFIED an
+hour earlier. A 4-run smoke sweep reproduced it exactly. The server was healthy
+(0.5 s probe, coherent 174-token generation), so the arms were not the story:
+something was ending every turn at iteration 3.
+
+The last event of a degenerate run says it outright:
+
+```
+[turn_end] result = "```update_plan\n{\"tasks\": [\n  \"[x] Run initial tests…\",
+                      \"[>] Fix the bug in `word_wrap` function\", …]}\n```"
+```
+
+A well-formed `update_plan` call, emitted as the turn's **final answer**. The
+model had put the tool name where Markdown expects a language tag. `extract()`
+matched no tier: `_FENCE_OPEN_RE` accepts only ```` ```tool / ```tool_call /
+```json ````, and the body names no tool, so tier 2 never opened it and tier 3's
+strict salvage refused a nameless object. No malformed note, no nudge — the loop
+saw a text-only reply and ended the turn. **A perfect tool call, discarded in
+silence.**
+
+**How much of it there is.** Every `turn_end` in the archive whose result opens
+with a name-tagged fence:
+
+| tag | n | body | why every tier missed it |
+|---|---:|---|---|
+| `update_plan` | 33 | valid JSON, nameless | tag not an envelope tag; no name key |
+| `bash` | 13 | JSON-ish, **already holds `{"name": "edit_file", …}`** | tag was just a wrong language guess |
+| `tool` | 5 | Python `"""` used as a JSON delimiter | a different bug (below) |
+
+46 turn-ending messages, and **20 of 20** across `b98-routeorder` and
+`b98-smoke`. Sporadic before (b93 12/24, b96 4/16) and total now. This is why
+the sweeps were unmeasurable, and it silently taxed every prior sweep too.
+
+**Build 99 — tier 2b.** A fence tagged with a **live tool name** is opened and
+its body parsed as that tool's arguments. Three constraints keep it narrow:
+
+- **Only tags that are known tool names** are opened. A ```` ```python ```` or
+  ```` ```diff ```` illustration is stepped over by the tag alone, so
+  `_closing_fence` — which tracks JSON string state — never runs over prose it
+  cannot track, and cannot swallow a real call that follows.
+- **The body must be JSON** (strict, embedded-object, or the loose key-anchored
+  recovery). A non-JSON body is prose and stays prose, silently — no malformed
+  note, no execution. This is what makes ```` ```bash ````, also the commonest
+  Markdown language tag, safe to accept: `pytest -q` in a bash fence is not a
+  call. (Zero plain-shell bodies exist in the archive, so the rule costs
+  nothing today and holds the door shut.)
+- **A name in the body always wins over the tag** — those 13 ```` ```bash ````
+  fences are `edit_file` calls, and must run as `edit_file`.
+
+Tier 2b runs *before* the malformed early-return, so a recovered call beats a
+sibling block's nudge; native `tool_calls` still win over everything.
+
+**Verified by replay, not by argument.** Re-running all 51 archived
+turn-enders through the new parser: **49 recovered** (33 `update_plan`,
+13 → `edit_file`/`write_file` from ```` ```bash ````, 3 from ```` ```tool ````),
+2 still dropped. 13 new tests, **1067 total, green**.
+
+**The 2 survivors are a separate bug**, left open deliberately: the model wrote
+Python triple-quoted strings as JSON values (`"content": """\ndef summary…`).
+That is a malformed-JSON problem, not a fence-tag one, and wants its own fix.
+
+**Consequence for measurement.** Every A/B before build 99 was run through a
+parser that discarded a fraction of the model's calls as prose, at a rate that
+varied by sweep (0% to 100%). Deltas are still paired within a sweep, so the
+comparison holds — but the *absolute* iteration counts and VERIFIED rates in
+5.11–5.22 are depressed by an unknown amount, and any sweep whose two arms drew
+different rates carried noise we attributed to the change under test. The
+0.2812 floor was calibrated under this defect and should be recalibrated.
+
+**The b98 sweep must be re-run against a base that includes this fix**, or it
+measures the parser rather than the route order.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced

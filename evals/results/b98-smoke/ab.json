@@ -1,0 +1,272 @@
+{
+  "kind": "paired-ab",
+  "label": "b98-smoke",
+  "created": "2026-08-07 19:55:57",
+  "base_ref": "89cf3bc",
+  "base_sha": "89cf3bc",
+  "cand_desc": "/Users/vszalvay/Code/locode",
+  "pairs": [
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "base": 0.5,
+      "cand": 0.5,
+      "delta": 0.0
+    },
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "base": 0.5,
+      "cand": 0.5,
+      "delta": 0.0
+    }
+  ],
+  "dropped": [],
+  "case_table": {
+    "exec-bugfix": {
+      "n": 2,
+      "mean_delta": 0.0,
+      "base": 0.5,
+      "cand": 0.5
+    }
+  },
+  "analysis": {
+    "n_pairs": 2,
+    "n_effective": 0,
+    "n_dropped": 0,
+    "min_pairs": 6,
+    "mean_delta": 0.0,
+    "wins": 0,
+    "losses": 0,
+    "ties": 2,
+    "p": 1.0,
+    "status": "inconclusive",
+    "why": "only 0 informative pair(s) (2 ran, but 2 scored the same on both arms and a tie cannot move a sign-flip test); a sign-flip test needs 6 before any result can reach p<0.05 (its floor is 2/2^n = 2.000)",
+    "calibrated": false
+  },
+  "runs": [
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "bash": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 1.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "malformed": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 35.7,
+        "model_seconds": 35.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 35.0,
+        "gen_chars": 684,
+        "gen_chars_per_sec": 19.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r1__base-6ggn9j1d",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "bash": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 1.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "malformed": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.9,
+        "model_seconds": 34.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.1,
+        "gen_chars": 766,
+        "gen_chars_per_sec": 22.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r1__cand-yhhx74_e",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "bash": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 1.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "malformed": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 35.7,
+        "model_seconds": 35.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.9,
+        "gen_chars": 748,
+        "gen_chars_per_sec": 21.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r2__cand-k11ev8oq",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "bash": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 1.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "malformed": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 36.8,
+        "model_seconds": 36.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.0,
+        "gen_chars": 840,
+        "gen_chars_per_sec": 23.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 36.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r2__base-i94bcgo1",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    }
+  ],
+  "summary": {
+    "overall_score": 0.5,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 4,
+    "total_iterations": 16,
+    "nudge_histogram": {
+      "malformed": 4
+    },
+    "n_runs": 4,
+    "n_valid": 4,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 21.7,
+    "gen_chars": 3038,
+    "rows": {
+      "exec-bugfix::qwencoder14": {
+        "case": "exec-bugfix",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 4,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.5,
+        "score_min": 0.5,
+        "scores": [
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "iterations_mean": 4,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 35.9,
+        "gen_rate_mean": 21.7,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "exec-bugfix": 1.0
+    }
+  },
+  "floor_key": "exec-bugfix|qwencoder14|r2",
+  "is_calibration": false
+}
