@@ -2924,6 +2924,54 @@ VERIFIED, on the prose-only rate against its own base arm, and on a read run.
 loudest nudges in the b107 census were symptoms of a run that had already gone
 wrong two nudges earlier.
 
+**The new bottleneck** (censusing the 7 candidate runs that still did not
+finish): the top edit failure among them is *"This edit does NOTHING: `new` is
+identical to `old`"*, 10 events. Across the whole sweep it runs 0.71/run in
+both arms, and `old` appearing more than once runs another 0.64–1.14/run. This
+becomes 5.34.
+
+### 5.34 "This edit does NOTHING" is the wrong diagnosis 90% of the time (2026-08-08)
+
+The no-op-edit message is the failure Victor reported hitting repeatedly in a
+live session, and it is the top edit error in the runs that still stall. It is
+**not** a prose-only failure — the model always acts on it (50% `read_file`,
+40% `replace_lines`, 5% resend). It acts on a message that is telling it the
+wrong thing.
+
+Reconstructing each event against the edits that had already landed in the same
+run:
+
+| what the no-op edit actually was | n |
+|---|---|
+| **a change the model had ALREADY applied successfully, earlier in the run** | **18** |
+| a genuine no-op with no prior landing | 2 |
+
+The message leads with "put the corrected code there" and diagnoses "the
+signature of drafting your intended replacement in `old` as well as `new`."
+That diagnosis is right for the 2 and wrong for the 18. Worse, it appends
+`_TRY_REPLACE_LINES`, which invites a line-numbered **re-apply of text the file
+already contains** — and 40% of the time that is exactly what happens next,
+after which nothing changes and the run dies on "edits kept hitting the same
+error without making progress."
+
+**Build 110 splits the message on a stateless check.** When `old == new`, look
+for `old` in the file:
+
+- **present** → the file already reads that way. Say so, name the line, and say
+  the edit is redundant rather than broken: the change is done, so what is still
+  failing is failing for a different reason — re-run the tests and read what
+  they say now, or look at a different line. **No `_TRY_REPLACE_LINES`** —
+  there is nothing to re-apply, and suggesting a mutation here is what starts
+  the churn.
+- **absent** → the model's `old` is not in the file at all, so it drafted its
+  replacement into both fields. Keep today's message, trimmed, for this case.
+
+Exposure 0.71/run in the current base arm (methodology 20 satisfied), so a
+14-run sweep sees ~10 events per arm. Grade on: the share of these events
+followed by a `replace_lines` re-apply of the same text (40% today), and on
+`stopped (edits kept hitting the same error)` — 3 of 14 candidate runs in
+b108.
+
 ### 5.32 The nudge asked for a sentence and got a sentence (2026-08-08)
 
 `b107-indent`'s real finding is not about indentation. Censusing **what the
