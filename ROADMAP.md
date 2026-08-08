@@ -2914,11 +2914,64 @@ tasks` from 23 to 3, `unverified edits` from 26 to 6. Fewer iterations and
 fewer landed edits with more verified finishes is the shape of a model that
 stopped thrashing.
 
-**The score channel still says INCONCLUSIVE** and it is right to: no A/A has
-measured this setup at r14, and the one A/A on record (b106, r8) returned
-+0.281 from identical code. `aa14-calib` is running now to fix that
-permanently. The verdict above does not rest on the score — it rests on
-VERIFIED, on the prose-only rate against its own base arm, and on a read run.
+**The score channel said INCONCLUSIVE** and was right to at the time: no A/A
+had measured this setup at r14, and the one A/A on record (b106, r8) returned
++0.281 from identical code. The verdict above did not rest on the score — it
+rested on VERIFIED, on the prose-only rate against its own base arm, and on a
+read run.
+
+**`aa14-calib` settles it, and corrects the headline.** Both arms build 109,
+28 runs, `exec-bugfix|qwencoder14|r14` — the exact configuration b108 ran in.
+
+| | A/A arm 1 | A/A arm 2 | b108 base (107) | b108 cand (108) |
+|---|---|---|---|---|
+| score | 0.500 | 0.643 | 0.304 | 0.696 |
+| VERIFIED | 3/14 | 4/14 | 0/14 | 7/14 |
+| DONE | 3 | 5 | 5 | 8 |
+| stopped | 11 | 9 | 9 | 6 |
+| iterations | 26.6 | 31.4 | 32.5 | 25.4 |
+| landed edits | 6.6 | 5.6 | 8.9 | 5.6 |
+
+Three readings, in descending order of how much they change:
+
+1. **The score now corroborates.** Identical code produces +0.143 (W7/L1/T6, 8
+   informative, p=0.141). Build 108 produced +0.393 (W10/L0/T4, p=0.002) —
+   2.7× the floor, and the first change in this project to clear the score
+   gate honestly rather than survive it. Recorded as the noise floor for this
+   configuration; stop quoting the b106 r8 figure.
+2. **The prose-only conversion is not a sample.** `same failure (2 runs in a
+   row)` fired 45 times across both A/A arms and was answered with prose **0
+   times**. Both arms contain build 108, so 0% is exactly what it predicts —
+   and 45 events at 0% is a far stronger statement than the 18 that earned the
+   verdict.
+3. **"VERIFIED 0/14 → 7/14" was optimistic.** Identical code reproduces that
+   metric at 3/14 and 4/14, so it swings ~1 in 14 at this sample size and 7 is
+   the high end of the post-108 range. The honest statement is the three-arm
+   one: pre-108 code verified **0, 0, 0** out of 14; post-108 code verified
+   **7, 3, 4**. The direction is not in doubt. The size is about a third of
+   runs finishing verified, not half.
+
+**Methodology 23: an A/A does not just size the noise — it re-reads your
+headline number.** The A/A was launched to calibrate the *score*, and it did.
+The thing it actually corrected was the mechanism metric the verdict was built
+on, which nobody had thought to question because it moved so far.
+
+**And it names the next prose lever.** Split by nudge, the A/A's prose-only
+rates are:
+
+| nudge | events | prose-only |
+|---|---|---|
+| `same failure (2 runs in a row)` | 45 | 0 (0%) |
+| `same failure (3 runs in a row)` | 20 | 13 (**65%**) |
+| `error unchanged across edits` | 19 | 14 (**74%**) |
+| `open plan tasks` | 16 | 0 (0%) |
+
+Both escalated branches read far worse here than they did pre-108 (24% and 8%
+in the b107 census), and that is not a regression — it is **selection**. With
+the level-1 note converting, the runs that still reach level 3 are the ones
+build 108 could not save, so the escalated branches now face a strictly harder
+population. They are the top prose-only offenders in the system and the
+methodology-19 successors to build 108. Do not read their pre-108 rates.
 
 **Methodology 22: fix the first steer in a cascade, not the loudest one.** The
 loudest nudges in the b107 census were symptoms of a run that had already gone
@@ -2979,6 +3032,20 @@ Exposure 0.71/run in the current base arm (methodology 20 satisfied), so a
 followed by a `replace_lines` re-apply of the same text (40% today), and on
 `stopped (edits kept hitting the same error)` — 3 of 14 candidate runs in
 b108.
+
+**Shipped as build 110** (`17c194f`), one departure from the design above: the
+present-branch is returned as a **non-error** `no_change`, not a softened
+error. Two paths a few lines below it already answer the same situation —
+re-submitting a change that landed — with a non-error "already done", and they
+exist for the same reason (build 55: a fixable-looking error drives the model
+to revert its own working fix). Leaving the identical case an error would have
+had one file answer the same question two ways. `no_change` still counts
+toward the no-change streak, so three of these still end the turn; the loop's
+error-stall signal already excludes `no_change` results, so nothing else
+moves. Presence is checked exact-then-whitespace-tolerant, because the re-send
+usually comes back dedented — an exact-only check would misroute the commonest
+shape of the case the build exists for. 1144 passed; sweeping as
+`b110-alreadydone` against build 109.
 
 ### 5.32 The nudge asked for a sentence and got a sentence (2026-08-08)
 
