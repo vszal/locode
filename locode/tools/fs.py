@@ -345,6 +345,48 @@ def _authored_old_note(old: str, new: str, text: str) -> str:
             "version in `new`. ")
 
 
+def _replace_lines_route(start: int, end: int) -> str:
+    """Name the call that has never missed, with its arguments already filled in.
+
+    Measured (5.22a, b87+ corpus, 87 not-found events): after a miss, retrying
+    `edit_file` with an `old` composed from memory lands 1/41 (2%); retrying
+    after a re-read lands 31/46 (67%); switching to `replace_lines` lands 16/16
+    and `write_file` 17/17. We already know the line numbers at this point — the
+    snippet below was cut with them — so the cheapest possible intervention is
+    to stop making the model derive the call, and to name it FIRST (5.20b: the
+    route named first is the route taken).
+
+    The range is the DISPLAYED block, window included, not just the region that
+    matched `old` — one range, one meaning, and it is the block sitting directly
+    under it. That makes "replace all of these lines" the literal truth, which
+    is why the last sentence has to say so: `new` overwrites every line shown,
+    so the unchanged context lines must be carried across.
+
+    The indentation sentence is not padding. `replace_lines` swaps whole lines
+    and so needs ABSOLUTE indentation, unlike `edit_file`, which supplies the
+    matched line's indent. Build 98 shipped the reindent rescue for exactly this
+    reason; saying it here keeps the promotion from converting not-found misses
+    into syntax-guard rejections.
+    """
+    span = "that line" if start == end else f"lines {start}-{end}"
+    tail = ("" if start == end else
+            " `new` replaces ALL of them, so carry the unchanged lines across "
+            "as well.")
+    return (f" Easiest fix: `replace_lines` with start={start}, end={end} — it "
+            f"targets {span} by NUMBER, so there is no `old` to reproduce. Give "
+            f"`new` the full replacement lines with the indentation they should "
+            f"have in the file.{tail}")
+
+
+# Closes every not-found, and it is a warning rather than an instruction — the
+# point is to make the 2% move unattractive, not to name a fourth route. Stated
+# as a measurement because "copy it exactly" has already been tried and does not
+# reach a model that believes it already did (the same reasoning as build 96).
+_FROM_MEMORY_WARNING = (
+    "\n\nWhat does NOT work is writing `old` from memory and sending it again: "
+    "measured over this project's eval archive, that lands 1 time in 41.")
+
+
 def _not_found_help(text: str, old: str, path: Path, *,
                     window: int = _HELP_WINDOW, new: str = "") -> str:
     """The reply when `old` didn't match — always hands back the file's ACTUAL
@@ -385,23 +427,39 @@ def _not_found_help(text: str, old: str, path: Path, *,
         if len(block) > _HELP_MAX_LINES:
             tail = f"\n… ({len(block) - _HELP_MAX_LINES} more lines)"
             block = block[:_HELP_MAX_LINES]
-        lead = ("The closest match is" if confident
-                else "No close match. The most similar region is")
-        snippet = (f" {lead} at lines {lo + 1}-{lo + len(block)} — this is what "
-                   "the file ACTUALLY contains there. Copy your `old` out of it "
-                   "verbatim:\n" + "\n".join(block) + tail)
+        if confident and not tail:
+            # The reordered path (5.25). Gated on `confident and not tail`
+            # because a stated line number that is WRONG is worse than none —
+            # it would send a correct edit to the wrong place — and a truncated
+            # block's end line is not the one we would be printing.
+            start, end = lo + 1, lo + len(block)
+            snippet = (_replace_lines_route(start, end)
+                       + f"\n\nHere is what the file ACTUALLY contains at lines "
+                       f"{start}-{end}:\n" + "\n".join(block)
+                       + "\n\nOr copy your `old` verbatim out of that block — "
+                       "whole lines, without read_file's line-number prefixes — "
+                       "and retry edit_file.")
+        else:
+            lead = ("The closest match is" if confident
+                    else "No close match. The most similar region is")
+            snippet = (f" {lead} at lines {lo + 1}-{lo + len(block)} — this is "
+                       "what the file ACTUALLY contains there. Copy your `old` "
+                       "out of it verbatim:\n" + "\n".join(block) + tail
+                       + _TRY_REPLACE_LINES)
     else:
         # Nothing scored above zero: `old` doesn't resemble ANY region. That is
         # a different failure from "close but drifted" and deserves a different
         # instruction — it usually means the wrong file, or one already changed.
         snippet = (" NOTHING in this file resembles `old` — you are probably "
                    "editing the wrong file, or it has already changed. Re-read "
-                   "it with read_file before trying again.")
+                   "it with read_file before trying again." + _TRY_REPLACE_LINES)
+    # The header states the failure and NOTHING else. It used to lead with
+    # "Copy the target text EXACTLY as it appears in the file", which 5.22a
+    # measured as the 2%-landing route — first position, worst outcome, the
+    # exact inversion 5.20b names. The routes now run 100% / 67% / warning.
     return (_authored_old_note(old, new, text)
-            + f"`old` not found in {path} ({len(lines)} lines). Copy the target "
-            "text EXACTLY as it appears in the file — do NOT include read_file's "
-            "line-number prefixes — or add more surrounding context to pin it down."
-            + snippet + _TRY_REPLACE_LINES)
+            + f"`old` not found in {path} ({len(lines)} lines)."
+            + snippet + _FROM_MEMORY_WARNING)
 
 
 def _mark_seen(ctx: ToolContext, p: Path) -> None:

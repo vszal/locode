@@ -463,7 +463,10 @@ def test_not_found_help_points_at_the_block_matched_region():
     msg = fs._not_found_help(text, "    return None\n    log('beta dnoe')",
                              Path("c.py"))
     assert "log('beta done')" in msg      # the real text, ready to copy
-    assert "The closest match is" in msg
+    # Build 105: the confident path leads with the filled-in replace_lines call
+    # instead of "The closest match is". The region it names is still the beta
+    # block (lines 4-7 with the window), not the alpha one.
+    assert "start=4, end=7" in msg
 
 
 def test_not_found_help_window_is_conservative_by_default():
@@ -1126,16 +1129,20 @@ async def test_the_elision_reply_does_not_accuse_the_model_of_inventing(ctx, tmp
 
 
 async def test_the_copy_me_block_is_not_run_into_by_the_advice(ctx, tmp_path):
-    # 5.16 defect 1: _TRY_REPLACE_LINES was concatenated with a leading space
-    # onto the last line of a block the model is told to copy verbatim.
+    # 5.16 defect 1: advice was concatenated with a leading SPACE onto the last
+    # line of a block the model is told to copy verbatim, so the block's final
+    # line read `    bravo = 2 If the target text is hard to reproduce…`.
+    # Build 105 replaced that trailer on this path; the invariant it protects
+    # did not change — whatever follows the block must start on its own line.
     (tmp_path / "m.py").write_text(
         "def f():\n    alpha = 1\n    bravo = 2\n    return alpha\n")
     res = await fs.EditFile().run(
         {"path": "m.py", "old": "    total_width = 1",
          "new": "    total_width = 2"}, ctx)
     assert res.is_error
+    block_end = res.content.index("    bravo = 2") + len("    bravo = 2")
+    assert res.content[block_end] == "\n"
     assert " If the target text is hard to reproduce" not in res.content
-    assert "\nIf the target text is hard to reproduce" in res.content
 
 
 async def test_no_op_message_names_the_same_misconception(ctx, tmp_path):
@@ -1260,3 +1267,113 @@ def test_the_column_hint_names_the_mismatch():
 def test_the_column_hint_is_silent_when_the_column_is_right():
     src = "def f():\n    a = 1\n"
     assert fs._column_hint(src, 2, "    a = (1") == ""
+
+
+# --- the not-found routes, reordered by landing rate (build 105 / ROADMAP 5.25)
+# 5.22a measured what a model does after a miss: `old` rewritten from memory
+# lands 1/41 (2%), a retry after re-reading 31/46 (67%), `replace_lines` 16/16,
+# `write_file` 17/17. The message led with the 2% route and gated the 100% one
+# behind "if the target text is hard to reproduce EXACTLY" — a condition a model
+# that believes its `old` WAS exact will never match. 5.20b: first is taken.
+
+async def test_not_found_leads_with_replace_lines_and_real_numbers(ctx, tmp_path):
+    src = ("def wrap(text, width):\n"
+           "    out = []\n"
+           "    current = []\n"
+           "    for word in text.split():\n"
+           "        if len(word) < width:\n"
+           "            current.append(word)\n"
+           "    return out\n")
+    (tmp_path / "m.py").write_text(src)
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "        if len(word) + len(current) <= width:",
+         "new": "        if len(word) + len(current) <= width - 1:"}, ctx)
+    assert res.is_error                       # too far off for the fuzzy tier
+    assert "`replace_lines` with start=" in res.content
+    # It leads the ROUTES; build 96's authored-old diagnosis still precedes the
+    # whole message when it fires, which is deliberate (it is a diagnosis, not
+    # a route) and flagged in 5.25 as its own open question.
+    assert (res.content.index("replace_lines` with start=")
+            < res.content.index("copy your `old`"))
+
+
+def test_the_100pct_route_precedes_the_67pct_route():
+    from pathlib import Path
+    body = "def f():\n    a = 1\n    return a\n"
+    out = fs._not_found_help(body, "    a = 2", Path("m.py"), new="    a = 3")
+    assert out.index("replace_lines` with start=") < out.index("copy your `old`")
+
+
+def test_the_header_no_longer_leads_with_the_2pct_route():
+    from pathlib import Path
+    out = fs._not_found_help("def f():\n    a = 1\n    return a\n", "    a = 2",
+                             Path("m.py"), new="    a = 3")
+    assert "Copy the target text EXACTLY" not in out
+
+
+def test_the_route_states_absolute_indentation():
+    assert "indentation they should have in the file" in fs._replace_lines_route(4, 6)
+
+
+def test_a_multi_line_route_says_new_replaces_all_of_them():
+    # The range is the displayed block, window included, so a `new` holding only
+    # the changed line would silently delete its neighbours.
+    assert "carry the unchanged lines across" in fs._replace_lines_route(4, 6)
+    assert "carry the unchanged lines across" not in fs._replace_lines_route(7, 7)
+
+
+def test_the_route_helper_formats_a_single_line_span():
+    out = fs._replace_lines_route(7, 7)
+    assert "start=7, end=7" in out and "that line" in out
+
+
+def test_the_stated_range_is_the_block_that_follows_it():
+    # A number that does not match the printed block would send a correct edit
+    # to the wrong place — worse than giving no number at all.
+    from pathlib import Path
+    body = "\n".join(f"line_{i}" for i in range(20))
+    out = fs._not_found_help(body, "line_9x", Path("m.py"))
+    start = int(out.split("start=")[1].split(",")[0])
+    end = int(out.split("end=")[1].split(" ")[0])
+    shown = out.split(f"at lines {start}-{end}:\n")[1].split("\n\nOr copy")[0]
+    assert shown.split("\n") == body.split("\n")[start - 1:end]
+
+
+def test_no_numbered_route_when_nothing_resembles_old():
+    from pathlib import Path
+    out = fs._not_found_help("alpha\nbravo\ncharlie\n", "zzzzzzzz", Path("m.py"))
+    assert "replace_lines` with start=" not in out
+
+
+def test_the_route_is_silent_on_a_truncated_block():
+    # _HELP_MAX_LINES truncation means the stated end line would be wrong.
+    from pathlib import Path
+    body = "\n".join(f"line_{i}" for i in range(200))
+    old = "\n".join(f"line_{i}" for i in range(50, 130)).replace("line_60",
+                                                                 "line_6O")
+    out = fs._not_found_help(body, old, Path("m.py"))
+    assert "more lines)" in out
+    assert "replace_lines` with start=" not in out
+
+
+def test_the_memory_warning_closes_every_not_found():
+    from pathlib import Path
+    for text, old in (("def f():\n    a = 1\n    return a\n", "    a = 2"),
+                      ("alpha\nbravo\ncharlie\n", "zzzzzzzz")):
+        out = fs._not_found_help(text, old, Path("m.py"), new="x")
+        assert out.rstrip().endswith("lands 1 time in 41.")
+
+
+def test_the_unconfident_branch_keeps_the_gated_hatch():
+    # No trustworthy numbers to offer there, so the old conditional advice is
+    # still the only replace_lines pointer that path can honestly give.
+    from pathlib import Path
+    out = fs._not_found_help("alpha\nbravo\ncharlie\n", "zzzzzzzz", Path("m.py"))
+    assert "use replace_lines" in out
+
+
+def test_the_noop_paths_are_untouched():
+    # _TRY_REPLACE_LINES is dropped from the CONFIDENT not-found path only; the
+    # two no-op call sites have no located block and nothing to fill in.
+    assert "hard to reproduce EXACTLY" in fs._TRY_REPLACE_LINES

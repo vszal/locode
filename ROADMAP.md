@@ -2804,6 +2804,45 @@ ambiguous-match message is now the largest remaining message target — but b97
 rewrote it and its endings went to 0/8 VERIFIED, so read that trajectory before
 touching it again.
 
+#### Shipped as build 105 ✅ — unproven-by-sweep, by design
+
+The message now runs: **`replace_lines start=N end=M`** (arguments filled in,
+no gate) → the block, with the copy route named after it → the from-memory
+warning last, phrased as a measurement rather than an instruction (*"that lands
+1 time in 41"*), because "copy it exactly" does not reach a model that believes
+it already did. The header states the failure and nothing else.
+
+Two choices worth recording:
+
+- **The stated range is the DISPLAYED block, window included** — not the region
+  that matched `old`. One range, one meaning, and it is the block printed
+  directly beneath it, so a number that disagrees with what the model can see
+  is impossible. The cost is that `new` must carry the unchanged context lines,
+  so the route says exactly that on multi-line spans. A wrong line number is
+  worse than no line number: it sends a *correct* edit to the wrong place.
+- **Gated on `confident and not tail`.** An unconfident match has no
+  trustworthy numbers, and a truncated block's end line is not the one printed;
+  both keep the old wording, `_TRY_REPLACE_LINES` included. The two no-op call
+  sites are untouched — no located block there, so nothing to fill in.
+
+**Exposure, measured on the archive instead of a sweep.** 316 not-found events
+are stored; 155 predate build 92 and carry the old "The nearest text is around
+line N" wording. Of the 161 in the current message's format, **160 took the
+confident path** and one did not — so the reorder reaches **99.4%** of modern
+not-found events. That is a statement about *reach*, not about behaviour, and
+the ceiling stays where the section already put it: the message is now ordered
+correctly. Whether it converts is not measurable at current exposure (2 events
+in the last sweep). 12 tests, 1112 total.
+
+**One thing the reorder did NOT fix, found while testing it.** When
+`_authored_old_note` fires (build 96 — `old` is a draft of `new`), it prefixes
+the whole message and ends *"Put the file's existing text in `old` and your
+corrected version in `new`"* — which is the 2% route, back in first position,
+on exactly the population most prone to it. It is a diagnosis rather than a
+route and it was separately validated, so it was not touched here. Open
+question: should the diagnosis keep the lead, or hand off to `replace_lines`
+after naming the misconception?
+
 ### 5.26 No A/A calibration has been able to FINISH since the floor was added (build 100) ✅
 
 The `b99-floor` recalibration died 40 minutes in, after run 1 of 16:
