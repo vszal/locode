@@ -2874,6 +2874,78 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.29 We break the model's indentation and then tell it its text is malformed (2026-08-08)
+
+Applying 5.28's methodology-15 ranking to every error message — *what does the
+model do NEXT* — put the syntax guard at the top by a distance, and following
+it led to a **bug in the edit splice**, not a wording problem.
+
+| message | events | next action |
+|---|---:|---|
+| **syntax guard** | **56** | **38% another syntax rejection** |
+| no-op | 19 | 21% another no-op |
+| ambiguous | 42 | 76% a working `replace_lines` (5.28) |
+| unread | 16 | **100%** `read_file` |
+| not-found | 4 | — (exposure collapsed, 5.25) |
+
+**Reproduced against the real code**, not inferred:
+
+```
+file:  def wrap(text, width):
+           ...
+           if current:
+               lines.append(" ".join(current))
+           return lines
+old:   "if current:\n    lines.append(' '.join(current))\nreturn lines"
+new:   the same, with two lines inserted — internally consistent, relative indent
+
+result:    if current:
+           lines.append(' '.join(current))     <-- LOST FOUR COLUMNS
+       SyntaxError: expected an indented block after 'if' statement
+```
+
+`try_edit`'s tolerant and fuzzy tiers splice into a span that begins **after**
+the matched line's own indentation, so they strip `new`'s first line:
+
+```python
+new_ins = new.lstrip(" \t")
+```
+
+That is all they do. Every **later** line of a multi-line `new` keeps whatever
+column the model wrote it at — and a model writing a multi-line `new` writes it
+*relative*, from column 0. Splice that into a block indented to 4 or 8 and the
+second line is no longer deeper than the first.
+
+The message then says **"Your `new` text is malformed"**. It was not; we broke
+it. **18 of 27 consecutive rejections resend the byte-identical `new`** — which
+is the *correct* response to being told to re-inspect text that is fine, and
+the same failure the comment at `fs.py:645` already diagnosed for a different
+sub-case. 26 of 27 consecutive pairs carry the identical error line.
+
+**Archive evidence:**
+
+- 203 stored syntax rejections; **169 (83%) carry an indentation-shaped
+  SyntaxError** — "expected an indented block" 127, "unexpected indent" 20,
+  "unindent does not match" 11, `for`/`try` variants 11.
+- 134 whose originating call is recoverable; **129 (96%) have a multi-line
+  `new` whose first line sits at column 0** — the exact fingerprint.
+
+**Build 106** re-anchors `new`: the first line is stripped as before, and every
+later line keeps its indentation *relative to that first line*, shifted onto
+the matched span's base column. When the model already wrote absolute
+indentation the shift is zero and the output is byte-identical, so a correct
+`new` cannot be made worse. It declines — falling back to strip-only — on tabs
+in the indentation, on a later line shallower than the first (the shift would
+eat real characters), and when the span does not begin after pure whitespace.
+The exact tier is untouched: a byte-exact `old` means `new` is already in the
+file's coordinates. Draft at `$CLAUDE_JOB_DIR/tmp/b106_draft.py`.
+
+**And unlike 5.25, this one can be swept.** 56 events across both arms of the
+last two sweeps. Target metric: syntax rejections per run and the 38% repeat
+share. Endings must not fall (methodology 8). Watch the no-op rate — a `new`
+that now lands could expose an already-applied state that used to read as a
+syntax error.
+
 ### 5.28 The ambiguous-match message is SOLVED — take it off the lever list (2026-08-08)
 
 It was queued as "the largest remaining message target" (11 events in the 5.25
