@@ -2552,6 +2552,62 @@ different rates carried noise we attributed to the change under test. The
 **The b98 sweep must be re-run against a base that includes this fix**, or it
 measures the parser rather than the route order.
 
+### 5.24 The b98 verdict: the score says nothing, the mechanism moved a long way (2026-08-07)
+
+First sweep run on a base that includes the b99 parser fix (`b98-abbase` =
+89cf3bc + only `toolparse.py`), so route order is isolated from parsing.
+Candidate is build 98 — b97's match rendering, b98's replace_lines-first
+ordering, and the 5.18 reindent rescue, together.
+
+**The score is INCONCLUSIVE and must be reported as such.** Delta **+0.031**,
+W2/L3/T3, 5 informative pairs, **p=1.0**, against a 0.2812 floor. A 4-pair smoke
+had shown +0.4375 (W3/L0/T1) and it did not survive the full run — a clean
+reminder that a 4-pair smoke is a liveness check, never evidence.
+
+**What the events show is not ambiguous at all:**
+
+| per arm, n=8 | base | cand |
+|---|---:|---:|
+| `edit_file` calls | 48 | 73 |
+| `replace_lines` calls | **0** | 10 |
+| `read_file` calls | **16** | **61** |
+| syntax-guard rejections | **33** | **4** |
+| landed edits / run | 2.2 | **7.8** |
+| mean iterations | 18.0 | 39.0 |
+| VERIFIED | 0/8 | 1/8 |
+
+Two things follow. The syntax-guard rejection was the base arm's single largest
+error class (33 of its 68 tool errors) and it nearly vanishes — the candidate
+does not author broken multi-line replacements, because it is no longer being
+pushed toward extending `old`. And `read_file` quadruples: the candidate arm
+re-reads before editing, which 5.22a measured as the difference between landing
+2% and 67%. Landed edits per run go 2.2 → 7.8.
+
+**The ambiguous-match comparison is one-armed and cannot be cited as a delta.**
+Base logged **zero** ambiguous events in 8 runs; it died on syntax rejections
+before reaching one. Within the candidate arm alone: 11 events, next attempt
+landed **9/10 (90%)**, took `replace_lines` 9/10, invented `old`+`replace_all`
+**0/10** — against a b87+ archive baseline of 33% landing and 63% inventing.
+Strong, but measured against history, not against a live control.
+
+**The honest summary: editing mechanics improved and the wall moved.** The
+candidate lands 3.5× more edits, avoids the guard almost entirely, and still
+verifies 1 run in 8. Its new failure signatures are the ones you get from a run
+that *works* and does not converge: `context compacted` ×5, `budget: max
+iterations reached`, and 36 red-test results. Base's failures were the ones you
+get from a run that cannot act at all.
+
+This closes out the edit-landing line of work as the binding constraint. Build
+98 stays — it is better on every mechanism metric and worse on none — but the
+next lever is no longer "help the model land an edit". It is **"the edit landed,
+the tests are still red, and nothing tells the model that its theory is wrong"**
+(5.13c), now reachable because runs survive long enough to get there.
+
+**Also worth its own line:** `This edit does NOTHING: new is identical to old`
+appears 6 times in the candidate arm (8% of its `edit_file` calls) and 0 times
+in base — the exact error the user reported from a live session. Base simply
+never got far enough to emit it. It is a real residual, not a regression.
+
 ### 5.12 A dead serving thread is invisible to us for ten minutes a run
 
 Found the hard way on 2026-08-06: the first `b93-readfirst` sweep produced

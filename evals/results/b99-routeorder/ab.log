@@ -1,0 +1,66 @@
+[1/16] exec-bugfix · qwencoder14 · r1 · base…
+        base: score=0.50 125.0s
+[2/16] exec-bugfix · qwencoder14 · r1 · cand…
+        cand: score=0.25 420.3s
+[3/16] exec-bugfix · qwencoder14 · r2 · cand…
+        cand: score=0.50 350.9s
+[4/16] exec-bugfix · qwencoder14 · r2 · base…
+        base: score=0.50 131.9s
+[5/16] exec-bugfix · qwencoder14 · r3 · base…
+        base: score=0.50 130.2s
+[6/16] exec-bugfix · qwencoder14 · r3 · cand…
+        cand: score=0.25 420.3s
+[7/16] exec-bugfix · qwencoder14 · r4 · cand…
+        cand: score=0.50 351.8s
+[8/16] exec-bugfix · qwencoder14 · r4 · base…
+        base: score=0.50 188.1s
+[9/16] exec-bugfix · qwencoder14 · r5 · base…
+        base: score=0.50 129.1s
+[10/16] exec-bugfix · qwencoder14 · r5 · cand…
+        cand: score=0.50 115.4s
+[11/16] exec-bugfix · qwencoder14 · r6 · cand…
+        cand: score=1.00 142.7s
+[12/16] exec-bugfix · qwencoder14 · r6 · base…
+        base: score=0.25 261.8s
+[13/16] exec-bugfix · qwencoder14 · r7 · base…
+        base: score=0.25 259.1s
+[14/16] exec-bugfix · qwencoder14 · r7 · cand…
+        cand: score=0.50 349.9s
+[15/16] exec-bugfix · qwencoder14 · r8 · cand…
+        cand: score=0.25 364.7s
+[16/16] exec-bugfix · qwencoder14 · r8 · base…
+        base: score=0.50 242.8s
+
+=== RUNS · b99-routeorder ===
+overall score      : 0.453
+clean-finish rate  : 0.062
+total iterations   : 456
+total nudges       : 53  {'repeated call': 20, 'malformed': 25, 'unchanged': 8}
+generation rate    : 36.1 chars/s
+
+case                      model          n  score  iter  nudge  clean    secs    ch/s
+-------------------------------------------------------------------------------------
+exec-bugfix               qwencoder14   16   0.45  28.5    3.3   0.06   249.0      36
+    ⏹ the model repeated the same tool call without making progress
+    ⏹ budget: max iterations reached
+    ⏹ edits kept hitting the same error without making progress
+
+========================================================================
+PAIRED A/B · b99-routeorder
+  base : b98-abbase (0b357c3)
+  cand : /Users/vszalvay/Code/locode
+========================================================================
+
+case                       n     base     cand    delta
+-------------------------------------------------------
+exec-bugfix                8    0.438    0.469   +0.031
+
+pairs      : 8  (W2/L3/T3) — 5 informative
+mean delta : +0.0312  (candidate − baseline)
+sign-flip p: 1.0
+noise floor: +0.2812 (largest of 2 A/A run(s), identical code)
+
+⚠️  INCONCLUSIVE — the experiment did not answer the question
+   only 5 informative pair(s) (8 ran, but 3 scored the same on both arms and a tie cannot move a sign-flip test); a sign-flip test needs 6 before any result can reach p<0.05 (its floor is 2/2^n = 0.062)
+
+wrote /Users/vszalvay/Code/locode/evals/results/b99-routeorder/ab.json
