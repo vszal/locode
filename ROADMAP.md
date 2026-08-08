@@ -2874,6 +2874,73 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.30 The exact tier splices mid-line — build 106 rescued nothing, and proved it (2026-08-08)
+
+`b106-indent` ran 8 paired runs and the rescue fired **zero times**. The score
+channel said UNDERPOWERED (W4/L1/T3, +0.094, 5 informative pairs — it needed
+10 per arm) exactly as 5.27 predicts, and the mechanism channel said nothing
+either: 3 base syntax rejections against 2 candidate, on 8 runs each.
+
+**Then I printed the calls it should have caught** (methodology 14), and every
+single one had a **single-line `old`**:
+
+```
+old: "return text[:cut] + suffix"
+new: "if cut > 0:\n    return text[:cut] + suffix\nelse:\n    return suffix"
+```
+
+`old` written without the file's indentation is a **substring** of the indented
+line. So `text.count(old)` finds it, the **exact** tier fires, and
+`text.replace(old, new)` splices `new` into the middle of that line — the
+line's own four spaces in front of `if cut > 0:`, and every later line left at
+column 0. The identical 5.29 bug, in the one tier build 106 declared untouched
+on the grounds that "an exact match means `old` was reproduced byte for byte,
+indentation included". **That is false for a mid-line match**, and mid-line
+matches were the entire population.
+
+Why the archive replay missed it: all 87 of its rescues had a *multi-line*
+`old`, which cannot match as a substring and so falls to the tolerant tier. The
+replay was right about what it measured and silent about what it did not — the
+population it drew from (b87–b99) is not the population today's sweeps produce.
+
+**Build 107 (`a4ba147`)** routes the exact tier through `_pick_splice` too, with
+`strip=False` (a byte-exact `old` carries the file's indentation, so `new` still
+goes in verbatim) and a new requirement that the base column be non-zero — a
+match that starts its own line has nothing to anchor onto. Replayed:
+
+| | build 106 | build 107 |
+|---|---|---|
+| rescued | 87 | **121** |
+| still rejected | 1 | 1 |
+| unmeasurable (state drift) | 46 | 17 |
+
+The 34 new rescues are **all single-line `old`** — including 17 of b101's 19
+and 4 of b106-indent's own 5.
+
+**`b106-indent` is an accidental A/A, and worth keeping as one.** With zero
+rescues, build 106 is byte-identical in behaviour to build 105, so the two arms
+ran the same code. They still came out:
+
+| | base | cand |
+|---|---|---|
+| mean iterations | 35.0 | 25.8 |
+| mean landed edits | 9.6 | 5.9 |
+| DONE | 4/8 | 5/8 |
+| syntax rejections | 3 | 2 |
+| "unverified edits" nudges | 16 | 3 |
+| score | 0.281 | 0.375 |
+
+**That whole table is noise.** It is the strongest calibration datum the
+mechanism channel has: at n=8 the arm spread swallows a 26% iteration gap and a
+5x nudge-count gap between *identical builds*. Read the next sweep's mechanism
+numbers against this, not against zero.
+
+**Methodology 17: a lever that fires zero times has not been tested.** The
+sweep reported a difference on every summary line and the difference was
+entirely arm noise. Before grading any lever, count how many times the thing
+being tested actually happened — which is why the rescue announces itself in
+the result text.
+
 ### 5.29 We break the model's indentation and then tell it its text is malformed (2026-08-08)
 
 Applying 5.28's methodology-15 ranking to every error message — *what does the
