@@ -2874,6 +2874,86 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.32 The nudge asked for a sentence and got a sentence (2026-08-08)
+
+`b107-indent`'s real finding is not about indentation. Censusing **what the
+next assistant turn did after every nudge** (`$CLAUDE_JOB_DIR/tmp/afterturn.py`):
+
+| nudge | n | prose-only, no tool call | acted |
+|---|---|---|---|
+| **same failure (2 runs in a row)** | **50** | **33 (66%)** | 9 |
+| open plan tasks | 47 | 12 (26%) | 35 |
+| unverified edits | 38 | **0 (0%)** | 38 |
+| same failure (3 runs in a row) | 33 | 6 (18%) | 27 |
+| repeated call | 31 | 11 (35%) | 11 |
+| error unchanged across edits | 27 | 1 (4%) | 26 |
+| tests claimed passing, never seen green | 10 | 0 (0%) | 10 |
+
+The highest-volume nudge in the system converts worst, and the median prose
+reply is **246 characters — about one sentence**. Which is what it asked for.
+Build 103's level-1 branch closed with:
+
+> Then say in one sentence what it expects versus what the code actually
+> produces, and make the next edit follow from that sentence.
+
+The model said the sentence. The turn ended having called nothing, and the
+next thing it saw was an "open plan tasks" nudge for having done nothing.
+
+**It is the wording, not the population.** The *escalated* branch of the same
+note ("Stop editing and open `X`") converts 82%; `unverified edits`, same
+imperative shape, converts 100%; `error unchanged across edits` 96%. The
+level-1 branch is the only one in the table that asks for words, and it is the
+only one that gets them instead of an action.
+
+**Build 108 (`adabb11`)** names the tool, puts the call first (methodology 9),
+and says the next thing sent must BE that call. The one-sentence diagnosis
+survives as something to do *after* reading, not as an alternative to it.
+Swept as `b108-callnotword` against `--base a4ba147` (build 107). Target
+metric: the prose-only share after the level-1 note, which is a per-event rate
+on 1.8 events/run — not a score, and not subject to 5.27's sizing problem.
+
+**Methodology 19: a steer that asks for narration will be answered with
+narration.** Every nudge must name a tool and demand a call. Grade the whole
+set on prose-only share; three of the eleven are above 25%.
+
+### 5.31 The indentation lever is closed — its target event no longer exists (2026-08-08)
+
+`b107-indent` (r14, base build 105): the rescue fired **once** in 14 candidate
+runs, and the **base arm had zero syntax rejections in 14 runs**. Score
+UNDERPOWERED again (W2/L1/T11, 3 informative — it wants 28 per arm). Endings
+flat and tight: VERIFIED 0/14 both arms, DONE 4 vs 5, iters 31.2 vs 31.6,
+landed edits 8.2 vs 8.0 — a much narrower spread than b106-indent's A/A, as
+n=14 should give.
+
+Syntax-guard rejections per run, across the archive:
+
+| sweep | rejections/run | replace_lines/run |
+|---|---|---|
+| b97-ambig | 1.25 | 0.06 |
+| b99-routeorder | 2.31 | 0.62 |
+| b101-samefail | 1.19 | 2.62 |
+| b102-floor | **0.00** | 1.25 |
+| b106-indent | 0.31 | 1.81 |
+| b107-indent | **0.04** | 1.82 |
+
+The event the fix targets **collapsed between b101 and b102**, and
+`replace_lines` usage rose 40x over the same stretch. Build 98's promotion of
+`replace_lines` routed models away from stuffing a multi-line `new` into
+`edit_file` at all — the bug was designed out from a different direction
+before it was fixed.
+
+**Keep build 107 anyway, and stop sweeping it.** It is a correctness fix with
+1137 tests and 121 archive rescues behind it; it costs nothing and fires when
+it fires. But it cannot be A/B'd against a base that produces zero of the
+event, and pretending otherwise would be reading noise (methodology 12).
+
+**The honest ledger for 5.29–5.31:** a real bug, correctly diagnosed, fixed
+twice, worth keeping — and worth **~0.04 events per run** by the time it
+landed. Three sweeps (~6h GPU) bought one number: the target was gone. The
+cheap check that would have caught it on day one is the first line of the
+grader now — count the target event in the CURRENT base arm before building
+anything.
+
 ### 5.30 The exact tier splices mid-line — build 106 rescued nothing, and proved it (2026-08-08)
 
 `b106-indent` ran 8 paired runs and the rescue fired **zero times**. The score
