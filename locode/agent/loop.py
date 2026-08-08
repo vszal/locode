@@ -2034,6 +2034,23 @@ def _name_the_tests(names: list[str]) -> str:
     return shown if len(names) <= 2 else f"{shown} (and {len(names) - 2} more)"
 
 
+def _split_test_ids(names: list[str]) -> tuple[str, list[str]]:
+    """Split pytest ids into a shared file and the bare test names under it.
+
+    Returns ("", names) when the ids don't all share one file — including the
+    FAILURES-banner fallback, which yields bare names with no file at all.
+
+    Found by printing what the model actually saw on a live run rather than
+    from a unit test. b102's first real annotation named two full `file::test`
+    ids whose file was the same, so the single most actionable token — the
+    filename to open — sat buried in a 140-character run-on with its own text
+    repeated inside it."""
+    files = {n.split("::", 1)[0] for n in names if "::" in n}
+    if len(files) != 1 or not all("::" in n for n in names):
+        return "", names
+    return files.pop(), [n.split("::", 1)[1] for n in names]
+
+
 def _same_failure_note(n: int, names: list[str] | None = None) -> str:
     """The note appended to a repeat failure; `n` is how many repeats deep.
 
@@ -2048,22 +2065,28 @@ def _same_failure_note(n: int, names: list[str] | None = None) -> str:
     reading the winning trajectory showed the model answering that with
     `read_file` on the module it had been editing, never once on the test. Told
     to do something it had no identifier for, it substituted the nearest thing
-    it already knew how to do."""
-    which = _name_the_tests(names or [])
+    it already knew how to do.
+
+    Build 103 then says the shared file ONCE — see _split_test_ids."""
+    names = names or []
+    path, bare = _split_test_ids(names)
+    which = _name_the_tests(bare if path else names)
+    target = f"`{path}`" if path else which
     if n <= 1:
+        tail = f" and read {which}." if path else " and read what it asserts."
         return (
             "\n\n⟳ SAME FAILURE as the previous test run — the same tests fail "
             "with the same errors. Whatever you changed since then did not "
             "affect this. Do not record progress on it and do not re-send a "
             "variation of the same edit: it is the idea behind the edit that is "
             "wrong, not its wording.\n"
-            f"Open {which} — the TEST, not the source file you have been "
-            "editing — and read what it asserts. Then say in one sentence what "
-            "it expects versus what the code actually produces, and make the "
-            "next edit follow from that sentence.")
+            f"Open {target} — the TEST, not the source file you have been "
+            f"editing —{tail} Then say in one sentence what it expects versus "
+            "what the code actually produces, and make the next edit follow "
+            "from that sentence.")
     return (f"\n\n⟳ SAME FAILURE — {n + 1} test runs in a row with identical "
             f"results. Nothing you have tried since the first one has changed "
-            f"anything. Stop editing and open {which}.")
+            f"anything. Stop editing and open {target}.")
 
 
 # A final answer that CLAIMS the tests pass. Deliberately test-specific — "tests"

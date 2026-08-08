@@ -3333,7 +3333,10 @@ def test_no_name_is_recoverable_from_a_bare_progress_line():
 
 def test_the_note_names_the_test_and_says_it_is_the_test():
     note = loop_mod._same_failure_note(1, ["tests/test_a.py::test_wrap"])
-    assert "`tests/test_a.py::test_wrap`" in note
+    # Build 103 splits the id: the file is the thing to open, the bare name is
+    # the thing to read once it is open.
+    assert "Open `tests/test_a.py`" in note
+    assert "`test_wrap`" in note
     assert "the TEST, not the source file" in note
 
 
@@ -3382,3 +3385,39 @@ async def test_no_event_when_the_failure_changes(tmp_path):
     loop._on_event = events.append
     await loop.run_turn("fix it")
     assert not any("same failure" in e.get("reason", "") for e in events)
+
+
+# --- build 103: the shared file is named once ---------------------------------
+# Found by printing what the model actually saw on a live b102 run: every failing
+# test was in test_textkit.py and the filename was repeated inside every id, so
+# the one actionable token was buried in a 140-character run-on.
+
+def test_a_shared_file_is_named_once():
+    note = loop_mod._same_failure_note(1, [
+        "test_textkit.py::test_word_wrap", "test_textkit.py::test_truncate"])
+    assert "Open `test_textkit.py`" in note
+    assert "test_textkit.py::" not in note          # not repeated inside the ids
+    assert "`test_word_wrap`, `test_truncate`" in note
+
+
+def test_ids_across_two_files_keep_their_full_form():
+    note = loop_mod._same_failure_note(1, [
+        "test_a.py::test_x", "test_b.py::test_y"])
+    assert "`test_a.py::test_x`" in note
+
+
+def test_banner_names_without_a_file_still_work():
+    note = loop_mod._same_failure_note(1, ["test_wrap_exact_fit"])
+    assert "`test_wrap_exact_fit`" in note
+    assert "the TEST, not the source file" in note
+
+
+def test_the_escalated_note_names_the_file():
+    note = loop_mod._same_failure_note(3, [
+        "test_textkit.py::test_a", "test_textkit.py::test_b"])
+    assert "open `test_textkit.py`" in note
+    assert "4 test runs in a row" in note
+
+
+def test_split_returns_no_file_when_ids_are_mixed():
+    assert loop_mod._split_test_ids(["a.py::t", "bare"]) == ("", ["a.py::t", "bare"])
