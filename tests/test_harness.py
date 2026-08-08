@@ -657,3 +657,58 @@ def test_a_comparable_pair_at_the_minimum_n_still_fails(capsys):
     cand = _scored({"a::m": [0.4] * 4})
     assert harness.compare(base, cand) == 1
     assert "FAIL" in capsys.readouterr().out
+
+
+# --- _nudge_bucket --------------------------------------------------------
+#
+# The histogram ab.py prints at the end of every sweep is read as evidence, so
+# a reason that lands in the wrong bucket is a wrong finding. The fallthrough
+# bucket is "malformed" — an unparseable tool call — and for a long stretch
+# every nudge added after the bucket list was written fell into it.
+
+import re  # noqa: E402  (kept next to the tests that need it)
+
+
+def _loop_nudge_reasons() -> set[str]:
+    """Every literal `reason` the agent loop emits on a nudge event."""
+    src = (ROOT / "locode" / "agent" / "loop.py").read_text()
+    out = set()
+    for m in re.finditer(r'"phase":\s*"nudge",\s*"reason":\s*(f?)"([^"]*)"', src):
+        prefix, text = m.groups()
+        # An f-string reason is a fixed stem plus a runtime detail; the stem is
+        # what has to bucket, so keep the part before the first placeholder.
+        out.add(text.split("{")[0].strip() if prefix else text)
+    return {r for r in out if r}
+
+
+def test_every_nudge_reason_has_a_bucket():
+    # The one nudge with a free-text reason is the malformed-tool-call one,
+    # which does not appear as a literal here — so nothing found in the loop
+    # should land in the malformed bucket.
+    reasons = _loop_nudge_reasons()
+    assert len(reasons) > 10, "the reason scrape found almost nothing"
+    misfiled = sorted(r for r in reasons
+                      if harness._nudge_bucket(r) == "malformed")
+    assert not misfiled, (
+        "these nudges are being counted as unparseable tool calls; add them "
+        f"to _NUDGE_BUCKETS: {misfiled}")
+
+
+def test_a_real_parse_failure_still_buckets_as_malformed():
+    assert harness._nudge_bucket("no ```tool block found") == "malformed"
+    assert harness._nudge_bucket("expecting ',' delimiter") == "malformed"
+
+
+def test_an_empty_reason_is_other_not_malformed():
+    assert harness._nudge_bucket("") == "other"
+
+
+def test_the_same_failure_family_collapses_to_one_bucket():
+    assert (harness._nudge_bucket("same failure (2 runs in a row)")
+            == harness._nudge_bucket("same failure (4 runs in a row)")
+            == "same failure")
+
+
+def test_missing_deliverable_keeps_its_bucket_despite_the_filename():
+    assert harness._nudge_bucket("missing deliverable: notes.md") == \
+        "missing deliverable"

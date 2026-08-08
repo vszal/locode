@@ -232,13 +232,33 @@ def _last_stamp(events: list[dict]) -> float:
     return float(events[-1].get("t", 0.0)) if events else 0.0
 
 
+#: Substrings identifying every NAMED nudge the loop emits, in match order.
+#: Only one nudge (`_nudge`, for an unparseable tool call) puts free text in
+#: `reason`; everything else uses a fixed string. So anything that matches
+#: nothing here really is a parse failure — but only while this list stays
+#: complete, which `test_every_nudge_reason_has_a_bucket` enforces.
+_NUDGE_BUCKETS = (
+    "empty response", "truncated", "repeated call", "repeated edit",
+    "same failure", "unverified edits", "unchanged", "missing deliverable",
+    "slow progress", "open plan tasks", "announced intent", "declared done",
+    "never verified", "never seen green", "edit changed nothing",
+    "context compacted", "repetition loop", "every call returning empty",
+    "every tool call failing", "verify task credited",
+)
+
+
 def _nudge_bucket(reason: str) -> str:
     """Collapse a nudge reason to a stable bucket (reasons embed details like
-    the specific missing filename, which would fragment the histogram)."""
+    the specific missing filename, which would fragment the histogram).
+
+    Unrecognized reasons used to fall through to "malformed", which meant every
+    nudge added after this function was written got counted as an unparseable
+    tool call: b108-callnotword reported 125 malformed calls in a sweep that had
+    exactly zero, most of them same-failure nudges. Keep `_NUDGE_BUCKETS` in
+    sync when adding a nudge.
+    """
     r = reason.lower()
-    for key in ("empty response", "truncated", "repeated call", "unchanged",
-                "missing deliverable", "slow progress", "open plan tasks",
-                "announced intent"):
+    for key in _NUDGE_BUCKETS:
         if key in r:
             return key
     return "malformed" if r else "other"
