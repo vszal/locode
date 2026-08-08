@@ -3135,3 +3135,170 @@ async def test_resetting_context_forgets_what_was_read(tmp_path):
     await loop.run_turn("now fix it")
     assert (tmp_path / "a.py").read_text() == "x = 1\n"
     assert any("have NOT read" in m.get("content", "") for m in loop.history)
+
+
+# --- a repeated test failure is named in the result (build 101 / 5.24b) ------
+# 47 of 84 failing test runs in the b99 sweep were identical to the one before,
+# in 16 of 16 runs, and the model's dominant response was to update its plan.
+# Archive-wide: 693 repeats across 370 runs, and the identity never once fired
+# on a green run or on non-pytest output.
+
+RED = ("[exit 1]\nF....F...\n"
+       "FAILED tests/test_a.py::test_wrap - AssertionError\n"
+       "E   AssertionError: assert 3 == 4\n")
+RED_OTHER = ("[exit 1]\n..F......\n"
+             "FAILED tests/test_a.py::test_trunc - AssertionError\n"
+             "E   AssertionError: assert 1 == 2\n")
+
+
+def test_the_same_failure_is_recognised_across_cosmetic_drift():
+    # Durations and tmp paths move every run; the failure has not changed.
+    a = loop_mod._test_failure_id(RED + "\n1 failed in 0.42s\n")
+    b = loop_mod._test_failure_id(RED + "\n1 failed in 0.51s\n")
+    assert a == b is not None
+
+
+def test_a_different_failing_test_is_a_different_identity():
+    assert loop_mod._test_failure_id(RED) != loop_mod._test_failure_id(RED_OTHER)
+
+
+def test_a_green_run_has_no_failure_identity():
+    assert loop_mod._test_failure_id("........\n\n8 passed in 0.3s\n") is None
+
+
+def test_ordinary_shell_output_is_not_a_test_result():
+    assert loop_mod._test_failure_id(
+        "total 8\ndrwxr-xr-x  3 me  staff  96 file.py\n") is None
+    assert loop_mod._test_failure_id("") is None
+    assert loop_mod._test_failure_id("...") is None   # a bare ellipsis in prose
+
+
+def test_an_error_only_run_still_has_an_identity():
+    assert loop_mod._test_failure_id(
+        "ERROR tests/test_a.py::test_x\nE   ImportError: no module\n") is not None
+
+
+def test_the_note_escalates_to_a_count_after_the_first():
+    first = loop_mod._same_failure_note(1)
+    assert "SAME FAILURE as the previous test run" in first
+    later = loop_mod._same_failure_note(3)
+    assert "4 test runs in a row" in later
+    assert len(later) < len(first)      # the paragraph earns its length once
+
+
+class ScriptedTool:
+    """A stand-in for `bash`: returns whichever canned payload it's asked for.
+
+    The real trigger is a pytest run, but the loop only ever sees the result
+    string, so scripting it keeps the test hermetic (and off a subprocess)."""
+    name = "run_tests"
+    description = "run the tests"
+    schema = {"type": "object", "properties": {"which": {"type": "string"}}}
+    permission = "auto"
+
+    def __init__(self, payloads):
+        self.payloads = payloads
+
+    async def run(self, args, ctx):
+        from locode.tools.base import ToolResult
+        return ToolResult(self.payloads[args["which"]], is_error=True)
+
+
+def make_loop_with_tests(tmp_path, scripted, payloads, cfg=None):
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    reg.register(UpdatePlan())
+    reg.register(ScriptedTool(payloads))
+    cfg = cfg or Config()
+    cfg.agent.max_repeat_calls = 99   # isolate the same-failure path
+    cfg.agent.max_error_stall = 99
+    return AgentLoop(FakeClient(scripted), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path))
+
+
+def _results(loop):
+    return [m["content"] for m in loop.history
+            if m["role"] == "user" and m.get("kind") == "tool_result"]
+
+
+async def test_a_repeat_failure_is_annotated(tmp_path):
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         native_call("run_tests", which="red"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED})
+    await loop.run_turn("fix it")
+    res = _results(loop)
+    assert "SAME FAILURE" not in res[0]      # the first one is just a failure
+    assert "SAME FAILURE as the previous test run" in res[1]
+
+
+async def test_the_repeat_note_escalates_in_place(tmp_path):
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red")] * 3
+        + [{"role": "assistant", "content": "ok"}],
+        {"red": RED})
+    await loop.run_turn("fix it")
+    res = _results(loop)
+    assert "SAME FAILURE as the previous test run" in res[1]
+    assert "3 test runs in a row" in res[2]
+
+
+async def test_a_changed_failure_is_not_annotated(tmp_path):
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         native_call("run_tests", which="other"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED, "other": RED_OTHER})
+    await loop.run_turn("fix it")
+    assert not any("SAME FAILURE" in r for r in _results(loop))
+
+
+async def test_a_green_run_between_two_reds_still_reads_as_a_repeat(tmp_path):
+    # A green run is not a failure identity, so it neither annotates nor clears
+    # the last one — the second red is still the same failure as the first.
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         native_call("run_tests", which="green"),
+         native_call("run_tests", which="red"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED, "green": "....\n4 passed in 0.1s\n"})
+    await loop.run_turn("fix it")
+    res = _results(loop)
+    assert "SAME FAILURE" not in res[1]
+    assert "SAME FAILURE" in res[2]
+
+
+async def test_the_identity_does_not_survive_into_the_next_turn(tmp_path):
+    # A new turn is a new question; opening it with a stale accusation would be
+    # wrong even when the bytes happen to match.
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED})
+    await loop.run_turn("fix it")
+    loop._client.n = 0
+    await loop.run_turn("now try again")
+    assert not any("SAME FAILURE" in r for r in _results(loop))
+
+
+async def test_the_annotation_does_not_disable_the_repeat_guard(tmp_path):
+    # result_sig is computed from the RAW result. If it were taken after the
+    # annotation, the running count would make every repeat look novel and the
+    # no-progress guard could never fire on the case it exists for.
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    loop = make_loop_with_tests(
+        tmp_path, [native_call("run_tests", which="red")] * 12,
+        {"red": RED}, cfg=cfg)
+    cfg.agent.max_repeat_calls = 3     # make_loop_with_tests widened it
+    cfg.agent.max_iterations = 20
+    out = await loop.run_turn("fix it")
+    assert "stopped" in out
+    assert len(_results(loop)) < 20

@@ -2638,7 +2638,7 @@ pytest's varying `in 0.42s` to be breaking byte-exact matching. It is not — 20
 of 68 consecutive failing results are already byte-identical, and normalising
 the duration changes nothing. The fragmentation is the batch join, not timing.
 
-**Build 100 (drafted).** Append the note to the *result*, not as a nudge: it is
+**Build 101 (shipped).** Append the note to the *result*, not as a nudge: it is
 an observation about the very output the model is reading, and it is true the
 first time it happens rather than after a streak. Same shape as `_EMPTY_OK` and
 the build-22 syntax warning. Wording leads by closing off `update_plan` and then
@@ -2659,6 +2659,22 @@ failing tests, **100% of them produced by a pytest command — zero false
 positives on any other command**, zero fires on a run reporting only passes,
 zero fires on a non-`bash` tool. It would annotate **692 times across 79 run
 files**. The largest measured exposure of any lever in this project.
+
+Re-run at ship time over the full archive (9,654 results): **1,961 identified,
+all 1,961 from `bash`, all carrying pytest markers, zero green runs among them**
+— **693 annotations across 370 run files**. Repeat depth is a long tail: 446
+first repeats, 92 seconds, 41 thirds, and **78 at six or more**, which is what
+justifies the escalation — the paragraph earns its length once, then the running
+count carries the signal.
+
+**One defect caught in review, worth recording because it would have been
+invisible.** `result_sig` — the key the no-progress repeat guard compares — was
+computed from `results` *after* the annotation. An annotation carrying a running
+count makes every repeat a different string, so the guard would have stopped
+firing on precisely the case it exists for, and nothing would have failed
+loudly. `result_sig` is now taken from the raw results before annotating, with a
+test (`test_the_annotation_does_not_disable_the_repeat_guard`) that fails if it
+moves back. 9 tests, 1082 total.
 
 ### 5.25 Route-order audit of the remaining multi-option messages (5.20b applied)
 

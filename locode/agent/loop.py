@@ -246,6 +246,12 @@ class AgentLoop:
         # guard needs "has the workspace moved SINCE this call last ran?", and a
         # flag that never falls back to False cannot answer that.
         self._landed_edits = 0
+        # [same-failure] The previous test run's failure identity, so a repeat
+        # can be named the first time it happens rather than after a streak.
+        # Turn-scoped: a new turn is a new question, and carrying the identity
+        # across one would open with a stale accusation.
+        self._last_test_id = None
+        self._same_failure_run = 0
         open_task_nudges = 0
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
@@ -1302,9 +1308,35 @@ class AgentLoop:
                 no_change = True
             elif res.is_error:
                 error_parts.append(f"{call.name}: {res.content}")
+        # Computed from the RAW results, before the same-failure annotation
+        # below: the repeat guard asks "is this byte-identical to last time?",
+        # and an annotation that carries a running count would make every repeat
+        # look novel and silently disable the guard on the exact case it exists
+        # for.
+        result_sig = "\n".join(f"{name}: {content}" for name, content in results)
+        # [same-failure] Name a repeat failure in the result the model is about
+        # to read, before it reads it. Scoped to the TURN, not the batch: the two
+        # runs being compared are usually several iterations apart with edits in
+        # between, which is exactly the case the batch-keyed error-stall signal
+        # fragments on — 97 distinct error signatures against 37 real test-
+        # failure identities on the b99 sweep, so streaks rarely reach
+        # max_error_stall and the stall nudge fired 8 times against 47
+        # opportunities. Appended to the successful result like the syntax
+        # warning and _EMPTY_OK: advisory, never an error, never suppresses
+        # output. ROADMAP 5.24b.
+        for i, (name, content) in enumerate(results):
+            fid = _test_failure_id(content)
+            if fid is None:
+                continue
+            if fid == self._last_test_id:
+                self._same_failure_run += 1
+                results[i] = (name,
+                              content + _same_failure_note(self._same_failure_run))
+            else:
+                self._same_failure_run = 0
+            self._last_test_id = fid
         self.history.append({"role": "user", "content": tool_results_block(results),
                              "kind": "tool_result"})
-        result_sig = "\n".join(f"{name}: {content}" for name, content in results)
         return (("\n".join(error_parts) if error_parts else None), result_sig,
                 no_change, ran > 0 and errored == ran,
                 ran > 0 and noinfo == ran)
@@ -1928,6 +1960,63 @@ def _looks_green_test(content: str) -> bool:
     if not content or not _TEST_GREEN_RE.search(content):
         return False
     return not _TEST_FAIL_RE.search(content)
+
+
+# A failing test run, reduced to what makes it the SAME failure: pytest's
+# progress line, the names of the tests that failed, and the exception types.
+# Deliberately NOT byte-exact — durations, absolute tmp paths and traceback line
+# numbers move between runs without the failure having changed. Returns None for
+# output that isn't recognisably a failing test result, which is what keeps this
+# off ordinary shell commands: measured over the whole archive, 1961 of 9654
+# tool results match, every one of them from `bash`, every one carrying pytest
+# markers, and zero green runs among them.
+_TEST_PROGRESS_RE = re.compile(r"^[.FEsx]{3,}\s*(?:\[\s*\d+%\])?\s*$", re.M)
+_TEST_FAILED_RE = re.compile(r"^(?:FAILED|ERROR) (\S+)", re.M)
+_TEST_EXC_RE = re.compile(r"^E\s+(\w*(?:Error|Exception|Failure))", re.M)
+
+
+def _test_failure_id(text: str) -> tuple | None:
+    """Identity of a failing test run, or None if this isn't one."""
+    prog = _TEST_PROGRESS_RE.search(text or "")
+    failed = tuple(sorted(set(_TEST_FAILED_RE.findall(text or ""))))
+    excs = tuple(sorted(set(_TEST_EXC_RE.findall(text or ""))))
+    if not prog and not failed:
+        return None
+    if prog and "F" not in prog.group(0) and "E" not in prog.group(0) \
+            and not failed:
+        return None                    # a green run is not a failure identity
+    return (prog.group(0).strip() if prog else "", failed, excs)
+
+
+# Ordered by authoring burden (5.20b: the route named first is the route taken),
+# and it opens by closing off the move the model actually makes. Measured on the
+# b99 sweep: after a stuck (edit → unchanged failure) transition its next action
+# was `update_plan` 23 times out of 37 and a re-read exactly once. It does
+# BOOKKEEPING — it ticks the task and moves on, because nothing in what it just
+# read said the attempt failed to matter.
+_SAME_FAILURE = (
+    "\n\n⟳ SAME FAILURE as the previous test run — the same tests fail with the "
+    "same errors. Whatever you changed since then did not affect this. Do not "
+    "record progress on it and do not re-send a variation of the same edit: it "
+    "is the idea behind the edit that is wrong, not its wording.\n"
+    "Read the failing test itself first — open it and the function it exercises, "
+    "and say in one sentence what the test expects versus what the code actually "
+    "produces. Make the next edit follow from that sentence.")
+
+
+def _same_failure_note(n: int) -> str:
+    """The note appended to a repeat failure; `n` is how many repeats deep.
+
+    Repeats beyond the first get the COUNT, not the paragraph again. The archive
+    holds 693 of these across 370 runs, with a tail 78 deep at 6+ repeats: the
+    same 60 words that often would stop being read and would crowd out the very
+    context this note exists to make usable. The running count is also the one
+    thing the model cannot see for itself."""
+    if n <= 1:
+        return _SAME_FAILURE
+    return (f"\n\n⟳ SAME FAILURE — {n + 1} test runs in a row with identical "
+            f"results. Nothing you have tried since the first one has changed "
+            f"anything. Stop editing and re-read the failing test.")
 
 
 # A final answer that CLAIMS the tests pass. Deliberately test-specific — "tests"
