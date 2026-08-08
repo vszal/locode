@@ -1503,3 +1503,55 @@ def test_the_rescued_edit_actually_lands_through_edit_file(tmp_path):
          "new": "if x:\n    p()\n    q()"}, ctx))
     assert res.ok, res.content
     compile((tmp_path / "w.py").read_text(), "w.py", "exec")
+
+
+# --- build 107 / 5.30: the EXACT tier splices mid-line too --------------------
+
+def test_a_dedented_old_matches_mid_line_and_is_still_rescued():
+    # `old` written without the file's indentation is a SUBSTRING of the
+    # indented line, so text.count() finds it and the "exact" tier splices into
+    # the middle of that line. This was the entire population of b106-indent.
+    text = ("def truncate(text, limit, suffix):\n"
+            "    cut = limit - len(suffix)\n"
+            "    return text[:cut] + suffix\n")
+    new = ("if cut > 0:\n    return text[:cut] + suffix\n"
+           "else:\n    return suffix")
+    upd, note, status, _c = fs.try_edit(text, "return text[:cut] + suffix", new,
+                                        False, Path("m.py"))
+    assert status == "ok" and "re-indented" in note
+    compile(upd, "m.py", "exec")
+    assert "    if cut > 0:\n        return text[:cut] + suffix\n" in upd
+
+
+def test_a_byte_exact_old_still_replaces_verbatim():
+    # The exact tier must NOT strip `new` the way the span tiers do: here `old`
+    # carries the file's indentation, so `new` is already in its coordinates.
+    text = "def f():\n    a = 1\n"
+    upd, note, status, _c = fs.try_edit(text, "    a = 1", "    a = 2", False,
+                                        Path("m.py"))
+    assert status == "ok" and note == "" and upd == "def f():\n    a = 2\n"
+
+
+def test_the_exact_tier_does_not_anchor_at_column_zero():
+    # Nothing to anchor onto — the match starts the line. Status quo.
+    text = "a = 1\nb = 2\n"
+    upd, note, status, _c = fs.try_edit(text, "a = 1", "a = 1\nc = 3", False,
+                                        Path("m.py"))
+    assert status == "ok" and note == "" and upd == "a = 1\nc = 3\nb = 2\n"
+
+
+def test_a_genuinely_malformed_new_is_still_left_broken():
+    # `else` shallower than its own `if`: the model's text really is wrong, and
+    # no shift fixes it. Rescue declines and the syntax guard gets to speak.
+    text = "def f():\n    return 1\n"
+    new = "if x:\n            return 1\n        else:\n            return 2"
+    upd, note, status, _c = fs.try_edit(text, "return 1", new, False,
+                                        Path("m.py"))
+    assert status == "ok" and note == ""
+    assert not fs._parses_py(upd, Path("m.py"))
+
+
+def test_replace_all_through_the_exact_tier_keeps_its_count():
+    text = "x = 1\ny = 1\n"
+    upd, _n, status, count = fs.try_edit(text, "= 1", "= 2", True, Path("m.py"))
+    assert status == "ok" and count == 2 and upd == "x = 2\ny = 2\n"

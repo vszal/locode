@@ -200,12 +200,18 @@ def _anchor_new(new: str, base: int | None) -> str:
 _REINDENTED = ", re-indented onto the matched block"
 
 
-def _splice(text: str, spans, new: str, anchored: bool) -> str:
-    """Apply `new` over every span, either strip-only or re-anchored."""
+def _splice(text: str, spans, new: str, anchored: bool, strip: bool = True) -> str:
+    """Apply `new` over every span: verbatim, strip-only, or re-anchored.
+
+    `strip` is False for the exact tier, whose spans cover `old` itself rather
+    than starting after a line's indentation — there `new` goes in as written.
+    """
     updated = text
     for a, b in sorted(spans, reverse=True):
-        ins = (_anchor_new(new, _span_base(text, a)) if anchored
-               else new.lstrip(" \t"))
+        if anchored:
+            ins = _anchor_new(new, _span_base(text, a))
+        else:
+            ins = new.lstrip(" \t") if strip else new
         updated = updated[:a] + ins + updated[b:]
     return updated
 
@@ -236,7 +242,8 @@ def _frame_ok(text: str, a: int, b: int, old: str) -> bool:
     return region is not None and region == _indent_profile(_old_block(old))
 
 
-def _pick_splice(text: str, spans, new: str, path, old: str = ""):
+def _pick_splice(text: str, spans, new: str, path, old: str = "",
+                 strip: bool = True):
     """The strip-only splice, unless it BREAKS the file and re-anchoring fixes it.
 
     ROADMAP 5.29. A model writing a multi-line `new` usually writes it relative,
@@ -252,12 +259,23 @@ def _pick_splice(text: str, spans, new: str, path, old: str = ""):
     keep the strip-only result unless Python rejects it and the anchored result
     parses. That makes this strictly a rescue — every edit that lands today
     lands identically, and only a file we were about to corrupt changes hands.
+
+    Build 107: the EXACT tier needs this too, and needs it most. `old` written
+    without the file's indentation is a *substring* of the indented line, so
+    `text.count(old)` finds it and `str.replace` splices `new` into the middle
+    of that line — leaving the line's own indent in front of `new`'s first line
+    and every later line at column 0. Build 106 called the exact tier untouched
+    on the grounds that an exact match means `old` was reproduced byte for
+    byte; that is false for a mid-line match, and it was the whole population
+    of the b106-indent sweep (0 rescues on 8 runs). See ROADMAP 5.30.
     """
-    plain = _splice(text, spans, new, False)
+    plain = _splice(text, spans, new, False, strip)
     if path is None or getattr(path, "suffix", "") != ".py":
         return plain, False
     if _parses_py(plain, path) or not _parses_py(text, path):
         return plain, False   # already fine, or the file was broken before us
+    if not all(_span_base(text, a) for a, b in spans):
+        return plain, False   # nothing to anchor onto: the span starts at col 0
     if not all(_frame_ok(text, a, b, old) for a, b in spans):
         return plain, False
     anchored = _splice(text, spans, new, True)
@@ -287,7 +305,16 @@ def try_edit(text: str, old: str, new: str, replace_all: bool, path=None):
     if count > 1 and not replace_all:
         return None, "", "ambiguous", count
     if count >= 1:                                     # tier 1: exact
-        return text.replace(old, new), "", "ok", count
+        # Not necessarily a whole-line match: a dedented `old` matches as a
+        # SUBSTRING of an indented line, and splicing a multi-line `new` there
+        # dedents everything after its first line (5.30). `_pick_splice` puts
+        # it back, but only if the plain replace would not parse.
+        hits, i = [], text.find(old)
+        while i != -1:
+            hits.append((i, i + len(old)))
+            i = text.find(old, i + len(old))
+        updated, fixed = _pick_splice(text, hits, new, path, old, strip=False)
+        return updated, (_REINDENTED if fixed else ""), "ok", count
     # Span replacements start AFTER the line's original indentation (which is
     # preserved), so drop any leading indentation the model put on `new`'s first
     # line — otherwise the two stack and the line is double-indented. When that
