@@ -1330,8 +1330,17 @@ class AgentLoop:
                 continue
             if fid == self._last_test_id:
                 self._same_failure_run += 1
-                results[i] = (name,
-                              content + _same_failure_note(self._same_failure_run))
+                results[i] = (name, content + _same_failure_note(
+                    self._same_failure_run, _failing_test_names(content)))
+                # Emitted because the annotation is otherwise INVISIBLE to the
+                # archive: the `result` event above is written per call, before
+                # this loop runs, so b101's sweep recorded zero annotations
+                # while 28 fired and exposure could only be inferred. A lever
+                # you cannot see is a lever you cannot grade (methodology 2).
+                self._on_event({
+                    "phase": "nudge",
+                    "reason": f"same failure "
+                              f"({self._same_failure_run + 1} runs in a row)"})
             else:
                 self._same_failure_run = 0
             self._last_test_id = fid
@@ -1988,35 +1997,73 @@ def _test_failure_id(text: str) -> tuple | None:
     return (prog.group(0).strip() if prog else "", failed, excs)
 
 
-# Ordered by authoring burden (5.20b: the route named first is the route taken),
-# and it opens by closing off the move the model actually makes. Measured on the
-# b99 sweep: after a stuck (edit → unchanged failure) transition its next action
-# was `update_plan` 23 times out of 37 and a re-read exactly once. It does
-# BOOKKEEPING — it ticks the task and moves on, because nothing in what it just
-# read said the attempt failed to matter.
-_SAME_FAILURE = (
-    "\n\n⟳ SAME FAILURE as the previous test run — the same tests fail with the "
-    "same errors. Whatever you changed since then did not affect this. Do not "
-    "record progress on it and do not re-send a variation of the same edit: it "
-    "is the idea behind the edit that is wrong, not its wording.\n"
-    "Read the failing test itself first — open it and the function it exercises, "
-    "and say in one sentence what the test expects versus what the code actually "
-    "produces. Make the next edit follow from that sentence.")
+# The note below is ordered by authoring burden (5.20b: the route named first
+# is the route taken), and it opens by closing off the move the model actually
+# makes. Measured on the b99 sweep: after a stuck (edit → unchanged failure)
+# transition its next action was `update_plan` 23 times out of 37 and a re-read
+# exactly once. It does BOOKKEEPING — it ticks the task and moves on, because
+# nothing in what it just read said the attempt failed to matter. b101 then
+# measured that closing it off works: 20 of 28 → 0 of 28, with total update_plan
+# calls across the sweep unchanged (59 vs 55), so the effect is local to the one
+# moment planning was useless.
+#
+# pytest's FAILURES section header — "____ test_word_wrap_exact_fit ____".
+# The fallback for naming the test when the short summary has been truncated out
+# of the result, which is the usual case: over the b99 and b101 sweeps a
+# `FAILED <id>` line survives in 33 of 106 repeat events, and this header covers
+# all 106. Between them the test is always nameable, which is what makes the
+# build-102 wording possible at all.
+_TEST_HEADER_RE = re.compile(r"^_{2,}\s+([A-Za-z_][\w.\[\]-]*)\s+_{2,}\s*$", re.M)
 
 
-def _same_failure_note(n: int) -> str:
+def _failing_test_names(text: str) -> list[str]:
+    """The failing tests named in a pytest result, best identifier first.
+
+    Prefers `FAILED path::test` from the short summary because it tells the
+    model which FILE to open; falls back to the bare name from the FAILURES
+    banner, which is still enough to grep for."""
+    return (_TEST_FAILED_RE.findall(text or "")
+            or _TEST_HEADER_RE.findall(text or ""))
+
+
+def _name_the_tests(names: list[str]) -> str:
+    """Render the failing tests for the note — two by name, the rest counted."""
+    if not names:
+        return "the failing test"
+    shown = ", ".join(f"`{n}`" for n in names[:2])
+    return shown if len(names) <= 2 else f"{shown} (and {len(names) - 2} more)"
+
+
+def _same_failure_note(n: int, names: list[str] | None = None) -> str:
     """The note appended to a repeat failure; `n` is how many repeats deep.
 
     Repeats beyond the first get the COUNT, not the paragraph again. The archive
     holds 693 of these across 370 runs, with a tail 78 deep at 6+ repeats: the
     same 60 words that often would stop being read and would crowd out the very
     context this note exists to make usable. The running count is also the one
-    thing the model cannot see for itself."""
+    thing the model cannot see for itself.
+
+    Build 102 names the test, and says explicitly that it means the test rather
+    than the source. b101's wording said "read the failing test itself first";
+    reading the winning trajectory showed the model answering that with
+    `read_file` on the module it had been editing, never once on the test. Told
+    to do something it had no identifier for, it substituted the nearest thing
+    it already knew how to do."""
+    which = _name_the_tests(names or [])
     if n <= 1:
-        return _SAME_FAILURE
+        return (
+            "\n\n⟳ SAME FAILURE as the previous test run — the same tests fail "
+            "with the same errors. Whatever you changed since then did not "
+            "affect this. Do not record progress on it and do not re-send a "
+            "variation of the same edit: it is the idea behind the edit that is "
+            "wrong, not its wording.\n"
+            f"Open {which} — the TEST, not the source file you have been "
+            "editing — and read what it asserts. Then say in one sentence what "
+            "it expects versus what the code actually produces, and make the "
+            "next edit follow from that sentence.")
     return (f"\n\n⟳ SAME FAILURE — {n + 1} test runs in a row with identical "
             f"results. Nothing you have tried since the first one has changed "
-            f"anything. Stop editing and re-read the failing test.")
+            f"anything. Stop editing and open {which}.")
 
 
 # A final answer that CLAIMS the tests pass. Deliberately test-specific — "tests"

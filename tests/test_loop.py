@@ -3302,3 +3302,83 @@ async def test_the_annotation_does_not_disable_the_repeat_guard(tmp_path):
     out = await loop.run_turn("fix it")
     assert "stopped" in out
     assert len(_results(loop)) < 20
+
+
+# --- naming the test, and making the annotation visible (build 102) ----------
+# b101 measured that the note redirects the model off update_plan (20 of 28 → 0
+# of 28) but the trajectory showed what it does instead: told to "read the
+# failing test", it called read_file on the SOURCE file it had been editing,
+# never once on the test. It substituted the nearest thing it had an identifier
+# for. A test name is recoverable in 106 of 106 archived repeat events.
+
+HEADER_ONLY = ("[exit 1]\nF....F...\n"
+               "=================================== FAILURES ==================\n"
+               "________________________ test_wrap_exact_fit __________________\n"
+               "E   AssertionError: assert 3 == 4\n")
+
+
+def test_the_failed_summary_line_is_preferred_for_naming():
+    # It carries the FILE too, which is what the model needs in order to open it.
+    assert loop_mod._failing_test_names(RED) == ["tests/test_a.py::test_wrap"]
+
+
+def test_the_failures_banner_is_the_fallback():
+    # The short summary is truncated out of most real results; the banner is not.
+    assert loop_mod._failing_test_names(HEADER_ONLY) == ["test_wrap_exact_fit"]
+
+
+def test_no_name_is_recoverable_from_a_bare_progress_line():
+    assert loop_mod._failing_test_names("FFF\n") == []
+
+
+def test_the_note_names_the_test_and_says_it_is_the_test():
+    note = loop_mod._same_failure_note(1, ["tests/test_a.py::test_wrap"])
+    assert "`tests/test_a.py::test_wrap`" in note
+    assert "the TEST, not the source file" in note
+
+
+def test_the_escalated_note_also_names_the_test():
+    note = loop_mod._same_failure_note(4, ["test_wrap_exact_fit"])
+    assert "`test_wrap_exact_fit`" in note
+    assert "5 test runs in a row" in note
+
+
+def test_many_failing_tests_are_summarised_not_listed():
+    out = loop_mod._name_the_tests(["a", "b", "c", "d"])
+    assert "`a`, `b`" in out and "(and 2 more)" in out
+    assert "`c`" not in out
+
+
+def test_the_note_degrades_gracefully_with_no_name():
+    assert "the failing test" in loop_mod._same_failure_note(1, [])
+
+
+async def test_the_annotation_emits_an_event(tmp_path):
+    # Without this the lever is ungradeable: the `result` event is written per
+    # call BEFORE the annotation, so b101's sweep archived zero annotations
+    # while 28 of them fired.
+    events = []
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red")] * 3
+        + [{"role": "assistant", "content": "ok"}],
+        {"red": RED})
+    loop._on_event = events.append
+    await loop.run_turn("fix it")
+    fired = [e for e in events
+             if e.get("phase") == "nudge" and "same failure" in e.get("reason", "")]
+    assert [e["reason"] for e in fired] == [
+        "same failure (2 runs in a row)", "same failure (3 runs in a row)"]
+
+
+async def test_no_event_when_the_failure_changes(tmp_path):
+    events = []
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         native_call("run_tests", which="other"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED, "other": RED_OTHER})
+    loop._on_event = events.append
+    await loop.run_turn("fix it")
+    assert not any("same failure" in e.get("reason", "") for e in events)

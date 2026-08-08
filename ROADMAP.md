@@ -2676,6 +2676,74 @@ loudly. `result_sig` is now taken from the raw results before annotating, with a
 test (`test_the_annotation_does_not_disable_the_repeat_guard`) that fails if it
 moves back. 9 tests, 1082 total.
 
+### 5.24c The b101 verdict: the cleanest causal result yet, and it converts nothing
+
+`b101-samefail`, 16 runs, base `e160435` (build 100) vs the live tree.
+
+**The target metric moved as decisively as anything measured in this project.**
+What the model does next after a stuck transition (an edit landed, the failure
+did not move):
+
+| next action | base | cand |
+|---|---:|---:|
+| `update_plan` | **20 of 28** | **0 of 28** |
+| `edit_file` | 3 | 17 |
+| `write_file` | 1 | 7 |
+| `read_file` | 0 | 4 |
+| `bash` / turn ended | 4 | 0 |
+
+Zero. The bookkeeping response was eliminated outright — and it is *local*:
+total `update_plan` calls across the sweep were **59 base vs 55 cand**,
+essentially unchanged. The model did not stop planning; it stopped planning at
+the one moment planning was useless. That specificity is what makes this causal
+rather than a general shift in behaviour.
+
+Supporting movement, cand vs base: `replace_lines` 8 → 34, `write_file` 4 → 17,
+landed edits 7.2 → 12.5 per run, repeat rate 69% → 58%, repeat depth ≥4 down
+from 14 to 4, `repeated call` nudges 14 → 5.
+
+**And nothing converted.** VERIFIED **0/8 on both arms**. Stopped 8/8 both.
+Score delta **−0.0938**, W1/L4/T3, p=0.375 — inside the 0.2812 floor, and
+therefore no evidence of harm either. **Verdict: KEEP, do not credit.** It
+removes a demonstrably useless behaviour at zero measured cost; it does not
+rescue the run.
+
+**Why not, from the trajectory (methodology 3) — `r4__cand`, the best run.** At
+118.0 s pytest returns the failure identical to 85.7 s, and the very next action
+is `edit_file`, not `update_plan`. The redirect fired. What it edited was a
+**reversal of its own correct edit from 44.6 s**. Then an identical re-send at
+153.4 s (no-op), then the repeat guard killed it. Redirected off bookkeeping,
+it thrashes instead.
+
+The specific failure is legible in that same trajectory. The note said *"read
+the failing test itself first — open it and the function it exercises."* The
+model answered with `read_file` on **`textkit.py`, the source it had been
+editing** — never once on the test, in any iteration. Told to do something it
+had no identifier for, it substituted the nearest thing it already knew how to
+do. That is build 102.
+
+### 5.24d Two defects in build 101, both found by grading it (build 102) ✅
+
+**1. The annotation is invisible to the archive.** `result` events are written
+per call at `loop.py:1264`, *before* `_run_calls` appends the note — so the
+sweep recorded **0 annotations while 28 fired**, and exposure could only be
+established by inference plus the `update_plan` discontinuity. A lever you
+cannot see is a lever you cannot grade (methodology 2). Now emits
+`{"phase": "nudge", "reason": "same failure (N runs in a row)"}`, which
+`armstats` already tallies and the REPL already renders — so it also surfaces
+the stall to the user, which is the symptom they reported in the first place.
+
+**2. The note named an action the model had no identifier for.** Measured
+whether it can be named at all, over the b99 + b101 repeat events: `FAILED
+path::test` survives in **33 of 106** (the short summary is usually truncated
+out of the result), but pytest's FAILURES banner — `____ test_name ____` —
+covers **106 of 106**. Between the two the test is *always* nameable. So the
+note now says which test, and says explicitly *"the TEST, not the source file
+you have been editing"*, which is the exact substitution the trajectory caught.
+Two names shown, the rest counted, so a 12-failure run doesn't paste a list.
+
+9 tests, 1091 total.
+
 ### 5.25 Route-order audit of the remaining multi-option messages (5.20b applied)
 
 `_not_found_help` is ordered exactly backwards against the 5.22a measurements:
@@ -2694,11 +2762,36 @@ exact will never match. The 100% route is both last and conditional; the 2%
 route leads.
 
 Correct order: `replace_lines` with the line numbers filled in (we already print
-them) → re-read then edit → copy-exactly last. Draft at
-`$CLAUDE_JOB_DIR/tmp/b99_draft.py`, still valid, renumber to build 101.
+them) → re-read then edit → copy-exactly last.
 
-**Ranked below build 100 on exposure**: 87 events archive-wide, and only 2 in
-the latest sweep — the candidate arm rarely reaches not-found any more.
+**Draft: `$CLAUDE_JOB_DIR/tmp/b102_draft.py`. The older `b99_draft.py` is
+SUPERSEDED and must not be applied** — it was written before 5.20b and *appends*
+the two good routes to the end of the message, leaving "Copy the target text
+EXACTLY" as the lead. Appending is precisely the mistake 5.20b names.
+
+**This one cannot be A/B'd, and that is the finding.** Not-found exposure has
+collapsed as b96 and b98 moved the traffic elsewhere:
+
+| sweep | not-found events | runs hit |
+|---|---:|---:|
+| b97-ambig | 7 (base only) | 7/8 base, 0/8 cand |
+| b98-routeorder | **0** | 0/16 |
+| b99-routeorder | **2** (cand only) | 1/16 |
+
+A fresh sweep would land in the same "exposure 0 → UNPROVEN" trap as builds 93
+and 95. Ship it on mechanism plus a replay of the 87 archived events (the
+message is deterministic given text/`old`/`new`, so the route ORDER can be
+checked directly), and record it as **unproven-by-sweep** rather than reading an
+arm difference. That measures what changed; it cannot measure what the model
+then does, which is what a sweep is for — so the honest ceiling here is "the
+message is now ordered correctly", not "this helps".
+
+**The census that displaced it.** Error results by kind, b99-routeorder cand:
+failing test runs **57** (36 of them repeats → build 101), ambiguous **11**,
+syntax-guard **8**, no-op **6**, unread **3**, not-found **2**. The
+ambiguous-match message is now the largest remaining message target — but b97
+rewrote it and its endings went to 0/8 VERIFIED, so read that trajectory before
+touching it again.
 
 ### 5.26 No A/A calibration has been able to FINISH since the floor was added (build 100) ✅
 
