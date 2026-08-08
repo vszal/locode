@@ -2874,6 +2874,56 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.33 Build 108 converts — the first sweep to move a turn ENDING (2026-08-08)
+
+`b108-callnotword` (r14, base build 107). The level-1 same-failure note stopped
+asking for a sentence and started demanding the `read_file` call. Every channel
+moved the same way:
+
+| | base (14) | cand (14) |
+|---|---|---|
+| **prose-only after the level-1 note** | 12/21 = **57%** | **0/18 = 0%** |
+| **VERIFIED** (ended on a green test run) | **0/14** | **7/14** |
+| false-done | 5 | 1 |
+| DONE | 5 | 8 |
+| stopped | 9 | 6 |
+| nudges/run | 9.4 | **3.8** |
+| escalated same-failure/run | 1.2 | 0.4 |
+| mean iterations | 32.5 | 25.4 |
+| mean landed edits | 8.9 | 5.6 |
+| score | 0.304 | 0.696 (+0.393, W10/L0/T4, p=0.002) |
+
+Two of these are unprecedented. **VERIFIED has been 0 in every arm of every
+sweep in this stretch** — b107 was 0/14 against 0/14 — and it is the only
+metric that cannot be gamed by a model announcing success. And prose-only hit
+**0 of 18**, the floor that `unverified edits` has always sat at, rather than
+merely improving; the 5.32 A/A control put the noise band at ±20 points, so a
+57 → 0 move is not a reading of noise.
+
+**The mechanism is visible in the trajectory** (r1, candidate). Four edit /
+pytest cycles fail; the nudge fires; the very next call is `read_file
+test_textkit.py` — the test, not the source file it had been editing — followed
+by one edit, then `13 passed`. The base arm at the same point reads the test
+too, then spends 775 characters narrating, collects an `open plan tasks` nudge
+for having done nothing, and its next edit dies on an ambiguous `old`.
+
+**The secondary effect is the bigger one.** Nudges fell 9.4 → 3.8 per run.
+Converting the *first* same-failure note stops the run from reaching the states
+that generate the rest: escalated same-failure fell to a third, `open plan
+tasks` from 23 to 3, `unverified edits` from 26 to 6. Fewer iterations and
+fewer landed edits with more verified finishes is the shape of a model that
+stopped thrashing.
+
+**The score channel still says INCONCLUSIVE** and it is right to: no A/A has
+measured this setup at r14, and the one A/A on record (b106, r8) returned
++0.281 from identical code. `aa14-calib` is running now to fix that
+permanently. The verdict above does not rest on the score — it rests on
+VERIFIED, on the prose-only rate against its own base arm, and on a read run.
+
+**Methodology 22: fix the first steer in a cascade, not the loudest one.** The
+loudest nudges in the b107 census were symptoms of a run that had already gone
+wrong two nudges earlier.
+
 ### 5.32 The nudge asked for a sentence and got a sentence (2026-08-08)
 
 `b107-indent`'s real finding is not about indentation. Censusing **what the
@@ -2931,6 +2981,18 @@ events per arm the prose-only rate carries a **±20-point noise band**, so
 build 108 has to land under roughly **40%** to be distinguishable from its own
 base arm — and the base arm in *its own sweep* is the only fair comparator,
 not b107's pooled 66%.
+
+**The histogram lied about this for months.** `evals/harness.py:_nudge_bucket`
+fell through to `"malformed"` for any reason not in a keyword list written
+before most of these nudges existed, so `b108-callnotword`'s summary reported
+**125 malformed tool calls in a sweep with zero of them** — really 77
+same-failure, 32 unverified-edits, 7 never-seen-green, 5 repeated-edit, 3
+context-compacted, 1 edit-changed-nothing. Fixed in build 109, with a test that
+scrapes every literal nudge reason out of `loop.py` and fails if any of them
+buckets as malformed. Checked: no conclusion in this file was drawn from that
+histogram — every other "malformed" here is the parser's or the syntax guard's,
+not the sweep summary's — so nothing above needs revising. It was one bad
+number away from mattering.
 
 **Methodology 21: split any per-event rate by arm on a sweep where the arms
 were identical, and read the spread as the noise floor.** The archive hands
