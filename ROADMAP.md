@@ -2994,6 +2994,82 @@ identical to `old`"*, 10 events. Across the whole sweep it runs 0.71/run in
 both arms, and `old` appearing more than once runs another 0.64–1.14/run. This
 becomes 5.34.
 
+### 5.36 Build 110 lands nothing, and VERIFIED turns out not to be a level (2026-08-08)
+
+`b110-alreadydone`, r14, base build 109. **NO DETECTABLE EFFECT.**
+
+| | base (109) | cand (110) |
+|---|---|---|
+| score | 0.821 | 0.821 (+0.000, W3/L3/T8, p=1.0) |
+| VERIFIED | 9/14 | 9/14 |
+| DONE | 9/14 | 9/14 |
+| stopped | 5 | 5 |
+| mean iterations | 25.6 | 24.1 |
+| mean landed edits | 5.1 | 5.1 |
+
+The mechanism moved in the intended direction — the `old == new` result routed
+to `replace_lines` 2 times in 10 in the base arm and **0 times in 4** in the
+candidate — but 4 events is not a measurement, and nothing downstream of it
+moved at all.
+
+**Why it did nothing is legible, and it is my error, not the model's.** All
+four candidate responses called `update_plan`. Not one re-ran the tests, which
+is what the new message asks for. Set it against build 108, which converted 63
+for 63:
+
+> **build 108:** Call read_file on \`test_x.py\` **now** … Do not answer this
+> with an explanation: the next thing you send must be that read_file call.
+
+> **build 110:** This edit is ALREADY DONE … Nothing to change … Do NOT resend
+> it, do NOT revert it, and do NOT switch to line-number edits to force it in.
+> If something is still failing, the cause is on a DIFFERENT line: **run the
+> tests again** …
+
+Build 110 names no tool, puts its action seventh, spends three clauses on
+prohibitions, and hedges it behind "if something is still failing". I wrote
+5.32's recipe, then wrote a message that breaks every clause of it. "Run the
+tests again" is not a call the model can emit; `bash` with the command in it
+is. This is build 102's lesson again — told to do something it has no
+identifier for, the model substitutes the nearest thing it does know how to do,
+and `update_plan` is the cheapest such thing in the toolset.
+
+So build 110 **stays** (its diagnosis is now true 90% of the time where the old
+one was false, and it removes a route that provably led to churn), but it is
+**not fixed**, and it joins 5.35's queue rather than closing.
+
+**Defect found while reading it: a no-op edit is credited as a landed edit.**
+`loop.py:1294` reads `if call.name in _MUTATING_EDIT_TOOLS and not res.is_error`
+and then sets `self._landed_edit = True`, whose own comment says "the workspace
+really did change". Build 110's already-done branch returns a NON-error
+`no_change` — as the two "already applied" branches beside it have since build
+55 — so the workspace demonstrably did not change and the loop is told it did.
+`_landed_edit` gates the done-on-repeated-verify exit and the unverified-edit
+accounting. Four events here, so it changed nothing measurable, but it is
+wrong. One condition: also require `not res.no_change`.
+
+**Methodology 26 — VERIFIED is a within-sweep DIFFERENCE, never a level.** Six
+r14 arms on the same case, model, and sample size:
+
+| build | 107 | 108 | 109 | 109 | 109 | 110 |
+|---|---|---|---|---|---|---|
+| VERIFIED /14 | 0 | 7 | 3 | 4 | **9** | **9** |
+
+Build 109 produced **3, 4 and 9**. Identical code, a 21% → 64% swing. But
+inside each sweep the arms track each other closely (3 vs 4; 9 vs 9), so the
+drift is **between** sweeps, not between runs — some per-sweep condition moves
+the whole level, and pairing is what cancels it. Consequences:
+
+- Every "VERIFIED went from X to Y" claim is only meaningful within one sweep.
+  Never compare an arm to an arm from a different sweep, which is exactly what
+  the b108 write-up did when it read aa14's 3-and-4 as a noise band of one.
+- The b108 verdict **survives**, but on the non-overlap rather than the size:
+  pre-108 arms verified 0, 0, 0; post-108 arms verified 7, 3, 4, 9, 9. Three
+  lowest of eight all landing in one group is p≈0.018. The size claim ("about
+  a third of runs") is withdrawn — it is unmeasurable at this sample size.
+- The A/A's real lesson was not "+0.143 is the floor". It was that **one A/A is
+  one sample of a drifting quantity**, and I read it as a fixed constant within
+  hours of measuring it.
+
 ### 5.35 The escalated nudges are the level-1 note before build 108 (2026-08-08)
 
 Queued behind `b110-alreadydone`. The two worst-converting steers left in the
