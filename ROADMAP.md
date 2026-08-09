@@ -3093,10 +3093,27 @@ message is the only edit error in the sweep whose follow-up action does not
 resolve it, and it is the only one whose leading diagnosis is usually false.
 
 Exposure 0.71/run in the current base arm (methodology 20 satisfied), so a
-14-run sweep sees ~10 events per arm. Grade on: the share of these events
-followed by a `replace_lines` re-apply of the same text (40% today), and on
-`stopped (edits kept hitting the same error)` — 3 of 14 candidate runs in
-b108.
+14-run sweep sees ~10 events per arm.
+
+**Grading metric, corrected before the sweep landed.** The plan said "the share
+followed by a `replace_lines` re-apply **of the same text**". Built as written
+— next call's `new` byte-identical to the one that just failed — it fires
+**once in b108's 20 events**, because the re-apply is normally a *variant* of
+the same text, not a byte copy. That metric would have read ~0 in both arms and
+graded nothing (methodology 12). The share that simply **routes to
+`replace_lines`** is what reproduces: 5/10 base, 3/10 cand, 8/20 = 40% overall,
+matching the census 5.34 was written from. That is the headline — build 110
+deletes the `replace_lines` suffix from the already-done branch, so it should
+collapse there — with `stopped (edits kept hitting the same error)` (3 of 14
+b108 candidate runs) as the outcome channel. `$CLAUDE_JOB_DIR/tmp/after110.py`
+prints both, and keeps the byte-identical count only as a labelled secondary.
+
+**Methodology 25: build the grader against the OLD sweep before the new one
+lands.** Run it on the archive the hypothesis came from and check it reproduces
+the number in the write-up. Two of the last three metrics I specified in
+advance did not survive that check — this one, and `_nudge_bucket`'s malformed
+histogram (5.32) — and both would have been discovered only after burning
+2.3 h of GPU, when the arms disagree by nothing and the reason is the ruler.
 
 **Shipped as build 110** (`17c194f`), one departure from the design above: the
 present-branch is returned as a **non-error** `no_change`, not a softened
