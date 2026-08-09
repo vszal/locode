@@ -2874,6 +2874,67 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.45 b115: the lever never fired, so the sweep graded the instrument instead (2026-08-09)
+
+`b115-stallcap` (r14, base `02fbfc2` = build 114). The verdict has three parts
+and the third is worth more than the first two.
+
+**1. No regression.** Score 0.821 → 0.893 (+0.071, W3/L1/T10, UNDERPOWERED —
+4 informative pairs against the 6 the sign-flip test needs). VERIFIED 9/14 →
+11/14. Stopped 5 → 3. Mean iterations 26.5 → 24.0. Every number moves the right
+way and not one of them is attributable, for the reason below.
+
+**2. The lever fired zero times.** No cand run stopped with the new message.
+Three cand runs reached the escalated steer and ended 3, 4 and 6 iterations
+later — all inside the K=8 budget, so the cap was never due. Methodology 17: a
+lever that fires zero times is untested. It is not credited.
+
+Its counterfactual within the sweep is favourable, which is the most that can be
+said: applied offline to the 14 **base** runs, K=8 would have cut 4 of them —
+they ran 17, 18, 18 and 18 iterations past the steer — saving 39 iterations and
+cutting **zero** VERIFIED runs. The corpus modelling holds; the live channel is
+just silent.
+
+**3. Because it never fired, the arms ran identical code — this was an A/A.**
+Nothing else in build 115 changes behaviour: the new config field is inert, the
+arming assignments write two attributes nothing else reads, and `_test_ran_green`
+has no effect but clearing them. So b115 is a free A/A of the endings channel,
+and it is only the second one ever run:
+
+| A/A sweep | build | VERIFIED base vs cand | mean iters |
+|---|---|---|---|
+| `aa14-calib` | 109 | 3 vs 4 | 26.6 vs 31.4 |
+| `b115-stallcap` | 114 | 9 vs 11 | 26.5 vs 24.0 |
+
+**On identical code, VERIFIED swings by 1-2 runs in 14 and mean iterations by up
+to 4.8.** That is the noise floor of the instrument 5.27 promoted to PRIMARY. It
+means a 2-run VERIFIED difference at r14 is not evidence, and I have been
+reading arm gaps of that size as if they were. 5.40 got this right by accident
+(it declined to attribute a 9→6 VERIFIED gap because the build bundled a
+behaviour change); the reason to decline was better than the one given.
+
+**And the thing those two rows actually measure: build 109 → build 114.** Same
+case, same model, same repeat count, and `git diff 553cc5e..HEAD -- evals/`
+is empty, so the harness, the case and the grader are byte-identical. Comparing
+A/A to A/A pools 28 runs of each against no candidate at all:
+
+| | VERIFIED |
+|---|---|
+| build 109 (`aa14-calib`, both arms) | 7/28 = **25%** |
+| build 114 (`b115-stallcap`, both arms) | 20/28 = **71%** |
+
+Fisher exact two-sided **p = 1.1e-3**. This is the first significant measurement
+of cumulative progress in the project, and it comes from the two sweeps that
+were testing nothing. Worth remembering next time a sweep looks wasted: the
+strongest number here was produced by the arms that were supposed to be boring.
+
+**Disposition: KEEP build 115.** It is a correct guard on the right signal, it
+costs nothing, its counterfactual on this sweep is 4 runs cut and 0 lost, and
+there is no evidence against it. But it stays UNTESTED until it fires, and it
+cannot be *seen* to fire: nothing in the event stream records the budget arming.
+That is methodology 2 all over again, so build 116 fixes the telemetry in the
+same change that gives the mechanism a trigger that fires often enough to grade.
+
 ### 5.44 The no-op re-send: 96% fatal, and it fires BEFORE the steer (2026-08-09, measured, not built)
 
 Queued as the lever after b115. Measured while that sweep runs, on the same
