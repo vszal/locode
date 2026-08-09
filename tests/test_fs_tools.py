@@ -18,43 +18,11 @@ async def test_read_file_line_numbered(ctx, tmp_path):
     assert "3\tthree" in res.content
 
 
-_WIDE = fs._WINDOW_OVERRIDE_LINES
-
-
 async def test_read_file_offset_limit(ctx, tmp_path):
-    # Build 113: a window is only honoured on a file too big to return whole.
-    big = _WIDE + 50
-    (tmp_path / "a.txt").write_text("\n".join(f"L{i}" for i in range(1, big)))
+    (tmp_path / "a.txt").write_text("\n".join(f"L{i}" for i in range(1, 11)))
     res = await fs.ReadFile().run({"path": "a.txt", "offset": 3, "limit": 2}, ctx)
     assert "L3" in res.content and "L4" in res.content
     assert "L5" not in res.content
-
-
-# --- build 113 / 5.41: a window on a SMALL file is overridden ---------------
-
-async def test_a_window_on_a_small_file_returns_the_whole_file(ctx, tmp_path):
-    # Weak models window compulsively and then edit text the window never
-    # showed them — 60 of 71 such edits across three sweeps. Below the
-    # threshold the whole file is cheaper than the mistake.
-    (tmp_path / "a.txt").write_text("\n".join(f"L{i}" for i in range(1, 84)))
-    res = await fs.ReadFile().run({"path": "a.txt", "offset": 47, "limit": 20}, ctx)
-    assert "L1" in res.content and "L83" in res.content
-    assert "ENTIRE file" in res.content and "83 lines" in res.content
-    # line numbers must still be the file's own, starting at 1
-    assert "     1\tL1" in res.content
-
-
-async def test_a_window_on_a_LARGE_file_is_still_honoured(ctx, tmp_path):
-    (tmp_path / "a.txt").write_text("\n".join(f"L{i}" for i in range(1, _WIDE + 50)))
-    res = await fs.ReadFile().run({"path": "a.txt", "offset": 10, "limit": 3}, ctx)
-    assert "L10" in res.content and "L13" not in res.content
-    assert "ENTIRE file" not in res.content
-
-
-async def test_an_unwindowed_read_of_a_small_file_says_nothing_extra(ctx, tmp_path):
-    (tmp_path / "a.txt").write_text("one\ntwo\n")
-    res = await fs.ReadFile().run({"path": "a.txt"}, ctx)
-    assert "ENTIRE file" not in res.content
 
 
 async def test_read_missing_file_errors(ctx):
@@ -975,12 +943,11 @@ async def test_read_file_unlocks_the_edit(gated, tmp_path):
 async def test_a_windowed_read_still_unlocks_the_edit(gated, tmp_path):
     # The gate is a floor against editing text the model never saw, not a
     # guarantee it saw the right part — a partial read counts.
-    (tmp_path / "a.py").write_text(
-        "\n".join(f"L{i}" for i in range(1, _WIDE + 50)))
+    (tmp_path / "a.py").write_text("\n".join(f"L{i}" for i in range(1, 50)))
     assert (await fs.ReadFile().run(
         {"path": "a.py", "offset": 1, "limit": 2}, gated)).ok
     res = await fs.EditFile().run(
-        {"path": "a.py", "old": "L444", "new": "L999"}, gated)
+        {"path": "a.py", "old": "L40", "new": "L99"}, gated)
     assert res.ok
 
 

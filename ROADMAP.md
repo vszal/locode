@@ -2874,6 +2874,57 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.42 Build 113 is a negative result, and it rested on a bad number (2026-08-09)
+
+`b113-wholefile` (r14, base build 112). Graded in the planned order.
+
+| | base (112) | cand (113) |
+|---|---|---|
+| `ENTIRE file` notes emitted (reach) | 0 | **21** |
+| score | 0.786 | 0.786 (+0.000, W4/L4/T6, p=1.0) |
+| VERIFIED | 8/14 | 8/14 |
+| median iterations | 25 | 25 |
+| runs hitting `ALREADY DONE` | 6/14 | 5/14 |
+| prose after the escalated pair | — | 0/13 |
+
+**The lever reached its target 21 times and moved nothing.** Not underpowered
+in the usual way either: the exposure channel that was supposed to shrink
+(`ALREADY DONE`, the fatal path) went 6 → 5, and every outcome tied.
+
+**And the premise was false.** Re-running 5.41's mechanism check with the edit
+required to touch the file that had just been read: of 75 windowed reads
+followed by an edit, **53 (71%) edited a different file** — read the test,
+patch the source, which is exactly right — 11 targeted text inside the window,
+and only **7** were genuine misses. "60 of 71" was counting normal two-file
+work as a failure. The one trajectory I read end to end was real and atypical,
+and reading it is what made the wrong aggregate look confirmed.
+
+**Build 114 reverts build 113.** No benefit measured, and the reason for
+believing there would be one does not survive checking. Keeping a neutral
+change whose justification has been withdrawn is how a codebase accretes
+complexity that nobody can later argue for.
+
+What survives 5.41: windowed reads still correlate with dying runs at the
+per-run level (median 0% verified vs 25% died). With the mechanism gone that
+reads as a **symptom** of a confused run, not a cause — and build 113 is the
+experiment that says so, because removing the windows changed nothing.
+
+**Methodology 30: a mechanism check must pin every dimension the claim names.**
+"The edit targeted text outside the window" is a claim about one file. The
+check allowed any file, so it counted the most ordinary thing the model does —
+reading a test and editing the source — as the pathology. Reading a single
+matching trajectory made it feel verified; one confirming example cannot test
+an aggregate, only illustrate one. When a census produces a number that looks
+decisive, re-derive it with the tightest possible predicate before spending a
+sweep on it.
+
+**Also: level 3 is not a literal zero.** `b113` base r8 is the first recovery
+after an escalated steer in this whole stretch — read the file, edit, test,
+edit again, 13 passed at 31 iterations. Nothing exotic; it simply got the
+second edit right. So the standing count is **1 of ~69**, not 0 of 58. That
+does not change 5.40's conclusion (level-3 compliance buys ~1.5%), but the
+claim should be stated as vanishingly rare rather than impossible.
+
 ### 5.41 The model narrows the read, then edits from the older view (2026-08-08)
 
 5.40 left the next lever as "structural, not verbal", with the `ALREADY DONE`
@@ -2913,9 +2964,17 @@ the model choosing to look at the wrong twenty lines.
 | runs using a window at least once | 7/40 | 23/44 |
 
 The per-run median is the number that matters — 5.39's cadence lever died
-because its pooled gap reversed at run level, and this one does not. And the
-mechanism check is direct: **after a windowed read, 60 of 71 following edits
-targeted text that was not in the window.** Only 11 were inside it.
+because its pooled gap reversed at run level, and this one does not.
+
+> **CORRECTION (5.42).** The mechanism sentence that stood here — "after a
+> windowed read, 60 of 71 following edits targeted text that was not in the
+> window" — was **wrong**, and it is what this build was built on. The check
+> did not require the edit to touch the file that had just been read. Redone
+> properly over the same 75 events: **53 (71%) edited a DIFFERENT file** —
+> reading the test and editing the source, which is correct behaviour and not
+> a window miss at all — 11 (15%) targeted text inside the window, and only
+> **7 (9%)** were genuine misses. The r10 trajectory below is real but
+> atypical. The correlation above survives; the mechanism did not.
 
 The requested windows are absurd on their face: the most common asks are
 `offset=8 limit=10` and `offset=8 limit=20`, against a file of 83 lines.
