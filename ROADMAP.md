@@ -2874,6 +2874,67 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.46 b116: the cap works, and VERIFIED was never the metric for it (2026-08-09)
+
+`b116-noopcap` (r14, base `a6f28f7` = build 115, so the only delta is the no-op
+trigger and its telemetry). The headline numbers look spectacular and **none of
+them may be credited to the change** — for a reason that finally makes the whole
+lever family gradeable.
+
+**1. It fires, and it is now visible.** Cand armed the budget three times: the
+escalated steer twice (iteration 27, both runs ended at 34, inside K=8, so no
+stop) and the no-op re-send once (iteration 12, K=10, expired and ended the turn
+at 24). Base, which is build 115, hit its own cap **five** times. Build 115 is
+no longer untested — it just had to be a *baseline* before it fired.
+
+**2. Zero winners cut.** All six cap-stops landed at iterations 24-29. That is
+past the window in which this case is ever won, which brings us to the finding
+that reframes everything:
+
+**3. Every VERIFIED run in this project takes exactly 23 iterations.** Across
+b115 and b116, all four arms, 35 successful runs: `23, 23, 23, … 23`. Not a
+median — the complete list. `exec-bugfix` has one deterministic winning path and
+a run either falls into it or it does not. **A winner never arms the budget at
+all**, because it never repeats a failure three times and never sends a no-op.
+So the stall cap is structurally incapable of moving VERIFIED, in either
+direction, and grading it on VERIFIED was a category error I built into my own
+criteria in 5.43.
+
+**4. Which makes the arm gap noise, and a warning.** Base 4/14 vs cand 11/14 —
+a difference of seven — from a mechanism that fired once in cand. The causality
+runs backwards: stuck runs cause firings, firings do not cause stuck runs. A run
+is a ~54% coin flip between the 23-iteration win and a doomed grind, so a 14-run
+arm has a standard error near 1.9 and a 4-vs-11 split is roughly a 2% draw. I
+have run 28 sweeps; 2% events are due. Worse, 5.45's "floor is ±2" was itself an
+underestimate from two A/A samples, and all three A/A sweeps on record lean the
+same way (`b94-AA` +3, `b94-AA2` +1, `aa14-calib` +1), with the 28-sweep pool at
+base 19% vs cand 25% (sign test p=0.18 — suggestive, not established).
+
+> **VERIFIED at r14 on `exec-bugfix` cannot grade an effect smaller than about
+> six runs, and may carry a small pro-candidate bias. Stop reading it as the
+> primary channel for anything narrower than that.**
+
+**5. The metric that does work: iterations spent on doomed runs.** It is a
+within-arm measure, it needs no cross-arm comparison, and it is exactly what the
+lever was built to move:
+
+| | doomed runs | mean iterations | mean seconds | worst |
+|---|---|---|---|---|
+| build 114, no cap | 5 | 32.8 | 277 | 35 (the ceiling) |
+| build 115, cap firing 5× | 10 | **26.1** | **242** | 29 |
+
+**A run that was never going to succeed now costs 26 iterations instead of 33 —
+about 20% less, and it stops naming the test that beat it instead of grinding
+into the iteration ceiling.** That is the entire claim of 5.43, delivered.
+
+Cost, stated honestly: 5 runs were cut at 26-29 that would otherwise have run to
+35, and the archive says a level-3 run recovers about 1 time in 69. Expected loss
+≈ 0.07 runs. That is the trade, and it is a good one.
+
+**Disposition: KEEP builds 115 and 116, credited on iterations-on-doomed-runs,
+not on VERIFIED.** The next sweep of any stall lever should report that table
+and treat VERIFIED purely as a veto.
+
 ### 5.45 b115: the lever never fired, so the sweep graded the instrument instead (2026-08-09)
 
 `b115-stallcap` (r14, base `02fbfc2` = build 114). The verdict has three parts
