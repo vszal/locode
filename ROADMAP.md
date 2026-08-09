@@ -2874,6 +2874,64 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.44 The no-op re-send: 96% fatal, and it fires BEFORE the steer (2026-08-09, measured, not built)
+
+Queued as the lever after b115. Measured while that sweep runs, on the same
+five-sweep corpus (140 runs), with the tight predicate 5.42 says to use first.
+
+**The standing claim survived this time.** 5.34 read 20 events and said the
+`old == new` edit is not a malformed edit but a *redundant* one — the model
+re-sending a change it had already applied. Against all 51 events in the
+corpus, with the predicate demanding the same file AND a byte-identical match
+to the `new` of an edit that actually landed earlier in the same run:
+
+| what the `old == new` text actually is | events |
+|---|---|
+| the `new` of the run's OWN earlier landed edit, byte-identical | **48 (94%)** |
+| text it had read but never written | 3 (6%) |
+| a malformed "drafted the replacement into both fields" edit | **0** |
+
+Median gap between the landing edit and the no-op re-send: 4 calls. Worth
+stating explicitly because it was the alternative hypothesis and it is dead:
+the equality test in `fs.py` is a strict `old == new` on the raw arguments, and
+the archived arguments are byte-identical in all 51 cases. **No normalisation
+bug, no parser bug — the model really does send the same string twice.**
+
+The shape of it, from `b113 r10` (calls 10-16): edit lands → `bash`, test fails
+→ **no-op re-send** → `bash`, same failure → `read_file` on the test → **the
+same no-op again**. Note what that trajectory also shows: the build-111 message
+converts. It asks for `bash` and gets `bash` on the very next call. Then the
+model re-sends the no-op anyway, three calls later. Another instance of
+methodology 31 — the wording is not the problem and a fourth revision of it
+will not be either.
+
+**Why it is the better trigger.** Two numbers make this the sharpest marker in
+the archive:
+
+| population | runs | VERIFIED |
+|---|---|---|
+| whole corpus | 140 | 63 (45%) |
+| runs with at least one no-op re-send | 25 | **1 (4%)** |
+
+and it is *early*: 22 of those 25 runs go on to reach the escalated steer, with
+the no-op arriving first in 18 of 22, by a median of 4 iterations. Three more
+runs emit a no-op and never reach the steer at all, so build 115's budget never
+sees them.
+
+So the lever is not a new mechanism, it is a second trigger on the one built in
+5.43: **a byte-identical no-op re-send arms the escalated-stall budget.** Fires
+~4 iterations earlier than the current trigger on the runs both catch, and
+covers 3 the current trigger misses. Deliberately arms the budget rather than
+stopping outright — 96% precision is not 100%, and the one survivor deserves
+its 8 iterations. Check before building: whether that survivor finished within
+8 iterations of its own no-op. If it did not, the trigger needs a longer budget
+than the steer's, not the same one.
+
+**Not built yet, on purpose.** b115 is in flight and methodology 28 says one
+change per sweep. It also has to wait for b115's verdict on principle: if the
+budget mechanism itself regresses, adding a second, earlier trigger to it makes
+things worse, not better.
+
 ### 5.43 Build 115: the signal that tracks stuck-ness has no stop on it (2026-08-09)
 
 Every lever from 5.32 through 5.42 tried to make the escalated steer *work*.
