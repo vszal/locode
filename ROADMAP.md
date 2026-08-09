@@ -2874,6 +2874,67 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.37 Prose is a function of DEPTH — except where the recipe is (2026-08-08)
+
+Built the build-111 grader against the old sweeps first (methodology 25) and
+it reproduced 5.35's table to the event. Then it turned up something the table
+could not show, and it changes how every nudge-level metric in this project
+must be read.
+
+**Finding 1 — the events are not independent; they cluster by run.** Almost
+every run is `0/2` or `2/2` on the escalated pair. Per arm in `aa14-calib`:
+base `2/2 2/2 2/2 1/2 0/2 0/2 0/2 2/2 2/2 0/2 0/2`, cand `0/1 2/2 2/2 2/2 2/2
+2/2 2/2 2/2 2/2`. So "n=22 events" is really n=11 runs, and every p-value I
+have quoted on a per-nudge rate is inflated. A model that starts narrating
+narrates at every subsequent steer in that turn — one draw, not two.
+
+**Finding 2 — the arms differ systematically on identical code.** `aa14-calib`
+is an A/A (both arms build 109) and the escalated pair splits 50% base vs 94%
+cand; `b110-alreadydone`, which changed nothing about these steers, splits 0%
+base vs 80% cand. Same direction, both times. Taken at face value that would
+mean the metric is unusable.
+
+**Finding 3 — it is depth, and depth alone.** Pooling every escalated-steer
+event across the post-108 arms and bucketing by the iteration it fired on:
+
+| iteration when the steer fired | prose |
+|---|---|
+| 9–16 | 1/26 = 4% |
+| 17–24 | 9/28 = 32% |
+| 25+ | 36/45 = 80% |
+
+Median firing iteration: base 20, cand 31. The arm asymmetry is entirely a
+population difference in *when* level 3 is reached — methodology 24 again, one
+level down.
+
+**Finding 4 — and the recipe is immune to it.** Cross-tabulating the same
+events by steer SHAPE (the level-1 note carries the 5.32 recipe from build 108
+on; the escalated pair never did) against depth:
+
+| depth | has the 5.32 recipe | no recipe |
+|---|---|---|
+| 1–8 | 0/11 = 0% | 0/4 = 0% |
+| 9–16 | 0/17 = 0% | 3/28 = 11% |
+| 17–24 | 0/25 = 0% | 19/40 = 48% |
+| 25+ | 0/23 = 0% | 36/48 = 75% |
+
+**0 prose in 76, at every depth.** Depth predicts narration only for steers
+that do not name a call, put it first, and forbid the explanation. That is the
+cleanest evidence yet that 5.32 is a real mechanism and not a lucky sweep, and
+it says the escalated steers — which fire at median iteration 31, the worst
+bucket — are exactly where build 111 should pay the most.
+
+**How this changes the b111 grading.** Do NOT read a cand-vs-base prose
+difference directly: if build 111 shortens runs, depth alone moves it. Read
+against the *level*, which the table above makes a sharp prediction about —
+the recipe is 0% everywhere, so a cand rate meaningfully above zero means the
+reshape failed to transfer, and a base rate near 50–75% is just build 110
+behaving as measured. Cluster by run when quoting any n.
+
+**Methodology 27: a per-nudge rate is a per-RUN draw, and it decays with
+depth. Cluster the events by run before quoting n, and check the two arms'
+firing depths before crediting the difference to the change.**
+
 ### 5.33 Build 108 converts — the first sweep to move a turn ENDING (2026-08-08)
 
 `b108-callnotword` (r14, base build 107). The level-1 same-failure note stopped
