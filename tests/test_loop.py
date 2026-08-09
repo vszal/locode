@@ -3357,6 +3357,112 @@ async def test_the_level_one_note_alone_does_not_arm_the_budget(tmp_path):
     assert "⏹ stopped" not in out
 
 
+def _noop_loop(tmp_path, extra_calls, noop_k=2, esc_k=8):
+    # A no-op re-send needs `old` to be present in the file, which is what makes
+    # it the REDUNDANT case rather than the malformed one (5.34/5.44).
+    (tmp_path / "a.py").write_text("value = 42\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    cfg.agent.noop_resend_stall_budget = noop_k
+    cfg.agent.escalated_stall_budget = esc_k
+    cfg.agent.max_repeat_calls = 99
+    cfg.agent.max_nochange_edits = 99
+    cfg.agent.max_consecutive_errors = 99
+    scripted = [native_call("read_file", path="./a.py"),
+                native_call("edit_file", path="./a.py", old="value = 42",
+                            new="value = 42")] + extra_calls
+    loop = make_loop(tmp_path, scripted + [{"role": "assistant",
+                                            "content": "done"}], cfg=cfg)
+    events = []
+    loop._on_event = events.append
+    return loop, events
+
+
+def _armed(events):
+    return [e for e in events
+            if e.get("phase") == "stall_budget" and e.get("event") == "armed"]
+
+
+async def test_a_byte_identical_edit_arms_the_stall_budget(tmp_path):
+    # ROADMAP 5.44. 4% of the runs that emit one of these ever verify, against a
+    # 45% base rate, and 48 of 51 in the archive are the model re-sending the
+    # `new` of an edit it landed itself. Detected structurally — the two fields
+    # are equal or they are not — not by matching the tool's message.
+    loop, events = _noop_loop(tmp_path, [], noop_k=8)
+    await loop.run_turn("fix a.py")
+    a = _armed(events)
+    assert len(a) == 1
+    assert a[0]["trigger"] == "noop-resend" and a[0]["k"] == 8
+
+
+async def test_the_noop_trigger_ends_the_turn_when_its_budget_runs_out(tmp_path):
+    loop, events = _noop_loop(
+        tmp_path, [native_call("read_file", path="./a.py")] * 6, noop_k=2)
+    out = await loop.run_turn("fix a.py")
+    assert "Stopping rather than grinding" in out
+    # armed on the edit (iteration 1), so iteration 4 is the first past K=2
+    assert _armed(events)[0]["iter"] == 1
+
+
+async def test_a_real_edit_does_not_arm_the_budget(tmp_path):
+    # Blast radius: only the byte-identical case is the death marker. An edit
+    # that changes something is the normal path.
+    (tmp_path / "a.py").write_text("value = 42\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("read_file", path="./a.py"),
+         native_call("edit_file", path="./a.py", old="value = 42",
+                     new="value = 43"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("fix a.py")
+    assert _armed(events) == []
+
+
+async def test_the_first_trigger_wins_and_keeps_its_own_budget(tmp_path):
+    # The two triggers fire at different depths (the no-op leads by ~4
+    # iterations), so re-arming on the later one would extend a clock that was
+    # already counting down.
+    loop = make_loop(tmp_path, [{"role": "assistant", "content": "hi"}])
+    await loop.run_turn("nothing")          # turn-scoped state gets set here
+    loop._iter = 3
+    loop._arm_stall_budget("noop-resend", 10, "test_a")
+    loop._arm_stall_budget("escalated-steer", 8, "test_b")
+    assert loop._esc_stall_by == "noop-resend"
+    assert loop._esc_stall_k == 10 and loop._esc_stall_at == 3
+
+
+async def test_a_zero_budget_disables_one_trigger_not_the_other(tmp_path):
+    loop = make_loop(tmp_path, [{"role": "assistant", "content": "hi"}])
+    await loop.run_turn("nothing")
+    loop._arm_stall_budget("noop-resend", 0, None)
+    assert loop._esc_stall_at is None
+    loop._arm_stall_budget("escalated-steer", 8, "test_a")
+    assert loop._esc_stall_by == "escalated-steer"
+
+
+async def test_going_green_emits_the_disarm(tmp_path):
+    # Build 115 could not be graded because nothing distinguished "never armed"
+    # from "armed and never expired". Both transitions are on the wire now.
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red")] * 3
+        + [native_call("run_tests", which="green"),
+           {"role": "assistant", "content": "ok"}],
+        {"red": RED, "green": "....\n4 passed in 0.1s\n"})
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("fix it")
+    assert _armed(events) and _armed(events)[0]["trigger"] == "escalated-steer"
+    dis = [e for e in events if e.get("phase") == "stall_budget"
+           and e.get("event") == "disarmed"]
+    assert dis and dis[0]["trigger"] == "escalated-steer"
+
+
 def test_a_green_test_run_is_told_apart_from_output_that_is_not_a_test():
     assert loop_mod._test_ran_green("....\n4 passed in 0.1s\n") is True
     assert loop_mod._test_ran_green(RED) is False

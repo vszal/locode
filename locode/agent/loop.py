@@ -261,6 +261,8 @@ class AgentLoop:
         # cut off. Turn-scoped, like the counter it keys off. ROADMAP 5.43.
         self._esc_stall_at = None
         self._esc_stall_test = None
+        self._esc_stall_by = None
+        self._esc_stall_k = 0
         self._iter = 0
         # [same-failure] Basename of the file the last landed edit touched. The
         # escalated steers need to NAME a source file, and neither can reach
@@ -394,16 +396,16 @@ class AgentLoop:
                 # [escalated-stall] Checked here, at the top of the iteration
                 # the budget would be spent on, so the count in the message is
                 # the number of iterations that actually went by after the
-                # steer. See AgentConfig.escalated_stall_budget for the numbers.
-                budget = self._cfg.agent.escalated_stall_budget
-                if (budget > 0 and self._esc_stall_at is not None
-                        and i - self._esc_stall_at > budget):
+                # trigger. See AgentConfig.escalated_stall_budget for the
+                # numbers; the budget itself is whatever armed it.
+                if (self._esc_stall_at is not None
+                        and i - self._esc_stall_at > self._esc_stall_k):
                     which = (f"`{self._esc_stall_test}` still fails"
                              if self._esc_stall_test else "the same test fails")
                     return self._stop(
-                        f"{which} — {budget} iterations since the repeat was "
-                        "flagged changed nothing. Stopping rather than "
-                        "grinding; the fix needs a different idea")
+                        f"{which} — {self._esc_stall_k} iterations since the "
+                        "repeat was flagged changed nothing. Stopping rather "
+                        "than grinding; the fix needs a different idea")
                 # A stuck loop (or just a long session — history only shrinks via
                 # an explicit reset) can grow the prompt past what the local
                 # server can safely allocate; unlike the other budgets this isn't
@@ -1356,6 +1358,23 @@ class AgentLoop:
                 if isinstance(edited, str) and edited.strip():
                     self._last_edit_file = os.path.basename(edited.rstrip("/"))
             if getattr(res, "no_change", False):
+                # [escalated-stall] Build 116's second, EARLIER trigger. A
+                # byte-identical `old`/`new` edit is the sharpest death marker
+                # in the archive: 4% of the runs that emit one ever verify,
+                # against a 45% base rate, and 48 of the 51 in the corpus are
+                # the model re-sending the `new` of an edit it landed itself a
+                # median of 4 calls earlier. Structural, not a message match —
+                # the two fields are equal or they are not. Bigger K than the
+                # steer's because it fires ~4 iterations sooner and the lone
+                # survivor recovered at +9. ROADMAP 5.44.
+                if (call.name in _MUTATING_EDIT_TOOLS
+                        and (call.args or {}).get("old") is not None
+                        and (call.args or {}).get("old")
+                        == (call.args or {}).get("new")):
+                    self._arm_stall_budget(
+                        "noop-resend",
+                        self._cfg.agent.noop_resend_stall_budget,
+                        self._last_edit_file)
                 # Remembered (not just counted) so the loop can lift this call
                 # back out of history — see redact_noop_calls.
                 self._noop_calls.append(call)
@@ -1389,8 +1408,12 @@ class AgentLoop:
                 # no longer stuck, and whatever it does next (a second test
                 # file, a cleanup edit) deserves the normal guards, not a clock
                 # started by a failure it has since fixed.
-                if _test_ran_green(content):
-                    self._esc_stall_at = self._esc_stall_test = None
+                if _test_ran_green(content) and self._esc_stall_at is not None:
+                    self._on_event({"phase": "stall_budget", "event": "disarmed",
+                                    "trigger": self._esc_stall_by,
+                                    "iter": self._iter})
+                    self._esc_stall_at = None
+                    self._esc_stall_test = self._esc_stall_by = None
                 continue
             if fid == self._last_test_id:
                 self._same_failure_run += 1
@@ -1401,9 +1424,11 @@ class AgentLoop:
                 # same condition _same_failure_note switches wording on — and
                 # only the first time, so the clock measures from the steer
                 # rather than restarting with every later repeat.
-                if self._same_failure_run > 1 and self._esc_stall_at is None:
-                    self._esc_stall_at = self._iter
-                    self._esc_stall_test = names[0] if names else None
+                if self._same_failure_run > 1:
+                    self._arm_stall_budget(
+                        "escalated-steer",
+                        self._cfg.agent.escalated_stall_budget,
+                        names[0] if names else None)
                 # Emitted because the annotation is otherwise INVISIBLE to the
                 # archive: the `result` event above is written per call, before
                 # this loop runs, so b101's sweep recorded zero annotations
@@ -1834,6 +1859,29 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "slow progress vs wallclock"})
+
+    def _arm_stall_budget(self, trigger: str, k: int, test: str | None) -> None:
+        """Start the stall clock, if it is not already running.
+
+        FIRST arm wins, and keeps its own K. The two triggers do not fire at the
+        same depth — the no-op re-send leads the escalated steer by a median of
+        4 iterations — so re-arming on the later one would silently extend a
+        budget that was already counting down, which is the opposite of the
+        point. `budget <= 0` disables that trigger without disabling the other.
+
+        Emitted as an event because build 115 could not be graded: it fired zero
+        times in 14 runs and nothing in the archive could distinguish "never
+        armed" from "armed and never expired". Methodology 2. ROADMAP 5.45.
+        """
+        if k <= 0 or self._esc_stall_at is not None:
+            return
+        self._esc_stall_at = self._iter
+        self._esc_stall_k = k
+        self._esc_stall_by = trigger
+        self._esc_stall_test = test
+        self._on_event({"phase": "stall_budget", "event": "armed",
+                        "trigger": trigger, "k": k, "iter": self._iter,
+                        "test": test})
 
     def _stop(self, why: str) -> str:
         self._on_event({"phase": "stopped", "reason": why})

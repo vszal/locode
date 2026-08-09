@@ -187,6 +187,18 @@ class AgentConfig:
     # 46% of the waste. A quarter of these runs burn 18-30 further iterations
     # at a 0% success rate. ROADMAP 5.43.
     escalated_stall_budget: int = 8
+    # Build 116. The same budget, armed by an EARLIER trigger: an `edit_file`
+    # whose `old` and `new` are byte-identical. Sharpest death marker in the
+    # archive — 4% of the runs that emit one ever verify against a 45% base
+    # rate — and it leads the escalated steer by a median of 4 iterations in the
+    # runs that hit both, with some runs never reaching the steer at all.
+    #
+    # Larger than the steer's budget on purpose. It fires sooner, so an equal K
+    # would be a strictly tighter cut; and the one run in 140 that ever came
+    # back from either signal went green 9 iterations after its own no-op. Both
+    # numbers rest on that single run — recalibrate up from evidence, never
+    # down. 0 disables this trigger without disabling the other. ROADMAP 5.44.
+    noop_resend_stall_budget: int = 10
     max_consecutive_errors: int = 4  # nudge/bail when nothing at all succeeds
     # Consecutive batches where everything SUCCEEDED and returned nothing. Lower
     # than max_consecutive_errors: an empty answer repeats perfectly (the query

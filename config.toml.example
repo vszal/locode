@@ -102,6 +102,11 @@ max_nochange_edits = 2          # redirect/bail if edits keep changing nothing
 # Across the last five sweeps, runs past that point spent 19% of all iterations
 # to produce one verified finish in 69. 0 disables the cap.
 escalated_stall_budget = 8
+# The same budget, armed earlier: by an edit_file whose `old` and `new` are
+# byte-identical. 4% of the runs that emit one ever verify (45% base rate), and
+# it leads the steer by ~4 iterations. Larger K because it fires sooner. 0
+# disables this trigger without disabling the one above.
+noop_resend_stall_budget = 10
 # Consecutive batches in which EVERY call errored. Content-independent, unlike
 # max_error_stall above: a model guessing at filenames gets a different "no such
 # file" each time, so neither the same-error stall nor the repeat guard sees it
