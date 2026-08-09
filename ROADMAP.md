@@ -2874,6 +2874,67 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.51 The read guard is load-bearing — and not for the reason it was built (2026-08-09)
+
+`b119-readguard`, the probe pre-registered in 5.49. Base = guard on, candidate =
+`require_read_before_edit = False`, one behavioural line, r14.
+
+| | VERIFIED | mean iters | mean landed edits |
+|---|---|---|---|
+| base (guard **on**) | **7 / 14** | 23.6 | 5.1 |
+| cand (guard **off**) | **0 / 14** | 33.3 | 8.4 |
+
+Fisher **p = 0.0058**; every candidate run stopped. Conditioned on the edit-first
+opening — the tightest comparison available, since it removes 5.48's branch —
+base goes **7/11** and candidate **0/9**, **p = 0.0047**. This is the largest
+effect ever measured in this project, and the first measured value of the guard
+build 93 shipped on an argument rather than a number.
+
+**The mechanism check refuted my own framing of it.** 5.49 predicted that with
+the guard off "its call-2 edit now lands, unaimed". It does not land. The
+attempted edit at call 2 is **byte-identical in both arms** (one payload hash,
+11 base / 9 cand) and **fails in both**. The guard was never preventing a good
+edit from applying, and the forced read is not what earns the 7 runs. The only
+thing that differs is *which rejection the model reads*:
+
+> **guard on:** You have NOT read `textkit.py` yet, so you cannot know the exact
+> text it contains. Call read_file on it FIRST, then copy `old` verbatim… Do not
+> reconstruct the code from a traceback, from the tests, or from memory.
+
+> **guard off:** `old` not found in `textkit.py` (84 lines). Easiest fix:
+> `replace_lines` with start=15, end=32 — it targets lines 15-32 by NUMBER, so
+> there is no `old` to reproduce.
+
+The second message recommends **blind line-number surgery to a model that has
+never seen the file**. It takes it: the candidate lands 8.4 edits per run to
+base's 5.1, runs 33.3 iterations to base's 23.6, and reaches its first no-op
+re-send at iteration 13 instead of 22. More edits, applied faster, all wrong.
+
+So the guard's real job is **triage of the first failure**. Both arms make the
+same mistake; one is told to go look at the file, the other is handed a
+power tool and pointed at coordinates it cannot check. That reframes 5.48: the
+third call correlates with the outcome because of what the *harness says* in
+response to it, which is a lever, unlike the model's choice of branch.
+
+**The obvious follow-up is closed before building it.** If the not-found message
+is harmful to a model working from an unverified view, make it read-aware —
+recommend `read_file` when the file is unread and `replace_lines` only when it
+is not. There is no population for that fix: across b110–b116 with the guard on,
+**115 of 115** not-found messages that recommended `replace_lines` went to a run
+that had already read the file. The guard intercepts that state completely, so
+the message is only ever dangerous in a configuration we do not ship. Do not
+build it (methodology 17: a lever that cannot fire is not a lever).
+
+**Disposition: `require_read_before_edit` stays ON, default unchanged, the probe
+flag reverted.** Honouring 5.49's caveat: the flag governs every edit in the
+run, not only the third call, so some of the collapse is downstream blind
+editing rather than the first message alone. The identical call-2 payload and
+the conditioned 7/11-vs-0/9 localize where the arms first diverge; they do not
+prove the first message carries the whole 7 runs, and I am not claiming it does.
+
+**Still unexplained:** read-first runs went 0/3 in base and 0/5 in candidate.
+Whatever kills them is not the guard — it is untouched by this probe.
+
 ### 5.50 Recalibrating both budgets found nothing to recalibrate from (2026-08-09)
 
 `escalated_stall_budget = 8` and `noop_resend_stall_budget = 10` were each fitted
