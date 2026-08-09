@@ -252,6 +252,14 @@ class AgentLoop:
         # across one would open with a stale accusation.
         self._last_test_id = None
         self._same_failure_run = 0
+        # [same-failure] Basename of the file the last landed edit touched. The
+        # escalated steers need to NAME a source file, and neither can reach
+        # `edit_tally`: that lives here in _run_turn while the annotation fires
+        # in _run_calls. Build 102 is why naming it matters at all — told to
+        # "read the failing test itself" with no identifier, the model read the
+        # module it had been editing instead, every time. Turn-scoped for the
+        # same reason as _last_test_id.
+        self._last_edit_file = None
         open_task_nudges = 0
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
@@ -1291,12 +1299,25 @@ class AgentLoop:
                 # "did this turn ever close the loop?"); the done-on-repeated-
                 # verify exit needs "is the code green RIGHT NOW?" instead.
                 self._last_verify_ok = not res.is_error
-            if call.name in _MUTATING_EDIT_TOOLS and not res.is_error:
+            if (call.name in _MUTATING_EDIT_TOOLS and not res.is_error
+                    and not getattr(res, "no_change", False)):
                 # An edit that actually landed. Distinct from edit_tally, which
                 # counts attempts including the not_found/no-op failures — this
                 # is the "the workspace really did change" evidence.
+                #
+                # `no_change` has to be excluded explicitly, not left to
+                # is_error: three edit_file branches answer an already-applied
+                # edit as a NON-error no_change (build 55's two, plus build
+                # 110's `old == new` case), precisely so the model reads "done"
+                # rather than reverting its own working fix. Those return
+                # is_error=False while the workspace demonstrably did not
+                # change, and this flag gates the done-on-repeated-verify exit
+                # and the unverified-edit accounting. ROADMAP 5.36.
                 self._landed_edit = True
                 self._landed_edits += 1
+                edited = (call.args or {}).get("path")
+                if isinstance(edited, str) and edited.strip():
+                    self._last_edit_file = os.path.basename(edited.rstrip("/"))
             if getattr(res, "no_change", False):
                 # Remembered (not just counted) so the loop can lift this call
                 # back out of history — see redact_noop_calls.
@@ -1331,7 +1352,8 @@ class AgentLoop:
             if fid == self._last_test_id:
                 self._same_failure_run += 1
                 results[i] = (name, content + _same_failure_note(
-                    self._same_failure_run, _failing_test_names(content)))
+                    self._same_failure_run, _failing_test_names(content),
+                    self._last_edit_file))
                 # Emitted because the annotation is otherwise INVISIBLE to the
                 # archive: the `result` event above is written per call, before
                 # this loop runs, so b101's sweep recorded zero annotations
@@ -1537,18 +1559,36 @@ class AgentLoop:
         self._on_event({"phase": "nudge", "reason": "edit changed nothing"})
 
     def _nudge_stall(self) -> None:
+        """Build 111: the worst-converting steer in the system, reshaped.
+
+        The previous wording asked for narration twice — "reason about WHY the
+        error happens", then "If you genuinely cannot fix it, say so in plain
+        text now" — and buried its tool name five sentences in. Methodology 19
+        says a steer that asks for narration is answered with narration, and
+        this one measures 17 prose replies in 26 across the post-108 arms. It
+        also named `write_file`, which took 11 calls before build 108 and
+        **zero** since; every post-108 response that acted called `read_file`.
+        So: the call first, named, an explicit ban on answering with prose, the
+        structural advice demoted to what to do *after* reading, and the escape
+        hatch kept — level 3 is where a genuinely stuck run should be allowed
+        to stop — but moved last and gated on having made the call, rather than
+        sitting where it reads as the easier of two options. ROADMAP 5.35."""
+        where = f"`{self._last_edit_file}`" if self._last_edit_file else \
+            "the file you have been editing"
         self.history.append({
             "role": "user",
             "content": ("Your last few edits have NOT changed the error — it is "
-                        "identical each time. That means the change you keep "
-                        "making is not the real fix: this is a STRUCTURAL problem "
-                        "(control flow, indentation/scope, or how the pieces fit "
-                        "together), not a small text substitution. Stop making the "
-                        "same kind of edit. Re-read the whole relevant function and "
-                        "reason about WHY the error happens, then rewrite the entire "
-                        "function in one shot with write_file instead of another "
-                        "small edit_file swap. If you genuinely cannot fix it, say "
-                        "so in plain text now."),
+                        "identical each time, so the line you keep editing is "
+                        "not the fault.\n"
+                        f"Call read_file on {where} now and read the whole "
+                        "function the error comes from. Do not answer this with "
+                        "an explanation: the next thing you send must be that "
+                        "read_file call.\n"
+                        "Then fix the STRUCTURE — control flow, "
+                        "indentation/scope, or how the pieces fit together — "
+                        "instead of substituting text again. If after reading it "
+                        "you still cannot see the fix, say so in plain text "
+                        "then, not before."),
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "error unchanged across edits"})
@@ -2051,7 +2091,8 @@ def _split_test_ids(names: list[str]) -> tuple[str, list[str]]:
     return files.pop(), [n.split("::", 1)[1] for n in names]
 
 
-def _same_failure_note(n: int, names: list[str] | None = None) -> str:
+def _same_failure_note(n: int, names: list[str] | None = None,
+                       edited: str | None = None) -> str:
     """The note appended to a repeat failure; `n` is how many repeats deep.
 
     Repeats beyond the first get the COUNT, not the paragraph again. The archive
@@ -2096,9 +2137,24 @@ def _same_failure_note(n: int, names: list[str] | None = None) -> str:
             "Then make your next edit follow from what the test asserts. Do "
             "not re-send a variation of the edit that just failed — it is the "
             "idea behind it that is wrong, not its wording.")
+    # Build 111. This branch was left in its pre-108 shape and measures like
+    # it: two sentences of diagnosis, no tool named ("open" is not a call), no
+    # clause forbidding an explanation. Pooled over every arm running build
+    # >=108 it is answered with prose 16 times in 28 — against 0 in 63 for the
+    # level-1 branch above. Every post-108 response that acted on it called
+    # read_file, 11 for 11, so the recipe's shape is what is missing, not its
+    # action. The TARGET moves, though: by here the model has already been sent
+    # to the test and re-issuing level 1 verbatim would order it to redo what
+    # just failed. Send it to the source it has been editing, whole. ROADMAP 5.35.
+    where = f"`{edited}`" if edited else target
+    scope = ("and read the WHOLE function the failing test calls, not just the "
+             "line you have been editing" if edited else
+             "and read all of it, not just the assertion that failed")
     return (f"\n\n⟳ SAME FAILURE — {n + 1} test runs in a row with identical "
-            f"results. Nothing you have tried since the first one has changed "
-            f"anything. Stop editing and open {target}.")
+            f"results. The fault is in code you have not looked at yet.\n"
+            f"Call read_file on {where} now {scope}. Do not answer this with "
+            "an explanation: the next thing you send must be that read_file "
+            "call.")
 
 
 # A final answer that CLAIMS the tests pass. Deliberately test-specific — "tests"

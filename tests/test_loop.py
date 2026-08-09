@@ -3416,9 +3416,12 @@ def test_banner_names_without_a_file_still_work():
 
 
 def test_the_escalated_note_names_the_file():
+    # No edited file known, so it falls back to naming the test — but it must
+    # still name SOMETHING (build 102: a steer with no identifier in it gets
+    # answered with whatever the model already knows how to do).
     note = loop_mod._same_failure_note(3, [
         "test_textkit.py::test_a", "test_textkit.py::test_b"])
-    assert "open `test_textkit.py`" in note
+    assert "`test_textkit.py`" in note
     assert "4 test runs in a row" in note
 
 
@@ -3447,7 +3450,137 @@ def test_the_call_is_named_before_the_diagnosis():
     assert note.index("read_file") < note.index("idea behind it")
 
 
-def test_the_escalated_note_is_unchanged_in_shape():
-    # It already converts 82%; build 108 does not touch it.
+# --- build 111 / 5.35: the escalated branch gets the same recipe ------------
+#
+# It was left alone at build 108 on the strength of "it already converts 82%".
+# That reading was pre-108 and did not survive: pooled over every arm running
+# build >=108, this branch is answered with prose 16 times in 28, against 0 in
+# 63 for the level-1 branch. The 11 responses that DID act all called
+# read_file, so what was missing was the shape, not the action.
+
+def test_the_escalated_note_now_demands_a_call():
     note = loop_mod._same_failure_note(3, ["tests/test_a.py::test_wrap"])
-    assert "Stop editing and open" in note
+    assert "read_file" in note
+    assert "must be that read_file call" in note
+    # the call comes before any prohibition or diagnosis tail (methodology 9)
+    assert note.index("Call read_file") < note.index("Do not answer")
+
+
+def test_the_escalated_note_sends_the_model_to_the_source_it_edited():
+    # Level 1 has already sent it to the test by this point, so repeating that
+    # target would order it to redo the thing that just failed.
+    lvl1 = loop_mod._same_failure_note(1, ["test_textkit.py::test_a"],
+                                       "textkit.py")
+    lvl3 = loop_mod._same_failure_note(3, ["test_textkit.py::test_a"],
+                                       "textkit.py")
+    assert "`test_textkit.py`" in lvl1 and "`textkit.py`" not in lvl1
+    assert "`textkit.py`" in lvl3
+    assert "WHOLE function" in lvl3
+
+
+def test_the_escalated_note_never_lands_without_an_identifier():
+    # Both with and without a known edited file, and with no test names at all.
+    for names in ([], ["test_a"], ["tests/test_a.py::test_wrap"]):
+        for edited in (None, "textkit.py"):
+            note = loop_mod._same_failure_note(3, names, edited)
+            assert "``" not in note and "read_file on ." not in note
+
+
+# --- build 111 / 5.35: _nudge_stall, the worst-converting steer -------------
+#
+# It asked for narration twice ("reason about WHY the error happens", then "if
+# you genuinely cannot fix it, say so in plain text now") and buried its tool
+# name five sentences in — 17 prose replies in 26 across the post-108 arms. It
+# also named write_file, which took 11 calls before build 108 and zero since.
+
+async def test_the_stall_nudge_leads_with_the_call(tmp_path):
+    async def confirm(name, args, preview):
+        return "yes"
+
+    cfg = Config()
+    cfg.agent.max_error_stall = 3
+    cfg.agent.max_repeat_calls = 99
+    loop = make_loop(tmp_path, [
+        native_call("edit_file", path="ghost.txt", old="a", new="b"),
+        native_call("edit_file", path="ghost.txt", old="c", new="d"),
+        native_call("edit_file", path="ghost.txt", old="e", new="f"),
+        {"role": "assistant", "content": "ok"},
+    ], confirm=confirm, cfg=cfg)
+    await loop.run_turn("fix it")
+    nudge = next(m["content"] for m in loop.history if m["role"] == "user"
+                 and "identical each time" in m["content"])
+    assert "read_file" in nudge
+    assert nudge.index("Call read_file") < nudge.index("fix the STRUCTURE")
+    assert "must be that read_file call" in nudge
+    # the two narration invitations are gone
+    assert "reason about WHY" not in nudge
+    assert "write_file" not in nudge
+    # the escape hatch survives, but only after the call
+    assert nudge.index("cannot see the fix") > nudge.index("Call read_file")
+
+
+async def test_the_stall_nudge_names_the_file_it_edited(tmp_path):
+    (tmp_path / "textkit.py").write_text("x = 1\n")
+
+    async def confirm(name, args, preview):
+        return "yes"
+
+    cfg = Config()
+    cfg.agent.max_error_stall = 3
+    cfg.agent.max_repeat_calls = 99
+    loop = make_loop(tmp_path, [
+        # one edit that LANDS, so _last_edit_file is known…
+        native_call("read_file", path="textkit.py"),  # read-before-edit gate
+        native_call("edit_file", path="textkit.py", old="x = 1", new="x = 2"),
+        # …then the stall, on a different file that always errors
+        native_call("edit_file", path="ghost.txt", old="a", new="b"),
+        native_call("edit_file", path="ghost.txt", old="c", new="d"),
+        native_call("edit_file", path="ghost.txt", old="e", new="f"),
+        {"role": "assistant", "content": "ok"},
+    ], confirm=confirm, cfg=cfg)
+    await loop.run_turn("fix it")
+    nudge = next(m["content"] for m in loop.history if m["role"] == "user"
+                 and "identical each time" in m["content"])
+    assert "`textkit.py`" in nudge
+
+
+# --- build 111 / 5.36: a no-op edit is not a landed edit --------------------
+
+async def test_a_nonerror_no_change_edit_is_not_counted_as_landed(tmp_path):
+    # edit_file answers an ALREADY-APPLIED edit as a NON-error no_change so the
+    # model doesn't revert its own working fix. _landed_edit means "the
+    # workspace really did change", and it did not — it gates the
+    # done-on-repeated-verify exit and the unverified-edit accounting.
+    (tmp_path / "a.py").write_text("value = 42\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("read_file", path="./a.py"),
+         # old == new and present -> "already done", non-error
+         native_call("edit_file", path="./a.py", old="value = 42",
+                     new="value = 42"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("fix a.py")
+    assert loop._landed_edits == 0
+    assert loop._landed_edit is False
+    assert loop._last_edit_file is None
+
+
+async def test_a_real_edit_still_counts_as_landed(tmp_path):
+    # Guard the blast radius of the condition above.
+    (tmp_path / "a.py").write_text("value = 42\n")
+    cfg = Config()
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("read_file", path="./a.py"),
+         native_call("edit_file", path="./a.py", old="value = 42",
+                     new="value = 43"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("fix a.py")
+    assert loop._landed_edits == 1
+    assert loop._landed_edit is True
+    assert loop._last_edit_file == "a.py"

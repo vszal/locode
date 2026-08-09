@@ -181,6 +181,24 @@ async def test_edit_file_noop_with_old_present_reads_as_already_done(ctx, tmp_pa
     assert (tmp_path / "c.py").read_text() == "a = 0\nvalue = compute()\n"
 
 
+async def test_edit_file_already_done_asks_for_a_CALL_not_a_paragraph(ctx, tmp_path):
+    # Build 111. Build 110 got the diagnosis right and the shape wrong: it named
+    # no tool, put its action seventh behind three prohibitions, and hedged it
+    # as "if something is still failing, run the tests again". All four
+    # candidate responses in b110-alreadydone answered with `update_plan` — the
+    # cheapest thing in the toolset, because "run the tests again" is not a call
+    # the model can emit. 5.32's recipe: the call first, named, and an explicit
+    # ban on replying with prose. ROADMAP 5.36.
+    (tmp_path / "c.py").write_text("a = 0\nvalue = compute()\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "value = compute()", "new": "value = compute()"}, ctx)
+    body = res.content
+    assert "Call bash now" in body
+    assert "the next thing you send must be that bash call" in body
+    # the call precedes every prohibition
+    assert body.index("Call bash") < body.index("Do NOT resend")
+
+
 async def test_edit_file_noop_already_done_is_found_at_a_shifted_indent(ctx, tmp_path):
     # The re-send usually comes back dedented (the model retypes the line rather
     # than copying it), so presence has to be whitespace-tolerant or the run

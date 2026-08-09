@@ -1196,15 +1196,28 @@ class EditFile:
             # siblings below already get.
             at = _first_line_of(text, old)
             if at is not None:
+                # Build 111 reshapes this to 5.32's recipe. Build 110 got the
+                # DIAGNOSIS right and the shape wrong: it named no tool, put its
+                # action seventh behind three prohibitions, and hedged it as "if
+                # something is still failing, run the tests again". All four
+                # candidate responses in b110-alreadydone answered it with
+                # `update_plan` — build 102's lesson, that a model told to do
+                # something it has no identifier for substitutes the nearest
+                # thing it does know how to do. So: the call first, named, with
+                # the clause that forbids an explanation, and the prohibitions
+                # demoted to the tail. ROADMAP 5.36.
                 return ToolResult(
                     f"This edit is ALREADY DONE: `old` and `new` are the same "
-                    f"text, and {p} already contains it (line {at}). Nothing to "
-                    "change — the file already reads the way this edit asks for. "
-                    "Do NOT resend it, do NOT revert it, and do NOT switch to "
-                    "line-number edits to force it in. If something is still "
-                    "failing, the cause is on a DIFFERENT line: run the tests "
-                    "again to see the CURRENT failure and read the line it names "
-                    "before editing anything.", no_change=True)
+                    f"text, and {p} already contains it (line {at}). The change "
+                    "you are making is in the file.\n"
+                    "Call bash now and re-run the test or command that last "
+                    "failed — you need its CURRENT output, because this line is "
+                    "not what is wrong. Do not answer this with an explanation: "
+                    "the next thing you send must be that bash call. Then fix "
+                    "the line the new output names.\n"
+                    "Do NOT resend this edit, do NOT revert it, and do NOT "
+                    "switch to line-number edits to force it in.",
+                    no_change=True)
             return ToolResult(
                 "This edit does NOTHING: `new` is identical to `old`, and that "
                 f"text is not in {p} at all — you put your intended replacement "
