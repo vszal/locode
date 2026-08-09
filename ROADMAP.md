@@ -2874,6 +2874,46 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.50 Recalibrating both budgets found nothing to recalibrate from (2026-08-09)
+
+`escalated_stall_budget = 8` and `noop_resend_stall_budget = 10` were each fitted
+to a single run (`b113 exec-bugfix r8 base`), which 5.44 flagged as the weakest
+thing about build 116. Pooling the 84 VERIFIED runs across b110–b116 to replace
+that n=1 with a distribution:
+
+| | winners reaching it | survivor lead-time to green |
+|---|---|---|
+| escalated steer | **1 / 84** | 7 iterations |
+| no-op re-send | **1 / 84** | 8 iterations |
+
+Both are the *same run* — `b113 r8` again. Eighty-four winners over five sweeps
+produced **zero** new survivors, so there is still exactly one sample per
+trigger, and it still says K=8 and K=10 clear it (by 1 and 2 iterations).
+
+**Disposition: both K's unchanged.** Not because the pool confirmed them — it
+did not add a single data point — but because lowering a budget requires
+evidence that the one survivor was noise, and 84 runs produced no evidence
+either way. What the pool *does* establish is different and more useful than a
+tuned constant: **a winner essentially never reaches these triggers.** The
+budgets are not a trade-off between speed and success on this case; they are
+almost pure waste-cutting, which is what 5.46 credited them with.
+
+**And a correction to 5.46's invariant.** "Every VERIFIED run takes exactly 23
+iterations" was scoped to b115+b116, where it holds. Pooled over b110–b116 it is
+80 / 84:
+
+| iterations | winners |
+|---|---|
+| 23 | 80 |
+| 25 | 2 |
+| 31 | 2 |
+
+The claim should have been "95% of winners finish at 23, and the only ones that
+run long are the ones that stalled and recovered". The exceptions are exactly
+the population the budgets govern, which is the part that mattered, but the
+absolute version overstated it and would have made any 24-iteration winner look
+impossible instead of rare.
+
 ### 5.49 Probe: is the read guard load-bearing, or just a marker? (2026-08-09, pre-registered)
 
 5.48 cannot tell cause from correlation because the model picks the branch. But
@@ -2882,7 +2922,7 @@ flag, and it is what rejects the third call in **106 of 106** edit-first runs
 across b110–b116 — a tight predicate, not a family of messages. So the guard can
 be intervened on even though the branch cannot.
 
-**Sweep `b119-readguard`:** base = `ea1c722` (guard on), candidate = the same
+**Sweep `b119-readguard`:** base = `1b90642` (guard on), candidate = the same
 tree with `require_read_before_edit = False`. `exec-bugfix`, `qwencoder14`,
 r14. Per methodology 28 the flag is the only difference; nothing else moves.
 
