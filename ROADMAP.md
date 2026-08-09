@@ -2874,6 +2874,43 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.39 Two level-1 levers, mined and declined (2026-08-08)
+
+5.38 says the level-1 escape rate is the whole game, so I went looking for a
+lever there. Both candidates died on inspection. Recording them so they are not
+rebuilt.
+
+**Declined 1 — "make the note prescribe the whole sequence, not just the
+read".** The level-1 note converts 100% to `read_file`, yet only 22% of the
+runs that receive it verify. Censusing the calls after each note in the
+post-108 arms looked decisive:
+
+| next three calls | runs that VERIFIED | runs that died |
+|---|---|---|
+| `read_file → edit_file → bash` | **14 of 14 (100%)** | 9 of 62 |
+| `read_file → edit_file → update_plan` | 0 | 27 |
+| `read_file → edit_file → read_file` | 0 | 18 |
+
+Every survivor read, edited, and immediately ran the tests; half the dead
+detoured through `update_plan`. The obvious lever is to name the whole sequence
+in the note and forbid the detour. **Then I followed the dying branch two calls
+further: all 27 of the `update_plan` detours reach `bash` anyway** (19 of them
+`→ bash → bash`). The detour costs one call and nothing else. Survivors and
+casualties run the *same* loop — read, edit, test. The difference is whether
+the edit was **right**, which is a capability wall, not a steering one. No
+lever here.
+
+**Declined 2 — "dying runs don't test their edits".** Pooled over landed edits,
+survivors verify 111/148 = 75% of their edits before making the next one and
+casualties 210/370 = 57%, which reads as a real cadence gap. It is entirely
+5.37's clustering trap: the per-RUN median is **60% for survivors and 67% for
+casualties** — the gap reverses sign. Dying runs have more edits, so pooling
+weights them by exactly the thing that makes them dying runs.
+
+That second one is worth keeping as the sharpest example of methodology 27 in
+the log: the same data says survivors test *more* (pooled) and *less* (per
+run). **Compute the per-run median before believing any pooled per-event rate.**
+
 ### 5.38 Level 3 is a dead zone: 0 of 49 runs that reached it ever verified (2026-08-08)
 
 Followed 5.37's depth finding one step further — if prose decays with depth,
