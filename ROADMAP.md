@@ -2874,6 +2874,39 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.49 Probe: is the read guard load-bearing, or just a marker? (2026-08-09, pre-registered)
+
+5.48 cannot tell cause from correlation because the model picks the branch. But
+the *other* half of that branch is mine: `require_read_before_edit` is a config
+flag, and it is what rejects the third call in **106 of 106** edit-first runs
+across b110–b116 — a tight predicate, not a family of messages. So the guard can
+be intervened on even though the branch cannot.
+
+**Sweep `b119-readguard`:** base = `ea1c722` (guard on), candidate = the same
+tree with `require_read_before_edit = False`. `exec-bugfix`, `qwencoder14`,
+r14. Per methodology 28 the flag is the only difference; nothing else moves.
+
+**Predictions, fixed now.**
+
+- *If the block is load-bearing* (the rejection is what forces the read that
+  makes the fix aimable), the candidate should fall sharply — its call-2 edit
+  now lands, unaimed, and no read is forced. Expect it to drift toward the
+  read-first rate rather than the 78% edit-first rate.
+- *If the branch is only a marker* (the sample that reaches for an edit was
+  going to win regardless), the candidate should be flat within the ±2 floor.
+
+**Read the mechanism, not just the rate.** Whatever VERIFIED does, check three
+things in the candidate arm, because they distinguish the readings even if the
+rate is ambiguous: does the call-2 edit actually apply; does the run ever read
+the file at all afterwards; and does the no-op re-send of 5.44 arrive earlier.
+
+**Interpretation caveat, stated in advance.** Turning the flag off changes every
+edit in the run, not only the third call, so a candidate collapse would show the
+guard is load-bearing *somewhere* without proving it is load-bearing *at call 2*.
+That is a weaker claim than 5.48's, and I will not report it as the stronger one.
+This is a probe. Neither arm is a proposed default: the guard stays on unless
+this says otherwise, and it will not be turned off on a null result.
+
 ### 5.48 One coin flip at call 2 decides the run, and it decides the sweep (2026-08-09)
 
 Within the post-restart era of 5.47 (b110–b116, 140 runs, one server process),
