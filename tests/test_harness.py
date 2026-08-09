@@ -782,3 +782,42 @@ def test_an_unknowable_comparison_is_none_not_false():
 
 def test_server_fingerprint_accepts_injected_ps_text():
     assert harness.server_fingerprint(_PS)["pid"] == "8412"
+
+
+# --- armstats: the 3rd-call opening (5.48) -----------------------------------
+def _load_armstats():
+    spec = importlib.util.spec_from_file_location(
+        "eval_armstats", ROOT / "evals" / "armstats.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["eval_armstats"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+armstats = _load_armstats()
+
+
+def _calls(*names):
+    return [{"phase": "run", "name": n} for n in names]
+
+
+def test_the_opening_is_the_third_tool_call():
+    ev = _calls("bash", "update_plan", "edit_file", "read_file")
+    assert armstats._opening(ev) == "edit_file"
+
+
+def test_the_opening_ignores_non_call_events_between_the_calls():
+    # Real logs interleave iteration/result/nudge phases; counting those would
+    # slide the index and silently mislabel every run.
+    ev = [{"phase": "run", "name": "bash"},
+          {"phase": "result", "content": "..."},
+          {"phase": "iteration"},
+          {"phase": "run", "name": "update_plan"},
+          {"phase": "result", "content": "..."},
+          {"phase": "run", "name": "read_file"}]
+    assert armstats._opening(ev) == "read_file"
+
+
+def test_a_run_too_short_to_have_a_third_call_has_no_opening():
+    assert armstats._opening(_calls("bash", "update_plan")) is None
+    assert armstats._opening([]) is None

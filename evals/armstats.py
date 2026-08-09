@@ -59,7 +59,8 @@ def _blank() -> dict:
     return {"n": 0, "clean": 0, "done": 0, "gaveup": 0, "landed": 0,
             "verified": 0, "falsedone": 0, "unverifiable": 0,
             "iters": 0, "mut": 0, "exposed": 0, "exposed_clean": 0,
-            "exposed_done": 0,
+            "exposed_done": 0, "openings": collections.Counter(),
+            "opening_won": collections.Counter(),
             "nudges": collections.Counter(), "stops": collections.Counter()}
 
 
@@ -117,6 +118,22 @@ def _matcher(pattern: str | None):
     return lambda text: pattern in text
 
 
+def _opening(ev: list[dict]) -> str | None:
+    """Which branch the run took at its decisive third tool call (5.48).
+
+    In b110-b116 every run opened identically — same `bash` call, same pytest
+    output, same 233-char plan — and then split here: the runs whose third call
+    was an `edit_file` that `require_read_before_edit` rejected went on to
+    verify 83/106, and the runs that read the file instead verified 1/34. The
+    per-arm draw of this branch tracked the arm's score better than the lever
+    under test did, so it is reported next to VERIFIED rather than left to be
+    rediscovered. Descriptive only: the model chooses the branch, nothing here
+    assigns it.
+    """
+    calls = [e for e in ev if e.get("phase") == "run"]
+    return calls[2].get("name") if len(calls) > 2 else None
+
+
 def collect(label: str, by_case: bool = False,
             exposure: str | None = None) -> dict:
     root = pathlib.Path("evals/results") / label / "events"
@@ -146,8 +163,13 @@ def collect(label: str, by_case: bool = False,
         a["clean"] += clean
         a["done"] += done
         a["gaveup"] += clean and not done
+        opening = _opening(ev)
+        if opening:
+            a["openings"][opening] += 1
         green = _ended_green(ev)
         a["verified"] += done and green is True
+        if opening and done and green is True:
+            a["opening_won"][opening] += 1
         a["falsedone"] += done and green is False
         a["unverifiable"] += done and green is None
         if hit is not None:
@@ -189,6 +211,12 @@ def main() -> None:
               f"  stopped={a['n'] - a['clean']}"
               f"  mean-iters={a['iters'] / a['n']:.1f}"
               f"  mean-landed-edits={a['landed'] / a['n']:.1f}")
+        if a["openings"]:
+            mix = "  ".join(
+                f"{k}={a['opening_won'][k]}/{v}"
+                for k, v in sorted(a["openings"].items(),
+                                   key=lambda kv: -kv[1]))
+            print(f"     3rd-call (verified/n): {mix}")
         if exposure:
             ex = a["exposed"]
             # DONE among exposed runs — the only subset that can be evidence
