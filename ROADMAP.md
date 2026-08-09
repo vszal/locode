@@ -2908,6 +2908,33 @@ where essentially all the recoverable probability mass sits (22% still verify
 after it); by level 3 there is none left, and the remaining ~10 iterations are
 spent producing nothing.
 
+**And VERIFIED is almost entirely determined by that one number.** Running
+the same read across all six recent arms (14 runs each):
+
+| arm | build | runs reaching level 3 | VERIFIED | 14 − reached |
+|---|---|---|---|---|
+| b108 base | 107 | 14 | 0 | 0 |
+| b108 cand | 108 | 7 | 7 | 7 |
+| aa14 base | 109 | 11 | 3 | 3 |
+| aa14 cand | 109 | 9 | 4 | 5 |
+| b110 base | 109 | 3 | 9 | 11 |
+| b110 cand | 110 | 5 | 9 | 9 |
+
+Four of six land exactly on `14 − reached`, the other two within two. VERIFIED
+is not really a second channel at all — it is the **escape rate at level 1**,
+reported in different units. Three consequences:
+
+- Build 108's `VERIFIED 0 → 7` was *entirely* "runs reaching level 3 fell 14 →
+  7". The level-1 note is the lever, and that is why it is the only change so
+  far that moved an ending.
+- The between-sweep VERIFIED drift that produced methodology 26 (build 109
+  giving 3, 4 and 9) is drift in **how many runs get stuck at level 1** — real
+  sampling variation in run difficulty, which is why pairing cancels it and
+  levels do not travel.
+- **Build 111 can only win by breaking the 0/49 wall.** Nothing it changes
+  fires upstream of level 3, so if reaching level 3 stays fatal, its VERIFIED
+  must come out flat no matter how well the reshaped steers convert.
+
 **This reframes the running b111-recipe sweep, for the better.** Build 111
 gives the escalated steers the recipe that makes the level-1 note convert 100%
 of the time. The prose-only metric asks "did the model obey"; the question that
