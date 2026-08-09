@@ -2927,6 +2927,24 @@ its 8 iterations. Check before building: whether that survivor finished within
 8 iterations of its own no-op. If it did not, the trigger needs a longer budget
 than the steer's, not the same one.
 
+**Checked, and it did not — so the trigger needs its own K.** The survivor is
+`b113 exec-bugfix r8`, the *same run* that is the lone survivor of the
+escalated-steer population. Its first no-op is at iteration 22 and it went green
+at 31: **9 iterations after, one past a K of 8.** Arming the shared budget on
+the no-op would cut the only run in 140 that ever came back from either signal.
+So the earlier trigger takes a longer leash — K=10 on this one, against 8 on the
+steer — which is coherent rather than arbitrary: the no-op fires a median of 4
+iterations sooner, so an equal budget is a strictly tighter cut, not the same
+one moved earlier.
+
+Say the uncomfortable part plainly: **both thresholds are now calibrated on the
+same single run.** That is not a safety margin, it is one observation doing the
+work of a distribution. It is the conservative direction to be wrong in — the
+cost of too large a K is some wasted iterations, the cost of too small a K is
+deleting the only evidence that deep stalls are survivable — but b115 adds 28
+runs to the corpus and its survivors, if any, are the first real chance to
+replace this with a number. Recalibrate then; do not tune either K down before.
+
 **Not built yet, on purpose.** b115 is in flight and methodology 28 says one
 change per sweep. It also has to wait for b115's verdict on principle: if the
 budget mechanism itself regresses, adding a second, earlier trigger to it makes
