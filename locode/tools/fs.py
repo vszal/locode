@@ -15,6 +15,18 @@ from locode.tools.base import ToolContext, ToolResult
 
 _MAX_BYTES = 256 * 1024  # guard against dumping a huge file into context
 
+# Build 113 (ROADMAP 5.41). A file at or under this size is returned WHOLE even
+# when the model asked for a window. Weak models window compulsively and badly:
+# across three r14 sweeps they asked for 10- and 20-line slices of an 83-line
+# file, and after a windowed read **60 of 71** following edits targeted text
+# that was not in the window they had just read — they narrow the read, then
+# author `old` from an earlier, staler view. Per-run windowed share is 0%
+# (median) in runs that ended verified and 25% in runs that died. Paging still
+# works where paging is the point; below this, the whole file is cheaper than
+# the mistake.
+_WINDOW_OVERRIDE_LINES = 400
+_WINDOW_OVERRIDE_BYTES = 40 * 1024
+
 # A read_file display prefix, e.g. "    12\t" — weak models sometimes copy it
 # into `old`. Stripped during tolerant matching so it doesn't block an edit.
 _LINENO_PREFIX = re.compile(r"^\s*\d+\t")
@@ -881,9 +893,22 @@ class ReadFile:
         lines = text.splitlines()
         offset = max(1, int(args.get("offset", 1)))
         limit = args.get("limit")
+        # Build 113: a window on a small file is overridden, not honoured. See
+        # _WINDOW_OVERRIDE_LINES. The note is one line and states the fact —
+        # the model has to know it is holding the whole file, or it will keep
+        # composing edits against the slice it thinks it asked for.
+        widened = ((offset > 1 or limit) and not truncated
+                   and len(lines) <= _WINDOW_OVERRIDE_LINES
+                   and len(data) <= _WINDOW_OVERRIDE_BYTES)
+        if widened:
+            offset, limit = 1, None
         end = offset - 1 + int(limit) if limit else len(lines)
         chosen = lines[offset - 1:end]
         body = "\n".join(f"{offset + i:>6}\t{ln}" for i, ln in enumerate(chosen))
+        if widened:
+            body = (f"({len(lines)} lines — small enough to return whole, so "
+                    "this is the ENTIRE file, not the window you asked for.)\n"
+                    + body)
         if truncated:
             body += "\n… (truncated)"
         # A truncated or windowed read still counts: the gate is a floor

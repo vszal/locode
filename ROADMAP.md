@@ -2874,6 +2874,63 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.41 The model narrows the read, then edits from the older view (2026-08-08)
+
+5.40 left the next lever as "structural, not verbal", with the `ALREADY DONE`
+path (0 for 11) as the place to look. Mining it gave a mechanism.
+
+**25 of 29 already-applied edits are the model re-sending an edit it made
+itself**, a median of 4 tool calls earlier, and **21 of those 25 without having
+re-read the file in between**. Reading one end to end (`b111-recipe` r10 cand)
+showed what that actually looks like, and it is not what "already applied"
+suggests:
+
+```
+bash pytest            -> 1 failed
+NUDGE same failure (2)
+read_file test_textkit.py
+edit_file textkit.py   -> edited (lands)
+update_plan / bash     -> the SAME failure
+NUDGE same failure (3)
+read_file textkit.py   offset=47 limit=20      <- obeys build 111, and windows
+edit_file textkit.py   old = "def truncate(...  <- line ~40, ABOVE the window
+                       new = the same text      -> ALREADY DONE
+```
+
+The model complied with the steer, then asked for a 20-line slice of an
+**83-line** file, and composed `old` from an earlier, staler read — text the
+window it had just fetched did not contain. The success path of `edit_file`
+already echoes the changed region, so this is not staleness at edit time; it is
+the model choosing to look at the wrong twenty lines.
+
+**It generalises, and it survives methodology 27.** Across `b111-recipe`,
+`b110-alreadydone` and `aa14-calib`:
+
+| | runs that VERIFIED | runs that died |
+|---|---|---|
+| `read_file` calls that were windowed | 7/97 = 7% | 78/258 = 30% |
+| **per-run windowed share (median)** | **0%** | **25%** |
+| runs using a window at least once | 7/40 | 23/44 |
+
+The per-run median is the number that matters — 5.39's cadence lever died
+because its pooled gap reversed at run level, and this one does not. And the
+mechanism check is direct: **after a windowed read, 60 of 71 following edits
+targeted text that was not in the window.** Only 11 were inside it.
+
+The requested windows are absurd on their face: the most common asks are
+`offset=8 limit=10` and `offset=8 limit=20`, against a file of 83 lines.
+
+**Build 113 (5.41).** `read_file` overrides the window when the whole file is
+small — at or under 400 lines and 40 KB — and says so in one line ("this is the
+ENTIRE file, not the window you asked for"), because a model that does not know
+it holds the whole file will keep composing against the slice it thinks it
+asked for. Paging still works where paging is the point. One change, swept
+alone (methodology 28).
+
+This is also the first lever in this stretch aimed at the *cause* of a stuck
+run rather than at the message the harness sends once it is stuck — which is
+where 5.38 and 5.40 jointly say the remaining headroom is.
+
 ### 5.40 Build 111: the steer converts perfectly and buys nothing (2026-08-08)
 
 `b111-recipe` (r14, base build 110 at `09b0c16`, cand build 111). The clearest
