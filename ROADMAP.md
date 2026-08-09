@@ -2874,6 +2874,96 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.52 What kills read-first runs: they never make a big edit (2026-08-09)
+
+Answering "investigate what kills read-first runs" — the 5.48 branch, where the
+run's 3rd tool call is `read_file` (1/37 verified) rather than `edit_file`
+(90/117). Population: the guard-on runs of b110/b111/b113/b115/b116 plus
+b119's base arm, n=154.
+
+**"Read-first" is a misnomer. The branch is an edit-granularity mode that the
+model locks into at call 3 and never leaves for the rest of the run.**
+
+| | median `new` | p90 | **largest edit in the entire branch** |
+|---|---|---|---|
+| edit-first (117 runs, 1087 edits) | 673 ch | 2019 | 2020 |
+| read-first (37 runs, 346 edits) | **70 ch** | **79** | **537** |
+
+Across 346 edits in 37 runs, the read-first branch emits exactly one payload
+above 79 characters. It is doing single-line surgery, exclusively, start to
+finish. The edit-first branch rewrites whole function blocks.
+
+That decides the case, because of how the three seeded bugs are shaped:
+
+| seeded bug | shape | edit-first | read-first |
+|---|---|---|---|
+| `truncate` `- len(suffix) + 1` | drop a `+ 1` — **one line** | fixed | **100%** |
+| `title_case` `append(lower)` | add `.capitalize()` — **one line** | 100% | **100%** |
+| `word_wrap` `... < width` | `<` → `<=` — **an operator the model must first localize** | **84%** | **14%** |
+
+Surgical mode fixes both one-line bugs in every single run, then stalls forever
+on the operator. Median best-reached failure count is exactly 1 (vs 0), and
+**36/36 of the budget-killed read-first runs end still failing
+`test_word_wrap_exact_fit_stays_on_one_line`** — the same test, every time.
+Edit-first hits that wall in 15/117.
+
+Writing `<= width` is very nearly necessary and sufficient: **1/51** runs that
+never wrote it verified; **90/103** that did. A block rewrite gets it for free —
+re-deriving the function from its docstring forces the model past the
+comparison. Surgical mode never rewrites the region the operator lives in, so
+it never re-reads the contract, so it mis-localizes: the losing runs patch
+`current_len = len(word)` → `+ 1`, then `+ 1 if current else len(word)`,
+plausible-looking arithmetic one line below the actual defect.
+
+Both branches are **100% monotone-down** in failure count. Nothing here is
+thrashing or regression — read-first runs are stuck, not confused.
+
+**Four things I was wrong about, in order.**
+
+1. *The `NN |` gutter contaminates the next edit* (5.28 recorded it collapsing
+   b97). Measured: **0/76**. The gutter is never once copied into a subsequent
+   `old`/`new`.
+2. *The multi-match message fails.* It does not: **76/76** multi-match messages
+   are answered by a `replace_lines` that succeeds. It is, locally, the
+   best-performing message in the system, exactly as 5.28 said.
+3. *Read-first runs never verify.* Extractor bug of mine — bash args are keyed
+   `cmd`, not `command`, so my first pass reported "36/36 never ran pytest."
+   False. Every run in both arms runs pytest; read-first runs it **more**
+   (median 6 vs 4).
+4. *5.49-style prediction failure again.* I expected the killer to be a message
+   defect. It is a strategy the message never touches.
+
+**Rule 31, sharper.** 5.28 graded this message on next-call conversion (32/42)
+and called it the system's best. Both facts hold at n=76 — and it is the losing
+branch's message. A steer can convert perfectly and still be worse than
+neutral, because what it converts *to* is the losing strategy: the message
+ends with "pick the match you want and call `replace_lines` … passing only the
+replacement line as `new`," i.e. it explicitly prescribes single-line surgery
+to a model that is already trapped in single-line surgery.
+
+**Collinearity (5.48's caveat, unresolved).** Multi-match and the branch are
+perfectly collinear: 37/37 read-first runs see it, 0/117 edit-first runs do.
+The model picks a 31-char `old` (`lines.append(" ".join(current))`, which
+occurs twice) versus a 536-char block — so the mode *causes* the message, and
+message and mode cannot be separated in observational data. The message did
+not create the mode. The open question is only whether it can **break** it.
+
+**Threat to validity, stated plainly.** This is one case with 2 of 3 bugs
+shaped as one-line fixes and 1 shaped as a block re-derivation. That is a
+design that rewards block rewriting by construction. The finding "surgical mode
+loses" may be partly "this case's hard bug happens to punish surgical mode." A
+second case whose hard bug *is* a one-liner would separate them, and until one
+exists I will not generalize this beyond `exec-bugfix`.
+
+**Lever (not yet built, not yet sized).** The multi-match message is the only
+harness intervention point that fires inside the losing mode, at 100% of it.
+Rewrite it to prescribe widening — "`old` is not unique; extend it with
+surrounding lines until it matches once" plus a wide raw window — instead of
+prescribing the single-line `replace_lines`. Per b119's lesson the population
+is checked first and it is real (37/154 = 24%, and 100% of the losing branch);
+the mechanism is not, since the model is in surgical mode before the message
+arrives. A/B it before believing it.
+
 ### 5.51 The read guard is load-bearing — and not for the reason it was built (2026-08-09)
 
 `b119-readguard`, the probe pre-registered in 5.49. Base = guard on, candidate =
