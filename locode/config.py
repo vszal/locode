@@ -169,6 +169,24 @@ class AgentConfig:
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing
+    # Iterations a turn may still spend after the ESCALATED same-failure steer
+    # (the one that fires on the third identical test result) before the turn
+    # ends itself. 0 disables the cap.
+    #
+    # Measured over 140 runs / 3787 iterations of the last five sweeps: 49% of
+    # runs reach that steer, and between them they spend 712 iterations — 19%
+    # of every iteration in the corpus — after it, to produce ONE verified
+    # finish in 69. 88% of them are eventually stopped by the repeat guard or
+    # max_error_stall anyway; those guards just arrive ~10 iterations late,
+    # because they key on the error TEXT (which the model keeps varying) while
+    # the same-failure counter keys on the test's identity (which it doesn't).
+    # This is the missing stop on the signal that actually tracks stuck-ness.
+    #
+    # 8 is deliberately conservative, not tuned: the single observed recovery
+    # went green at exactly +8, so the budget is set to keep it. It still cuts
+    # 46% of the waste. A quarter of these runs burn 18-30 further iterations
+    # at a 0% success rate. ROADMAP 5.43.
+    escalated_stall_budget: int = 8
     max_consecutive_errors: int = 4  # nudge/bail when nothing at all succeeds
     # Consecutive batches where everything SUCCEEDED and returned nothing. Lower
     # than max_consecutive_errors: an empty answer repeats perfectly (the query

@@ -252,6 +252,16 @@ class AgentLoop:
         # across one would open with a stale accusation.
         self._last_test_id = None
         self._same_failure_run = 0
+        # [escalated-stall] Iteration at which the ESCALATED same-failure steer
+        # first fired, and the test it named. The steer converts perfectly —
+        # build 111 measured prose 0 for 10 against 6 for 6 before it — and buys
+        # nothing: 1 verified finish in 69 runs that reached it. What follows it
+        # is 19% of every iteration in the corpus. Cleared if the tests go green,
+        # so a run that recovers and then does legitimate follow-up work is not
+        # cut off. Turn-scoped, like the counter it keys off. ROADMAP 5.43.
+        self._esc_stall_at = None
+        self._esc_stall_test = None
+        self._iter = 0
         # [same-failure] Basename of the file the last landed edit touched. The
         # escalated steers need to NAME a source file, and neither can reach
         # `edit_tally`: that lives here in _run_turn while the annotation fires
@@ -372,6 +382,7 @@ class AgentLoop:
         nudged_zero_change = False
         try:
             for i in range(self._cfg.agent.max_iterations):
+                self._iter = i
                 now = time.monotonic()
                 self._on_event({"phase": "iteration", "n": i,
                                 "elapsed": round(now - start, 2)})
@@ -380,6 +391,19 @@ class AgentLoop:
                 elapsed = now - start - self._wallclock_pause
                 if elapsed > self._cfg.agent.max_wallclock_seconds:
                     return self._stop("budget: wallclock exceeded")
+                # [escalated-stall] Checked here, at the top of the iteration
+                # the budget would be spent on, so the count in the message is
+                # the number of iterations that actually went by after the
+                # steer. See AgentConfig.escalated_stall_budget for the numbers.
+                budget = self._cfg.agent.escalated_stall_budget
+                if (budget > 0 and self._esc_stall_at is not None
+                        and i - self._esc_stall_at > budget):
+                    which = (f"`{self._esc_stall_test}` still fails"
+                             if self._esc_stall_test else "the same test fails")
+                    return self._stop(
+                        f"{which} — {budget} iterations since the repeat was "
+                        "flagged changed nothing. Stopping rather than "
+                        "grinding; the fix needs a different idea")
                 # A stuck loop (or just a long session — history only shrinks via
                 # an explicit reset) can grow the prompt past what the local
                 # server can safely allocate; unlike the other budgets this isn't
@@ -1361,12 +1385,25 @@ class AgentLoop:
         for i, (name, content) in enumerate(results):
             fid = _test_failure_id(content)
             if fid is None:
+                # [escalated-stall] A green run disarms the budget: the turn is
+                # no longer stuck, and whatever it does next (a second test
+                # file, a cleanup edit) deserves the normal guards, not a clock
+                # started by a failure it has since fixed.
+                if _test_ran_green(content):
+                    self._esc_stall_at = self._esc_stall_test = None
                 continue
             if fid == self._last_test_id:
                 self._same_failure_run += 1
+                names = _failing_test_names(content)
                 results[i] = (name, content + _same_failure_note(
-                    self._same_failure_run, _failing_test_names(content),
-                    self._last_edit_file))
+                    self._same_failure_run, names, self._last_edit_file))
+                # [escalated-stall] Armed on the ESCALATED branch only — the
+                # same condition _same_failure_note switches wording on — and
+                # only the first time, so the clock measures from the steer
+                # rather than restarting with every later repeat.
+                if self._same_failure_run > 1 and self._esc_stall_at is None:
+                    self._esc_stall_at = self._iter
+                    self._esc_stall_test = names[0] if names else None
                 # Emitted because the annotation is otherwise INVISIBLE to the
                 # archive: the `result` event above is written per call, before
                 # this loop runs, so b101's sweep recorded zero annotations
@@ -2035,6 +2072,20 @@ def _looks_green_test(content: str) -> bool:
 _TEST_PROGRESS_RE = re.compile(r"^[.FEsx]{3,}\s*(?:\[\s*\d+%\])?\s*$", re.M)
 _TEST_FAILED_RE = re.compile(r"^(?:FAILED|ERROR) (\S+)", re.M)
 _TEST_EXC_RE = re.compile(r"^E\s+(\w*(?:Error|Exception|Failure))", re.M)
+
+
+def _test_ran_green(text: str) -> bool:
+    """True only for output that is recognisably a test run that PASSED.
+
+    The inverse of _test_failure_id is not this: that returns None both for a
+    green run and for output that is not a test at all, and the difference
+    matters to anything that wants to know the turn stopped being stuck.
+    """
+    prog = _TEST_PROGRESS_RE.search(text or "")
+    if not prog or _TEST_FAILED_RE.search(text or ""):
+        return False
+    line = prog.group(0)
+    return "F" not in line and "E" not in line
 
 
 def _test_failure_id(text: str) -> tuple | None:

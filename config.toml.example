@@ -97,6 +97,11 @@ require_read_before_edit = true
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 max_nochange_edits = 2          # redirect/bail if edits keep changing nothing
+# Iterations a turn may still spend after the escalated same-failure steer (the
+# one that fires on the third identical test result) before it ends itself.
+# Across the last five sweeps, runs past that point spent 19% of all iterations
+# to produce one verified finish in 69. 0 disables the cap.
+escalated_stall_budget = 8
 # Consecutive batches in which EVERY call errored. Content-independent, unlike
 # max_error_stall above: a model guessing at filenames gets a different "no such
 # file" each time, so neither the same-error stall nor the repeat guard sees it

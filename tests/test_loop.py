@@ -3277,6 +3277,97 @@ async def test_a_green_run_between_two_reds_still_reads_as_a_repeat(tmp_path):
     assert "SAME FAILURE" in res[2]
 
 
+def _budget_loop(tmp_path, scripted, payloads, budget):
+    cfg = Config()
+    cfg.agent.escalated_stall_budget = budget
+    # Every ScriptedTool payload is an error, so without this the all-failing
+    # guard ends these turns before the budget can be observed.
+    cfg.agent.max_consecutive_errors = 99
+    return make_loop_with_tests(tmp_path, scripted, payloads, cfg=cfg)
+
+
+async def test_the_escalated_steer_starts_a_budget_that_ends_the_turn(tmp_path):
+    # ROADMAP 5.43. The escalated steer converts perfectly and buys nothing: 1
+    # verified finish in the 69 runs that reached it, and 19% of every iteration
+    # in the corpus spent after it. The same-failure counter keys on the test's
+    # identity, which is the signal that actually tracks stuck-ness — this is
+    # the stop it never had.
+    loop = _budget_loop(
+        tmp_path,
+        [native_call("run_tests", which="red")] * 12
+        + [{"role": "assistant", "content": "ok"}],
+        {"red": RED}, budget=2)
+    out = await loop.run_turn("fix it")
+    assert "⏹ stopped" in out and "Stopping rather than grinding" in out
+    # armed on the third red (iteration 2), so iteration 4 is the first past it
+    assert loop._esc_stall_at == 2
+    assert len(_results(loop)) == 5
+
+
+async def test_the_stall_stop_names_the_test_that_is_stuck(tmp_path):
+    # An honest ending is only useful if it says what is stuck. The name comes
+    # from the same _failing_test_names the steer itself uses.
+    loop = _budget_loop(
+        tmp_path,
+        [native_call("run_tests", which="red")] * 12
+        + [{"role": "assistant", "content": "ok"}],
+        {"red": RED}, budget=2)
+    out = await loop.run_turn("fix it")
+    assert "tests/test_a.py::test_wrap" in out
+
+
+async def test_going_green_disarms_the_stall_budget(tmp_path):
+    # A run that recovers and then keeps working — a second test file, a
+    # cleanup edit — must not be cut off by a clock a fixed failure started.
+    loop = _budget_loop(
+        tmp_path,
+        [native_call("run_tests", which="red")] * 3
+        + [native_call("run_tests", which="green")]
+        + [native_call("run_tests", which="green")] * 6
+        + [{"role": "assistant", "content": "ok"}],
+        {"red": RED, "green": "....\n4 passed in 0.1s\n"}, budget=2)
+    out = await loop.run_turn("fix it")
+    assert "⏹ stopped" not in out
+    assert loop._esc_stall_at is None
+
+
+async def test_a_zero_budget_leaves_the_old_behaviour_alone(tmp_path):
+    # The escape hatch, and the A/B baseline.
+    loop = _budget_loop(
+        tmp_path,
+        [native_call("run_tests", which="red")] * 12
+        + [{"role": "assistant", "content": "ok"}],
+        {"red": RED}, budget=0)
+    out = await loop.run_turn("fix it")
+    assert "⏹ stopped" not in out
+    assert len(_results(loop)) == 12
+
+
+async def test_the_level_one_note_alone_does_not_arm_the_budget(tmp_path):
+    # Two identical runs is the level-1 note, which is worth 18% VERIFIED and
+    # is not what the cap is for. Only the escalated branch arms it.
+    loop = _budget_loop(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         native_call("run_tests", which="red"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED}, budget=2)
+    out = await loop.run_turn("fix it")
+    assert loop._esc_stall_at is None
+    assert "⏹ stopped" not in out
+
+
+def test_a_green_test_run_is_told_apart_from_output_that_is_not_a_test():
+    assert loop_mod._test_ran_green("....\n4 passed in 0.1s\n") is True
+    assert loop_mod._test_ran_green(RED) is False
+    # a passing progress line is not enough if something FAILED further down
+    assert loop_mod._test_ran_green(
+        "....\nFAILED tests/test_a.py::test_wrap\n") is False
+    # and ordinary command output is not a green run
+    assert loop_mod._test_ran_green("wrote 3 files\n") is False
+    assert loop_mod._test_ran_green("") is False
+
+
 async def test_the_identity_does_not_survive_into_the_next_turn(tmp_path):
     # A new turn is a new question; opening it with a stale accusation would be
     # wrong even when the bytes happen to match.

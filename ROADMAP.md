@@ -2874,6 +2874,79 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.43 Build 115: the signal that tracks stuck-ness has no stop on it (2026-08-09)
+
+Every lever from 5.32 through 5.42 tried to make the escalated steer *work*.
+Three sweeps and 5.38's wall say it doesn't and won't. So stop trying to convert
+the steer and ask the other question: what does the turn do with the iterations
+it spends after it?
+
+Measured over the five most recent sweeps — 140 runs, 3787 iterations, arms
+pooled because the question is about the harness, not about any candidate.
+
+| depth reached | runs | VERIFIED | median iterations still to come |
+|---|---|---|---|
+| `same failure (2)` — the level-1 note | 92 | 17 (18%) | 15 |
+| `same failure (3)` — the escalated steer | 69 | 1 (1%) | 8 |
+| `same failure (4)` | 46 | 0 (0%) | 0 |
+| `same failure (5)`+ | 5 | 0 (0%) | 0 |
+
+The level-1 note sits in front of a population that succeeds 18% of the time and
+is worth every iteration it costs. One step deeper the population is dead: 49%
+of all runs reach the escalated steer, and between them they spend **712
+iterations — 19% of every iteration in the corpus — to produce one verified
+finish in 69.**
+
+The obvious objection is that the existing guards already handle this, and they
+do handle it — late. 61 of those 69 runs (88%) are eventually ended by the
+repeat guard or by `max_error_stall`, a median of 10 iterations after the steer.
+They arrive late for a structural reason worth naming: **`max_error_stall` keys
+on the error TEXT, and the same-failure counter keys on the test's identity.**
+5.24b measured the gap directly — 97 distinct error signatures against 37 real
+failure identities on b99 — so a model that varies what it gets wrong walks past
+the text-keyed guard while the identity-keyed counter tracks it perfectly. The
+counter is the better stuck-ness signal and it is the one with no stop attached.
+Build 115 attaches one.
+
+**`agent.escalated_stall_budget = 8`.** Once the escalated steer fires, the turn
+gets 8 more iterations; if it is still going after that, it ends itself naming
+the test that is stuck. Going green disarms it, so a run that recovers and then
+does legitimate follow-up work is not cut off.
+
+8 is chosen to be **conservative, not optimal**, and the distinction matters
+because it is fitted to n=1. The single recovery in the corpus
+(`b113 exec-bugfix r8`) went green at exactly +8, so the budget is set to keep
+it. That costs half the available saving:
+
+| budget K | iterations saved | share of the waste | recoveries kept |
+|---|---|---|---|
+| 2 | 574 | 81% | 0 / 1 |
+| 4 | 482 | 68% | 0 / 1 |
+| 6 | 400 | 56% | 0 / 1 |
+| **8** | **327** | **46%** | **1 / 1** |
+| 12 | 210 | 29% | 1 / 1 |
+
+Cutting at 2 would look twice as good on the only number this lever moves, and
+would delete the one thing in 140 runs that argues the deep end is survivable at
+all. Tune it down later if a sweep says the recovery was noise; do not tune it
+down first.
+
+**What this is and is not.** It is not expected to raise VERIFIED — nothing
+downstream of the escalated steer verifies, so there is nothing there to save.
+It converts a long useless turn into a short honest one, which is most of what
+turn efficacy means from outside the process, and it is the first lever aimed at
+that rather than at the success rate. The grading criteria, fixed before the
+sweep runs:
+
+- **Must not regress.** VERIFIED and score unchanged within noise. A drop means
+  the budget is cutting live runs and 8 is too low.
+- **Should show.** Median iterations down; `stopped` reasons shifting toward the
+  new message; the post-steer iteration count down by roughly the modelled 46%.
+- **Watch.** Runs where the stop fires and the case would have passed anyway —
+  read them, they are the counter-argument.
+
+Per methodology 28 this is the **only** change in its sweep. No wording moved.
+
 ### 5.42 Build 113 is a negative result, and it rested on a bad number (2026-08-09)
 
 `b113-wholefile` (r14, base build 112). Graded in the planned order.
