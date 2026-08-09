@@ -712,3 +712,73 @@ def test_the_same_failure_family_collapses_to_one_bucket():
 def test_missing_deliverable_keeps_its_bucket_despite_the_filename():
     assert harness._nudge_bucket("missing deliverable: notes.md") == \
         "missing deliverable"
+
+
+# --- server fingerprint ------------------------------------------------------
+# A restart between two sweeps moved clean finishes 40+ points with the model,
+# alias, weights, temperature and case all held fixed, and ab.json recorded
+# nothing that could have caught it. These pin the identity check that does.
+
+_PS = (
+    "  PID                  STARTED COMMAND\n"
+    "  501 Sat Aug  2 09:00:00 2026 /usr/sbin/coreaudiod\n"
+    " 8412 Sat Aug  8 16:18:10 2026 /opt/homebrew/opt/python/bin/python3.11 "
+    "/opt/homebrew/bin/mlx_lm.server --model "
+    "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit --host 127.0.0.1 "
+    "--port 8081 --max-tokens 8192 --prompt-cache-size 4\n"
+)
+
+
+def test_the_server_fingerprint_reads_pid_start_and_model():
+    fp = harness._parse_server_ps(_PS)
+    assert fp["pid"] == "8412"
+    # `ps` space-pads single-digit days; the fingerprint stores the whitespace-
+    # normalized form so the same process compares equal on the 8th and 18th.
+    assert fp["started"] == "Sat Aug 8 16:18:10 2026"
+    assert fp["model"] == "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
+
+
+def test_the_fingerprint_keeps_the_whole_argv():
+    # The Aug-8 restart differed from its predecessor in cache flags, not the
+    # model, so dropping argv would have thrown away the only visible change.
+    assert "--prompt-cache-size 4" in harness._parse_server_ps(_PS)["argv"]
+
+
+def test_a_space_padded_day_number_does_not_shift_the_columns():
+    fp = harness._parse_server_ps(_PS.replace("Aug  8", "Aug 18"))
+    assert fp["started"] == "Sat Aug 18 16:18:10 2026"
+    assert fp["model"].endswith("Qwen2.5-Coder-14B-Instruct-4bit")
+
+
+def test_no_server_running_is_none_not_a_crash():
+    assert harness._parse_server_ps("  PID STARTED COMMAND\n") is None
+    assert harness._parse_server_ps("") is None
+
+
+def test_a_grep_for_the_server_is_not_mistaken_for_the_server():
+    line = " 9001 Sat Aug  8 16:18:10 2026 grep mlx_lm.server\n"
+    assert harness._parse_server_ps(line) is None
+
+
+def test_same_server_is_true_only_for_the_same_process():
+    a = harness._parse_server_ps(_PS)
+    assert harness.same_server(a, dict(a)) is True
+    assert harness.same_server(a, {**a, "pid": "9999"}) is False
+
+
+def test_a_recycled_pid_at_a_new_start_time_is_a_different_server():
+    a = harness._parse_server_ps(_PS)
+    assert harness.same_server(a, {**a, "started": "Sun Aug  9 01:02:03 2026"}) \
+        is False
+
+
+def test_an_unknowable_comparison_is_none_not_false():
+    # None must not read as "different" — an old sweep with no recorded server
+    # is unknown, and warning about it would train me to ignore the warning.
+    a = harness._parse_server_ps(_PS)
+    assert harness.same_server(a, None) is None
+    assert harness.same_server(None, None) is None
+
+
+def test_server_fingerprint_accepts_injected_ps_text():
+    assert harness.server_fingerprint(_PS)["pid"] == "8412"

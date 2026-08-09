@@ -63,8 +63,34 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness import (  # noqa: E402
     REPO_ROOT, RESULTS_DIR, RunResult, discover_cases, run_case, summarize,
-    print_report,
+    print_report, server_fingerprint, same_server,
 )
+
+#: Captured once per process: `_persist` checkpoints after every run, and
+#: shelling out to `ps` 28 times to re-learn the same pid is waste. `"unset"`
+#: distinguishes "not looked yet" from "looked, found no server".
+_SERVER_FP: object = "unset"
+
+
+def _server_fp() -> dict | None:
+    global _SERVER_FP
+    if _SERVER_FP == "unset":
+        _SERVER_FP = server_fingerprint()
+    return _SERVER_FP  # type: ignore[return-value]
+
+
+def _prior_sweep_server() -> tuple[str, dict] | None:
+    """The newest earlier sweep that recorded a server, as (label, fingerprint)."""
+    best: tuple[str, str, dict] | None = None
+    for path in RESULTS_DIR.glob("*/ab.json"):
+        try:
+            report = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        fp, created = report.get("server"), report.get("created", "")
+        if fp and (best is None or created > best[0]):
+            best = (created, report.get("label", path.parent.name), fp)
+    return (best[1], best[2]) if best else None
 
 # A sign-flip test on n pairs can produce at most 2**n distinct outcomes, so its
 # smallest attainable two-sided p-value is 2/2**n. At 5 pairs that floor is
@@ -470,6 +496,7 @@ def _persist(results_dir: Path, runs: list[RunResult], label: str,
         "base_sha": base_sha,
         "cand_desc": (str(cand_root) if cand_root else
                       f"working tree ({REPO_ROOT})"),
+        "server": _server_fp(),
         "pairs": pairs,
         "dropped": dropped,
         "case_table": per_case(pairs),
@@ -546,6 +573,21 @@ def main(argv=None) -> int:
                   f"result. Pass --allow-identical to run it as an A/A "
                   f"calibration.", file=sys.stderr)
             return 2
+        fp, prior = _server_fp(), _prior_sweep_server()
+        if fp is None:
+            print("!! could not identify the model server process; this "
+                  "sweep's results will not be comparable to others by "
+                  "server identity.\n", flush=True)
+        else:
+            print(f"   server: pid {fp['pid']} up since {fp['started']}"
+                  f"{' · ' + fp['model'] if fp['model'] else ''}")
+            if prior and same_server(fp, prior[1]) is False:
+                print(f"!! the server has RESTARTED since {prior[0]} (pid "
+                      f"{prior[1]['pid']} up {prior[1]['started']}). This "
+                      f"sweep's own base-vs-cand comparison is unaffected, but "
+                      f"do NOT compare its absolute rate against {prior[0]} or "
+                      f"anything older — a restart alone has moved clean "
+                      f"finishes by 40+ points before.\n", flush=True)
         n_pairs = len(cases) * len(args.model) * args.repeat
         if n_pairs < _MIN_PAIRS:
             print(f"!! this plan yields {n_pairs} pair(s); below {_MIN_PAIRS} "

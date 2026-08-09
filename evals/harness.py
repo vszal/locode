@@ -725,6 +725,69 @@ def _power_state() -> tuple[bool | None, str]:
     return None, "could not read power state"
 
 
+def _parse_server_ps(text: str) -> dict | None:
+    """Pull the model server's identity out of `ps -eo pid,lstart,command`.
+
+    Returns pid, the process start time, and the full argv, or None if no
+    server is running. `lstart` is five space-separated fields ("Sat Aug  8
+    16:18:10 2026") with a day number that may be space-padded, so the columns
+    are taken positionally rather than split on runs of whitespace.
+    """
+    for line in text.splitlines():
+        if "mlx_lm.server" not in line or " grep " in line:
+            continue
+        parts = line.split()
+        if len(parts) < 7:
+            continue
+        pid, started, argv = parts[0], " ".join(parts[1:6]), parts[6:]
+        model = ""
+        if "--model" in argv:
+            i = argv.index("--model")
+            model = argv[i + 1] if i + 1 < len(argv) else ""
+        return {"pid": pid, "started": started, "model": model,
+                "argv": " ".join(argv)}
+    return None
+
+
+def server_fingerprint(ps_text: str | None = None) -> dict | None:
+    """Identify the model server process this sweep is about to talk to.
+
+    The eval pins the case, the prompt, the alias and the git ref, and for a
+    long time that felt like enough. It was not: on 2026-08-08 the server was
+    restarted between two sweeps, and with the *same* model, alias, weights and
+    temperature on both sides the model's behaviour changed sharply — the plan
+    it wrote went from three variants to one byte-identical string across 140
+    runs, and clean finishes went from 0-7/14 to 4-11/14. Every cross-sweep
+    comparison spanning that restart was measuring the restart. Nothing in
+    ab.json recorded it, so the confound was invisible for eight builds.
+
+    Paired A/B is immune (both arms interleave against one live process), but
+    "build N was 25%, build N+5 is 71%" is not. Stamping the pid and start time
+    into every report makes that comparison checkable after the fact.
+    """
+    if ps_text is None:
+        if sys.platform not in ("darwin", "linux"):
+            return None
+        try:
+            ps_text = subprocess.run(["ps", "-eo", "pid,lstart,command"],
+                                     capture_output=True, text=True,
+                                     timeout=5).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None
+    return _parse_server_ps(ps_text)
+
+
+def same_server(a: dict | None, b: dict | None) -> bool | None:
+    """Did two sweeps run against the same server process? None if unknowable.
+
+    Keyed on pid AND start time: pids are recycled, and a recycled pid pointing
+    at a different process is exactly the case this guard exists to catch.
+    """
+    if not a or not b:
+        return None
+    return (a.get("pid"), a.get("started")) == (b.get("pid"), b.get("started"))
+
+
 def _validity_warnings(baseline: dict, candidate: dict) -> list[str]:
     """Reasons the two sweeps cannot be compared as like for like.
 

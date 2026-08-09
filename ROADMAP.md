@@ -2874,6 +2874,119 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.48 One coin flip at call 2 decides the run, and it decides the sweep (2026-08-09)
+
+Within the post-restart era of 5.47 (b110–b116, 140 runs, one server process),
+runs split at their **third tool call** and never recover from the split:
+
+| 3rd tool call | outcome | VERIFIED | share of runs |
+|---|---|---|---|
+| `edit_file` | rejected — "You have NOT read … yet" | **83 / 106 = 78%** | 76% |
+| `read_file` | succeeds | **1 / 34 = 3%** | 24% |
+
+Fisher two-sided **p = 6.7e-16**. The winning path goes *through* a blocked
+edit: `require_read_before_edit` refuses the edit, the model reads, then fixes
+it. The runs that read the file of their own accord at that same point lose
+almost every time.
+
+**The context before the split is byte-identical.** All 140 runs open with the
+same `bash` call, get the same pytest output (one md5 across every run in every
+sweep since b102), and write the same `update_plan` — 233 characters, one hash,
+28 out of 28, in both branches. There is no earlier state difference to point
+at. Both branches then read the whole file; neither windows the read, so this is
+not 5.41 wearing a new hat.
+
+**This is the variance the endings channel has been fighting.** The branch mix
+is drawn fresh per arm, and it tracks the arm's score almost exactly:
+
+| sweep | base read-first | base VERIFIED | cand read-first | cand VERIFIED |
+|---|---|---|---|---|
+| b115 | 4 / 14 | 9 / 14 | 1 / 14 | 11 / 14 |
+| b116 | 6 / 14 | 4 / 14 | 1 / 14 | 11 / 14 |
+
+b116's headline gap — base 4/14 vs cand 11/14, p = 0.021 — sits on top of a
+read-first draw of 6 versus 1 (p = 0.077) in arms whose only code difference is
+a stall cap that **cannot fire before iteration 24**. The lever is downstream of
+a split that has already decided the run. This is the mechanism behind 5.46's
+conclusion, and it is why a 2-run VERIFIED gap at r14 is worth nothing.
+
+**What this is not.** The branch is chosen by the model, not assigned by me, so
+"blocking the edit causes the win" is one reading and "the sample that reaches
+for the edit was going to win anyway" is the other, and no amount of staring at
+these logs separates them. The pre-restart era argues for caution: there, *all*
+28 runs were read-first and build 108's candidate arm still went 7/14, so
+reading first is not intrinsically fatal — it is fatal in this process. Do not
+turn this into a "force an edit first" lever without a randomized test.
+
+**What to do with it now, which is free:** report the branch mix beside VERIFIED
+in every sweep. It costs nothing and it converts b116's exciting-looking table
+into the honest statement that one arm drew five more losing openings.
+
+### 5.47 The 25%→71% was a server restart, and I emailed it as progress (2026-08-09)
+
+**Retracting the headline of 5.45.** That section reported build 109 at 7/28 =
+25% against build 114 at 20/28 = 71%, Fisher p = 1.1e-3, and called it the
+project's first significant progress measurement. It compares two sweeps that
+ran against **two different server processes**, and the restart alone accounts
+for the jump.
+
+The mlx-server log records every start. Laid against the sweeps:
+
+| when | what |
+|---|---|
+| Aug 7 19:42 | server starts (Qwen2.5-Coder-14B-Instruct-4bit) |
+| Aug 8 01:08 → 07:27 | b102, b106, b107, **b108** run here |
+| Aug 8 16:08, **16:18** | server restarted twice; pid 69851 is still up |
+| Aug 8 19:05 → Aug 9 05:14 | **b110**, b111, b113, b115, b116 run here |
+
+Everything a sweep pins was held fixed across that line: same case fixture
+(untouched since build 78), same 284-char prompt, same alias, same resolved
+model id on both sides of the restart, `temperature = 0.3` unchanged since the
+repo's first commit, same deterministic first pytest output. And the only
+product change between build 108 and b110's base ref is `locode/__init__.py` —
+the build number. Every other commit in the window is docs.
+
+What moved anyway:
+
+| | pre-restart (b102–b108) | post-restart (b110–b116) |
+|---|---|---|
+| distinct plans at call 1 | 3 | **1** (233 chars, 140/140 identical) |
+| 3rd call is `read_file` | 100% | 24% |
+| VERIFIED per arm | 0–7 / 14 | 4–11 / 14 |
+
+A restart with identical weights should not do that. The most likely mechanism
+is the prompt cache (`--prompt-cache-size 4 --prompt-cache-bytes 1610612736` on
+the current process): a warm KV cache makes the shared prefix numerically
+identical run to run, which is exactly the shape of the observation — one plan
+instead of three. I cannot confirm the old process's flags; the log does not
+record argv. That uncertainty does not matter for the retraction, because the
+confound is established by the timing and the elimination of every alternative,
+not by the mechanism.
+
+**What survives.** Every *paired* verdict — b110, b111, b113, b115, b116 — is
+untouched, because both arms interleave against one live process, and that is
+precisely the property paired same-session A/B was built for. 5.33's build-108
+result (0/14 → 7/14) is within a single sweep and stands. What dies is every
+cross-sweep comparison of absolute rates that spans Aug 8 16:08: 5.45's
+headline, and any future sentence of the form "build N was X%, build N+5 is Y%".
+
+**The fix, landed in build 117.** `server_fingerprint()` reads the server's pid,
+start time, model and full argv from `ps` and `ab.py` stamps it into every
+`ab.json`; a sweep that starts against a different process than the newest
+recorded one prints a loud warning that its absolute rate is not comparable
+backwards. Nine tests in `tests/test_harness.py` pin the parse, including the
+recycled-pid case (identity is pid **and** start time) and the rule that an
+unknowable comparison returns None rather than a false alarm. The archived
+`ab.json` files are deliberately **not** backfilled: I inferred their servers
+from a log, and inferred data written into a results file is indistinguishable
+from measured data six weeks later.
+
+**Methodology.** New rule 35: *an A/B pins the code; only the paired design pins
+the machine. Before comparing an absolute rate across two sweeps, prove they
+ran on the same server process.* This is rule 24 (the population changed) with
+a part of the population I did not know was a variable. A correction has gone
+out by email, since the 25%→71% number was reported as a result.
+
 ### 5.46 b116: the cap works, and VERIFIED was never the metric for it (2026-08-09)
 
 `b116-noopcap` (r14, base `a6f28f7` = build 115, so the only delta is the no-op
@@ -2978,6 +3091,13 @@ behaviour change); the reason to decline was better than the one given.
 case, same model, same repeat count, and `git diff 553cc5e..HEAD -- evals/`
 is empty, so the harness, the case and the grader are byte-identical. Comparing
 A/A to A/A pools 28 runs of each against no candidate at all:
+
+> **RETRACTED — see 5.47.** `aa14-calib` ran 2026-08-08 09:51 and
+> `b115-stallcap` 2026-08-09 02:50, with the model server restarted between them
+> (Aug 8 16:08/16:18). The code was byte-identical; the *process* was not, and
+> the restart alone moves this number. The two rows below are not comparable and
+> the p-value is meaningless. Everything else in 5.45 — the noise floor, the
+> A/A reading, the disposition — is within-sweep and stands.
 
 | | VERIFIED |
 |---|---|
