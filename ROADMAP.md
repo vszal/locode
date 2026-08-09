@@ -2874,6 +2874,83 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.40 Build 111: the steer converts perfectly and buys nothing (2026-08-08)
+
+`b111-recipe` (r14, base build 110 at `09b0c16`, cand build 111). The clearest
+result in this stretch, in both directions.
+
+**Channel A — the reshape works, completely.** Prose-only after the two
+escalated steers:
+
+| arm | prose | what they called instead |
+|---|---|---|
+| base (110) | **6/6 = 100%** | — |
+| cand (111) | **0/10 = 0%** | 10× `read_file` |
+
+The 5.32 recipe transfers to any steer it is applied to. That is now three
+steers and 86 events at 0%, against 100% for the same steer one build earlier.
+The control (the level-1 note) held at 0/5 and 0/13.
+
+**Channel B — and the wall did not move.** Runs reaching an escalated steer,
+then verifying: base 0 of 3, cand **0 of 6**. The standing count goes from 0/49
+to **0/58**. So the model now does exactly what level 3 asks — reads the file
+it was told to read — and still never recovers. **Compliance at level 3 is a
+vanity metric.** 5.38's fork resolves to its second branch.
+
+**The arms also diverged, and build 111 cannot be cleared or convicted for
+it.** VERIFIED 9 → 6, stopped 5 → 8, mean iterations 22.4 → 28.1, score −0.107
+(p=0.51, inside the +0.143 floor). The proximate cause is exposure, not the
+steers: runs that touch the `edit_file` "ALREADY DONE" path are fatal in *both*
+arms — **0 of 4 base, 0 of 7 cand, 0 of 11 overall** — and the cand arm drew
+seven of them against base's four. Every single VERIFIED run in the sweep, both
+arms, finished in exactly 23 iterations.
+
+**But I bundled, so I cannot finish that sentence honestly.** Build 111 carried
+a second change: 5.36's "no_change edits are not landed edits". Two things about
+it, both found only after the sweep:
+
+1. **It fixed no metric.** `armstats` derives landed edits from the event
+   stream, where a `no_change` result carries `error: false`. It counted them
+   before and after. The eval number 5.36 set out to correct never changed.
+2. **It did change the agent.** `_landed_edits` feeds the repeat detector's
+   [verify-after-change] reset, so suppressing it makes repeat-stops fire
+   sooner — and the cand arm's stop mix shifted exactly that way, from `edits
+   kept hitting the same error` (3) to `the model repeated the same tool call`
+   (6), with `repeated call` nudges going 2 → 15.
+
+A behaviour change rode inside a sweep testing steer *wording*. Whatever the
+regression is, this sweep cannot attribute it.
+
+**Build 112** unbundles: revert the `_landed_edits` exclusion to build 110
+semantics, and emit `no_change` on the result event instead, where a grader can
+read it without touching how the agent behaves. Build 111's wording survives
+intact — Channel A earned it, and it costs nothing.
+
+**Methodology 28: never bundle a behaviour change into a sweep that tests
+wording.** The temptation is that the behaviour change is "obviously correct
+and unrelated". 5.36's was neither, and one bundled line cost the attribution
+of a 2.4-hour sweep. Ship the wording, sweep it, then ship the behaviour.
+
+**Methodology 29: before "fixing" a metric in the product, check where the
+metric is actually computed.** This one lived in the grader the whole time. The
+fix belonged in `armstats.py`, cost nothing, and risked nothing; putting it in
+`loop.py` changed the agent to correct a number the agent does not produce.
+
+**Where this leaves turn efficacy.** Three sweeps of steer-wording work have
+established the shape that makes a local model act instead of narrate, and it
+is reliable. But 5.38's law says VERIFIED is the level-1 escape rate, and
+nothing downstream of level 1 has ever moved it. The remaining levers are
+structural, not verbal:
+
+- **The `ALREADY DONE` path is 0 for 11.** A run that sends an already-applied
+  edit does not recover, under any of the three messages tried (build 55's,
+  110's, 111's). Stop writing messages for it. The question worth asking is why
+  the model believes an applied edit still needs applying — most likely it is
+  reading stale file contents out of its own context rather than the disk.
+- **Ending the turn at level 3** now costs nothing measurable: 0/58 recoveries,
+  and the runs that get there spend 10–20 further iterations (cand's reached
+  runs ran to 33, 35, 44) producing nothing.
+
 ### 5.39 Two level-1 levers, mined and declined (2026-08-08)
 
 5.38 says the level-1 escape rate is the whole game, so I went looking for a

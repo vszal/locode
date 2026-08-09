@@ -1271,6 +1271,17 @@ class AgentLoop:
                                  f"tool's schema and try again.", is_error=True)
             self._on_event({"phase": "result", "name": call.name,
                             "error": res.is_error, "content": res.content,
+                            # Build 112. Telemetry ONLY — nothing in the loop
+                            # reads it back. It exists because armstats counts
+                            # a landed edit as "an editing call whose result
+                            # was not an error", which silently includes the
+                            # three no_change branches: the eval has been
+                            # scoring an already-applied edit as a landed one
+                            # all along. Emitting the flag lets the grader be
+                            # corrected without touching how the agent behaves
+                            # — which is exactly the mistake build 111 made
+                            # (ROADMAP 5.40).
+                            "no_change": bool(getattr(res, "no_change", False)),
                             "seconds": round(time.monotonic() - t0, 3)})
             results.append((call.name, res.content))
             ran += 1
@@ -1299,20 +1310,22 @@ class AgentLoop:
                 # "did this turn ever close the loop?"); the done-on-repeated-
                 # verify exit needs "is the code green RIGHT NOW?" instead.
                 self._last_verify_ok = not res.is_error
-            if (call.name in _MUTATING_EDIT_TOOLS and not res.is_error
-                    and not getattr(res, "no_change", False)):
+            if call.name in _MUTATING_EDIT_TOOLS and not res.is_error:
                 # An edit that actually landed. Distinct from edit_tally, which
                 # counts attempts including the not_found/no-op failures — this
                 # is the "the workspace really did change" evidence.
                 #
-                # `no_change` has to be excluded explicitly, not left to
-                # is_error: three edit_file branches answer an already-applied
-                # edit as a NON-error no_change (build 55's two, plus build
-                # 110's `old == new` case), precisely so the model reads "done"
-                # rather than reverting its own working fix. Those return
-                # is_error=False while the workspace demonstrably did not
-                # change, and this flag gates the done-on-repeated-verify exit
-                # and the unverified-edit accounting. ROADMAP 5.36.
+                # Build 112 REVERTS build 111's `no_change` exclusion here.
+                # 5.36 justified it as a metric fix, and it fixed no metric:
+                # armstats derives landed edits from the event stream, where a
+                # no_change result carries `error: false`, so it counted them
+                # either way. What the exclusion did do was change the agent —
+                # `_landed_edits` feeds the repeat detector's [verify-after-
+                # change] reset, so suppressing it makes repeat-stops fire
+                # sooner. That behaviour change rode along inside a sweep
+                # testing STEER WORDING, which is why b111 cannot attribute its
+                # own regression. The grader-side flag now rides on the result
+                # event instead. ROADMAP 5.40.
                 self._landed_edit = True
                 self._landed_edits += 1
                 edited = (call.args or {}).get("path")

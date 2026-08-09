@@ -3544,13 +3544,14 @@ async def test_the_stall_nudge_names_the_file_it_edited(tmp_path):
     assert "`textkit.py`" in nudge
 
 
-# --- build 111 / 5.36: a no-op edit is not a landed edit --------------------
+# --- build 112 / 5.40: the no_change flag rides on the EVENT, not the loop ---
 
-async def test_a_nonerror_no_change_edit_is_not_counted_as_landed(tmp_path):
-    # edit_file answers an ALREADY-APPLIED edit as a NON-error no_change so the
-    # model doesn't revert its own working fix. _landed_edit means "the
-    # workspace really did change", and it did not — it gates the
-    # done-on-repeated-verify exit and the unverified-edit accounting.
+async def test_a_nonerror_no_change_edit_is_reported_on_the_result_event(tmp_path):
+    # Build 111 excluded no_change from _landed_edits as a "metric fix". It
+    # fixed no metric — armstats reads the event stream, where these results
+    # carry error=false — and it DID change the agent, since _landed_edits
+    # feeds the repeat detector's reset. Build 112 puts the flag where the
+    # grader can see it and leaves the loop's own counter alone.
     (tmp_path / "a.py").write_text("value = 42\n")
     cfg = Config()
     cfg.permissions.tools["edit_file"] = "auto"
@@ -3562,10 +3563,16 @@ async def test_a_nonerror_no_change_edit_is_not_counted_as_landed(tmp_path):
                      new="value = 42"),
          {"role": "assistant", "content": "done"}],
         cfg=cfg)
+    events = []
+    loop._on_event = events.append
     await loop.run_turn("fix a.py")
-    assert loop._landed_edits == 0
-    assert loop._landed_edit is False
-    assert loop._last_edit_file is None
+    # the loop still counts it — reverted deliberately, see ROADMAP 5.40
+    assert loop._landed_edits == 1
+    # ...and the grader can now tell the difference from the event alone
+    noop = [e for e in events
+            if e.get("phase") == "result" and e.get("name") == "edit_file"]
+    assert noop and noop[-1]["no_change"] is True
+    assert noop[-1]["error"] is False
 
 
 async def test_a_real_edit_still_counts_as_landed(tmp_path):
