@@ -2874,6 +2874,67 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.38 Level 3 is a dead zone: 0 of 49 runs that reached it ever verified (2026-08-08)
+
+Followed 5.37's depth finding one step further — if prose decays with depth,
+what does *success* do? Pooled over the three recent r14 sweeps (84 runs),
+using armstats' own VERIFIED definition:
+
+| total iterations | runs | VERIFIED | stopped |
+|---|---|---|---|
+| 16–25 | 46 | 31 (67%) | 14 |
+| 26–35 | 24 | 1 (4%) | 21 |
+| 36+ | 14 | 0 (0%) | 10 |
+
+A run either finishes inside ~25 iterations or it does not finish. Conditioning
+on which steer a run ever reached makes it sharper:
+
+| nudge reached | runs | VERIFIED | median iters |
+|---|---|---|---|
+| `same failure (2 runs in a row)` — level 1 | 64 | **14 (22%)** | 33 |
+| `same failure (3 runs in a row)` — level 3 | 49 | **0 (0%)** | 33 |
+| `error unchanged across edits` — level 3 | 45 | **0 (0%)** | 33 |
+| `same failure (4 runs in a row)` | 32 | 0 (0%) | 33 |
+| `unverified edits` | 43 | 18 (42%) | 23 |
+| `repeated call` | 21 | 0 (0%) | 34 |
+| `tests claimed passing but never seen green` | 7 | 0 (0%) | 40 |
+| `context compacted` | 6 | 0 (0%) | 45 |
+
+**Not one run that reached an escalated steer has ever ended verified — 0 of
+49 — while runs that never reached one verify at 91% (32/35).** Part of that is
+definitional: a run that recovers at level 1 never reaches level 3, so level 3
+selects for runs already in trouble. But the *cliff* is the finding. Level 1 is
+where essentially all the recoverable probability mass sits (22% still verify
+after it); by level 3 there is none left, and the remaining ~10 iterations are
+spent producing nothing.
+
+**This reframes the running b111-recipe sweep, for the better.** Build 111
+gives the escalated steers the recipe that makes the level-1 note convert 100%
+of the time. The prose-only metric asks "did the model obey"; the question that
+actually matters is now sharper and free — **does any run that reaches level 3
+verify?** The answer has been 0/49 across three sweeps. If build 111's cand arm
+produces even two or three, level 3 is recoverable and the steer wording was
+the whole problem. If it converts the prose to `read_file` calls and *still*
+returns 0, then compliance at level 3 is a vanity metric and the lever is
+elsewhere. Either result is worth the GPU time; grade both.
+
+**Two candidate levers behind that fork, neither built yet:**
+
+1. **Stop asking at level 3 — inject.** 19 of 19 post-108 responses that acted
+   on an escalated steer called `read_file`, and the ones that narrate never
+   call anything. So the harness could simply attach the relevant source window
+   itself and skip the compliance question. The tension is 5.37: depth is
+   lethal, and pasting a file at iteration 31 spends the budget that is already
+   killing the run — so a focused window (the function under the failing
+   assertion), not the whole file.
+2. **End the turn at level 3 instead of grinding.** If 0/49 is real, the ~10
+   iterations after the first escalated steer are pure waste, and the user gets
+   a stall report ten iterations later than the harness knew. Ending there
+   would not raise VERIFIED, but it converts a long useless turn into a short
+   honest one, which is most of what "turn efficacy" means from the outside.
+   Gate this on the b111 result — if level 3 does convert, cutting it off would
+   be throwing away the recoveries.
+
 ### 5.37 Prose is a function of DEPTH — except where the recipe is (2026-08-08)
 
 Built the build-111 grader against the old sweeps first (methodology 25) and
