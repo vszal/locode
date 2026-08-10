@@ -2874,6 +2874,44 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.63 Lever 0b — build 119 teaches the copying and loses the correction (design, 2026-08-10)
+
+The user-reported defect ("edit_file … ✗ This edit does NOTHING: `new` is
+identical to `old`") is now reproducible on demand, and build 119's own message
+is what produces it. Counts from the sweeps that ran it: **96 of 96** applied
+edits in b122 were no-ops, **78 of 132** in b121-aa.
+
+The message currently says:
+
+> Pick the block you meant and copy it VERBATIM into `old` — every line of it,
+> with its leading spaces exactly as shown above. **Put that same block in
+> `new` with your correction applied to it.**
+
+The load-bearing instruction — *change something* — is a trailing subordinate
+clause on a sentence whose main verb is "put that same block in `new`". The
+model executes the main clause and drops the modifier, which is exactly the
+failure 5.32 describes: these models act on the sentence's SUBJECT, and here the
+subject is copying. Verbatim-copying is stressed three times; the correction
+once, last, and grammatically demoted.
+
+**The rewrite** (to land once b123 frees the source tree): make the correction
+the thing being asked for and copying the mechanism that aims it, and add the
+explicit negative these messages otherwise lack —
+
+- lead with *decide the one line that is wrong and what it becomes*;
+- then the two fields, `old` verbatim and `new` the same block **with that one
+  line rewritten**;
+- then a flat prohibition: a block pasted into both fields unchanged is an edit
+  that does nothing and will be rejected;
+- keep the read-the-whole-block paragraph and the `replace_all` /
+  `replace_lines` escape hatches at the tail, per 5.20b's route order.
+
+Graded on the no-op rate among edits that follow an ambiguous message (base
+~73%, and the bar is a fall to under a third), with `fully_fixed` as the
+non-regression guard. Note this metric is *directly* readable from the event
+stream — `no_change` rides on the result event — so unlike 5.62 it does not need
+the ending channel.
+
 ### 5.62 PRE-REGISTRATION — the stale-reading reprieve (build 120, written before b123 runs)
 
 Lever 0 from 5.61, shipped as build 120 (`54b594b`). The escalated-stall stop
