@@ -2874,6 +2874,53 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.64 b123 verdict — build 120 CREDITED, and the miss is in my bar, not the fix (2026-08-10)
+
+Graded against 5.62, written before the sweep. `ab.py`: −0.062, p=0.58, NO
+DETECTABLE DIFFERENCE — expected, and not the result (rule 37).
+
+| call | bar | base | cand | |
+|---|---|---|---|---|
+| 1 DONE rate | cand ≥ 6/24 | **0/24** | **8/24** | **PASS**, Fisher p=0.0039 |
+| 2 lever fires | ≥60% of cand runs | 0/24 | 8/24 (33%) | **MISSED AS WRITTEN** |
+| 3 no new grinding | Δmedian ≤ ~2 | 17.0 | 17.0 | PASS |
+| 4 fully_fixed holds | must not fall | 11/24 | 8/24 | **raw MISS**, p=0.56 |
+
+**The mechanism is as clean as anything in this archive.** The reprieved runs
+and the DONE runs are *the same 8 runs* — 8 reprieved, 8 DONE, 0 reprieved-and-
+still-stopped, 0 DONE-without-a-reprieve. All 8 answered the nudge with `bash`
+on the very next call, all 8 came back green, and **all 8 were `fully_fixed`.
+Zero false completions** — the failure mode that would have killed this outright.
+Read one end to end (`r10__cand`): reprieve → nudge → `python3 -m pytest -q` →
+`13 passed` → closes out.
+
+**Call 2 is a miss, and the bar was the thing that was wrong.** 60% was a guess
+at how often the stale condition *occurs*; it is not a property of the lever. The
+actual incidence is 33%, and b121-aa predicted it almost exactly (18/48 = 38%
+green-but-killed). Within the population the fix exists for, conversion is 8/8.
+Recording it as a miss rather than rewriting the bar (rule 40 exists to stop me
+doing that) — but rule 40's "instrument failed, call 1 is UNGRADED" escape does
+**not** apply here: it is for a lever that never fired. This one fired, and
+converted totally.
+
+**Call 4 is a raw miss that the calibration overturns.** The A/A in 5.59 gave
+base 12/24 vs cand 6/24 on *identical* code — a ~2× slot bias against the
+candidate. Against that expectation, base 11 and cand 8 is the candidate coming
+in **above** its slot, not below its baseline. p=0.56 on the raw pair. So: no
+evidence of a fixing regression, and no license to claim an improvement either.
+This is the second verdict in a row bent by the slot bias; 5.59's note that it
+touches every past A/B on this setup is still unactioned.
+
+Also visible in cand: `fully_fixed` is 8/8 among reprieved runs and **0/16**
+among the rest. The reprieve does not cause fixing — it is fired *by* having
+finished. What it recovers is the ending.
+
+**Secondary, not pre-registered, so a lead and not a result:** after a reprieved
+run goes provably green, it still spends a median of **4 more tool calls** — the
+`open plan tasks` nudge sends it back to `update_plan`/`read_file` and a second
+identical pytest before it will stop. Worth a look after 0b: the plan gate
+outranks proof.
+
 ### 5.63 Lever 0b — build 119 teaches the copying and loses the correction (design, 2026-08-10)
 
 The user-reported defect ("edit_file … ✗ This edit does NOTHING: `new` is
