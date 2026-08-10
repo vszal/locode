@@ -2874,6 +2874,52 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.61 b122: the probe failed, and found the bigger bug on the way out (2026-08-10)
+
+**The pre-registered call in 5.60 is UNGRADED.** I predicted POSITION. I got no
+data: across 48 runs the model never reached the reordered pairs even once, so
+the "buggy listed FIRST" row is empty and neither hypothesis was tested. Not
+confirmed, not refuted. The question is still open and needs a design that does
+not disturb the run's early branch.
+
+Reordering alone destroyed the case — 0/48 runs made a single real edit, against
+18/48 under the v2 ordering, Fisher p = 1.1e-06. Real edits per run are bimodal,
+**0 or exactly 3, never in between**, and the 18 runs with 3 are exactly the 18
+that fully fixed it. An early branch decides the entire run (the same shape as
+the 5.48 call-2/call-3 branch), and moving two function definitions removed the
+good branch. v3 is reverted.
+
+**The bigger find: build 119's message is half-obeyed, and the dropped half is
+the one that matters.** The message says copy the block VERBATIM into `old`,
+then put that same block in `new` *with your correction applied*. The model does
+the first clause and drops the second — it copies the block into **both** fields:
+
+    OLD:  """Clamp `x` into the inclusive range [0, 100]."""  ...
+    NEW:  """Clamp `x` into the inclusive range [0, 100]."""  ...   (identical)
+
+Rates of applied edits that changed nothing: **96/96 in v3, 78/132 in v2.** This
+is exactly the defect reported from real sessions — *"edit_file ✗ This edit does
+NOTHING: `new` is identical to `old`"* — and it is now reproduced on demand with
+a measured rate. Note the irony to be honest about: build 119 is credited and
+deserved it (0/38 vs 25/72), and build 119 also *causes* this, because leaning
+hard on "copy VERBATIM" gets a verbatim copy into both fields. The next lever is
+to make the message lead with the change and treat the copying as the mechanism,
+not the instruction.
+
+**A second, independent product defect: the agent abandons work it has already
+finished.** All 48 runs of the v2 A/A ended with the stall message "`limits.py`
+still fails — 10 iterations since the repeat was flagged changed nothing", yet
+**18 of those 48 were green when check.py re-ran pytest.** The stall detector is
+reading the model's last observed pytest, but the model edits after its last
+pytest, so the run is judged on a stale observation and killed after it has
+succeeded. This is rule 41 — a read point that measures when you last looked
+rather than what is true — appearing in the product rather than in my metrics.
+It is a plain bug and likely worth more than any prompt wording: up to 18/48
+runs here were finished and thrown away.
+
+Both go on the lever list, the stale-stall bug first, since it is a correctness
+defect rather than a persuasion problem.
+
 ### 5.60 PRE-REGISTRATION — position or reasoning? (written before b122 finished)
 
 b122-v3probe is running: 48 runs of build 119 on exec-ambig v3, which lists the
