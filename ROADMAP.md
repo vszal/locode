@@ -2874,6 +2874,46 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.58 b121-confirm: the pre-registered bar is cleared — pending A/A (2026-08-10)
+
+The confirmatory r=24 sweep, pre-registered on `fully_fixed` alone, no peeking
+and no extension of b121-ambigcase.
+
+**Primary: cand 7/24, base 0/24, Fisher two-sided p = 0.0094.** Clears the 0.05
+bar. Attribution guard passes again at 24/24 in both arms, and the mechanism
+replicates exactly: base 70 `replace_lines` and 0 wide-block copies, cand 0 and
+62, all landing.
+
+Two independent sweeps of the same comparison now exist, so pooling is fair:
+
+| sweep | cand | base | Fisher p |
+|---|---|---|---|
+| b121-ambigcase | 4/14 | 0/14 | 0.0978 |
+| b121-confirm | 7/24 | 0/24 | 0.0094 |
+| pooled | **11/38** | **0/38** | **0.00042** |
+
+The baseline has now failed to solve this case **38 times out of 38**. That is
+the part worth holding onto: build 119 is not nudging a rate, it is the
+difference between a case that is never solved and one solved ~29% of the time.
+
+**Not credited yet.** ab.py returned INCONCLUSIVE on its own endpoint for a
+reason unrelated to the p-value: **UNCALIBRATED** — no A/A has measured this
+setup's noise floor. The gate is not pedantry here; its message cites a prior
+sweep of this project that read +0.375 at p=0.031 while an A/A of the same
+setup returned +0.281. A paired design that flatters the candidate arm with
+identical code on both sides would produce exactly the numbers above. An A/A at
+`--base HEAD --allow-identical`, same case/model/r, is running now, and the
+credit decision waits on it. If the A/A shows a materially non-zero delta, the
+pooled p is worthless and this gets recorded as another b120.
+
+**The selection failure replicates and is now significant.** Pooled over both
+sweeps the model picked the wrong twin **65 times against 33** — 66% wrong,
+binomial p = 0.0016 against chance. It is not fumbling at random; it reliably
+rewrites a function that was already passing. But the confound is still total:
+all 65 wrong picks were also the first-listed block, because v2 always lists
+the correct twin first. Whether this is "takes the first block" or "takes the
+block that looks correct" is unresolved and v3 answers it.
+
 ### 5.57 b121: the lever fires, the route converts totally, the outcome is underpowered (2026-08-10)
 
 First A/B in this whole line of work where the **attribution guard passes**:
