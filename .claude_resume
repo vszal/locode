@@ -1,0 +1,653 @@
+# locode resume — build 123 (2026-08-10)
+
+## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
+Every verdict since 5.24 has read "mechanism moved a long way, score
+INCONCLUSIVE". That is the **instrument**, not luck. Census of all 22 sweeps
+that banked pairs (`$CLAUDE_JOB_DIR/tmp/power.py`):
+
+- **3 of 22** sweeps ever reached **6 informative pairs** — the floor below
+  which p<0.05 is unattainable no matter how big the effect is (6–0 gives
+  0.031; 5–1 gives 0.219). One of those three only got there by pooling 24
+  pairs across 8 cases, which is not one hypothesis.
+- **1 of 22** ever reached p<0.05: `b94-infername`, 6W/0L, +0.375. It needed a
+  perfect sweep of every informative pair.
+- **132 of 194 pairs (68%) tied.**
+- `exec-bugfix` carries 112 of the 194 pairs at a **43%** informative rate →
+  needs **14 runs/arm**. Every sweep has run **8**, where the expected
+  informative count is 3.4 against a threshold of 6.
+- `syntax-fix`: **0 of 33** informative, every score 1.0 — saturated, no signal
+  at all. `diff-report`: 0 of 4. **Both are OUT of the A/B rotation** (keep as
+  regression smoke, where 1.0 is the point).
+
+**Consequences, already decided and written into 5.27:**
+- The **endings/mechanism channel is the PRIMARY instrument.** `armstats.py`
+  (prefer VERIFIED) + the arm-split grader are what earns a KEEP. The score is
+  now a **veto-only guardrail**: it can kill a change by moving against it past
+  the floor; it can no longer be what credits one.
+- If a sweep is genuinely meant to settle something on score, run `exec-bugfix`
+  at `-r 14` (~2.3 h/arm at 300 s/run). Budget it or don't claim the channel.
+- DONE in **build 104**: `ab.py` now prints **UNDERPOWERED** (own status, same
+  exit 2) with the runs-per-arm the observed informative rate would have
+  needed, and says **SATURATED** instead when every pair tied. "Inconclusive"
+  read as evidence about the change; it is evidence about the sample.
+
+## Noise floor
+**`exec-bugfix|qwencoder14|r14` = +0.1429** (W7/L1/T6, 8 informative, sign-flip
+p=0.141), from `aa14-calib`, both arms build 109. **This is the floor to judge
+r14 sweeps against.** The r8 figure below is retained only for older verdicts.
+
+`exec-bugfix|qwencoder14|r8` = **0.2812**, from 3 A/A samples
+`[0.2812, 0.0625, 0.0]` (`evals/noise_floor.json`). `b102-floor` is the first
+A/A ever to run to completion (mean delta +0.0000, W1/L1/T6) — direct proof
+build 100's `_persist` fix works. Floor unchanged; the max sample is still the
+first one.
+
+## VERDICT — b113-wholefile: NEGATIVE, and built on a bad number (5.42)
+Nothing running. Tree is at build 114 (`02fbfc2`), which REVERTS 113.
+- Reach was fine: **21** `ENTIRE file` notes in cand, 0 in base.
+- Everything tied: score 0.786/0.786 (+0.000 p=1.0), VERIFIED 8/8, median
+  iters 25/25, and the target channel `ALREADY DONE` went 6/14 -> 5/14.
+- **The premise was false.** 5.41's "after a windowed read, 60 of 71 edits
+  targeted text not in the window" never required the edit to touch the file
+  just read. Redone tightly: of 75 events, **53 (71%) edited a DIFFERENT file**
+  (read the test, patch the source — correct behaviour), 11 hit inside the
+  window, only **7** were real misses.
+- Reverted rather than kept-as-harmless: no benefit measured and the reason to
+  expect one withdrew.
+- Surviving from 5.41: windowed reads still correlate with dying runs at run
+  level (median 0% verified vs 25% died). b113 proves that is a SYMPTOM.
+- **Level 3 is not a literal zero.** b113 base r8 recovered (read, edit, test,
+  edit again, 13 passed, 31 iters). Standing count **1 of ~69**. State 5.40 as
+  "vanishingly rare", not "impossible".
+
+## VERDICT — b111-recipe: steer converts 100%, buys NOTHING (5.40)
+Nothing is running. Tree is at build 112.
+- **Channel A, decisive:** prose after the escalated pair **6/6 = 100% base ->
+  0/10 = 0% cand**, 10x read_file. The 5.32 recipe transfers to any steer it is
+  applied to. Three steers, 86 events, 0%.
+- **Channel B, the wall held:** runs reaching level 3 that verified — base 0/3,
+  cand **0/6**. Standing count now **0 of 58**. The model does exactly what
+  level 3 asks and still never recovers. **Compliance at level 3 is a vanity
+  metric.** 5.38's fork resolved to branch two.
+- Arms diverged (VERIFIED 9 -> 6, stopped 5 -> 8, iters 22.4 -> 28.1, score
+  -0.107 p=0.51 inside the floor). Proximate cause is exposure: the `edit_file`
+  **ALREADY DONE path is 0 for 11** across BOTH arms (base 0/4, cand 0/7) and
+  cand drew seven. Every VERIFIED run in the sweep, both arms, took exactly 23
+  iterations.
+- **But I BUNDLED, so it cannot be attributed.** Build 111 also carried 5.36's
+  "no_change is not a landed edit". That fixed no metric (armstats reads the
+  event stream, where these carry `error: false` — it counted them either way)
+  and DID change the agent (`_landed_edits` feeds the repeat detector's reset,
+  so repeat-stops fire sooner; cand's stops shifted 3 -> 6 on "repeated the
+  same tool call" and `repeated call` nudges went 2 -> 15).
+
+**Build 112 (shipped)** unbundles: revert the exclusion to build 110 semantics,
+emit `no_change` on the result event for the grader instead. Build 111's
+wording survives — Channel A earned it. 1151 passed.
+
+## THE OTHER BIG ONE: level 3 is a dead zone (5.38)
+84 runs pooled over the three recent r14 sweeps, armstats' VERIFIED:
+- **0 of 49** runs that ever reached an escalated steer verified. Runs that
+  never reached one: **32/35 = 91%**.
+- Level 1 (`same failure (2 runs in a row)`) still verifies **14/64 = 22%**.
+  That is where all the recoverable mass is. By level 3 there is none left.
+- By total iterations: <=25 -> 67% VERIFIED, 26-35 -> 4%, 36+ -> 0%. A run
+  finishes inside ~25 iterations or it does not finish.
+- `context compacted` 0/6 (median 45 iters); `tests claimed passing but never
+  seen green` 0/7 (median 40). Both are death markers, not warnings.
+
+**VERIFIED is that number in other units.** Across all six recent arms,
+VERIFIED ~= 14 - (runs reaching level 3), exact in 4 of 6, within 2 in the
+others (b108 14/0, 7/7; aa14 11/3, 9/4; b110 3/9, 5/9). So build 108's
+0 -> 7 was entirely "14 -> 7 runs reached level 3", the methodology-26 drift is
+drift in the level-1 escape rate, and **build 111 can only win by breaking the
+0/49 wall** — nothing it touches fires upstream of level 3.
+
+Partly definitional (recovering at level 1 means never reaching level 3), but
+the cliff is the point. **So grade b111 on BOTH channels:** the prose
+conversion AND `does any cand run that reached level 3 verify?` — 0/49 is the
+standing answer. If cand returns 2-3, level 3 is recoverable and wording was
+the whole problem. If it converts prose to read_file and still returns 0,
+compliance at level 3 is a vanity metric and the next lever is one of 5.38's
+two: inject a focused source window instead of asking, or end the turn there
+instead of grinding ~10 more iterations. Do not build either before b111 reads.
+
+## VERDICT — b110-alreadydone: NO DETECTABLE EFFECT (5.36)
+score 0.821 vs 0.821 (+0.000, W3/L3/T8, p=1.0); VERIFIED 9/14 both arms; DONE
+9/14 both; stopped 5 both; iters 25.6 -> 24.1; landed edits 5.1 both. The
+mechanism moved as designed (`replace_lines` route 2/10 base -> 0/4 cand) but
+n=4, and **all four candidate responses called `update_plan`** — the message
+named no tool, put its action seventh behind three prohibitions, and hedged it
+as "if something is still failing, run the tests again". Build 110 STAYS (its
+diagnosis is true where the old one was false in 18 of 20) and its shape is
+fixed in build 111.
+
+## VERDICT — b108-callnotword: build 108 WORKS (5.33), corrected by the A/A
+First sweep in this stretch to move a turn ENDING. prose-only after the level-1
+note 57% -> **0/18**; false-done 5 -> 1; stopped 9 -> 6; nudges/run 9.4 -> 3.8;
+iters 32.5 -> 25.4. Mechanism read end-to-end in r1 cand: nudge -> `read_file
+test_textkit.py` -> one edit -> 13 passed.
+
+`aa14-calib` (both arms build 109, r14, the same configuration) then settled
+the two open questions and corrected one number:
+- **The score corroborates.** A/A = +0.143 W7/L1/T6 p=0.141. b108's +0.393
+  p=0.002 is 2.7x that. First change in this project to clear the score gate
+  honestly. **This is the r14 noise floor now — stop quoting b106's r8 +0.281.**
+- **The conversion is solid.** `same failure (2 runs in a row)` fired 45 times
+  across both A/A arms, **0% prose-only** — both arms have build 108, so that
+  is what it predicts, on 45 events instead of 18.
+- **"VERIFIED 0/14 -> 7/14" was optimistic.** Identical code reproduces that
+  metric at 3/14 and 4/14. Say it three-armed instead: pre-108 verified
+  **0, 0, 0**; post-108 verified **7, 3, 4**. Direction certain, size ~a third
+  of runs, not half.
+
+## THE NEW BIG ONE: the endings channel has a noise floor, and it is +/-2 (5.45)
+b115's lever fired ZERO times, so both arms ran identical code and the sweep is
+an accidental A/A. Two A/A sweeps now exist and they agree:
+
+| A/A | build | VERIFIED base vs cand | mean iters |
+|-----|-------|----------------------|------------|
+| aa14-calib    | 109 | 3 vs 4  | 26.6 vs 31.4 |
+| b115-stallcap | 114 | 9 vs 11 | 26.5 vs 24.0 |
+
+**On IDENTICAL code, VERIFIED swings 1-2 runs in 14 and mean-iters up to 4.8.**
+5.27 promoted this channel to PRIMARY; it is not precise enough to read a 2-run
+gap as evidence, and I have been doing exactly that. Require a bigger margin, or
+require the mechanism channel to carry the verdict.
+
+**RETRACTED (5.47) — what looked like the free result was a server restart.**
+I read the two A/A sweeps as build 109 (7/28 = 25%) vs build 114 (20/28 = 71%),
+p = 1.1e-3, and emailed it as the first measurement of cumulative progress. But
+`aa14-calib` ran Aug 8 09:51 and `b115-stallcap` Aug 9 02:50, and `:8081` was
+restarted between them (Aug 8 16:08/16:18). Same model, weights, alias,
+temperature, case and prompt; only the process differed — and across that line
+the model's plan collapsed from 3 variants to 1 (233 chars, 140/140 identical)
+and the 3rd call flipped from read_file 100% to 24%. **I have no clean
+measurement of cumulative progress. Do not reconstruct one from the archive.**
+The two A/A rows above are still valid as noise floors: each is internally
+paired, run inside one process.
+
+Build 117 stamps pid + start time into every `ab.json` and warns at sweep start
+when the server has changed. See methodology 35.
+
+## DONE — b116-noopcap graded (5.46), and what it really showed (5.48)
+Both triggers fire and are visible. Six cap-stops at iterations 24-29, zero
+winners cut. Doomed runs cost 26.1 iters / 242 s with the cap vs 32.8 / 277 s
+without. **KEEP, credited on iterations, not VERIFIED** — every VERIFIED run in
+this project takes exactly 23 iterations, so a cap that cannot fire before 24 is
+structurally incapable of moving it.
+
+**5.48 — the split that actually decides these runs.** In b110-b116 (140 runs,
+one server process) runs diverge at their THIRD tool call, from a byte-identical
+prior context (same bash call, same pytest md5, same 233-char plan):
+- 3rd call `edit_file`, rejected by `require_read_before_edit`: **83/106 = 78%**
+- 3rd call `read_file`, succeeds: **1/34 = 3%**   Fisher **p = 6.7e-16**
+
+The per-arm draw of that branch tracks the arm's score: b116 base drew 6
+read-first and scored 4/14; cand drew 1 and scored 11/14. **b116's headline gap
+is the draw, not the cap.** NOT causal — the model picks the branch itself, and
+pre-restart every run was read-first yet build 108 still went 7/14, so reading
+first is not intrinsically fatal. Do NOT build a "force an edit first" lever off
+this without a randomized test.
+
+## DONE — b119-readguard: the guard is load-bearing (5.51). FLAG REVERTED.
+base 7/14 vs cand 0/14 (p=0.0058); conditioned on the edit-first opening,
+7/11 vs 0/9 (p=0.0047). Largest effect ever measured here.
+
+**But the mechanism refuted the framing.** The call-2 edit is BYTE-IDENTICAL in
+both arms and FAILS in both. The guard never stopped a good edit. Only the
+rejection message differs:
+  guard on  -> "you have NOT read it; call read_file FIRST, copy `old` verbatim"
+  guard off -> "`old` not found ... Easiest fix: replace_lines start=15 end=32"
+The second hands blind line-number surgery to a model that has never seen the
+file. Cand: 8.4 landed edits vs 5.1, 33.3 iters vs 23.6, first no-op at
+iteration 13 vs 22. The guard's real job is TRIAGE OF THE FIRST FAILURE.
+
+**Follow-up CLOSED before building:** a read-aware not-found message has no
+population — 115/115 not-found+replace_lines messages in b110-b116 went to runs
+that had already read the file. The guard covers that state completely.
+
+**Still unexplained:** read-first runs are 0/3 base, 0/5 cand. Not the guard.
+
+## NEXT LEVER — after b116
+Spent: steer wording (5.32/5.40 — converts 100%, buys nothing). Spent: the
+read-window lever (5.42 — neutral, false premise). Shipped-but-unfired: the
+stall cap (5.43, build 115). In flight: its earlier trigger (5.44, build 116).
+
+Still standing, in order:
+1. **Recalibrate both K's from b116's survivors.** K=8 and K=10 are both fitted
+   to ONE run (b113 exec-bugfix r8). b116 adds 28 runs. For every VERIFIED run,
+   measure iterations from its first no-op / escalated steer to green; that
+   distribution replaces n=1. Tune UP from evidence; never down without it.
+2. **Stop crediting 2-run VERIFIED gaps (5.45).** Not a lever, a habit to fix.
+   Either demand a 3+ run margin at r14, or make the mechanism channel carry
+   the verdict and use VERIFIED only as a veto — the mirror of what 5.27 did to
+   the score channel.
+3. Older, untouched: the 2 unparsed turn-enders (Python triple-quotes as JSON
+   delimiters); 5.16 defect 2 (widen the not-found window); 5.12d (ab.py abort
+   after 3 consecutive ungraded runs); 5.13a (render the NORMALIZED call into
+   history); the CLAUDE.md-reading config option.
+
+## DEAD ENDS — do not re-open
+- **Rewriting the ALREADY DONE message.** b113 r10 shows it converts (asks for
+  bash, gets bash on the very next call) and the model re-sends the identical
+  no-op three calls later. Methodology 31.
+- **Hunting a parser/normalisation bug behind `old == new`.** `fs.py` compares
+  raw args with `==`, and all 51 archived events are byte-identical. There is
+  no bug; the model really does send the same string twice.
+- **Making the escalated steer work.** 5.32 -> 5.40, three sweeps, 100%
+  compliance, 1 verified finish in 69. It is a budget problem, not a wording
+  problem.
+
+## Where things stand
+- **build 108 (adabb11)** — the level-1 same-failure note names `read_file`,
+  puts the call first, and no longer asks for a sentence (5.32). It was the
+  highest-volume nudge in the system and the worst-converting: 66% prose-only.
+- **build 107 (a4ba147)** — the EXACT tier gets the 5.29 rescue too (5.30). A
+  dedented single-line `old` is a SUBSTRING of the indented line, so it never
+  reached the span tiers at all; that was 100% of b106-indent's population and
+  why the rescue fired zero times. Archive replay 87 -> 121 rescues.
+- **build 106 (f038a9e)** — `edit_file` no longer breaks a relative multi-line
+  `new` and then blames the model for it (5.29). Strict rescue: only when the
+  strip-only splice would turn parseable Python into a SyntaxError, only when
+  `old` reproduced the matched region's shape, `.py` only, and it says
+  `, re-indented onto the matched block` when it fires. `try_edit` takes a
+  `path` now, and `render.py`'s diff preview passes it so the preview still
+  equals what gets written.
+- **build 105 (e95c979)** — the not-found message names `replace_lines` FIRST
+  with start/end filled in, no gate; the block and its copy route follow; the
+  from-memory move closes as a WARNING phrased as a measurement ("lands 1 time
+  in 41"). Header states the failure only. The stated range is the DISPLAYED
+  block so it can never disagree with what the model sees; multi-line spans say
+  `new` replaces all of them. Gated on confident-and-not-truncated. **Graded on
+  archive REACH, not a sweep** (exposure is 2 events/sweep): of the 161 stored
+  events in the current message format, 160 take the confident path — 99.4%
+  reach. Recorded UNPROVEN-BY-SWEEP. 12 tests.
+  - **Left undone deliberately:** when `_authored_old_note` fires it prefixes
+    the whole message and ends "Put the file's existing text in `old`…" — the
+    2% route, back in first position, on the population most prone to it. It is
+    a diagnosis, not a route, and was separately validated. Open question.
+- **build 104 (8ffdaf3)** — `ab.py` UNDERPOWERED vs inconclusive (see 5.27).
+- **build 103 (eb206b3)** — the same-failure note names the shared test **file
+  once**. Found by printing what the model *actually saw* on a live b102 run:
+  every failing test was in `test_textkit.py` and the filename was repeated
+  inside every `file::test` id, burying the one actionable token in a
+  140-character run-on. `_split_test_ids` splits them; the note says the file
+  as the thing to **open** and the bare names as the thing to **read**.
+  Rendering only, no new trigger — ships with the next real lever, no sweep.
+  1096 tests.
+- **build 102 (9c0b228)** — two b101 defects. (1) The annotation was invisible
+  to the archive: `result` events are written per call at `loop.py:1264`
+  *before* the note is appended, so b101's sweep recorded **0 annotations while
+  28 fired**. Now emits `{"phase": "nudge", "reason": "same failure (N runs in
+  a row)"}`, which `armstats` tallies and the REPL renders. (2) The note named
+  an action the model had no identifier for — now names the test, and says
+  *"the TEST, not the source file you have been editing"*.
+- **build 101 (4ad6876) — the cleanest causal result yet, and it converts
+  nothing. KEEP, DO NOT CREDIT.** After a stuck transition, `update_plan` went
+  **20 of 28 → 0 of 28**, while *total* `update_plan` was 59 base vs 55 cand —
+  the effect is local and causal, not a global suppression. `replace_lines`
+  8→34, `write_file` 4→17, landed edits 7.2→12.5, repeat rate 69%→58%, repeat
+  depth ≥4 from 14→4. **But VERIFIED stayed 0/8 on BOTH arms**, stopped 8/8
+  both, delta −0.0938 inside the floor.
+- **The trajectory read of `r4__cand`** (why it converts nothing): the redirect
+  fires and the next action *is* `edit_file` — but the model **reverted its own
+  correct edit from 44.6 s**, re-sent an identical one (no-op at 153.4 s), and
+  died on the repeat guard. It called `read_file` on `textkit.py`, the source,
+  **never once on the test**. That is what b102/b103's naming targets.
+- **build 100 (e160435)** — `_persist` crashed every A/A on run 1 since that
+  branch landed, which is why the floor had only 2 samples: impossibility, not
+  cost. 45 tests in `test_ab.py`.
+- **build 99 (5aff9df)** — the model puts the TOOL NAME in the fence tag
+  (```` ```update_plan ````). 46 archive-wide turn-enders, 49 of 51 recovered.
+  **Every pre-b99 sweep ran through that defect**; absolute VERIFIED numbers
+  before it are depressed (paired deltas still hold).
+- **builds 93 and 95 are UNPROVEN**, exposure 0. Every pre-calibration
+  "IMPROVED" was decided uncalibrated (5.14).
+
+## The current failure surface (censused on b99-routeorder cand, 2026-08-07)
+| bucket | cand events | note |
+|---|---:|---|
+| failing test runs | **57** | 36 of 57 identical to the previous → builds 101–103 |
+| edit: ambiguous | 11 | **CLOSED — 76% convert to a working `replace_lines` (5.28)** |
+| syntax-guard reject | 8 | **NOW THE #1 LEVER — 56 events pooled, 38% repeat, it is OUR bug (5.29)** |
+| edit: no-op | 6 | |
+| edit: unread file | 3 | |
+| **edit: old not found** | **2** | **collapsed — 7 → 0 → 2 across three sweeps** |
+
+Endings, cand: 6/8 "repeated the same tool call", 1 max-iterations, 1 real
+completion. **The repeat death is still the dominant ending.**
+
+## Standing methodology (hard-won, do not skip)
+1. Grade on how turns **ENDED** (`evals/armstats.py`). Prefer **VERIFIED**.
+   NEVER `clean-finish` (counts surrender as success). `DONE` alone is too
+   generous: b94 r7 declared completion with the suite red.
+2. **Check exposure before reading any table**, matching the trigger **both
+   arms emit**, never the new wording.
+3. **Open a winning run and read the trajectory** before crediting anything.
+   Worth more than the score table three separate times now.
+4. Probe the mlx server with a real 2-token completion, not `/v1/models`.
+5. Anchor any log watch to a byte offset captured at launch.
+6. **Calibrate before crediting.** A p-value is not a noise floor.
+7. **Measure before prioritising, even your own alarms.**
+8. **Grade a message change on its target event rate AND on the endings.** b97
+   won its own metric outright (landing 47%→72%, not-found 7→0) while every run
+   died (VERIFIED 5/8→0/8).
+9. **The route named first is the route taken** (5.20b). Order by authoring
+   burden: the route that makes the model write least goes first.
+10. **Two identical degenerate arms mean the HARNESS, not the change.**
+11. **A sweep that exits is not a sweep that ran.** Read the log tail.
+12. **When a lever's exposure has collapsed, say so and change the grading
+    method** — don't run the sweep anyway and read the noise.
+13. **An underpowered test does not return "no effect", it returns nothing** —
+    and the two must never be printed with the same word (5.27).
+14. **Print what the model actually saw.** Build 103's defect passed every unit
+    test; it was only visible in the rendered string on a live run.
+15. **Rank levers by what FOLLOWS the message, not by how often it fires**
+    (5.28). The ambiguous message was queued as the top remaining target on 20
+    events; measured, 32 of 42 are answered with a successful `replace_lines`,
+    0 re-send, 0 syntax errors. Exposure says where to look; the next action
+    says whether there is anything to fix.
+16. **Replay the fix against the archive before spending GPU on it** (5.29).
+    `$CLAUDE_JOB_DIR/tmp/replay106b.py` re-ran every stored syntax rejection
+    through the new `try_edit` in ten minutes: 87 rescued of 88 judgeable. It
+    also found both of the draft's defects. Two traps it walked into first:
+    the event log **clips tool result content**, so file state must be rebuilt
+    from `evals/cases/<case>/seed` forward, not from `read_file`; and the
+    broken version reported "no reach in the current sweeps" rather than
+    "cannot tell" (methodology 13 in a new place). And a replay measures the
+    population it drew from, not the one the next sweep produces — 5.30.
+17. **A lever that fires zero times has not been tested** (5.30). b106-indent
+    reported a difference on every summary line and the rescue had never run
+    once; the whole table was arm noise between identical builds. Count the
+    firings BEFORE reading any metric — which is why the rescue announces
+    itself in the result text.
+19. **A steer that asks for narration will be answered with narration** (5.32).
+    Every nudge must name a tool and demand a call. Grade the whole set on
+    prose-only share (`afterturn.py`); 3 of 11 are above 25%.
+20. **Count the target event in the CURRENT base arm before building the fix**
+    (5.31). Three sweeps went into an indentation bug whose event rate had
+    already fallen from 2.31/run to 0.04/run, because an earlier change routed
+    models around it. The archive said the bug was everywhere; the archive was
+    describing a population that no longer exists.
+21. **Split a per-event rate by arm on a sweep whose arms were identical, and
+    read the spread as the noise floor** (5.32). b107-indent's arms were
+    behaviourally the same (rescue fired once in 14 runs), yet prose-only after
+    the level-1 same-failure nudge read 56% base vs 76% cand — a ±20pt band at
+    n≈25. Build 108 must land under ~40%, judged against ITS OWN base arm.
+18. **The exact tier is not exact.** `text.count(old)` is a SUBSTRING test, so
+    a dedented single-line `old` matches mid-line and `str.replace` splices
+    there. Any reasoning that starts "an exact match means `old` was
+    reproduced byte for byte" is wrong.
+22. **Fix the first steer in a cascade, not the loudest one.** The loudest
+    nudges in the b107 census were symptoms of a run that had already gone
+    wrong two nudges earlier; converting the first one took the rest with it
+    (nudges/run 9.4 -> 3.8).
+23. **An A/A does not just size the noise — it re-reads your headline number.**
+    `aa14-calib` was launched to calibrate the score and did. What it actually
+    corrected was the mechanism metric the b108 verdict was built on (VERIFIED
+    7/14, which identical code reproduces at 3 and 4), because nobody thinks to
+    question the number that moved the furthest. Run the A/A against **every**
+    channel you credited, not just the one you distrusted.
+25. **Build the grader against the OLD sweep before the new one lands** and
+    check it reproduces the number in the write-up. Two of the last three
+    metrics specified in advance failed that check — b110's "re-applied the
+    same text" (1 hit in 20 events; the re-apply is a VARIANT, not a byte
+    copy) and `_nudge_bucket`'s malformed histogram — and both would otherwise
+    have surfaced only after 2.3h of GPU, as arms that disagree by nothing
+    because the ruler is wrong.
+24. **When a rate is measured before and after a fix upstream of it, the
+    population changed.** The escalated nudges read 18%/4% prose-only pre-108
+    and 65%/74% after. Nothing about them regressed — build 108 removed the
+    easy runs from their input. A before/after on a downstream metric is not a
+    comparison unless the funnel above it held still.
+
+27. **A per-nudge rate is a per-RUN draw, and it decays with depth.** The
+    events cluster: runs come out 0/2 or 2/2, so "n=22 events" is n=11 draws
+    and every p-value quoted on an event count is inflated. And prose after a
+    steer runs 4% (iter 9-16) -> 32% (17-24) -> 80% (25+), while the cand arm
+    fires ~11 iterations deeper than base — which is the ENTIRE base-vs-cand
+    asymmetry seen on identical code in aa14 and b110. Cluster by run before
+    quoting n; check firing depth before crediting an arm difference.
+    **Except:** the 5.32 recipe is 0 prose in 76 events at EVERY depth. Depth
+    predicts narration only for steers that don't name the call. ROADMAP 5.37.
+
+## Mined and DECLINED at level 1 (5.39) — do not rebuild
+- **"Prescribe the whole sequence in the level-1 note."** Survivors go
+  read -> edit -> bash 14/14; half the dead detour via `update_plan`. Looked
+  decisive until I followed the dead branch two calls further: **all 27
+  detours reach bash anyway.** Both groups run the same loop; the difference
+  is whether the edit was RIGHT. Capability wall, not a steering one.
+- **"Dying runs don't test their edits."** Pooled: 75% vs 57%. Per-run median:
+  60% vs 67% — the gap REVERSES. Clustering trap (methodology 27); dying runs
+  have more edits so pooling weights them by the thing that kills them.
+
+28. **Never bundle a behaviour change into a sweep that tests WORDING.** The
+    temptation is that the behaviour change is obviously correct and
+    unrelated. 5.36's was neither, and one bundled line cost the attribution
+    of a 2.4h sweep.
+29. **Before "fixing" a metric in the product, check where the metric is
+    computed.** 5.36's lived in `armstats.py` the whole time. The fix there
+    cost nothing and risked nothing; in `loop.py` it changed the agent to
+    correct a number the agent does not produce.
+
+30. **A mechanism check must pin EVERY dimension the claim names.** "The edit
+    targeted text outside the window" is a claim about one file; the check
+    allowed any file and so counted the most ordinary thing the model does
+    (read the test, edit the source) as the pathology. And one confirming
+    trajectory can illustrate an aggregate, never test it — reading r10 is
+    what made the wrong number feel verified. Re-derive a decisive-looking
+    census with the tightest predicate BEFORE spending a sweep on it.
+31. **A steer that converts but changes no outcome is asking for a STOP, not
+    better wording.** Three sweeps went into making the escalated same-failure
+    steer land (5.32 -> 5.40); it ended at 100% compliance and 1 verified
+    finish in 69. The compliance channel measures whether the model DID the
+    thing; it says nothing about whether the thing was worth doing. Once
+    conversion is maxed and the outcome is flat, the honest read is that the
+    population is dead and the lever is a budget, not a phrasing. Ask "what
+    does the turn spend after this fires?" before writing another version of
+    it.
+32. **When two guards watch the same failure, prefer the one keyed on
+    IDENTITY over the one keyed on TEXT.** `max_error_stall` keys on the error
+    string and fires ~10 iterations late because the model rewords what it
+    gets wrong; the same-failure counter keys on which test is failing and
+    tracks it exactly. The stop belongs on the signal that is right, not on
+    the one that happens to already have a stop.
+33. **A lever that never fires turns your A/B into an A/A — read it as one.**
+    b115's cap fired 0 times, so both arms ran identical code. That sweep is
+    not wasted: it is a free calibration of the instrument, and it produced the
+    best number in the project (5.45). Before filing a null result, check
+    whether the arms were actually DIFFERENT; if they were not, grade the
+    instrument with the data you just bought.
+34. **A change you cannot see fire cannot be graded — put the transition on the
+    wire in the SAME build that adds it.** Build 115 shipped with no event for
+    arming its own budget, so "never armed" and "armed, never expired" were
+    indistinguishable in the archive and the sweep could not answer its own
+    question. Methodology 2, learned again, cheaply.
+
+35. **An A/B pins the code; only the PAIRED design pins the machine.** Before
+    comparing an absolute rate across two sweeps, prove they ran against the
+    same server process. A restart of `:8081` — same model, same weights, same
+    alias, same temperature — moved clean finishes from 0-7/14 to 4-11/14 and
+    collapsed the model's plan from 3 variants to 1 across 140 runs. It cost me
+    a headline I had already emailed (5.47). Build 117 stamps pid + start time
+    into every `ab.json`; check it before any cross-sweep sentence.
+
+36. **When an early branch decides the run, report the BRANCH MIX beside the
+    metric.** In b110-b116 the 3rd tool call splits runs 78% vs 3% on VERIFIED
+    from a byte-identical prior context, and the per-arm draw of that branch
+    explains b116's 4/14-vs-11/14 better than the lever under test does
+    (5.48). A lever downstream of a decisive coin flip cannot be graded by a
+    metric the coin flip dominates.
+37. **Verify the event schema before writing an extractor over it.** Bash args
+    are keyed `cmd`, not `command`. My extractor silently returned "" for every
+    run and I reported "36/36 read-first runs never ran pytest" — 100%
+    confident, completely false; both arms run pytest, the losing one more
+    often. A predicate that returns the same answer for every row in the
+    population is a bug until proven otherwise (5.52).
+38. **Grade a steer by what it converts TO, not whether it converts.** The
+    multi-match message converts at 76/76 and is the losing branch's message:
+    what it prescribes ("pass only the replacement line as `new`") is the
+    losing strategy. Sharpens rule 31 — a perfectly-converting steer can be
+    worse than neutral (5.52).
+39. **When the case's bug shapes align with a strategy, "strategy X loses" may
+    just be "this case punishes X."** exec-bugfix has 2 one-line bugs and 1
+    needing a block re-derivation, so it rewards block rewriting by
+    construction. State the confound before generalizing off a single case.
+
+40. Pilot a new instrument for whether the LEVER FIRES, not whether the
+    metric moves. exec-ambig v1 fired 0 ambiguous messages in a paired pilot:
+    I duplicated the wrong LINE, but the model always sends the enclosing
+    guard as `old`, which was unique. Ambiguity is a property of the string
+    the model actually sends. ~10 min saved a 2.5h sweep whose result would
+    have read as 'the message doesn't help'. (ROADMAP 5.56)
+
+41. A metric read from the model's own self-check measures WHEN the arm last
+    looked, not what it left behind. b121's secondary said the candidate was
+    0.36 tests worse; runs editing after their final pytest were cand 14/14 vs
+    base 0/14, so it scored one arm mid-repair and the other at rest. Check the
+    read point is arm-independent before differencing. Sibling of 37.
+    (ROADMAP 5.57)
+
+42. An A/A can STRENGTHEN a result, not only kill one. b121's A/A found a ~2x
+    arm-slot bias favouring BASE (identical code: 12/24 base vs 6/24 cand), the
+    slot build 119 was never in — so the pre-registered p was conservative, and
+    builds could then be compared WITHIN one slot (119: 12/24 vs 118: 0/38,
+    p=1.25e-06), removing the bias entirely. Run calibration before deciding
+    what it would have meant. (ROADMAP 5.59)
+
+43. WRITE THE DENOMINATOR DOWN NEXT TO THE NUMERATOR, or you will pair them
+    wrong. Third instance now: `cmd`/`command` (37), `rep`/`repeat` (grade121),
+    and lever 0b, whose whole premise was "96/96 and 78/132" — actually 48/96
+    and 36/132, i.e. I divided a TWO-arm no-op count by a ONE-arm edit count and
+    read a per-arm edit count as a no-op count. Consequence: the bar I
+    pre-registered (cand "under a third") was already met by the BASELINE, so
+    the sweep would have credited the build for nothing. The pattern is always
+    the same — a number quoted from memory in prose instead of recomputed by the
+    grader. Every rate in a pre-registration must come out of the same script
+    that will grade it, run against a CLOSED sweep first. (ROADMAP 5.65)
+
+44. A pre-registration may be AMENDED, never quietly. The 5.65 amendment is
+    legitimate because the correction came from closed sweeps (b121-aa, b122)
+    while b124 was still on its base arm, and it is written in the document
+    above the result with the old numbers left visible. Fixing a bar after
+    seeing the candidate's data is a different act entirely.
+
+45. WHEN A MESSAGE MAKES TWO DEMANDS, THIS MODEL OBEYS THE FIRST AND DROPS THE
+    SECOND — and re-ranking them just swaps which one it drops. Proven both
+    ways at n=24: build 119 (copy first) got 29% no-ops, build 121 (correct
+    first) got 100% fragments. Both significant, both useless. So a wording
+    that isn't working is not a prompt to reorder the clauses; the next move is
+    to DELETE a demand, usually by giving the model a mechanism that makes the
+    demand unnecessary. Build 123's `occurrence` is that move. (ROADMAP 5.66)
+
+46. BEFORE BUILDING ON A RECOMMENDATION IN MY OWN ROADMAP, RE-DERIVE ITS
+    PREMISE FROM THE ARCHIVE. 5.66 recommended auto-widening in prose that
+    sounded airtight; ten minutes of counting showed 0 of 245 cases were
+    widenable, for a reason that is obvious once stated (a context window drawn
+    around a match always contains the match). Prose reasoning about a corpus
+    is not evidence about that corpus, even when I wrote the prose.
+
+## Next levers, in order
+0. ~~STALE-STALL BUG~~ — **SHIPPED as build 120 (`54b594b`) and CREDITED by
+   b123.** DONE 0/24 -> 8/24, Fisher p=0.0039, and the mechanism is 1:1: the 8
+   reprieved runs ARE the 8 DONE runs, all answered with bash, all green, all
+   fully_fixed, **zero false completions**. Two misses recorded honestly — the
+   60% lever-fires bar was a guess at incidence (true rate 33%, which b121-aa had
+   already predicted at 38%), and fully_fixed 11->8 is a raw miss the 5.59 slot
+   calibration overturns. Full verdict: ROADMAP 5.64.
+0b. ~~NO-OP EDITS (build 121)~~ — **SHIPPED, then REVERTED as build 122
+   (`62cb10f`).** b124-noop killed it on the pre-registered call-5 condition:
+   the no-op rate went 29% -> **0%**, and the landing rate went 26% -> **0%**
+   with it. `fully_fixed` 11/24 -> 0/24. The model made exactly the right
+   correction and sent a two-line FRAGMENT as `old`, which is byte-identical
+   between the twins and can never match one site. (ROADMAP 5.66.)
+   **The synthesis, which is the actual finding:** build 119 led with the
+   copying and got copying without the correction; build 121 led with the
+   correction and got the correction without the copying. Both orderings, n=24
+   each, opposite and significant. **This model obeys whichever demand the
+   sentence leads with, and only that one — so the wording lever is CLOSED.**
+   The fix has to REMOVE a demand, not re-rank it.
+   Note: the revert also took `__build__` back to 120. Corrected to 123.
+
+0b-ii. **AUTO-WIDENING IS DEAD, and it never shipped.** ROADMAP 5.66 recommended
+   it ("auto-widen a fragment to its unique enclosing block"). Measured first,
+   against all 245 archived fragments: contained in 0 blocks 46/36, in exactly
+   ONE block **0 and 0**, in 2 blocks 85/78. Zero uniquely widenable, because
+   the offered blocks are windows drawn AROUND the match, so the fragment is
+   inside every one of them by construction. Fourth instance of "check the
+   premise against a closed sweep before building on it".
+
+0b-iii. **THE OCCURRENCE SELECTOR — build 123 (`57de838`), IN FLIGHT.** The one
+   remaining option, and b124 makes it strong: in that candidate arm the model's
+   `new` was ALREADY correct. It knew the fix; it could not point at the site.
+   So `edit_file` takes an optional 1-based `occurrence`, the ambiguous message
+   numbers each block it offers, and its single instruction is now "resend the
+   SAME call and add the number" — no copying, no rewriting, `replace_lines`
+   removed from the message entirely.
+   - **b125-occurrence** in flight (`--base a175ed7`, i.e. the build-120 message,
+     so the selector is the only difference; exec-ambig, qwencoder14, r24, log
+     `$CLAUDE_JOB_DIR/tmp/ab125.log`, ~95 min). **No source edits until it exits.**
+   - Pre-registered in ROADMAP 5.67, graded by `$CLAUDE_JOB_DIR/tmp/grade125.py`.
+     Baselines from that script, dry-run on b124's base arm (rule 43): 129
+     post-ambiguous edits, 26% landed / 29% no-op / 46% came back ambiguous.
+   - **Call 1 is the one to watch and the one I expect to fail:** does a 14B
+     model use a brand-new argument at all (bar: >=50% of post-ambiguous edits
+     carry it)? If it misses, the finding is about argument discoverability, not
+     about the idea. REVERT if calls 2 AND 3 both miss.
+
+0c. OPEN: position vs reasoning on twin selection — b122 could not test it,
+   reordering destroys the case. Needs a design that leaves the early branch
+   alone. (ROADMAP 5.60/5.61)
+
+0. ~~BUILD 106 — the indentation splice bug (5.29).~~ **SHIPPED** as `f038a9e`,
+   sweeping now. Landed as a strict RESCUE (`_pick_splice`), not the
+   unconditional re-anchor the draft proposed: the strip-only splice stands
+   unless it turns parseable Python into a SyntaxError and re-anchoring fixes
+   it, and `_frame_ok` additionally requires that `old` reproduced the matched
+   region's shape. Both guards exist because the draft, run, broke 4 tests and
+   silently moved a `return` into a loop.
+1. ~~Build 104 — the not-found route reorder~~ — **SHIPPED as build 105** (5.25).
+2. ~~`ab.py`: "underpowered"~~ — **SHIPPED as build 104.**
+3. ~~The ambiguous-match message~~ — **CLOSED, see 5.28.** Audited: 32 of 42
+   ambiguous messages are answered with a `replace_lines` that succeeds, 0
+   re-sends, 0 syntax errors. It is the best-performing error message in the
+   system, not a target. (b97's collapse is also finally explained: its message
+   led with "extend `old` … copied verbatim from what is shown", and
+   `_match_locations` prints a `NN |` gutter — the model stripped it, lost the
+   indentation with it, and 8 of its 20 syntax rejections came straight off an
+   ambiguous message. Build 98's reorder took that 8 → 0 and has held it there
+   for 31 events. Do NOT re-promote the extend route without killing the
+   gutter first.)
+4. The 2 remaining unparsed turn-enders (Python `"""` as JSON delimiters).
+5. 5.16 defect 2: widen the not-found window to cover the model's first `old`
+   line. (Same exposure problem as 104.)
+6. 5.11d lever 1: name the elision (28 events) instead of "not found".
+7. 5.12d: `ab.py` aborts after 3 consecutive ungraded runs.
+8. 5.13a: render the NORMALIZED call into history so the model stops learning
+   its own malformed shape.
+9. 5.19 option 3 (low): name the similarity in a fuzzy success message.
+
+## Instruments
+- `evals/ab.py --base REF -m MODEL -c CASE -r N --label L` — paired A/B, git
+  worktree baseline vs the **LIVE WORKING TREE** candidate. **Source edits are
+  forbidden while a sweep runs.** Docs, ROADMAP.md and gitignored files are safe.
+- `evals/armstats.py <label>` — turn ENDINGS per arm. The primary channel.
+- `$CLAUDE_JOB_DIR/tmp/grade101.py <label>` — arm-split mechanism grader:
+  repeat rate, repeat depth, stuck→next-action mix, annotation fires.
+- `$CLAUDE_JOB_DIR/tmp/power.py` — the 5.27 census; re-run it after new sweeps.
+- Event phases in `evals/results/<label>/events/*.jsonl`: `result` (**not**
+  `tool_result`), `run`, `nudge`, `turn_end`, `stopped`, `iteration`,
+  `assistant_start`/`assistant_end`.
+- Repeat COUNT scales with run length — compare rate *and* per-run depth.
+
+## Do not re-fix
+- **5.21's unchanged-tree stat walk is CLOSED**, superseded by build 101.
+- Runs killed as "repeating" while tests were green: closed by build 88.
+- A cand-favoring harness bias: ruled out (arm order alternates, cand won from
+  both positions, A/A #2 symmetric).
+- **The fuzzy tier as a corruption risk**: 29 applications archive-wide, median
+  100%, min 85%, **zero in b87+**.
+- **The stall-signature fix** (5.13d): three hypotheses, all refuted.
+- Whitespace-normalising the `old` match: **zero** of 187 misses were whitespace.
+- **The pytest duration string as the stall-fragmentation cause**: tested, wrong.
