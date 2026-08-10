@@ -1237,18 +1237,20 @@ class EditFile:
         "and tolerates whitespace differences, so it CANNOT make an "
         "indentation-only or whitespace-only change — such an edit collapses to a "
         "no-op and is rejected. To re-indent a line or fix a broken indent, use "
-        "replace_lines instead."
-        # [b126 attribution] Build 123 added a sentence here — "If `old` turns
-        # out to appear more than once, do NOT rewrite it: resend the same call
-        # with `occurrence` set to which one you mean." — and the case went from
-        # 7/24 to 22/24 fixed. But that build changed the description, the
-        # schema, AND the ambiguous message together, and reading the runs
-        # showed the win came from the model widening its FIRST `old` before any
-        # ambiguous message exists. Only the description and the schema are
-        # visible that early. This build removes the sentence and keeps
-        # everything else, so b126 asks which of the two it was. Whichever way
-        # it lands, the sentence comes back or stays out on the evidence — do
-        # not restore it by hand. ROADMAP 5.69/5.70.
+        "replace_lines instead. "
+        # [b126] THE SINGLE HIGHEST-VALUE SENTENCE IN THIS FILE — do not trim it
+        # as redundant with the ambiguous message. It is not redundant: the
+        # message is read only after the model is stuck, this is read before it
+        # aims. Build 124 removed it and kept the schema, the selector and the
+        # message; `fully_fixed` fell 18/24 -> 7/24 (Fisher p=0.0034) and the
+        # share of runs whose FIRST `old` reaches the def/docstring — the only
+        # `old` that can be unique — fell 15/24 -> 0/24. Two independent
+        # replications of each condition across b125 and b126. Its real work is
+        # upstream of everything it mentions: a model told that `old` can match
+        # more than once picks a bigger `old` to begin with, and never reaches
+        # the ambiguous branch at all. ROADMAP 5.71.
+        "If `old` turns out to appear more than once, do NOT rewrite it: resend "
+        "the same call with `occurrence` set to which one you mean."
     )
     permission = "ask"
     schema = {

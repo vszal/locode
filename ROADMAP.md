@@ -2874,6 +2874,74 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.71 b126 verdict — it was THE SENTENCE, and the schema property is not innocent (2026-08-10)
+
+`b126-attribution`, `--base 57de838` (build 123), cand = build 124 = build 123
+**minus one sentence of tool description**, everything else identical.
+
+| | build 123 (sentence in) | build 124 (sentence out) | |
+|---|---|---|---|
+| `fully_fixed` | 18/24 | **7/24** | Fisher **p = 0.0034** |
+| first `old` reaches the def/docstring | 15/24 | **0/24** | the mechanism, gone completely |
+| score channel | 0.875 | 0.646 | W3/L14/T7, p = 0.0127 |
+| false completions | 0 | 0 | |
+
+**Call 1 and call 2 agree, and call 2 is total.** Removing one sentence from
+`edit_file`'s description takes the wide-aim behaviour from 15/24 to **zero**.
+
+#### Both conditions now have two independent replications
+
+| condition | `fully_fixed` | wide first aim |
+|---|---|---|
+| no sentence, no schema, no selector (b125 base) | 7/24 | 0/24 |
+| no sentence, **with** schema + selector + message (b126 cand) | **7/24** | **0/24** |
+| sentence + schema + selector + message (b125 cand) | 22/24 | 21/24 |
+| the same, in the other arm slot (b126 base) | 18/24 | 15/24 |
+
+The two "no sentence" cells land on 7/24 and 0/24 **twice, exactly**, in
+opposite arm slots, with and without the entire selector machinery. The two
+"sentence" cells land at 22 and 18. This is as clean as this rig gets, and it
+also happens to show the 5.59 arm-slot bias is not driving it — build 123 scored
+*higher* in the cand slot (22) than the base slot (18), the opposite of the
+direction the bias predicts.
+
+**Verdict: the sentence is the whole effect. Restored as build 125**, with a
+comment on it saying why it must not be trimmed as redundant.
+
+#### The schema property is not neutral — it is mildly harmful on its own
+
+Build 124 still carried the new `occurrence` argument, and it did not behave
+like plain base code. Its failure *signature* is different:
+
+| | b125 base (build 120) | b126 cand (build 124) |
+|---|---|---|
+| first `old` | `if x > 100:\n        return 100` — correct indent, 24/24 | `if x > 100:\n    return 100` — **wrong indent**, 19/24 |
+| runs that saw ambiguity | 24/24 | 5/24 |
+| edit_file calls per run | 5 or 8 | **exactly 1 in 17/24** |
+| how it ended | stall stop, 17/24 | **repeated the same call, 17/24** |
+
+Offering the argument *without* the sentence that explains it made the model
+mis-indent its `old`, so the edit never matched, so it re-sent the identical
+broken call until the repeat stop killed it. Same 7/24 outcome as base, reached
+by a worse route. **An argument added to a schema with no prose to anchor it is
+a perturbation, not a feature** — which is the same lesson as the sentence, from
+the other side: the words do the work, not the affordance.
+
+#### What this licenses, and what it does not
+
+Licensed: rule 47 is no longer provisional **for this tool and this case**. The
+description is read before the model aims; the error message is read only after
+it is stuck; and on this evidence the former is worth more than six builds of
+the latter.
+
+**Not licensed:** any claim about other tools. One case, one tool, one 14B
+model. 5.70 pre-committed to testing transfer on a *different* tool and a
+*different* case before generalising, and that stands — the whole reason this
+result is trustworthy is that I stopped and attributed instead of banking the
+7→22 and moving on.
+
+**Next:** the transfer test, then lever 0c (now instrumented, 64% first-position).
+
 ### 5.70 pre-registration — b126, which half of the prompt change did it? (2026-08-10)
 
 Written and committed before the sweep starts. This is an **attribution** run,
