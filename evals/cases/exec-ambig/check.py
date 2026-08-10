@@ -28,23 +28,18 @@ thing that distinguishes them is a one-line docstring naming the real range:
 Three bugs, four failing tests (clamp_minute(45) is inside [0, 59] but outside
 the copied [0, 23] guard, so its inside-range test fails too).
 
-Version 3 changes ONLY the order the six functions appear in, and exists to
-break a confound in v2. Build 119's message lists every match site, and across
-b121 the model picked the WRONG twin 65 times against 33 — it rewrites a
-function that already passes. But in v2 the correct twin was always defined
-first, so all 65 wrong picks were also the FIRST-listed block, and "takes the
-first block offered" could not be told apart from "takes the block that looks
-correct". v3 defines the buggy twin first in two pairs of three:
+A v3 was tried and REVERTED; the ordering above is deliberate, do not "tidy" it.
+v3 moved the buggy twin first in two of the three pairs, to break a confound
+(in this ordering the correct twin is always listed first, so "takes the first
+block offered" and "takes the block that looks correct" predict the same
+number). Reordering alone destroyed the case: across 48 runs the model produced
+**zero** real edits and never once reached the second or third pair, against
+18/48 runs that fixed all three bugs under this ordering (Fisher p = 1.1e-06).
 
-    clamp_percent  then clamp_score    <- correct first
-    clamp_nibble   then clamp_byte     <- BUGGY first
-    clamp_minute   then clamp_hour     <- BUGGY first
-
-A model that simply takes the first block now scores 2 of 3; a model reasoning
-from the docstring scores 3 of 3; and the two are no longer the same number.
-Difficulty is otherwise untouched — the seed still fails 4/9, targeted fixes
-still reach 13/13, replace_all still nets zero — but v3 results are not
-pooled with v2's, since reordering could shift difficulty on its own.
+Real edits per run are bimodal — 0 or exactly 3, never in between — so an early
+branch decides the whole run, and the reorder removed the good branch. The
+position-vs-reasoning question is therefore still OPEN, and needs a design that
+does not perturb that branch. See ROADMAP 5.61.
 
 Every granularity is now ambiguous — the bare return line, the guard plus its
 return, and the entire four-line body all occur exactly 2x. Disambiguating
