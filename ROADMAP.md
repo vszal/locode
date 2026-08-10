@@ -2874,6 +2874,62 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.66 b124 verdict — build 121 REVERTED, and the message is asking for one thing too many (2026-08-10)
+
+The pre-registered revert condition (5.65 call 5) fired. Build 121 is out as
+build 122 (`62cb10f`).
+
+| | base (b120) | cand (b121) |
+|---|---|---|
+| post-ambiguous edits | 129 | 72 |
+| ...no-ops | 37 (29%) | **0 (0%)** |
+| ...came back ambiguous | 59 (46%) | **72 (100%)** |
+| ...**landed** | 33 (26%) | **0 (0%)** |
+| `fully_fixed` | 11/24 | **0/24** |
+
+`ab.py`: W0/L11/T13, delta −0.229, p=0.001. The score channel is veto-only
+(5.27) and this is it exercising the veto.
+
+**Call 1 passed and it did not matter.** The no-op is gone — completely, 37→0 —
+and nothing took its place. Read `r3__cand`: the model now makes exactly the
+correction we asked for, `if x > 100:` → `if x > 50:`, and sends the two-line
+guard as `old`. That guard is byte-identical between the twins, so it matches
+twice, so it comes back ambiguous, so it sends it again. 131 of 131 repeats
+were fragments. Zero runs fixed anything.
+
+**This is build 119's defect with the halves swapped, and that is the finding.**
+119 led with copying and got copying without the correction (29% no-ops). 121
+led with the correction and got the correction without the copying (100%
+fragments). The message makes two demands — *copy this whole four-line block*
+and *change one line inside it* — and this model obeys **whichever one the
+sentence leads with, and only that one.** Both orderings have now been run at
+n=24 with a clean, opposite, significant result. There is no third ordering.
+
+So **the lever is not wording, and the wording lever is now closed.** What the
+data says is that a two-instruction repair message is beyond this model's
+budget, and the fix has to *remove* an instruction rather than re-rank them.
+The tool already knows the exact text of every candidate block and its line
+numbers — the model is being asked to hand back information the tool printed a
+moment ago, purely so the tool can look it up again. Options, in order of how
+much they shrink the ask:
+
+1. **Let the model name the site instead of quoting it.** The message already
+   labels each block ("match at line 3"); accept `old` as-is plus an
+   occurrence/line selector, so the only thing the model authors is the change.
+   Removes the copying instruction entirely. Needs an API decision (new arg on
+   `edit_file` vs. honouring a bare line number) — ask before landing.
+2. **Auto-widen a fragment to its unique enclosing block.** When `old` is an
+   exact sub-slice of a block the tool offered this turn, and the model's `new`
+   is a well-formed replacement for it, expand both to the unique block and
+   apply. Fixes it without the model changing behaviour at all.
+3. **Name the sub-slice in the message** ("you sent 2 of the 4 lines I gave
+   you"). Cheapest, but it is still a two-instruction message, so 5.66 predicts
+   it fails the same way. Do not run this one first.
+
+Option 2 is the one to build: it needs no API change, it is testable offline
+against the 131 archived fragments, and it converts the dominant failure in the
+corpus without asking the model for anything new.
+
 ### 5.65 PRE-REGISTRATION — the no-op rewrite (build 121, written before b124 runs)
 
 Lever 0b, shipped as `dc7b8bb`. Bars set before looking, and this time the
