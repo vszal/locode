@@ -2905,13 +2905,42 @@ failure I wrote down, and the "under a third" bar I pre-registered was
 **already satisfied by the baseline**, which would have handed build 121 a free
 pass. Hence the corrected bar above.
 
-Two things fall out that are worth more than the correction. First: the
-dominant post-ambiguous outcome is not the no-op at all, it is `old` **not
-matching** — 45–50% in every arm measured, against 27–50% no-ops. That is a
-bigger population than this lever's, and nothing is currently aimed at it.
 Second: in b121-aa the two arms ran *identical code* and their no-op rates were
 27% and 37%. That 10-point spread is the noise floor for this metric, so a
 b124 result inside ±10 points means nothing.
+
+**And the third thing is bigger than the lever.** Classifying all 246
+post-ambiguous edits in b121-aa by what the tool said *back*:
+
+| | share | n |
+|---|---|---|
+| **got the ambiguous message AGAIN** | **46.3%** | 114 |
+| no-op (`old == new`) | 31.7% | 78 |
+| landed | 22.0% | 54 |
+
+**114 of those 114 repeats sent a FRAGMENT of an offered block** — typically the
+two-line guard (`if x > 100:` / `return 100`) instead of the four-line block the
+message printed and labelled *"these are lines 2-5, copy all 4 of them"*. Not
+one sent a whole block and got ambiguity anyway. So the single biggest failure
+after this message is **the model taking a sub-slice of exactly the text it was
+handed**, and on exec-ambig the sub-slice it takes is the part that is
+byte-identical between the twins — the one part that cannot disambiguate
+anything. That is a loop, not a mistake: fragment → same message → fragment.
+
+The 5.16-defect-2 "widen the not-found window" item on the backlog is *not* this
+— these are not near-misses, they are exact sub-slices. The targeted fix is a
+message that recognises the sub-slice and says so ("you sent 2 of the 4 lines I
+gave you"), which no current message does. Queued as the next lever.
+
+**RISK TO BUILD 121, recorded before its data exists.** The rewrite leads with
+*"decide the ONE line in it that is wrong"*. Given the above, that phrasing
+could plausibly make fragment-sending **worse** by focusing attention on a
+single line at the exact moment the model has to copy four. So a fifth call:
+
+5. **Fragment rate must not rise.** Base ~46% of post-ambiguous edits come back
+   ambiguous again; cand must not exceed base + 10 points (the measured noise
+   floor). If it rises past that, build 121 gets **reverted** whatever the no-op
+   number does — trading a no-op for an infinite loop is a bad trade.
 2. **Lever fires equally in both arms.** Both arms must emit a comparable number
    of ambiguous messages — this message is the trigger, not the treatment, so a
    lopsided exposure means the arms diverged upstream and the primary is
