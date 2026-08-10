@@ -1,4 +1,4 @@
-# locode resume — build 124 (2026-08-10)
+# locode resume — build 125 (2026-08-10)
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -554,10 +554,12 @@ completion. **The repeat death is still the dominant ending.**
     stuck. Build 123 incidentally added one sentence to `edit_file`'s
     DESCRIPTION, which it reads before it does anything, and the case went
     7/24 -> 22/24 by changing where the model AIMED — 21/24 runs never saw the
-    message at all. Attribution is in flight (b126) and this rule is
-    provisional until it lands. The generalisation to check afterwards, on a
-    DIFFERENT tool and a DIFFERENT case: when a tool fails the same way over
-    and over, fix the description, not the failure message. (ROADMAP 5.69)
+    message at all. **CONFIRMED by b126**: removing that one sentence and
+    keeping everything else took fixed 18/24 -> 7/24 (p=0.0034) and wide-aim
+    15/24 -> 0/24. Two replications per condition, opposite arm slots. Still
+    one tool, one case: the generalisation to check next, on a DIFFERENT tool
+    and a DIFFERENT case, is that when a tool fails the same way over and over,
+    fix the description, not the failure message. (ROADMAP 5.69/5.71)
 
 48. EVERY PRE-REGISTRATION MUST CARRY ONE POPULATION-INDEPENDENT OUTCOME. 5.67
     scoped all five of its calls to "edits that follow an ambiguous message",
@@ -615,22 +617,26 @@ completion. **The repeat death is still the dominant ending.**
    **92%**, repeat loop 47% -> **0%**. And 2 of those 3 runs still failed —
    see 0c, which it just instrumented.
 
-0b-iv. **ATTRIBUTION — build 124, b126 IN FLIGHT.** Build 124 removes the
-   description sentence and keeps the schema property, the selector, and the
-   message, so the sweep says which half did it.
-   - `--base 57de838` (build 123 itself), exec-ambig, qwencoder14, r24, log
-     `$CLAUDE_JOB_DIR/tmp/ab126.log`. **No source edits until it exits.**
-   - Pre-registered ROADMAP 5.70; grader `$CLAUDE_JOB_DIR/tmp/grade126.py`
-     (validated by dry-run on b125, where it reproduces 21/24 wide-aim
-     independently of the hand count).
-   - Reading: cand <=12/24 credits THE SENTENCE (the big, general finding —
-     tool descriptions steer aim, applies to every tool); >=19/24 credits THE
-     SCHEMA; 13-18 means both and needs a third arm.
-   - Build 124 is EXPECTED TO BE WORSE. That is what is being bought.
-   - Generic prompt perturbation is ruled out in advance: **48/48** base runs
-     across b124+b125 opened with the byte-identical first `old`, so that call
-     is deterministic and flipping it in 21/24 is causal. (Outcomes still vary
-     later — same base code gave 11/24 and 7/24 fully_fixed.)
+0b-iv. **ATTRIBUTION — LANDED, and the sentence won.** b126 removed the one
+   description sentence from build 123 and kept the schema property, the
+   selector and the message. `--base 57de838`, exec-ambig, qwencoder14, r24.
+   - `fully_fixed` **18/24 -> 7/24** (Fisher p=0.0034); wide first aim
+     **15/24 -> 0/24**; score W3/L14/T7, delta -0.229, p=0.0127; 0 false
+     completions both arms. Pre-registered band said <=12/24 credits THE
+     SENTENCE — it landed at 7.
+   - Both conditions now have TWO replications in OPPOSITE arm slots: no
+     sentence = 7/24 fixed and 0/24 wide, twice, with and without the whole
+     selector machinery; sentence = 22/24 and 18/24. Runs opposite to the 5.59
+     slot bias, so that isn't it either.
+   - Second finding: **the schema property alone is mildly harmful.** Offering
+     `occurrence` with no prose to anchor it made the model mis-indent its
+     `old` (4 spaces, 19/24 runs) so nothing matched, and it re-sent the
+     identical broken call to the repeat stop (17/24 ended that way, 17/24 with
+     exactly one edit call). Same 7/24, worse route.
+   - **Build 125 = build 123 + a comment saying do not trim that sentence.**
+     Restored on the evidence, not by hand. Verdict in ROADMAP 5.71.
+   - NEXT, pre-committed in 5.70 and NOT yet done: the **transfer test** — same
+     idea, DIFFERENT tool, DIFFERENT case, before claiming anything general.
 
 0c. **POSITION VS REASONING — now INSTRUMENTED, and the first datum is in.**
    b122 could not test it because reordering the case destroys it. The
@@ -642,7 +648,8 @@ completion. **The repeat death is still the dominant ending.**
    every edit lands, at the wrong site. r1 breaks `clamp_byte`, notices the
    suite got worse, flips it back, and thrashes to the stall stop.
    **The selector converted an invisible matching failure into a visible
-   targeting failure.** Next after b126. (ROADMAP 5.61/5.69)
+   targeting failure.** b126 is done, so this is next after the transfer
+   test. (ROADMAP 5.61/5.69)
 
 0. ~~BUILD 106 — the indentation splice bug (5.29).~~ **SHIPPED** as `f038a9e`,
    sweeping now. Landed as a strict RESCUE (`_pick_splice`), not the
