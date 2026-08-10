@@ -2874,6 +2874,52 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.56 The ambiguity was never there: the model edits at guard granularity (2026-08-10)
+
+5.55 ended by building `exec-ambig`, a case whose bugs sit on duplicated lines
+so the ambiguous-match message would fire in nearly every run — the instrument
+b120 lacked. Before spending 2.5h on a full sweep I ran a paired r=1 pilot with
+one question: *does the message actually fire?*
+
+It fired **zero times, in both arms.** Both runs finished VERIFIED in nine
+calls and three clean edits. `ab.py` returned UNDERPOWERED and warned the case
+might be saturated, but saturation was not the story — the event log was:
+
+    edit_file old='if x > 255:\n    return 100' new='if x > 255:\n    return 255'
+    edit_file old='if x > 1:\n    return 0'     new='if x > 1:\n    return 1'
+    edit_file old='if x > 127:\n    return 128' new='if x > 127:\n    return 127'
+
+Six edits across two arms, every one anchored on the **enclosing guard**. I had
+duplicated `return 100` and `return 0`; the model never sent either of those as
+`old`. It sends the guard line plus its return — and that two-line block was
+unique, so the ambiguity the case was built around did not exist.
+
+The generalisable point is not about this case. **Ambiguity is a property of
+the string the model actually sends, and the model chooses that string at a
+granularity of its own.** A case that duplicates the line that is *wrong* tests
+nothing if the model habitually copies the line above it too. This is also a
+partial second explanation for b120: ambiguous matches are rarer in practice
+than the file's duplicate-line count suggests, because anchoring on control
+flow disambiguates for free. Worth noting that this is the model doing
+something *sensible* — the failure was in my instrument, not its behaviour.
+
+Rebuilt as v2 (`bcefdd2`): six functions in three pairs, each buggy function's
+whole body byte-identical to its correct twin's, distinguished only by a
+one-line docstring naming the real range. Now the bare return, the guard plus
+return, and the entire body each occur exactly 2x, so no anchor choice escapes
+ambiguity, and `_unique_window` must widen out to the docstring — which is
+exactly the copy-the-wider-block behaviour build 119 is meant to teach. Guards
+verified before landing: seed 4 failed / 9 passed, targeted fixes 13/13,
+`replace_all` fixes the buggy twin, breaks the correct one, stays at 4 failed.
+
+Cost of the pilot: ~10 minutes, against the 2.5h sweep it would have wasted —
+and a v1 result would have read as "the message doesn't help," which is a
+conclusion about the message that the run contained no evidence for.
+
+**Rule 40. Pilot a new instrument for whether the LEVER FIRES, not for whether
+the metric moves.** An r=1 pilot cannot measure an effect, but it can prove the
+mechanism is reachable, and that is the failure mode that wastes whole sweeps.
+
 ### 5.55 b120: the metric moved, the lever didn't fire, do not credit it (2026-08-10)
 
 Graded by `grade120.py`, written and validated against b119 *before* the sweep
