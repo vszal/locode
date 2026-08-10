@@ -120,11 +120,31 @@ async def test_ambiguous_sites_are_not_byte_identical(ctx, tmp_path):
     assert blocks[0] != blocks[1]
 
 
-async def test_ambiguous_marks_which_line_is_the_match(ctx, tmp_path):
-    (tmp_path / "c.py").write_text("alpha\nx = 1\nbravo\ncharlie\nx = 1\ndelta\n")
+async def test_ambiguous_renders_blocks_verbatim_with_no_gutter(ctx, tmp_path):
+    # Build 119: the `NN |` gutter and the `>` marker are GONE. The model is
+    # now told to copy these lines into `old`, and b97 proved it cannot tell a
+    # gutter's padding from the code's own indentation when it strips one —
+    # 8 of its 20 syntax rejections came off this message (5.28).
+    (tmp_path / "c.py").write_text(
+        "alpha\n    x = 1\nbravo\ncharlie\n    x = 1\ndelta\n")
+    res = await fs.EditFile().run(
+        {"path": "c.py", "old": "    x = 1", "new": "    x = 9"}, ctx)
+    assert "|>" not in res.content
+    # the code's OWN indentation survives, at column 0 of the message
+    assert "\n    x = 1\n" in res.content
+    assert "match at line 2" in res.content and "lines 1-3" in res.content
+
+
+async def test_ambiguous_widens_a_window_that_is_not_yet_unique(ctx, tmp_path):
+    # A +/-1 window that still occurs twice would send the model straight back
+    # into the same error, so it expands until the block is unique.
+    (tmp_path / "c.py").write_text(
+        "head\npad\nx = 1\npad\nmid\npad\nx = 1\npad\ntail\n")
     res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
-    assert "   2 |> x = 1" in res.content
-    assert "   1 |  alpha" in res.content
+    blocks = res.content.split("── match at line ")[1:]
+    assert len(blocks) == 2 and blocks[0] != blocks[1]
+    body = res.content
+    assert "head" in body and "tail" in body  # widened past the identical pads
 
 
 async def test_ambiguous_tells_the_model_not_to_resend(ctx, tmp_path):
@@ -147,9 +167,9 @@ async def test_ambiguous_handles_a_multiline_old(ctx, tmp_path):
     res = await fs.EditFile().run(
         {"path": "c.py", "old": "a = 1\nb = 2", "new": "a = 9\nb = 9"}, ctx)
     assert res.is_error
-    # both lines of the match marked, at both sites, with their own context
-    assert res.content.count("|> a = 1") == 2
-    assert res.content.count("|> b = 2") == 2
+    # both lines of the match rendered, at both sites, with their own context
+    assert res.content.count("a = 1") == 2
+    assert res.content.count("b = 2") == 2
     assert "head" in res.content and "tail2" in res.content
 
 
@@ -1211,26 +1231,43 @@ async def test_no_op_message_names_the_same_misconception(ctx, tmp_path):
     assert "both fields" in res.content.lower()
 
 
-# --- the ambiguous reply must lead with replace_lines, not with extending
-#     `old` (build 98). Build 97 showed the model takes whichever route is
-#     named first: it went 0 -> 22 multi-line `old` values and 1 -> 20
-#     syntax-guard refusals, and took replace_lines zero times. ROADMAP 5.20b.
+# --- build 119 REVERSES build 98's ordering. 98 put replace_lines first
+#     because b97's extend-`old` route caused 20 syntax refusals — but 5.52
+#     measured what winning looks like: the runs that verify rewrite whole
+#     blocks (median `new` 673 chars) and the runs that die do single-line
+#     surgery (p90 79 chars across 346 edits) and never re-derive the logic.
+#     replace_lines converts at 76/76 and is the LOSING branch's route, because
+#     what it prescribes ("only the replacement line as `new`") is the losing
+#     strategy. b97's syntax disaster is guarded against by removing the gutter
+#     the model used to strip, per 5.28's stated precondition. ROADMAP 5.53.
 
-async def test_ambiguous_names_replace_lines_before_the_other_routes(ctx, tmp_path):
+async def test_ambiguous_leads_with_copying_the_block_not_replace_lines(ctx, tmp_path):
     (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
     await fs.ReadFile().run({"path": "m.py"}, ctx)
     res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
     assert res.is_error
     body = res.content
-    assert body.index("replace_lines") < body.index("replace_all")
-    assert body.index("replace_lines") < body.index("Extending `old`")
+    assert body.index("VERBATIM into `old`") < body.index("replace_all")
+    assert body.index("VERBATIM into `old`") < body.index("replace_lines")
 
 
-async def test_ambiguous_warns_that_extending_means_rewriting_the_block(ctx, tmp_path):
+async def test_ambiguous_says_the_bug_may_be_a_neighbouring_line(ctx, tmp_path):
+    # The 5.52 mechanism: read-first runs mis-localize, patching a plausible
+    # line one below the real defect. For the exec-bugfix `old` they actually
+    # send, the buggy comparison is IN the +/-1 window.
     (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
     await fs.ReadFile().run({"path": "m.py"}, ctx)
     res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
-    assert "WHOLE extended block" in res.content
+    assert "one of THEM rather than the line you first picked" in res.content
+
+
+async def test_ambiguous_promises_each_block_is_unique(ctx, tmp_path):
+    # The message tells the model to copy a block into `old`; that advice has
+    # to be true or it fails ambiguously a second time.
+    (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+    res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
+    assert "exactly ONCE" in res.content
 
 
 async def test_ambiguous_still_shows_the_surrounding_lines(ctx, tmp_path):

@@ -397,10 +397,36 @@ def _same_content(a: str, b: str) -> bool:
 # line of context is ~12 lines. Named, not inlined, so the width is A/B-able.
 _AMBIG_SITES = 4
 _AMBIG_WINDOW = 1
+# Expansion ceiling for the uniqueness guarantee below. Only widens the sites
+# that NEED it, so the common case stays at ~12 lines and build 90's finding
+# still holds.
+_AMBIG_MAXWINDOW = 4
+
+
+def _unique_window(lines: list[str], text: str, first: int, span: int,
+                   window: int, max_window: int) -> tuple[int, int]:
+    """Smallest window around a match whose rendered block is unique in `text`.
+
+    The message now tells the model to copy one of these blocks verbatim into
+    `old`, so the advice has to be TRUE: a block that itself occurs twice would
+    fail ambiguously all over again. Widens only until the block occurs once,
+    stopping at `max_window` or the file edges (whichever comes first).
+    """
+    lo = max(1, first - window)
+    hi = min(len(lines), first + span - 1 + window)
+    for w in range(window, max_window + 1):
+        lo = max(1, first - w)
+        hi = min(len(lines), first + span - 1 + w)
+        if text.count("\n".join(lines[lo - 1:hi])) == 1:
+            break
+        if lo == 1 and hi == len(lines):
+            break
+    return lo, hi
 
 
 def _match_locations(text: str, old: str, *, limit: int = _AMBIG_SITES,
-                     window: int = _AMBIG_WINDOW) -> str:
+                     window: int = _AMBIG_WINDOW,
+                     max_window: int = _AMBIG_MAXWINDOW) -> str:
     """Show every place `old` matches, WITH the lines around it.
 
     This used to list `line N: <first line of old>` per match — which is
@@ -413,6 +439,18 @@ def _match_locations(text: str, old: str, *, limit: int = _AMBIG_SITES,
     identical `old` (ROADMAP 5.20).
 
     Capped at `limit` so a pattern that appears everywhere can't flood the reply.
+
+    **Rendered VERBATIM and UNNUMBERED since build 119** — the way
+    `_not_found_help` prints its block. It used to carry a `NN |` gutter and a
+    `>` marker on the matched span, which was survivable only while nothing was
+    told to copy out of it. b97 promoted the extend-`old` route while the gutter
+    was still there, the model stripped `NN |`, could not tell the gutter's
+    padding from the code's indentation, sent a dedented `old`, and wrote `new`
+    at the wrong column: 8 of its 20 syntax rejections came straight off this
+    message. 5.28 recorded the precondition — "if the extend route is ever
+    promoted again, the gutter has to go first" — and build 119 promotes it.
+    The line numbers move into the header prose, where they cannot be copied
+    into code by accident.
     """
     lines = text.split("\n")
     span = len(old.split("\n"))
@@ -422,12 +460,11 @@ def _match_locations(text: str, old: str, *, limit: int = _AMBIG_SITES,
         if i < 0:
             break
         first = text.count("\n", 0, i) + 1
-        lo = max(1, first - window)
-        hi = min(len(lines), first + span - 1 + window)
-        out.append(f"  ── match at line {first} ──")
-        for n in range(lo, hi + 1):
-            hit = first <= n <= first + span - 1
-            out.append(f"  {n:>4} |{'>' if hit else ' '} {lines[n - 1]}")
+        lo, hi = _unique_window(lines, text, first, span, window, max_window)
+        block = lines[lo - 1:hi]
+        out.append(f"  ── match at line {first} — these are lines {lo}-{hi}, "
+                   f"copy all {len(block)} of them ──")
+        out.extend(block)
         start = i + max(1, len(old))
         shown += 1
     if total > shown:
@@ -1238,21 +1275,23 @@ class EditFile:
         if status == "ambiguous":
             return ToolResult(
                 f"`old` appears {count} times in {p}, so it is not clear which "
-                "one to change. Here is each place it matches, WITH THE LINES "
-                "AROUND IT — those lines differ, and that is what lets you pick "
-                "one:\n" + _match_locations(text, old) +
+                "one to change. Here is each place it matches, with the lines "
+                "around it. Each block below occurs exactly ONCE in the file:\n"
+                + _match_locations(text, old) +
                 "\n\nResending the same `old` will fail in exactly the same way. "
-                "The reliable fix is replace_lines: pick the match you want and "
-                "call replace_lines with start and end set to ITS line number "
-                "from the list above (start=end for a single line), passing only "
-                "the replacement line as `new`, indented to the same column. No "
-                "`old` is involved, so there is nothing to disambiguate.\n"
+                "Pick the block you meant and copy it VERBATIM into `old` — "
+                "every line of it, with its leading spaces exactly as shown "
+                "above. Put that same block in `new` with your correction "
+                "applied to it. Because the block is unique, `old` then matches "
+                "one place only.\n"
+                "Read the whole block before you rewrite it: the lines around "
+                "your match are part of the same logic, and the line you need "
+                "to change is often one of THEM rather than the line you first "
+                "picked.\n"
                 "If every occurrence really should change, pass replace_all "
-                "instead.\n"
-                "Extending `old` upward or downward to make it unique also "
-                "works, but only do it if the two lines above are genuinely "
-                "different: `new` must then contain the WHOLE extended block, "
-                "rewritten correctly, and that is where this edit usually breaks.",
+                "instead. If you cannot reproduce the block's exact characters, "
+                "call replace_lines with start and end set to the line numbers "
+                "named above.",
                 is_error=True)
         # `old` didn't produce a real change (it's not in the file, or a tolerant/
         # fuzzy match landed on a line that's byte-identical to `new`). Two shapes

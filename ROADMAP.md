@@ -2874,6 +2874,77 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.53 Build 119 — the ambiguous message now prescribes the winning strategy (2026-08-09, pre-registered)
+
+5.52's lever, built. The ambiguous-match message fires on **100% of the losing
+branch** (37/37 read-first runs, 0/117 edit-first) and is the only harness
+intervention point inside it. It currently prescribes single-line surgery
+verbatim — *"passing only the replacement line as `new`"* — and explicitly
+argues against the alternative: *"extending `old` … is where this edit usually
+breaks."* That is the losing strategy, recommended, at the moment the model is
+most receptive.
+
+**The change (two halves that cannot be separated, deliberately).**
+
+1. **Route order reversed.** Copy-the-block-verbatim is now first;
+   `replace_lines` is demoted to the can't-reproduce-the-characters fallback;
+   `replace_all` unchanged. Plus one new sentence aimed at 5.52's measured
+   failure — *"the line you need to change is often one of THEM rather than
+   the line you first picked"* — because the losing runs mis-localize to a
+   plausible line one below the defect.
+2. **The `NN |` gutter and `>` marker are gone**; blocks render verbatim and
+   unnumbered like `_not_found_help`, line numbers stated in the header prose.
+
+Half 2 is the precondition 5.28 wrote down for half 1: *"if the extend route is
+ever promoted again, the gutter has to go first."* b97 promoted extend **with**
+the gutter, the model stripped `NN |`, lost the indentation with it, and 8 of
+its 20 syntax rejections came off this message. So this **knowingly violates
+rule 28** (never bundle a behaviour change into a wording sweep), and the
+justification is that the two are not independently shippable: promoting extend
+with the gutter present is the known-catastrophic b97 configuration, and
+removing the gutter without promoting extend changes nothing, since nothing
+currently takes that route. If the sweep loses I cannot attribute which half
+lost — accepted, and recorded here in advance.
+
+**New: the uniqueness guarantee.** The message now claims each block "occurs
+exactly ONCE in the file", so `_unique_window` widens any site whose ±1 window
+is not yet unique (ceiling 4, only for the sites that need it — build 90
+measured a wide window actively harmful, so the common case stays at ~12
+lines). Advice the model follows has to be true, or it fails ambiguously twice.
+
+**Mechanism, and why this case may flatter it.** For the exact `old` the losing
+runs actually send, the ±1 window contains the bug:
+
+```
+  ── match at line 24 — these are lines 23-25, copy all 3 of them ──
+            current = [word]
+            current_len = len(word)
+        elif current_len + 1 + len(word) < width:
+```
+
+That third line is the defect (`<` should be `<=`). Copying the block into
+`old` and its corrected form into `new` puts the operator in the model's own
+output. Strong mechanism here — and exactly the reason it may not generalize,
+since nothing guarantees a real bug sits within one line of the ambiguous
+match. Filed as case-favorable in advance.
+
+**Pre-registered predictions**, graded on `b120-ambigblock`, r14, paired, base
+= build 118:
+
+- **Primary:** VERIFIED rate up. Read-first runs are 1/37 (3%) and the branch
+  is ~24% of runs, so the ceiling on this case is ~+18pp; I predict a smaller
+  real effect and would call **any** significant gain a win.
+- **Mechanism (the honest test):** among read-first runs, median `new` payload
+  rises off 70 chars, and the `<= width` write rate rises off 14%. **If VERIFIED
+  moves but these do not, the message is not what moved it** and I will say so.
+- **Guardrail (the b97 failure mode):** syntax rejections downstream of an
+  ambiguous message must stay at **0**. It has been 0 across 31+ events since
+  build 98. Any regression here condemns the change regardless of the primary.
+- **Null is live.** The mode is chosen before the message arrives; the message
+  never created it. This tests only whether the message can *break* it.
+- Per 5.45's standing habit fix: a 2-run VERIFIED gap at r14 is **not** a
+  result. It needs the mechanism numbers to move with it.
+
 ### 5.52 What kills read-first runs: they never make a big edit (2026-08-09)
 
 Answering "investigate what kills read-first runs" — the 5.48 branch, where the
