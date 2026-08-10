@@ -2874,6 +2874,28 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.65 PRE-REGISTRATION — the no-op rewrite (build 121, written before b124 runs)
+
+Lever 0b, shipped as `dc7b8bb`. Bars set before looking, and this time the
+incidence question 5.64 got wrong is handled by grading on the **exposed**
+population from the start (rule 40): the denominator is *edits that follow an
+ambiguous message*, not runs.
+
+1. **Primary — no-op rate among post-ambiguous edits.** Base ~73% (78/132 in
+   b121-aa; b122 was 96/96 but on the reverted v3 case). Candidate **under a
+   third**. Above half is a miss.
+2. **Lever fires equally in both arms.** Both arms must emit a comparable number
+   of ambiguous messages — this message is the trigger, not the treatment, so a
+   lopsided exposure means the arms diverged upstream and the primary is
+   ungraded rather than won or lost.
+3. **`fully_fixed` does not fall,** read against the 5.59 slot bias (identical
+   code gives base ~12/24, cand ~6/24) rather than against base directly.
+4. **No new syntax refusals.** b97 lost 20 runs to a copy-the-block message; the
+   guard is that `old`-not-found and syntax-reject counts do not rise.
+
+DONE rate is *not* a bar here. Build 120 owns that channel now, and both arms
+carry it.
+
 ### 5.64 b123 verdict — build 120 CREDITED, and the miss is in my bar, not the fix (2026-08-10)
 
 Graded against 5.62, written before the sweep. `ab.py`: −0.062, p=0.58, NO
