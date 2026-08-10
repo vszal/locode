@@ -2881,9 +2881,37 @@ incidence question 5.64 got wrong is handled by grading on the **exposed**
 population from the start (rule 40): the denominator is *edits that follow an
 ambiguous message*, not runs.
 
-1. **Primary — no-op rate among post-ambiguous edits.** Base ~73% (78/132 in
-   b121-aa; b122 was 96/96 but on the reverted v3 case). Candidate **under a
-   third**. Above half is a miss.
+1. **Primary — no-op rate among post-ambiguous edits.** See the amendment
+   below: base is **~27–50%**, and the bar is **cand under half the base arm's
+   rate in the same sweep, and under 20% absolute**. At or above 0.75× base is
+   a miss.
+
+**AMENDMENT, written after building the grader and BEFORE any b124 data
+existed** (the sweep was still on its base arm; the corrected numbers come from
+re-reading b121-aa and b122, which are closed). *Both figures this lever was
+justified with were numerator/denominator mix-ups of mine — the same class of
+error as the `cmd`/`command` and `rep`/`repeat` bugs, and the third instance.*
+
+| | claimed | actual (grade124.py) |
+|---|---|---|
+| b121-aa | "78/132 = 73%" | base **36/132 (27%)**, cand **42/114 (37%)** |
+| b122 | "96/96 = 100%" | **48/96 (50%)** in *each* arm |
+
+78 was the no-op count summed over **both** arms divided by **one** arm's edit
+count; 96 was the per-arm *edit* count read as if it were the no-op count. The
+defect is real and worth the build — a third to a half of the edits a model
+makes after this message still do nothing — but it is not the near-total
+failure I wrote down, and the "under a third" bar I pre-registered was
+**already satisfied by the baseline**, which would have handed build 121 a free
+pass. Hence the corrected bar above.
+
+Two things fall out that are worth more than the correction. First: the
+dominant post-ambiguous outcome is not the no-op at all, it is `old` **not
+matching** — 45–50% in every arm measured, against 27–50% no-ops. That is a
+bigger population than this lever's, and nothing is currently aimed at it.
+Second: in b121-aa the two arms ran *identical code* and their no-op rates were
+27% and 37%. That 10-point spread is the noise floor for this metric, so a
+b124 result inside ±10 points means nothing.
 2. **Lever fires equally in both arms.** Both arms must emit a comparable number
    of ambiguous messages — this message is the trigger, not the treatment, so a
    lopsided exposure means the arms diverged upstream and the primary is
@@ -2947,8 +2975,11 @@ outranks proof.
 
 The user-reported defect ("edit_file … ✗ This edit does NOTHING: `new` is
 identical to `old`") is now reproducible on demand, and build 119's own message
-is what produces it. Counts from the sweeps that ran it: **96 of 96** applied
-edits in b122 were no-ops, **78 of 132** in b121-aa.
+is what produces it.
+
+> **The counts first written here — "96 of 96 in b122, 78 of 132 in b121-aa" —
+> are WRONG; see the amendment in 5.65.** The measured rates are 27–37% in
+> b121-aa and 50% in b122. The lever survives the correction, its bar did not.
 
 The message currently says:
 
