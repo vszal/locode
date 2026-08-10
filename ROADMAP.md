@@ -2916,6 +2916,33 @@ not a measurement. Two specific things to check before building anything:
 wrong twice about a lever whose prose argument sounded finished (5.63's premise,
 5.66's option 2), and both times ten minutes of counting settled it.
 
+#### Both checks, answered (same day, before anything was built)
+
+**1. Yes — the loop requires a closed plan to stop.** `loop.py:790` refuses to
+end the turn while `self.plan.open` and nudges instead. So most of that tail is
+NOT waste; it is the exit protocol, and "wasted calls" would have been the wrong
+write-up. There is already a narrow credit above it (`loop.py:776`): a green test
+auto-completes the current task, but only when the current task is
+*verify-shaped*. It fired in **10 of the 19** green runs — so in the other 9 the
+green landed while the model sat on an implementation task it had finished and
+never marked done.
+
+**2. No — the post-green `bash` calls are not insurance.** All **10 of 10**
+re-run the byte-identical command that produced the green. Zero were a different
+command. That is the nudge's own wording doing it: it says "do the work now with
+a tool call", and a model with nothing left to do re-proves the same green.
+
+**So the lever sharpens, and it is not "skip the plan".** The defect is that
+*finishing a task and recording it are two separate acts, and this model only
+does the first*. The existing credit already accepts that for verify tasks; the
+question is whether it can safely extend to an implementation task whose files
+demonstrably changed while the suite went green. The hard constraint is build
+120's headline — **zero false completions** — so any widening has to be gated on
+real evidence (a green verify AND landed edits), never on the model's say-so.
+
+**Status: ready to pre-register, queued behind b125.** One lever in flight at a
+time; stacking them is how the arm-slot bias went unnoticed for nine sweeps.
+
 ### 5.67 pre-registration — build 123, the `occurrence` selector (2026-08-10)
 
 Written and committed BEFORE `b125-occurrence` starts. Every baseline figure
