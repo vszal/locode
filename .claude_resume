@@ -1,4 +1,4 @@
-# locode resume — build 123 (2026-08-10)
+# locode resume — build 124 (2026-08-10)
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -548,6 +548,26 @@ completion. **The repeat death is still the dominant ending.**
     around a match always contains the match). Prose reasoning about a corpus
     is not evidence about that corpus, even when I wrote the prose.
 
+47. THE TOOL DESCRIPTION MAY BE A STRONGER LEVER THAN THE ERROR MESSAGE, and I
+    spent six builds on the wrong one. Builds 119/121/123 all rewrote the
+    ambiguous-match MESSAGE, which the model reads only after it is already
+    stuck. Build 123 incidentally added one sentence to `edit_file`'s
+    DESCRIPTION, which it reads before it does anything, and the case went
+    7/24 -> 22/24 by changing where the model AIMED — 21/24 runs never saw the
+    message at all. Attribution is in flight (b126) and this rule is
+    provisional until it lands. The generalisation to check afterwards, on a
+    DIFFERENT tool and a DIFFERENT case: when a tool fails the same way over
+    and over, fix the description, not the failure message. (ROADMAP 5.69)
+
+48. EVERY PRE-REGISTRATION MUST CARRY ONE POPULATION-INDEPENDENT OUTCOME. 5.67
+    scoped all five of its calls to "edits that follow an ambiguous message",
+    because that was the failure I knew about — and the fix arrived upstream by
+    stopping the ambiguous message from happening, which made four of the five
+    calls unreadable. `fully_fixed` was in there as call 5 and is the only
+    reason the sweep could be graded at all. A metric conditioned on the
+    failure you are fixing goes blind exactly when you succeed. (5.69; the
+    fourth relative of rule 43.)
+
 ## Next levers, in order
 0. ~~STALE-STALL BUG~~ — **SHIPPED as build 120 (`54b594b`) and CREDITED by
    b123.** DONE 0/24 -> 8/24, Fisher p=0.0039, and the mechanism is 1:1: the 8
@@ -578,27 +598,51 @@ completion. **The repeat death is still the dominant ending.**
    inside every one of them by construction. Fourth instance of "check the
    premise against a closed sweep before building on it".
 
-0b-iii. **THE OCCURRENCE SELECTOR — build 123 (`57de838`), IN FLIGHT.** The one
-   remaining option, and b124 makes it strong: in that candidate arm the model's
-   `new` was ALREADY correct. It knew the fix; it could not point at the site.
-   So `edit_file` takes an optional 1-based `occurrence`, the ambiguous message
-   numbers each block it offers, and its single instruction is now "resend the
-   SAME call and add the number" — no copying, no rewriting, `replace_lines`
-   removed from the message entirely.
-   - **b125-occurrence** in flight (`--base a175ed7`, i.e. the build-120 message,
-     so the selector is the only difference; exec-ambig, qwencoder14, r24, log
-     `$CLAUDE_JOB_DIR/tmp/ab125.log`, ~95 min). **No source edits until it exits.**
-   - Pre-registered in ROADMAP 5.67, graded by `$CLAUDE_JOB_DIR/tmp/grade125.py`.
-     Baselines from that script, dry-run on b124's base arm (rule 43): 129
-     post-ambiguous edits, 26% landed / 29% no-op / 46% came back ambiguous.
-   - **Call 1 is the one to watch and the one I expect to fail:** does a 14B
-     model use a brand-new argument at all (bar: >=50% of post-ambiguous edits
-     carry it)? If it misses, the finding is about argument discoverability, not
-     about the idea. REVERT if calls 2 AND 3 both miss.
+0b-iii. ~~THE OCCURRENCE SELECTOR — build 123 (`57de838`)~~ — **SHIPPED and
+   KEPT.** b125: `fully_fixed` **7/24 -> 22/24**, Fisher p=1.7e-05, W15/**L0**/T9,
+   score p=0.0001, **zero false completions in either arm**, stopped-by-loop
+   17/24 -> 2/24. Biggest effect anything has had on this case.
+   **But NOT by the mechanism I pre-registered, and the verdict says so.**
+   Call 0 (exposure parity) missed 24 vs 3, which by my own rule 40 leaves
+   calls 1-5 ungraded — honoured. Reading the runs shows why: build 123 also
+   changed `edit_file`'s DESCRIPTION and SCHEMA, which sit in every run's
+   system prompt, and the cand model consequently aims its FIRST edit at the
+   whole function (unique) instead of the duplicated 2-line guard (ambiguous)
+   in **21/24** runs. The ambiguous branch never fires. Six builds of rewriting
+   the MESSAGE moved nothing like this; one sentence in the DESCRIPTION moved
+   7/24 -> 22/24. **I have been tuning the wrong surface.** (ROADMAP 5.69.)
+   Where the selector DID fire (3 runs, 25/25 edits used it): landing 18% ->
+   **92%**, repeat loop 47% -> **0%**. And 2 of those 3 runs still failed —
+   see 0c, which it just instrumented.
 
-0c. OPEN: position vs reasoning on twin selection — b122 could not test it,
-   reordering destroys the case. Needs a design that leaves the early branch
-   alone. (ROADMAP 5.60/5.61)
+0b-iv. **ATTRIBUTION — build 124, b126 IN FLIGHT.** Build 124 removes the
+   description sentence and keeps the schema property, the selector, and the
+   message, so the sweep says which half did it.
+   - `--base 57de838` (build 123 itself), exec-ambig, qwencoder14, r24, log
+     `$CLAUDE_JOB_DIR/tmp/ab126.log`. **No source edits until it exits.**
+   - Pre-registered ROADMAP 5.70; grader `$CLAUDE_JOB_DIR/tmp/grade126.py`
+     (validated by dry-run on b125, where it reproduces 21/24 wide-aim
+     independently of the hand count).
+   - Reading: cand <=12/24 credits THE SENTENCE (the big, general finding —
+     tool descriptions steer aim, applies to every tool); >=19/24 credits THE
+     SCHEMA; 13-18 means both and needs a third arm.
+   - Build 124 is EXPECTED TO BE WORSE. That is what is being bought.
+   - Generic prompt perturbation is ruled out in advance: **48/48** base runs
+     across b124+b125 opened with the byte-identical first `old`, so that call
+     is deterministic and flipping it in 21/24 is causal. (Outcomes still vary
+     later — same base code gave 11/24 and 7/24 fully_fixed.)
+
+0c. **POSITION VS REASONING — now INSTRUMENTED, and the first datum is in.**
+   b122 could not test it because reordering the case destroys it. The
+   occurrence selector solves that without touching the case: the model's
+   choice is now a single integer in the tool call. First reading, b125's 25
+   selector edits: it chose **occurrence 1 in 16 (64%)**, and in this case's
+   ordering occurrence 1 is ALWAYS the correct twin — i.e. always the wrong
+   target. That is why 2 of the 3 runs that used the selector still failed:
+   every edit lands, at the wrong site. r1 breaks `clamp_byte`, notices the
+   suite got worse, flips it back, and thrashes to the stall stop.
+   **The selector converted an invisible matching failure into a visible
+   targeting failure.** Next after b126. (ROADMAP 5.61/5.69)
 
 0. ~~BUILD 106 — the indentation splice bug (5.29).~~ **SHIPPED** as `f038a9e`,
    sweeping now. Landed as a strict RESCUE (`_pick_splice`), not the
