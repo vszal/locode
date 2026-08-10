@@ -1278,30 +1278,12 @@ class EditFile:
                 "one to change. Here is each place it matches, with the lines "
                 "around it. Each block below occurs exactly ONCE in the file:\n"
                 + _match_locations(text, old) +
-                # Build 121 rewrites the middle paragraph. Build 119's version
-                # ended "Put that same block in `new` with your correction
-                # applied to it" — the correction was a trailing modifier on a
-                # sentence whose main clause was "put that same block in
-                # `new`", and the model executed the main clause: 96 of 96
-                # applied edits in b122 came back byte-identical, 78 of 132 in
-                # b121-aa. That is the user-reported "this edit does NOTHING",
-                # produced by our own message. So the CHANGE leads and the
-                # copying is demoted to the mechanism that aims it, with the
-                # identical-fields case named outright rather than left to be
-                # inferred. Same lesson as 5.32. ROADMAP 5.63.
                 "\n\nResending the same `old` will fail in exactly the same way. "
-                "Pick the block you meant, and decide the ONE line in it that "
-                "is wrong and what that line should say instead — that "
-                "correction is the whole point of this call. Then send the "
-                "block twice: `old` is the block copied VERBATIM, every line "
-                "with its leading spaces exactly as shown above, and `new` is "
-                "that same block with your corrected line in place of the wrong "
-                "one. Because the block is unique, `old` then matches one place "
-                "only.\n"
-                "`old` and `new` must not come out identical. A block pasted "
-                "into both fields unchanged is an edit that does nothing, and "
-                "it will be rejected — copying is only how you aim the edit, "
-                "the rewritten line is the edit.\n"
+                "Pick the block you meant and copy it VERBATIM into `old` — "
+                "every line of it, with its leading spaces exactly as shown "
+                "above. Put that same block in `new` with your correction "
+                "applied to it. Because the block is unique, `old` then matches "
+                "one place only.\n"
                 "Read the whole block before you rewrite it: the lines around "
                 "your match are part of the same logic, and the line you need "
                 "to change is often one of THEM rather than the line you first "

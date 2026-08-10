@@ -1247,33 +1247,8 @@ async def test_ambiguous_leads_with_copying_the_block_not_replace_lines(ctx, tmp
     res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
     assert res.is_error
     body = res.content
-    assert body.index("copied VERBATIM") < body.index("replace_all")
-    assert body.index("copied VERBATIM") < body.index("replace_lines")
-
-
-# --- build 121: the message was teaching the copying and losing the change ---
-#     "Put that same block in `new` with your correction applied to it" made the
-#     correction a trailing modifier, and the model kept the main clause and
-#     dropped it: 96/96 applied edits in b122 came back byte-identical, 78/132
-#     in b121-aa. ROADMAP 5.63.
-
-async def test_ambiguous_asks_for_the_correction_before_the_copying(ctx, tmp_path):
-    (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
-    await fs.ReadFile().run({"path": "m.py"}, ctx)
-    res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
-    body = res.content
-    # Deciding the change is the ask; copying is the mechanism that aims it.
-    assert body.index("decide the ONE line") < body.index("copied VERBATIM")
-
-
-async def test_ambiguous_forbids_identical_old_and_new(ctx, tmp_path):
-    # The no-op has to be named outright. Inferring it from "with your
-    # correction applied" is exactly what did not survive contact with a 14B.
-    (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
-    await fs.ReadFile().run({"path": "m.py"}, ctx)
-    res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
-    assert "must not come out identical" in res.content
-    assert "an edit that does nothing" in res.content
+    assert body.index("VERBATIM into `old`") < body.index("replace_all")
+    assert body.index("VERBATIM into `old`") < body.index("replace_lines")
 
 
 async def test_ambiguous_says_the_bug_may_be_a_neighbouring_line(ctx, tmp_path):
