@@ -2874,6 +2874,61 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.67 pre-registration — build 123, the `occurrence` selector (2026-08-10)
+
+Written and committed BEFORE `b125-occurrence` starts. Every baseline figure
+below came out of `grade125.py`, dry-run against **b124-noop's base arm**, which
+is byte-identical code to b125's base arm (rule 43 — the numerator and the
+denominator, from the grader, off a closed sweep).
+
+**Base (b124 base arm, n=24 runs, 129 post-ambiguous edits, 24/24 runs exposed):**
+
+| outcome of an edit issued after an ambiguous message | |
+|---|---|
+| LANDED | 33/129 (26%) |
+| no-op | 37/129 (29%) |
+| came back ambiguous | 59/129 (46%) |
+| other error | 0/129 (0%) |
+| `fully_fixed` | 11/24 (46%) |
+
+**What changed.** The message no longer asks for a rewrite of `old`. It numbers
+the sites and asks for one thing: resend the same call plus `occurrence: N`.
+`replace_lines` is gone from this message entirely (it was a competing route to
+a demoted tool). See the build-123 commit for why a *third wording* was not
+tried: both orderings have been run at n=24 and the model obeys whichever demand
+leads, so the lever is removal, not ranking.
+
+**Calls, all pre-registered:**
+
+0. **Exposure parity.** Both arms must put ≥70% as many runs in front of the
+   message as the other. If not, every call below is UNGRADED (rule 40) — the
+   arms diverged upstream and I am comparing different situations.
+1. **The model actually sends it.** ≥50% of post-ambiguous edits in the
+   candidate arm carry `occurrence`. This is the call 5.64 taught me to make
+   explicitly: a lever that never fires cannot be credited for anything
+   downstream, and I have no prior at all for whether a 14B model will use a
+   brand-new argument. **I expect this to be the call that fails**, and if it
+   does the finding is about argument discoverability, not about the idea.
+2. **Landing rate.** 26% → ≥46% (a 20-point rise). This is the outcome that
+   matters; the two failure modes below are just where the missing 74% goes.
+3. **The repeat loop halves.** "came back ambiguous" 46% → ≤23%. The selector
+   attacks this one directly and mechanically: an in-range `occurrence` cannot
+   return ambiguous. A miss here means the model is not sending the number.
+4. **No new no-ops.** 29% must not get worse by more than 10 points. Build 121
+   drove no-ops to zero by destroying the landing rate; the reverse trade is
+   just as available and just as worthless.
+5. **`fully_fixed` holds** at ≥6/24 (the 5.59 slot expectation for an unchanged
+   candidate arm — NOT the base arm's 11, which is the arm-slot bias, not a
+   target).
+
+**Revert condition, stated in advance:** if calls **2 and 3 both miss**, revert.
+That is exactly the b124 shape — a message the model obeys, into a different
+dead end — and one more instance of it means the whole ambiguous-message channel
+is exhausted and the next lever has to be somewhere else (5.61 lever 0c).
+
+**Known non-call.** Nothing here tests whether `occurrence` helps a *strong*
+model or a human; it is scoped to the one failure this corpus actually has.
+
 ### 5.66 b124 verdict — build 121 REVERTED, and the message is asking for one thing too many (2026-08-10)
 
 The pre-registered revert condition (5.65 call 5) fired. Build 121 is out as
