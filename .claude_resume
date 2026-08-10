@@ -570,6 +570,27 @@ completion. **The repeat death is still the dominant ending.**
     failure you are fixing goes blind exactly when you succeed. (5.69; the
     fourth relative of rule 43.)
 
+49. AN ASSOCIATION POOLED ACROSS THE ARCHIVE IS CONFOUNDED BY BUILD — STRATIFY
+    BY LABEL BEFORE BELIEVING IT. Picking the transfer target, I found that
+    exec-bugfix runs hitting a `replace_lines` syntax reject were fixed 51% vs
+    4% and nearly built a lever on it. Stratifying by label killed it: the
+    reject-heavy runs cluster in b110-b120, whose fix rates are 54-71% for
+    unrelated reasons. The archive spans ~40 builds; ANY behaviour that became
+    more common over time correlates with every improvement shipped since.
+    Compute the within-label breakdown and a pooled OR, and print the strata —
+    if one era carries the effect, there is no effect. (ROADMAP 5.73)
+
+50. A MARKER THAT CO-OCCURS WITH SUCCESS MAY BE INCIDENTAL TO THE WINNING
+    TRAJECTORY, NOT CAUSAL — AND TWO TRAJECTORIES SETTLE IN MINUTES WHAT
+    STATISTICS ARGUE ABOUT FOR AN HOUR. Even stratified, the reject signal
+    looked real (0/132 clean-use runs were EVER fixed, in every stratum).
+    Reading one winning and one losing run explained it instantly: the rejects
+    are the two failed detours a winning run makes on its way BACK to wide
+    `edit_file` calls. Suppressing them would not have passed a single run. The
+    causal variable was where the model aimed, which was visible in the first
+    line of both trajectories. Third time this rule has paid: see the
+    `read-a-winning-run-before-crediting-it` note. (ROADMAP 5.73)
+
 ## Next levers, in order
 0. ~~STALE-STALL BUG~~ — **SHIPPED as build 120 (`54b594b`) and CREDITED by
    b123.** DONE 0/24 -> 8/24, Fisher p=0.0039, and the mechanism is 1:1: the 8
@@ -637,6 +658,21 @@ completion. **The repeat death is still the dominant ending.**
      Restored on the evidence, not by hand. Verdict in ROADMAP 5.71.
    - NEXT, pre-committed in 5.70 and NOT yet done: the **transfer test** — same
      idea, DIFFERENT tool, DIFFERENT case, before claiming anything general.
+
+0b-v. **TRANSFER TEST — b127 IN FLIGHT.** Does the build-123 sentence, tuned
+   on exec-ambig, help a case it was never designed for? `--base a175ed7`
+   (build 120, sentence absent, verified by grep) vs working tree (build 125),
+   case **exec-bugfix**, qwencoder14, r24, log `$CLAUDE_JOB_DIR/tmp/ab127.log`,
+   grader `$CLAUDE_JOB_DIR/tmp/grade127.py`. Pre-registered ROADMAP 5.72.
+   - **No source edits needed** — this measures already-shipped code.
+   - Archive support (correlational, 488 runs): wide first aim -> fixed 54% vs
+     21%, pooled OR 11.15 across 9 strata, clean in 7.
+   - **A NULL is expected-ish and is a real result.** exec-bugfix already aims
+     wide 57-79% at build 120, vs 0/24 on exec-ambig, so there is little
+     headroom. Null => the sentence supplies a MISSING strategy rather than
+     being a general aim lever, and the description-audit plan dies cheaply.
+   - Read |delta fixed| < 15 pts as noise at n=24 (base arms on this case have
+     ranged 14%-50% across sweeps).
 
 0c. **POSITION VS REASONING — now INSTRUMENTED, and the first datum is in.**
    b122 could not test it because reordering the case destroys it. The
