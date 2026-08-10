@@ -2874,6 +2874,52 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.59 A/A calibration: build 119 is CREDITED, and the noise ran against it (2026-08-10)
+
+The A/A (`--base HEAD --allow-identical`, build 119 on both sides) came back
+with a genuine surprise: **identical code scored `fully_fixed` 12/24 in the base
+slot and 6/24 in the cand slot.** This design has an arm-slot effect of roughly
+2x, and it favours **base** — the arm build 119 was never in.
+
+That is the opposite of the failure mode the gate was written to catch. The
+worry was a design that flatters the candidate; what exists flatters the
+baseline. So b121-confirm's +7/-0 was measured against a headwind, and the
+pre-registered test was conservative rather than generous.
+
+Re-cut by build and by slot, which is precisely what calibration data licenses:
+
+| | build 118 | build 119 |
+|---|---|---|
+| base slot | 0/38 | 12/24 |
+| cand slot | — | 13/48 |
+
+- **Same slot, so no slot bias is possible — build 119 12/24 vs build 118 0/38,
+  Fisher p = 1.25e-06.** Both arms in the base worktree, same mechanism, same
+  position in the pair. This is the cleanest comparison available and it is not
+  close.
+- **Build 119 handicapped into the disfavoured slot against build 118 in the
+  favoured one — 13/48 vs 0/38, p = 0.000377.** The effect survives a
+  deliberately adversarial arrangement.
+- The slot bias itself is only p = 0.0689, so it may be noise; it does not
+  matter, because every arrangement of the data points the same way.
+
+**Build 119 is credited.** Across four independent arm-slots build 118 solved
+exec-ambig 0 times in 38, and build 119 solved it 25 times in 72. The
+disambiguation message converts the edit route completely (0 -> 62 wide-block
+copies, 70 -> 0 line-number fallbacks) and that conversion turns an unsolvable
+case into a solvable one.
+
+**What is NOT established: the magnitude.** Identical code produced 27% and 50%
+on the same case, so run-to-run variance here is large and the true rate is
+somewhere in a wide band. The existence of the effect is solid; any specific
+number is not. Do not quote 29%.
+
+**Rule 42. An A/A can strengthen a result, not only kill one.** If the measured
+bias runs against the candidate, a marginal pre-registered p becomes a
+conservative one, and builds can then be compared within a single arm slot,
+which removes the bias entirely. Run the calibration before deciding what it
+would have meant — I fully expected this one to be a retraction.
+
 ### 5.58 b121-confirm: the pre-registered bar is cleared — pending A/A (2026-08-10)
 
 The confirmatory r=24 sweep, pre-registered on `fully_fixed` alone, no peeking
