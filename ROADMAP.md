@@ -2874,6 +2874,64 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.57 b121: the lever fires, the route converts totally, the outcome is underpowered (2026-08-10)
+
+First A/B in this whole line of work where the **attribution guard passes**:
+the ambiguous-match message fired in **14/14 runs of both arms**. b120's lever
+fired in 1 of 14. The instrument built in 5.56 does what it was built to do.
+
+**The mechanism is not in doubt.** Counting what the model does on the very
+next call after an ambiguous message, across 28 runs:
+
+| next call after the message | base (b118) | cand (b119) |
+|---|---|---|
+| `replace_lines` (line-number fallback) | 41 | 0 |
+| wide unique block copied, edit lands | 0 | 36 |
+| read/bash instead | 14 | 10 |
+
+That is a total route conversion, 0→36 against 41→0, and every one of those 36
+copies landed cleanly. Build 119 produces exactly the behaviour it was written
+to produce. Rule 38 says grade a steer by what it converts TO, and this steer
+converts to the intended thing.
+
+**The outcome does not clear its pre-registered bar.** Primary endpoint,
+`fully_fixed`: **cand 4/14, base 0/14, Fisher two-sided p = 0.0978.** The
+direction is clean — ab.py scored it W4/L0/T10, the candidate never lost a
+single pair, and the baseline solved this case *zero* times out of fourteen —
+but 0.0978 is not < 0.05 and the pre-registration does not bend. **Not
+credited.** ab.py independently computed the design needs ~21 runs/arm; a
+confirmatory sweep at r=24 is running, pre-registered on `fully_fixed` alone,
+no peeking and no extension of this one.
+
+**The secondary endpoint was invalid and is withdrawn.** It read the failing-
+test count from the last pytest the model ran, and reported the candidate 0.36
+tests *worse* — the one result pointing against build 119. It is an artifact.
+Runs that edit after their final pytest: **cand 14/14, base 0/14.** The metric
+scored the candidate mid-repair and the baseline at rest, in every pair. It
+measures when each arm last looked, not what each arm left behind. check.py
+re-runs pytest against the final tree, so the score already is the unbiased
+form of that endpoint.
+
+**Rule 41. A metric read from the model's own self-check measures when the arm
+last looked, not what it left.** Before differencing such a metric across arms,
+check that the read point is arm-independent — here it was 14/14 against 0/14.
+Sibling of rule 37: both are predicates that quietly mean something different
+per arm, and both produced a confident number pointing the wrong way.
+
+**The next failure is already visible, and it is selection, not disambiguation.**
+Of the 36 wide-block copies, **24 rewrote the CORRECT twin** and only 12 the
+buggy one. Build 119 successfully teaches "copy the whole unique block" and the
+model then applies it to the wrong function — which is actively destructive,
+since it edits a passing function. That is the best available explanation for
+why total route conversion yields only 4/14 finishes.
+
+Caveat on that finding, and it is my own design fault: in v2 the correct twin
+is always listed **first**, so "picked the first block" and "picked the correct
+twin" are perfectly confounded — all 24 wrong picks were also first-listed. v3
+is drafted (buggy twin first in two of three pairs) to decouple them, and will
+land only after the confirmatory sweep, since the case must stay frozen while
+it runs.
+
 ### 5.56 The ambiguity was never there: the model edits at guard granularity (2026-08-10)
 
 5.55 ended by building `exec-ambig`, a case whose bugs sit on duplicated lines
