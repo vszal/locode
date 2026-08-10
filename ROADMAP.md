@@ -2874,6 +2874,106 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.72 pre-registration — b127, THE TRANSFER TEST (2026-08-10)
+
+5.70 pre-committed: *"if the sentence wins, the next move is to test the same
+idea on a DIFFERENT tool and a DIFFERENT case before claiming anything
+general."* This is that test, and it is written before the sweep runs.
+
+**Question.** The build-123 sentence was tuned on `exec-ambig`. Does it help on
+a case it was never designed for?
+
+**Design.** `--base a175ed7` (build 120, verified: sentence absent, `grep -c`
+= 0) vs the working tree (build 125, sentence present). Case **`exec-bugfix`**,
+qwencoder14, r24. **No source edits are needed** — this measures code already
+shipped, so nothing can drift mid-sweep.
+
+#### Why exec-bugfix is the right second case, from the archive
+
+Same mechanism variable, measured independently on 488 archived exec-bugfix
+runs: does the FIRST `edit_file` `old` reach the def/docstring?
+
+| first aim | fully_fixed |
+|---|---|
+| WIDE | 102/190 (54%) |
+| narrow | 62/298 (21%) |
+
+Fisher p = 6.7e-13, Mantel-Haenszel pooled OR **11.15** across 9 within-label
+strata, clean in 7 of 9 (the two exceptions are `b99-*`, n=3 and n=8, predating
+the modern harness). Reading one pair of trajectories from `b115-stallcap`
+shows the same thing directly: the winning run's every `old` is
+`def word_wrap(text, width):\n    """Wrap …`, the losing run's are fragments
+(`for word in words:`, `result.append(lower)`) that miss, fall back to
+single-line `replace_lines` patching, and stall-stop.
+
+**This is correlational.** The sentence has never run on exec-bugfix. That is
+the whole point of running it.
+
+#### The honest prior: this may well be NULL, and that is worth knowing
+
+Unlike exec-ambig, exec-bugfix is **not starved of wide aim**. Base-arm rates at
+build ~120: `b119` 11/14 wide (79%), `b120` 8/14 (57%), `b116` 8/14 (57%). The
+sentence took exec-ambig from **0/24** to 21/24 because wide aim was absent
+there; here there is at most ~40 points of headroom, and possibly none that the
+sentence can reach.
+
+So both outcomes are informative, and I am committing to the reading now:
+
+- **fixed goes UP and wide goes UP** → the sentence is a general aim lever.
+  Then, and only then, is it worth auditing every tool description.
+- **NULL (neither moves)** → the sentence is not a general "aim wide" lever; it
+  works by *supplying a missing strategy* to a model that had none. That is a
+  narrower and much more useful claim than the one I would otherwise have made,
+  and it kills the description-audit plan before I spend a week on it.
+- **fixed DOWN** → the sentence is case-specific and possibly harmful
+  off-distribution. Build 125 gets re-examined, not defended.
+
+#### Calls
+
+0. **Population-independent outcome (rule 48).** `fully_fixed`, defined for
+   every run regardless of which failure it hits. Primary.
+1. **Mechanism.** Wide first aim, same detector as `grade126.py`. Must move in
+   the same direction as call 0 or the attribution does not hold.
+2. **Guard.** False completions — a run not `fully_fixed` that never stopped.
+   0 in both arms or the result is void, as always.
+3. **Power warning, stated in advance.** Base-arm `fully_fixed` on this case
+   ranges 14%–50% across archived sweeps, so between-sweep variance is large.
+   The paired design controls for it (both arms, same session) but I will not
+   read a delta under ~15 points as anything but noise at n=24.
+
+**Not in scope, deliberately.** `replace_lines`'s description is the obvious
+*second* transfer target — its failure signature is fully characterised below
+(5.73) — but changing it in the same sweep would confound two edits. One change
+at a time.
+
+### 5.73 the replace_lines finding, banked for later (2026-08-10)
+
+Characterised while picking the transfer target; recorded so it is not
+re-derived. `replace_lines` fails on **45% of its 1052 archived calls**, and 470
+of those are one thing: a syntax rejection, 313 of them "unterminated
+triple-quoted string literal".
+
+The cause is a single off-by-one, visible in the arguments: **278 of 470
+rejects use `start=16`**, and line 16 of `textkit.py` is the *closing* `"""` of
+`word_wrap`'s docstring. The model means "replace the body, which starts at 17",
+begins at 16, deletes the closing delimiter, and leaves the docstring opened at
+line 9 unterminated. Nothing in the description warns that the line at `start`
+is itself destroyed, or that a range must not begin or end inside a multi-line
+string.
+
+**Do not "fix" this by chasing the reject count.** Two false trails, both
+walked:
+
+1. Crude association says runs that hit a reject are fixed 51% vs 4% — which is
+   entirely confounded by build era (the reject-heavy runs cluster in b110–b120,
+   whose fix rates are 54–71%).
+2. Stratifying does not rescue it either. The rejects are **incidental**: they
+   are the two failed detours a *winning* run makes before returning to wide
+   `edit_file` calls. Suppressing them would not have made a single run pass.
+
+The real lever here is the same one as everywhere else — where the model aims —
+and it is already being tested as 5.72.
+
 ### 5.71 b126 verdict — it was THE SENTENCE, and the schema property is not innocent (2026-08-10)
 
 `b126-attribution`, `--base 57de838` (build 123), cand = build 124 = build 123
