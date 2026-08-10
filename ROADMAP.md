@@ -2874,6 +2874,63 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.54 The archive cannot license 5.52, because both powered cases are rigged for it (2026-08-09)
+
+Run while b120 swept, read-only. 5.52 flagged its own threat to validity —
+exec-bugfix seeds 2 one-line bugs and 1 needing a block re-derivation, so it
+rewards block rewriting by construction. The obvious cheap check is whether the
+big-edits-win association replicates on the other cases already in the archive.
+It does, spectacularly, and the replication is **worthless**.
+
+Association between per-run median `new` payload and VERIFIED, every case with
+usable event data:
+
+| case | runs | verified | median payload, verified | lost | |
+|---|---:|---:|---:|---:|---|
+| exec-bugfix | 597 | 205 | 96 | 70 | 1.4x |
+| **exec-stall-trap** | **77** | **50** | **394** | **56** | **7.0x**, Mann-Whitney p=2.4e-8 |
+| exec-from-plan | 45 | 41 | 355 | 412 | 0.9x — 4 losers, no power |
+| e2e-spec-to-code | 45 | 1 | 958 | 411 | 1 winner, no power |
+| syntax-fix | 68 | — | — | — | 68/68 never run a test; ungradable here |
+
+exec-stall-trap looks like a clean independent replication at n=77 and p=2.4e-8,
+and the 5.48 branch effect reappears inside it untouched (edit-first 42/53
+verified, read-first 3/13). Then read its `case.json`: *"structural control-flow
+bug that baits naive text-swap edit loops."* **It was purpose-built to punish
+surgical editing.** It is not independent evidence for 5.52; it is the same
+confound, deliberately engineered instead of accidental.
+
+So both cases with the power to answer the question are rigged for the answer,
+one by accident and one on purpose. The three that are not rigged have no power
+— and the only one of them that discriminates at all, exec-from-plan, points
+mildly at **null** (0.9x), though on 4 losers that is worth nothing either.
+
+**5.52's generalization stays withdrawn.** Nothing in 648 archived exec-bugfix
+runs plus 359 others can license it. That is the whole finding here, and it is
+worth more than the p=2.4e-8 would have been.
+
+**Built tonight: `exec-pinpoint`, the missing instrument.** The structural
+mirror of exec-bugfix — same 13 tests, same 3 failures, same check.py, same
+prompt, one difference: every bug is a genuine single-line, single-token fix
+that the failing traceback names directly.
+
+- `median` — `ordered[n // 2 + 1]` should be `ordered[n // 2 - 1]`
+- `clamp` — `min(x, hi + 1)` should be `min(x, hi)`
+- `top_n` — `(kv[1], kv[0])` should be `(-kv[1], kv[0])`
+
+Verified before landing: seeds at exactly 3 failed / 10 passed, and the three
+substitutions are each unique in the file and take it to 13/13. Nothing here is
+easier to fix by rewriting a whole function, so surgical mode is not
+handicapped by construction. If surgical editing still loses on exec-pinpoint,
+5.52 is about the strategy and generalizes. If it does not, 5.52 is about
+exec-bugfix's bug shapes and the finding shrinks to one case. Either way it is
+the first honest test, and it also gives every future message lever a second
+instrument — 5.17b's complaint that "the exec-bugfix r8 instrument cannot
+resolve it" has been standing since build 97.
+
+Staged in scratch, not committed: landing files mid-sweep would change the
+candidate arm's working tree under b120. Lands when b120 finishes.
+
 ### 5.53 Build 119 — the ambiguous message now prescribes the winning strategy (2026-08-09, pre-registered)
 
 5.52's lever, built. The ambiguous-match message fires on **100% of the losing
