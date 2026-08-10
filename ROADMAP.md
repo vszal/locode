@@ -2874,6 +2874,60 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.70 pre-registration — b126, which half of the prompt change did it? (2026-08-10)
+
+Written and committed before the sweep starts. This is an **attribution** run,
+not an improvement run: build 124 is expected to be *worse* than build 123, and
+that is the result I am buying.
+
+**Why it is worth a sweep.** 5.69's effect is the largest this case has seen and
+I do not know its cause. Build 123 changed three things at once; only two of
+them (`edit_file`'s **description** and its **schema**) are visible before the
+first edit, which is where the runs show the change happening. Build 124 removes
+**the description sentence only** and keeps the schema property, the selector,
+and the rewritten message. So:
+
+- if build 124 collapses to ~7/24 → **the sentence did it**, and the finding is
+  that tool *descriptions* steer where a model aims. That generalises to every
+  tool in the product and is worth far more than this case.
+- if build 124 stays near 22/24 → **the schema property did it**, i.e. merely
+  offering an argument changes aim, which is a stranger and narrower finding.
+- if it lands in between, both contribute and I will need a third arm.
+
+**Ruled out in advance: generic prompt perturbation.** Across b124 and b125,
+**48 of 48** base runs opened with the byte-identical first `old`
+(`if x > 100:\n        return 100`). The first call is deterministic under this
+server; noise does not move it. So a change that flips it in 21/24 is causal,
+whatever its content. (Outcomes still vary later — same base code gave 11/24 and
+7/24 `fully_fixed` — so the divergence is downstream, not at call one.)
+
+**Calls:**
+
+1. **Primary, population-independent** (5.69's lesson — always carry one):
+   `fully_fixed`. Base here is build 123's own 22/24. Build 124 **collapsing to
+   ≤12/24 credits the sentence**; **≥19/24 credits the schema**; 13–18 is
+   "both", and says so.
+2. **The mechanism, measured where it happens.** Share of runs whose FIRST
+   `edit_file` sends a whole-function `old` rather than the 2-line guard:
+   build 123 = 21/24, base-code = 0/48. Whichever way call 1 lands, this must
+   move in the same direction, or I have the mechanism wrong and neither
+   attribution holds.
+3. **Ambiguity exposure**, as a cross-check on call 2: build 123 = 3/24 runs,
+   base-code = 48/48. Not a pass/fail bar — it is the same quantity as call 2
+   seen from the other side, and the two disagreeing means the story is wrong.
+4. **No false completions.** 0 in both arms of b125 and 0 in b123; any run that
+   finishes clean with a red suite is a REVERT of build 124 regardless of
+   everything above.
+
+**Sweep:** `--base 57de838` (build 123 itself, so the removed sentence is the
+only difference), exec-ambig, qwencoder14, r24.
+
+**What I will NOT do with this result.** If the sentence wins, the next move is
+to test the same idea on a *different* tool and a *different* case before
+claiming anything general. One case is not a product-wide finding, and 5.69 is
+already a record of what happens when I generalise from a mechanism I inferred
+rather than measured.
+
 ### 5.69 b125 verdict — build 123 KEPT, and it did not work the way I said it would (2026-08-10)
 
 `b125-occurrence`, `--base a175ed7`, exec-ambig, qwencoder14, 24 pairs.

@@ -1237,9 +1237,18 @@ class EditFile:
         "and tolerates whitespace differences, so it CANNOT make an "
         "indentation-only or whitespace-only change — such an edit collapses to a "
         "no-op and is rejected. To re-indent a line or fix a broken indent, use "
-        "replace_lines instead. "
-        "If `old` turns out to appear more than once, do NOT rewrite it: resend "
-        "the same call with `occurrence` set to which one you mean."
+        "replace_lines instead."
+        # [b126 attribution] Build 123 added a sentence here — "If `old` turns
+        # out to appear more than once, do NOT rewrite it: resend the same call
+        # with `occurrence` set to which one you mean." — and the case went from
+        # 7/24 to 22/24 fixed. But that build changed the description, the
+        # schema, AND the ambiguous message together, and reading the runs
+        # showed the win came from the model widening its FIRST `old` before any
+        # ambiguous message exists. Only the description and the schema are
+        # visible that early. This build removes the sentence and keeps
+        # everything else, so b126 asks which of the two it was. Whichever way
+        # it lands, the sentence comes back or stays out on the evidence — do
+        # not restore it by hand. ROADMAP 5.69/5.70.
     )
     permission = "ask"
     schema = {
