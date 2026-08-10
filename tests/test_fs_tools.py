@@ -115,7 +115,7 @@ async def test_ambiguous_sites_are_not_byte_identical(ctx, tmp_path):
     (tmp_path / "c.py").write_text(
         "alpha\nx = 1\nbravo\n\ncharlie\nx = 1\ndelta\n")
     res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
-    blocks = res.content.split("── match at line ")[1:]
+    blocks = res.content.split("── occurrence ")[1:]
     assert len(blocks) == 2
     assert blocks[0] != blocks[1]
 
@@ -141,23 +141,29 @@ async def test_ambiguous_widens_a_window_that_is_not_yet_unique(ctx, tmp_path):
     (tmp_path / "c.py").write_text(
         "head\npad\nx = 1\npad\nmid\npad\nx = 1\npad\ntail\n")
     res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
-    blocks = res.content.split("── match at line ")[1:]
+    blocks = res.content.split("── occurrence ")[1:]
     assert len(blocks) == 2 and blocks[0] != blocks[1]
     body = res.content
     assert "head" in body and "tail" in body  # widened past the identical pads
 
 
-async def test_ambiguous_tells_the_model_not_to_resend(ctx, tmp_path):
+async def test_ambiguous_tells_the_model_to_resend_with_a_number(ctx, tmp_path):
+    # Build 123 inverts this test's ancestor. It used to assert the message said
+    # resending would "fail in exactly the same way" — true while the only route
+    # out was rewriting `old`. With `occurrence`, resending the SAME call is now
+    # exactly the right move, so the message must say so and must not offer
+    # replace_lines as a competing route.
     (tmp_path / "c.py").write_text("a\nx = 1\nb\nc\nx = 1\nd\n")
     res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
-    assert "same way" in res.content
-    assert "replace_lines" in res.content and "replace_all" in res.content
+    assert "SAME call again" in res.content and "occurrence" in res.content
+    assert "replace_all" in res.content
+    assert "replace_lines" not in res.content
 
 
 async def test_ambiguous_caps_the_number_of_sites_shown(ctx, tmp_path):
     (tmp_path / "c.py").write_text("".join(f"pad{i}\nx = 1\n" for i in range(9)))
     res = await fs.EditFile().run({"path": "c.py", "old": "x = 1", "new": "x = 9"}, ctx)
-    assert res.content.count("── match at line ") == fs._AMBIG_SITES
+    assert res.content.count("── occurrence ") == fs._AMBIG_SITES
     assert f"and {9 - fs._AMBIG_SITES} more" in res.content
 
 
@@ -1241,14 +1247,21 @@ async def test_no_op_message_names_the_same_misconception(ctx, tmp_path):
 #     strategy. b97's syntax disaster is guarded against by removing the gutter
 #     the model used to strip, per 5.28's stated precondition. ROADMAP 5.53.
 
-async def test_ambiguous_leads_with_copying_the_block_not_replace_lines(ctx, tmp_path):
+async def test_ambiguous_leads_with_the_occurrence_number(ctx, tmp_path):
+    # Build 123. Both orderings of the old two-demand message have been run at
+    # n=24: lead with copying and you get copying without the correction; lead
+    # with the correction and you get the correction without the copying. The
+    # message now makes ONE demand, and the copying demand must be gone — not
+    # demoted, gone. ROADMAP 5.66/5.67.
     (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
     await fs.ReadFile().run({"path": "m.py"}, ctx)
     res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
     assert res.is_error
     body = res.content
-    assert body.index("VERBATIM into `old`") < body.index("replace_all")
-    assert body.index("VERBATIM into `old`") < body.index("replace_lines")
+    assert body.index("`occurrence`") < body.index("replace_all")
+    assert "VERBATIM" not in body and "copy" not in body.lower()
+    # and it says the edit itself needs no rewriting, which is the whole point
+    assert "Do NOT rewrite your edit" in body
 
 
 async def test_ambiguous_says_the_bug_may_be_a_neighbouring_line(ctx, tmp_path):
@@ -1258,16 +1271,158 @@ async def test_ambiguous_says_the_bug_may_be_a_neighbouring_line(ctx, tmp_path):
     (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
     await fs.ReadFile().run({"path": "m.py"}, ctx)
     res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
-    assert "one of THEM rather than the line you first picked" in res.content
+    # The surrounding lines are still printed, and are still what the choice is
+    # made on — but they are now a menu to pick from, not a block to copy.
+    assert "read the lines shown around each match" in res.content
 
 
-async def test_ambiguous_promises_each_block_is_unique(ctx, tmp_path):
-    # The message tells the model to copy a block into `old`; that advice has
-    # to be true or it fails ambiguously a second time.
+async def test_ambiguous_numbers_every_site_it_offers(ctx, tmp_path):
+    # The message's single instruction is "send back a number", so each block
+    # has to carry the number that selects it, and the count has to be honest.
     (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
     await fs.ReadFile().run({"path": "m.py"}, ctx)
     res = await fs.EditFile().run({"path": "m.py", "old": "a = 1", "new": "a = 3"}, ctx)
-    assert "exactly ONCE" in res.content
+    assert "occurrence 1 of 2" in res.content
+    assert "occurrence 2 of 2" in res.content
+
+
+# --- the occurrence selector (build 123, ROADMAP 5.67) -----------------------
+#
+# The route the ambiguous message now prescribes. Everything below is the
+# contract that message makes: the model resends its ORIGINAL `old`/`new`
+# unchanged and adds a number, and that has to work.
+
+async def _amb(ctx, tmp_path, text="a = 1\nb = 2\na = 1\n"):
+    (tmp_path / "m.py").write_text(text)
+    await fs.ReadFile().run({"path": "m.py"}, ctx)
+
+
+async def test_occurrence_picks_the_nth_match_and_leaves_the_rest(ctx, tmp_path):
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 3", "occurrence": 2}, ctx)
+    assert not res.is_error, res.content
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 2\na = 3\n"
+
+
+async def test_occurrence_one_is_the_first_match(ctx, tmp_path):
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 3", "occurrence": 1}, ctx)
+    assert not res.is_error, res.content
+    assert (tmp_path / "m.py").read_text() == "a = 3\nb = 2\na = 1\n"
+
+
+async def test_the_number_the_message_printed_selects_that_block(ctx, tmp_path):
+    # End to end: take the index out of the message's own header and send it
+    # back. If these two ever disagree the message is lying to the model.
+    await _amb(ctx, tmp_path, "x = 1\npad\nx = 1\npad2\nx = 1\n")
+    amb = await fs.EditFile().run({"path": "m.py", "old": "x = 1", "new": "x = 9"}, ctx)
+    assert "occurrence 3 of 3" in amb.content
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "x = 1", "new": "x = 9", "occurrence": 3}, ctx)
+    assert not res.is_error, res.content
+    assert (tmp_path / "m.py").read_text() == "x = 1\npad\nx = 1\npad2\nx = 9\n"
+
+
+async def test_occurrence_accepts_a_number_sent_as_a_string(ctx, tmp_path):
+    # Local models routinely stringify integers in tool JSON; rejecting "2"
+    # would put the run straight back in the loop this selector exists to end.
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 3", "occurrence": "2"}, ctx)
+    assert not res.is_error, res.content
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 2\na = 3\n"
+
+
+async def test_occurrence_past_the_end_names_the_real_range(ctx, tmp_path):
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 3", "occurrence": 5}, ctx)
+    assert res.is_error
+    assert "appears 2 times" in res.content and "1 to 2" in res.content
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 2\na = 1\n"
+
+
+async def test_occurrence_zero_is_refused_with_the_counting_rule(ctx, tmp_path):
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 3", "occurrence": 0}, ctx)
+    assert res.is_error and "counts from 1" in res.content
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 2\na = 1\n"
+
+
+async def test_occurrence_that_is_not_a_number_is_refused(ctx, tmp_path):
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 3",
+         "occurrence": "the second one"}, ctx)
+    assert res.is_error and "whole number" in res.content
+
+
+async def test_occurrence_true_is_not_read_as_one(ctx, tmp_path):
+    # bool is an int in Python; `occurrence: true` silently meaning "the first
+    # match" would edit a site the model never chose.
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 3", "occurrence": True}, ctx)
+    assert res.is_error and "must be a NUMBER" in res.content
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 2\na = 1\n"
+
+
+async def test_occurrence_with_replace_all_names_the_conflict(ctx, tmp_path):
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 3",
+         "occurrence": 2, "replace_all": True}, ctx)
+    assert res.is_error and "opposite things" in res.content
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 2\na = 1\n"
+
+
+async def test_occurrence_on_a_unique_old_still_applies(ctx, tmp_path):
+    # A model that adds the number defensively must not be punished for it.
+    await _amb(ctx, tmp_path, "a = 1\nb = 2\n")
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "b = 2", "new": "b = 4", "occurrence": 1}, ctx)
+    assert not res.is_error, res.content
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 4\n"
+
+
+async def test_occurrence_with_text_that_is_absent_falls_back_to_not_found(
+        ctx, tmp_path):
+    # With zero matches the selector is beside the point, and the ordinary
+    # not-found help (which can tell "already applied" from "wrong text") is
+    # far more useful than a range error quoting a range of nothing.
+    await _amb(ctx, tmp_path, "a = 1\nb = 2\n")
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "zzz = 9", "new": "zzz = 8", "occurrence": 2}, ctx)
+    assert res.is_error
+    assert "occurrence 2" not in res.content
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 2\n"
+
+
+async def test_occurrence_still_rejects_a_no_op(ctx, tmp_path):
+    # The selector aims an edit; it does not excuse one that changes nothing.
+    await _amb(ctx, tmp_path)
+    res = await fs.EditFile().run(
+        {"path": "m.py", "old": "a = 1", "new": "a = 1", "occurrence": 2}, ctx)
+    assert res.no_change
+    assert (tmp_path / "m.py").read_text() == "a = 1\nb = 2\na = 1\n"
+
+
+def test_the_diff_preview_honours_occurrence(tmp_path):
+    # The ASK prompt resolves through try_edit so the approved diff is exactly
+    # what gets written. If the preview ignored the selector, the user would
+    # approve one site and a different one would change.
+    from locode.ui.render import _proposed_change
+    (tmp_path / "m.py").write_text("a = 1\nb = 2\na = 1\n")
+    args = {"path": "m.py", "old": "a = 1", "new": "a = 3", "occurrence": 2}
+    _p, before, after = _proposed_change("edit_file", args, str(tmp_path))
+    assert before == "a = 1\nb = 2\na = 1\n"
+    assert after == "a = 1\nb = 2\na = 3\n"
+    args["occurrence"] = 1
+    _p, _b, after1 = _proposed_change("edit_file", args, str(tmp_path))
+    assert after1 == "a = 3\nb = 2\na = 1\n"
 
 
 async def test_ambiguous_still_shows_the_surrounding_lines(ctx, tmp_path):

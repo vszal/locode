@@ -284,11 +284,20 @@ def _pick_splice(text: str, spans, new: str, path, old: str = "",
     return plain, False
 
 
-def try_edit(text: str, old: str, new: str, replace_all: bool, path=None):
+def try_edit(text: str, old: str, new: str, replace_all: bool, path=None,
+             occurrence=None):
     """Resolve an edit across all matching tiers. Returns
     (updated_text|None, note, status, count) with status in
-    {'ok', 'ambiguous', 'not_found', 'empty_old', 'noop'}. Shared by edit_file and
-    its diff preview so the approved diff is exactly what gets written.
+    {'ok', 'ambiguous', 'not_found', 'empty_old', 'noop', 'bad_occurrence'}.
+    Shared by edit_file and its diff preview so the approved diff is exactly
+    what gets written.
+
+    `occurrence` is a 1-based index that resolves the 'ambiguous' case WITHOUT
+    the model rewriting `old`: it picks the Nth exact match, in the same order
+    `_match_locations` prints them. It applies to the exact tier only, which
+    costs nothing — 'ambiguous' is *only* ever raised by the exact tier, so the
+    selector covers every situation that can ask for it. Out of range gives
+    'bad_occurrence' with `count` set to how many there really are.
 
     'noop' means a tier matched but the replacement leaves the file byte-for-byte
     unchanged — the usual cause is `old`/`new` differing ONLY in leading
@@ -302,6 +311,16 @@ def try_edit(text: str, old: str, new: str, replace_all: bool, path=None):
         # reachable input, not a hypothetical. Refuse it before any tier runs.
         return None, "", "empty_old", 0
     count = text.count(old)
+    if occurrence is not None and count >= 1:          # tier 1a: pick the Nth
+        hits, i = [], text.find(old)
+        while i != -1:
+            hits.append((i, i + len(old)))
+            i = text.find(old, i + len(old))
+        if not 1 <= occurrence <= len(hits):
+            return None, "", "bad_occurrence", len(hits)
+        updated, fixed = _pick_splice(text, [hits[occurrence - 1]], new, path,
+                                      old, strip=False)
+        return updated, (_REINDENTED if fixed else ""), "ok", 1
     if count > 1 and not replace_all:
         return None, "", "ambiguous", count
     if count >= 1:                                     # tier 1: exact
@@ -451,6 +470,14 @@ def _match_locations(text: str, old: str, *, limit: int = _AMBIG_SITES,
     promoted again, the gutter has to go first" — and build 119 promotes it.
     The line numbers move into the header prose, where they cannot be copied
     into code by accident.
+
+    **Headed by a 1-based OCCURRENCE INDEX since build 123.** The blocks are no
+    longer something to copy — they are a menu, and the header is the answer the
+    model sends back in `occurrence`. "copy all N of them" is gone with the
+    instruction it served: b124 showed 245 of 245 retries sent a FRAGMENT of a
+    block rather than the block, and 0 of those 245 fragments were uniquely
+    widenable, because a window drawn AROUND the match always contains it
+    (ROADMAP 5.66). Nothing here is copied now, so nothing can be mis-copied.
     """
     lines = text.split("\n")
     span = len(old.split("\n"))
@@ -462,8 +489,8 @@ def _match_locations(text: str, old: str, *, limit: int = _AMBIG_SITES,
         first = text.count("\n", 0, i) + 1
         lo, hi = _unique_window(lines, text, first, span, window, max_window)
         block = lines[lo - 1:hi]
-        out.append(f"  ── match at line {first} — these are lines {lo}-{hi}, "
-                   f"copy all {len(block)} of them ──")
+        out.append(f"  ── occurrence {shown + 1} of {total} — "
+                   f"match at line {first}, shown with lines {lo}-{hi} ──")
         out.extend(block)
         start = i + max(1, len(old))
         shown += 1
@@ -1132,6 +1159,34 @@ class AppendFile:
             f"appended {added} lines to {p} ({total} lines total)" + warn)
 
 
+def _as_occurrence(v):
+    """Coerce whatever a model put in `occurrence` to a positive int.
+
+    Returns (value|None, error|None). Tolerant on purpose, like the rest of this
+    file: local models routinely send an integer as a JSON string ("2"), and
+    rejecting that would reintroduce the very retry loop the selector exists to
+    end. `True` is refused explicitly — bool is an int in Python, and letting it
+    through would silently mean "occurrence 1".
+    """
+    if isinstance(v, bool):
+        return None, ("`occurrence` must be a NUMBER saying which match to "
+                      "change (1 for the first, 2 for the second), not "
+                      f"{str(v).lower()}.")
+    if isinstance(v, int):
+        n = v
+    else:
+        try:
+            n = int(str(v).strip())
+        except (TypeError, ValueError):
+            return None, (f"`occurrence` must be a whole number, not {v!r}. Use "
+                          "1 for the first match in the file, 2 for the second, "
+                          "and so on.")
+    if n < 1:
+        return None, ("`occurrence` counts from 1, so it cannot be "
+                      f"{n} — the first match in the file is occurrence 1.")
+    return n, None
+
+
 class MoveFile:
     name = "move_file"
     description = "Move or rename a file from a source path to a destination path."
@@ -1182,7 +1237,9 @@ class EditFile:
         "and tolerates whitespace differences, so it CANNOT make an "
         "indentation-only or whitespace-only change — such an edit collapses to a "
         "no-op and is rejected. To re-indent a line or fix a broken indent, use "
-        "replace_lines instead."
+        "replace_lines instead. "
+        "If `old` turns out to appear more than once, do NOT rewrite it: resend "
+        "the same call with `occurrence` set to which one you mean."
     )
     permission = "ask"
     schema = {
@@ -1192,6 +1249,13 @@ class EditFile:
             "old": {"type": "string", "description": "Exact text to replace."},
             "new": {"type": "string", "description": "Replacement text."},
             "replace_all": {"type": "boolean"},
+            "occurrence": {
+                "type": "integer",
+                "description": "Which match to change when `old` appears more "
+                               "than once: 1 is the first in the file, 2 the "
+                               "second, and so on. Leave it out when `old` is "
+                               "unique.",
+            },
         },
         "required": ["path", "old", "new"],
     }
@@ -1264,8 +1328,38 @@ class EditFile:
                 "DIFFERENT." + _TRY_REPLACE_LINES,
                 is_error=True, no_change=True)
         replace_all = bool(args.get("replace_all"))
+        occurrence = None
+        if args.get("occurrence") is not None:
+            occurrence, err = _as_occurrence(args["occurrence"])
+            if err:
+                return ToolResult(err, is_error=True)
+            if replace_all:
+                # Contradictory intent. Answering it silently (either arg
+                # winning) is the shape that produces an unexplainable diff, so
+                # name the conflict and make the model choose.
+                return ToolResult(
+                    "`occurrence` and `replace_all` ask for opposite things — "
+                    f"one specific match versus every match. Send `occurrence: "
+                    f"{occurrence}` on its own to change just that one, or "
+                    "`replace_all: true` on its own to change them all.",
+                    is_error=True)
 
-        updated, note, status, count = try_edit(text, old, new, replace_all, p)
+        updated, note, status, count = try_edit(text, old, new, replace_all, p,
+                                                occurrence=occurrence)
+        if status == "bad_occurrence":
+            if count == 0:
+                # `old` isn't in the file at all; the selector is beside the
+                # point. Fall through to the ordinary not-found help, which
+                # knows how to tell "already applied" from "wrong text".
+                updated, note, status, count = try_edit(
+                    text, old, new, replace_all, p)
+            else:
+                where = "1" if count == 1 else f"1 to {count}"
+                return ToolResult(
+                    f"There is no occurrence {occurrence} — `old` appears "
+                    f"{count} time{'' if count == 1 else 's'} in {p}, so "
+                    f"`occurrence` has to be {where}. Resend the same call with "
+                    "a number in that range.", is_error=True)
         if status == "empty_old":
             return ToolResult(
                 "`old` is empty, so there is nothing to replace. To ADD text, "
@@ -1274,24 +1368,30 @@ class EditFile:
                 "existing lines into `old`.", is_error=True)
         if status == "ambiguous":
             return ToolResult(
+                # Build 123. ONE instruction, and it is not "copy" — it is
+                # "add a number". Two orderings of the old two-instruction
+                # message have now been run at n=24 each with opposite,
+                # significant, equally useless results: lead with the copying
+                # and you get copying without the correction (29% no-ops, b124
+                # base); lead with the correction and you get the correction
+                # without the copying (100% fragments, b124 cand). The model
+                # obeys whichever demand the sentence leads with and only that
+                # one, so the fix is to REMOVE a demand, not re-rank it. Its
+                # `old`/`new` pair is already right in the b124 candidate arm —
+                # all it could not do was point. ROADMAP 5.66/5.67.
                 f"`old` appears {count} times in {p}, so it is not clear which "
-                "one to change. Here is each place it matches, with the lines "
-                "around it. Each block below occurs exactly ONCE in the file:\n"
+                "one to change. Here is each one:\n"
                 + _match_locations(text, old) +
-                "\n\nResending the same `old` will fail in exactly the same way. "
-                "Pick the block you meant and copy it VERBATIM into `old` — "
-                "every line of it, with its leading spaces exactly as shown "
-                "above. Put that same block in `new` with your correction "
-                "applied to it. Because the block is unique, `old` then matches "
-                "one place only.\n"
-                "Read the whole block before you rewrite it: the lines around "
-                "your match are part of the same logic, and the line you need "
-                "to change is often one of THEM rather than the line you first "
-                "picked.\n"
-                "If every occurrence really should change, pass replace_all "
-                "instead. If you cannot reproduce the block's exact characters, "
-                "call replace_lines with start and end set to the line numbers "
-                "named above.",
+                "\n\nDo NOT rewrite your edit — it is fine as it is. Send the "
+                "SAME call again, with the same `old` and the same `new`, and "
+                "ADD one field: `occurrence`, set to the number of the one you "
+                "meant (1 for the first above, 2 for the second, and so on). "
+                "That is the whole change to make.\n"
+                "To choose, read the lines shown around each match: the one you "
+                "want is the one whose surrounding code does the thing you are "
+                "fixing.\n"
+                "If every occurrence really should change, pass "
+                "`replace_all: true` instead.",
                 is_error=True)
         # `old` didn't produce a real change (it's not in the file, or a tolerant/
         # fuzzy match landed on a line that's byte-identical to `new`). Two shapes

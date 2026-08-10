@@ -441,10 +441,13 @@ def _proposed_change(name: str, args: dict, cwd: str) -> tuple[str, str, str] | 
         return str(path), before, after
     # edit_file: resolve through the tool's own matcher so the previewed diff is
     # exactly what will be written (incl. whitespace-tolerant / fuzzy matches).
-    from locode.tools.fs import try_edit
+    from locode.tools.fs import try_edit, _as_occurrence
+    occ = None
+    if args.get("occurrence") is not None:
+        occ, _err = _as_occurrence(args["occurrence"])
     after, _note, status, _count = try_edit(
         before, args.get("old", ""), args.get("new", ""),
-        bool(args.get("replace_all")), path)
+        bool(args.get("replace_all")), path, occurrence=occ)
     if status != "ok" or after is None:
         return None
     return str(path), before, after
