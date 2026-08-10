@@ -2918,17 +2918,33 @@ much they shrink the ask:
    occurrence/line selector, so the only thing the model authors is the change.
    Removes the copying instruction entirely. Needs an API decision (new arg on
    `edit_file` vs. honouring a bare line number) — ask before landing.
-2. **Auto-widen a fragment to its unique enclosing block.** When `old` is an
-   exact sub-slice of a block the tool offered this turn, and the model's `new`
-   is a well-formed replacement for it, expand both to the unique block and
-   apply. Fixes it without the model changing behaviour at all.
-3. **Name the sub-slice in the message** ("you sent 2 of the 4 lines I gave
-   you"). Cheapest, but it is still a two-instruction message, so 5.66 predicts
-   it fails the same way. Do not run this one first.
+2. ~~**Auto-widen a fragment to its unique enclosing block.**~~ **DEAD, and
+   killed before it was built.** I wrote this up as "the one to build" and then
+   measured it against the 245 archived fragments first. For each one, how many
+   of the blocks the message had just offered contain it?
 
-Option 2 is the one to build: it needs no API change, it is testable offline
-against the 131 archived fragments, and it converts the dominant failure in the
-corpus without asking the model for anything new.
+   | contained in | b124 | b121-aa |
+   |---|---|---|
+   | 0 blocks | 46 | 36 |
+   | exactly 1 — *widenable* | **0** | **0** |
+   | 2 blocks | 85 | 78 |
+
+   **Zero of 245.** Obvious in hindsight and invisible in prose: the offered
+   blocks are windows *around the match*, so the matched fragment is inside
+   every one of them by construction. Widening can never disambiguate. (The 82
+   zero-hit cases are a different thing — the model has moved on to another
+   function pair and hit the same wall there.)
+3. **Name the sub-slice in the message** ("you sent 2 of the 4 lines I gave
+   you"). Still a two-instruction message, so 5.66 predicts it fails the same
+   way. Do not run this one.
+
+**So option 1 is the only one standing**, and b124 makes it much stronger than
+it looked: in the candidate arm the model's `new` was already *correct*
+(`if x > 100:` → `if x > 50:`). It knew the fix. The only thing it could not do
+was point at the right site. An `occurrence` selector converts those edits
+directly, and reduces the message to a single instruction — *don't change
+anything, just add the number* — which is the one thing this model has proven,
+twice at n=24, that it can do.
 
 ### 5.65 PRE-REGISTRATION — the no-op rewrite (build 121, written before b124 runs)
 
