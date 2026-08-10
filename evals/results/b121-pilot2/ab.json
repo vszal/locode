@@ -1,0 +1,307 @@
+{
+  "kind": "paired-ab",
+  "label": "b121-pilot2",
+  "created": "2026-08-10 00:32:29",
+  "base_ref": "3f3650f",
+  "base_sha": "3f3650f",
+  "cand_desc": "/Users/vszalvay/Code/locode",
+  "server": {
+    "pid": "69851",
+    "started": "Sat Aug 8 16:18:10 2026",
+    "model": "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit",
+    "argv": "/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model mlx-community/Qwen2.5-Coder-14B-Instruct-4bit --host 127.0.0.1 --port 8081 --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 1610612736"
+  },
+  "pairs": [
+    {
+      "case": "exec-ambig",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "base": 0.5,
+      "cand": 1.0,
+      "delta": 0.5
+    },
+    {
+      "case": "exec-ambig",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "base": 0.5,
+      "cand": 0.5,
+      "delta": 0.0
+    }
+  ],
+  "dropped": [],
+  "case_table": {
+    "exec-ambig": {
+      "n": 2,
+      "mean_delta": 0.25,
+      "base": 0.5,
+      "cand": 0.75
+    }
+  },
+  "analysis": {
+    "n_pairs": 2,
+    "n_effective": 1,
+    "n_dropped": 0,
+    "min_pairs": 6,
+    "mean_delta": 0.25,
+    "wins": 1,
+    "losses": 0,
+    "ties": 1,
+    "p": 1.0,
+    "status": "underpowered",
+    "why": "only 1 informative pair(s) (2 ran, but 1 scored the same on both arms and a tie cannot move a sign-flip test); a sign-flip test needs 6 before any result can reach p<0.05 (its floor is 2/2^n = 1.000). At the observed rate (1/2 informative) this design needs ~12 runs per arm, not 2",
+    "runs_needed": 12,
+    "calibrated": false
+  },
+  "runs": [
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 25,
+        "tool_calls": 23,
+        "tool_calls_by_name": {
+          "bash": 5,
+          "update_plan": 1,
+          "read_file": 7,
+          "edit_file": 7,
+          "replace_lines": 3
+        },
+        "tool_errors": 9,
+        "tool_error_rate": 0.391,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "unverified edits": 2,
+          "same failure": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 154.4,
+        "model_seconds": 152.3,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 152.3,
+        "gen_chars": 3373,
+        "gen_chars_per_sec": 22.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 154.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwencoder14__r1__base-1br1uycl",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 17,
+        "tool_calls": 16,
+        "tool_calls_by_name": {
+          "bash": 4,
+          "update_plan": 1,
+          "read_file": 3,
+          "edit_file": 8
+        },
+        "tool_errors": 8,
+        "tool_error_rate": 0.5,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "same failure": 1
+        },
+        "stop_reason": "`limits.py` still fails \u2014 10 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 116.1,
+        "model_seconds": 114.5,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 114.4,
+        "gen_chars": 3116,
+        "gen_chars_per_sec": 27.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 116.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwencoder14__r1__cand-joc2a570",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 17,
+        "tool_calls": 15,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "update_plan": 1,
+          "read_file": 6,
+          "edit_file": 5
+        },
+        "tool_errors": 6,
+        "tool_error_rate": 0.4,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "same failure": 2,
+          "unchanged": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "`limits.py` still fails \u2014 10 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 112.7,
+        "model_seconds": 111.5,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 111.4,
+        "gen_chars": 2969,
+        "gen_chars_per_sec": 26.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 112.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwencoder14__r2__cand-4afjjqoh",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 2,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 25,
+        "tool_calls": 23,
+        "tool_calls_by_name": {
+          "bash": 5,
+          "update_plan": 1,
+          "read_file": 7,
+          "edit_file": 7,
+          "replace_lines": 3
+        },
+        "tool_errors": 9,
+        "tool_error_rate": 0.391,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "unverified edits": 2,
+          "same failure": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 161.2,
+        "model_seconds": 159.2,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 159.1,
+        "gen_chars": 3373,
+        "gen_chars_per_sec": 21.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 161.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwencoder14__r2__base-1x2wft12",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    }
+  ],
+  "summary": {
+    "overall_score": 0.625,
+    "clean_finish_rate": 0.0,
+    "total_nudges": 13,
+    "total_iterations": 84,
+    "nudge_histogram": {
+      "unverified edits": 4,
+      "same failure": 5,
+      "repeated call": 3,
+      "unchanged": 1
+    },
+    "n_runs": 4,
+    "n_valid": 4,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 23.9,
+    "gen_chars": 12831,
+    "rows": {
+      "exec-ambig::qwencoder14": {
+        "case": "exec-ambig",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 4,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.625,
+        "score_min": 0.5,
+        "scores": [
+          0.5,
+          1.0,
+          0.5,
+          0.5
+        ],
+        "iterations_mean": 21,
+        "nudges_mean": 3.2,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 136.3,
+        "gen_rate_mean": 23.9,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress",
+          "`limits.py` still fails \u2014 10 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea",
+          "`limits.py` still fails \u2014 10 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea",
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "exec-ambig": 1.0
+    }
+  },
+  "floor_key": "exec-ambig|qwencoder14|r2",
+  "is_calibration": false
+}
