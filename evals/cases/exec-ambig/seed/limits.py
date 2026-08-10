@@ -24,15 +24,6 @@ def clamp_score(x):
     return x
 
 
-def clamp_byte(x):
-    """Clamp `x` into the inclusive range [0, 255]."""
-    if x < 0:
-        return 0
-    if x > 255:
-        return 255
-    return x
-
-
 def clamp_nibble(x):
     """Clamp `x` into the inclusive range [0, 15]."""
     if x < 0:
@@ -42,8 +33,17 @@ def clamp_nibble(x):
     return x
 
 
-def clamp_hour(x):
-    """Clamp `x` into the inclusive range [0, 23]."""
+def clamp_byte(x):
+    """Clamp `x` into the inclusive range [0, 255]."""
+    if x < 0:
+        return 0
+    if x > 255:
+        return 255
+    return x
+
+
+def clamp_minute(x):
+    """Clamp `x` into the inclusive range [0, 59]."""
     if x < 0:
         return 0
     if x > 23:
@@ -51,8 +51,8 @@ def clamp_hour(x):
     return x
 
 
-def clamp_minute(x):
-    """Clamp `x` into the inclusive range [0, 59]."""
+def clamp_hour(x):
+    """Clamp `x` into the inclusive range [0, 23]."""
     if x < 0:
         return 0
     if x > 23:
