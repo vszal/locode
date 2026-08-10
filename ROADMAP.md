@@ -2874,6 +2874,41 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.62 PRE-REGISTRATION — the stale-reading reprieve (build 120, written before b123 runs)
+
+Lever 0 from 5.61, shipped as build 120 (`54b594b`). The escalated-stall stop
+asserts a named test *still fails*; its evidence is the last test run the MODEL
+watched, and the model keeps editing after that. In b121-aa all 48 runs ended on
+that message and **18 were GREEN** when the grader re-ran pytest. Build 120
+tracks `_edits_at_last_verify` and, when the budget expires with edits the last
+reading never saw, spends one iteration demanding a current reading before
+stopping. One-shot; it re-arms the same budget, so a model that edits and never
+verifies still terminates.
+
+**This is a turn-ENDING change, so `ab.py`'s score delta cannot grade it** (rule
+37 / 5.27): the grader re-runs pytest, so those 18 runs already scored as fixed.
+The score is expected to tie and that tie is *not* the result. Read
+`evals/armstats.py` on the events.
+
+Pre-registered, before looking:
+
+1. **Primary — DONE rate.** Base ≈ 0/24 (b121-aa was 0/48). Candidate ≥ 6/24.
+   Anything under 4/24 is a miss and build 120 does not get credited on this
+   case, whatever else moves.
+2. **Lever fires.** The `stall_budget/reprieved` event appears in ≥ 60% of
+   candidate runs and in 0 base runs. If it fires in under half, the instrument
+   failed (rule 40) and 1 is ungraded rather than negative.
+3. **No new grinding.** Candidate median iterations rises by at most ~2 — the
+   reprieve is one iteration by construction, and a bigger rise means the
+   re-armed budget is buying loops, not readings.
+4. **`fully_fixed` does not fall.** The reprieve adds a nudge mid-run and could
+   perturb the early branch that decides these runs (5.61). A drop here is a
+   regression even if 1 converts.
+
+The arm-slot bias from 5.59 (~2× in the BASE slot's favour on this case) runs
+*against* the candidate, so a candidate win is conservative and a candidate loss
+is not clean evidence on its own.
+
 ### 5.61 b122: the probe failed, and found the bigger bug on the way out (2026-08-10)
 
 **The pre-registered call in 5.60 is UNGRADED.** I predicted POSITION. I got no
