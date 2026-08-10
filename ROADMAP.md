@@ -2874,6 +2874,117 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.69 b125 verdict — build 123 KEPT, and it did not work the way I said it would (2026-08-10)
+
+`b125-occurrence`, `--base a175ed7`, exec-ambig, qwencoder14, 24 pairs.
+
+**The outcome, which is not in doubt:**
+
+| | base (b120 msg) | cand (build 123) | |
+|---|---|---|---|
+| `fully_fixed` (grader re-runs pytest) | 7/24 | **22/24** | Fisher **p = 1.7e-05** |
+| score channel | 0.646 | 0.958 | W15/**L0**/T9, sign-flip p = 0.0001 |
+| stopped by the loop | 17/24 | **2/24** | |
+| finished clean but NOT fixed (false completions) | **0** | **0** | |
+
+Largest effect anything has had on this case. `ab.py` still prints INCONCLUSIVE
+because the delta (+0.3125) is under the k=1 A/A requirement of 0.375 — that is
+the score channel's coarseness (5.27), not a real doubt, and the `fully_fixed`
+channel and the zero-loss pair record both say otherwise.
+
+#### Call 0 failed, so calls 1–5 are UNGRADED. I am honouring that.
+
+Exposure parity: **24/24 base runs saw an ambiguous message, 3/24 candidate
+runs did.** 5.67 says that makes every call below it ungraded (rule 40), and it
+does. But the *reason* for the miss is not the one the gate was built for. The
+gate exists to catch arms landing in different situations **by chance**. What
+happened here is that the intervention acted **upstream of the population I
+chose to measure**.
+
+#### What actually happened, from reading the runs
+
+Build 123 changed three things: the ambiguous *message*, plus — unavoidably —
+`edit_file`'s **description** and **schema**, which live in the system prompt of
+every run. The message is what I designed and pre-registered. The description
+is what moved the number.
+
+The first `edit_file` call of each run, before any ambiguous message exists:
+
+| first `old` sent | base | cand |
+|---|---|---|
+| `if x > 100:\n        return 100` (2-line guard — ambiguous) | **24/24** | 3/24 |
+| `def clamp_score(x):\n    """Clamp…` (whole function — unique) | 0/24 | **21/24** |
+
+The candidate model stopped aiming at the duplicated guard and started aiming at
+the whole function, which is unique, so the ambiguous branch never fires. That
+is the entire effect. **Zero** `occurrence` arguments were sent before an
+ambiguous message, so it is not preemptive use of the new argument — it is the
+model reading a tool description that now talks about `old` appearing more than
+once, and widening its aim.
+
+Six builds of rewriting the ambiguous *message* (119, 121, and 123's message)
+moved this case by nothing comparable. One sentence in the tool *description*
+moved it from 7/24 to 22/24. **I have been tuning the wrong surface for six
+builds.**
+
+#### The selector itself: it works, and it is not what saved these runs
+
+In the 3 runs that did reach ambiguity, the model used `occurrence` on **25 of
+25** post-ambiguous edits, and:
+
+| post-ambiguous edit outcome | base | cand |
+|---|---|---|
+| LANDED | 21/117 (18%) | **23/25 (92%)** |
+| no-op | 41/117 (35%) | 2/25 (8%) |
+| came back ambiguous | 55/117 (47%) | **0/25 (0%)** |
+
+The mechanical failure is gone — an in-range `occurrence` cannot return
+ambiguous, and it doesn't. **And 2 of those 3 runs still failed**, which is the
+important part. Reading r1: every edit lands, and the model targets
+`clamp_byte` (correct, occurrence 1) instead of `clamp_nibble` (buggy,
+occurrence 2), breaks the working twin, notices the suite got worse, flips it
+back, and thrashes to the stall stop.
+
+Across all 25 selector edits it chose **occurrence 1 in 16 (64%)**. In this
+case's ordering the correct twin is always listed first, so occurrence 1 is
+*always the wrong target*.
+
+**So the selector converts an invisible matching failure into a visible
+targeting failure** — which is strictly more useful, and it hands 5.61's
+**lever 0c (position vs reasoning) its first real instrument.** The question
+"does the model pick by position or by reading the docstring" was unmeasurable
+before, because the model never got to express a choice. Now the choice is a
+single integer in the tool call. 64% first-position is the first datum.
+
+#### Decision: KEEP build 123
+
+A +15/24 improvement with zero false completions and zero losing pairs is not
+something to revert because the mechanism surprised me. But it is credited for
+the right reason: **the description, not the message.** Two follow-ups, in
+order:
+
+1. **Attribution A/B (next).** I cannot separate (a) the new description
+   sentence, (b) the new schema property, (c) generic system-prompt
+   perturbation. Cheapest discriminator: candidate = description sentence only,
+   with the message and the selector reverted. If that reproduces most of
+   7→22, the finding is "tool descriptions steer aim" and it generalises to
+   every tool in the product.
+2. **Lever 0c, now instrumented.** Grade twin choice directly off the
+   `occurrence` values.
+
+#### Recorded honestly
+
+- The base arm scored `fully_fixed` **11/24 in b124** and **7/24 here** on
+  byte-identical code. That is the run-to-run spread on this arm, and it is
+  wide enough that no single-sweep base figure should be quoted as a constant.
+- My pre-registered expectation that call 1 would fail (would a 14B model use a
+  brand-new argument?) was **wrong** — where it was offered it was used 25/25.
+- 5.67's population choice (post-ambiguous edits) is a fourth instance of rule
+  43: I fixed the denominator to the failure I already knew about, and the fix
+  arrived somewhere else. **A pre-registration should always carry one
+  population-independent outcome measure.** `fully_fixed` was in there as call
+  5 and is the only reason this sweep is readable at all.
+
 ### 5.68 lever candidate — the plan walk after a run has already proved success (2026-08-10)
 
 5.64 noticed this in passing and I have now measured it across every sweep with
