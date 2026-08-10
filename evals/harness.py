@@ -243,7 +243,7 @@ _NUDGE_BUCKETS = (
     "slow progress", "open plan tasks", "announced intent", "declared done",
     "never verified", "never seen green", "edit changed nothing",
     "context compacted", "repetition loop", "every call returning empty",
-    "every tool call failing", "verify task credited",
+    "every tool call failing", "verify task credited", "stale reading",
 )
 
 

@@ -3207,12 +3207,14 @@ class ScriptedTool:
         return ToolResult(self.payloads[args["which"]], is_error=True)
 
 
-def make_loop_with_tests(tmp_path, scripted, payloads, cfg=None):
+def make_loop_with_tests(tmp_path, scripted, payloads, cfg=None, extra=()):
     reg = Registry()
     for t in fs.all_tools():
         reg.register(t)
     reg.register(UpdatePlan())
     reg.register(ScriptedTool(payloads))
+    for t in extra:
+        reg.register(t)
     cfg = cfg or Config()
     cfg.agent.max_repeat_calls = 99   # isolate the same-failure path
     cfg.agent.max_error_stall = 99
@@ -3355,6 +3357,118 @@ async def test_the_level_one_note_alone_does_not_arm_the_budget(tmp_path):
     out = await loop.run_turn("fix it")
     assert loop._esc_stall_at is None
     assert "⏹ stopped" not in out
+
+
+# --- the stale-reading reprieve (ROADMAP 5.61) -------------------------------
+#
+# The stall stop asserts a named test STILL fails. Its evidence is the last test
+# run the MODEL watched, and the model keeps editing afterwards — so the claim
+# can be about a workspace that no longer exists. Measured in b121-aa: all 48
+# runs ended on that message and 18 were GREEN when the grader re-ran pytest.
+
+GREEN = "....\n4 passed in 0.1s\n"
+# Every sequence below opens with a read (the read-before-edit gate) and then
+# three reds, so the budget arms on iteration 3 and expires on iteration 6.
+_EDITS = [{"path": "limits.py", "old": w, "new": w.upper()}
+          for w in ("two", "three", "four")]
+
+
+def _stale_loop(tmp_path, scripted, budget=2, extra=()):
+    """A budget loop with a real file to edit, so a run can land edits AFTER
+    its last test run — the only state in which the reprieve applies."""
+    (tmp_path / "limits.py").write_text("one\ntwo\nthree\nfour\n")
+    cfg = Config()
+    cfg.agent.escalated_stall_budget = budget
+    cfg.agent.max_consecutive_errors = 99
+    cfg.permissions.tools["edit_file"] = "auto"
+    cfg.permissions.tools["bash"] = "auto"
+    return make_loop_with_tests(tmp_path, scripted, {"red": RED, "green": GREEN},
+                                cfg=cfg, extra=extra)
+
+
+def _reprieves(events):
+    return [e for e in events
+            if e.get("phase") == "stall_budget" and e.get("event") == "reprieved"]
+
+
+async def test_an_edit_after_the_last_test_run_buys_one_more_look(tmp_path):
+    # Arms on the third red (i3), lands an edit at i4, and the budget expires at
+    # i6 — with one edit the last reading never saw. Spend an iteration getting a
+    # current reading rather than stopping on the stale one.
+    events = []
+    loop = _stale_loop(
+        tmp_path,
+        [native_call("read_file", path="limits.py")]
+        + [native_call("run_tests", which="red")] * 3
+        + [native_call("edit_file", **_EDITS[0])]
+        + [native_call("run_tests", which="red")] * 9)
+    loop._on_event = events.append
+    out = await loop.run_turn("fix it")
+
+    rep = _reprieves(events)
+    assert len(rep) == 1 and rep[0]["iter"] == 6 and rep[0]["unverified"] == 1
+    nudge = [m["content"] for m in loop.history if m.get("kind") == "nudge"]
+    assert any("out of date" in n and "Run it again NOW" in n for n in nudge)
+    # The budget re-arms from the reprieve, so the turn goes on rather than
+    # ending at iteration 6 the way an un-reprieved run does.
+    assert loop._esc_stall_at == 6
+    assert len(_results(loop)) > 6
+    # ...and it is still a stop. The reprieve buys a reading, not an exemption.
+    assert "Stopping rather than grinding" in out
+
+
+async def test_the_reprieve_is_one_shot(tmp_path):
+    # A model that answers the nudge with more edits instead of a test run must
+    # still terminate — otherwise every edit resets the clock and nothing ends.
+    events = []
+    loop = _stale_loop(
+        tmp_path,
+        [native_call("read_file", path="limits.py")]
+        + [native_call("run_tests", which="red")] * 3
+        + [native_call("edit_file", **_EDITS[0]),
+           native_call("run_tests", which="red"),
+           native_call("edit_file", **_EDITS[1]),
+           native_call("edit_file", **_EDITS[2])]
+        + [native_call("run_tests", which="red")] * 8)
+    loop._on_event = events.append
+    out = await loop.run_turn("fix it")
+    assert len(_reprieves(events)) == 1
+    assert "⏹ stopped" in out and "Stopping rather than grinding" in out
+
+
+async def test_a_test_run_after_the_edits_stops_on_time(tmp_path):
+    # The reading is CURRENT here — pytest ran after the edit landed — so the
+    # stop's claim is true and the run ends at the budget, unreprieved.
+    events = []
+    loop = _stale_loop(
+        tmp_path,
+        [native_call("read_file", path="limits.py")]
+        + [native_call("run_tests", which="red")] * 3
+        + [native_call("edit_file", **_EDITS[0]),
+           native_call("bash", cmd="python -m pytest -q")]
+        + [native_call("run_tests", which="red")] * 8,
+        extra=(FakeBash(RED, is_error=True),))
+    loop._on_event = events.append
+    out = await loop.run_turn("fix it")
+    assert loop._edits_at_last_verify == 1
+    assert _reprieves(events) == []
+    assert "Stopping rather than grinding" in out
+
+
+async def test_a_reprieved_run_that_comes_back_green_finishes(tmp_path):
+    # The point of the reprieve: the 18 runs whose work was already done. A
+    # current reading that passes disarms the budget instead of stopping.
+    loop = _stale_loop(
+        tmp_path,
+        [native_call("read_file", path="limits.py")]
+        + [native_call("run_tests", which="red")] * 3
+        + [native_call("edit_file", **_EDITS[0]),
+           native_call("run_tests", which="red"),
+           native_call("run_tests", which="green"),
+           {"role": "assistant", "content": "fixed it"}])
+    out = await loop.run_turn("fix it")
+    assert "⏹ stopped" not in out
+    assert loop._esc_stall_at is None
 
 
 def _noop_loop(tmp_path, extra_calls, noop_k=2, esc_k=8):

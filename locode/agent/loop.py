@@ -263,6 +263,13 @@ class AgentLoop:
         self._esc_stall_test = None
         self._esc_stall_by = None
         self._esc_stall_k = 0
+        # [stale-stall] Value of _landed_edits the last time a verify command
+        # actually ran. The stall stop asserts the named test STILL fails, but
+        # that rests on the last run the MODEL watched, and it keeps editing
+        # afterwards — so the claim can be about a workspace that no longer
+        # exists. See the reprieve at the top of the loop. ROADMAP 5.61.
+        self._edits_at_last_verify = 0
+        self._stall_reprieved = False
         self._iter = 0
         # [same-failure] Basename of the file the last landed edit touched. The
         # escalated steers need to NAME a source file, and neither can reach
@@ -400,12 +407,34 @@ class AgentLoop:
                 # numbers; the budget itself is whatever armed it.
                 if (self._esc_stall_at is not None
                         and i - self._esc_stall_at > self._esc_stall_k):
-                    which = (f"`{self._esc_stall_test}` still fails"
-                             if self._esc_stall_test else "the same test fails")
-                    return self._stop(
-                        f"{which} — {self._esc_stall_k} iterations since the "
-                        "repeat was flagged changed nothing. Stopping rather "
-                        "than grinding; the fix needs a different idea")
+                    # [stale-stall] Do not kill a run on an out-of-date reading.
+                    # This stop asserts the named test still fails, but the
+                    # evidence is the last test run the model WATCHED, and edits
+                    # that landed after it are unaccounted for. Measured in
+                    # b121-aa: all 48 runs ended with this message and 18 of them
+                    # were GREEN when the grader re-ran pytest — finished work,
+                    # discarded on a stale observation. So if the workspace has
+                    # moved since the last check, spend one iteration getting a
+                    # current reading before stopping. One-shot and it re-arms
+                    # the same budget, so a model that edits and never verifies
+                    # still terminates. ROADMAP 5.61.
+                    if (self._landed_edits > self._edits_at_last_verify
+                            and not self._stall_reprieved):
+                        self._stall_reprieved = True
+                        self._esc_stall_at = i
+                        self._on_event({
+                            "phase": "stall_budget", "event": "reprieved",
+                            "trigger": self._esc_stall_by, "iter": i,
+                            "unverified": (self._landed_edits
+                                           - self._edits_at_last_verify)})
+                        self._nudge_stall_reprieve()
+                    else:
+                        which = (f"`{self._esc_stall_test}` still fails"
+                                 if self._esc_stall_test else "the same test fails")
+                        return self._stop(
+                            f"{which} — {self._esc_stall_k} iterations since the "
+                            "repeat was flagged changed nothing. Stopping rather "
+                            "than grinding; the fix needs a different idea")
                 # A stuck loop (or just a long session — history only shrinks via
                 # an explicit reset) can grow the prompt past what the local
                 # server can safely allocate; unlike the other budgets this isn't
@@ -1336,6 +1365,10 @@ class AgentLoop:
                 # "did this turn ever close the loop?"); the done-on-repeated-
                 # verify exit needs "is the code green RIGHT NOW?" instead.
                 self._last_verify_ok = not res.is_error
+                # [stale-stall] Mark how much of the workspace this reading
+                # covers, so the stall stop can tell a current claim from one
+                # made about edits the model never looked at.
+                self._edits_at_last_verify = self._landed_edits
             if call.name in _MUTATING_EDIT_TOOLS and not res.is_error:
                 # An edit that actually landed. Distinct from edit_tally, which
                 # counts attempts including the not_found/no-op failures — this
@@ -1632,6 +1665,33 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "edit changed nothing"})
+
+    def _nudge_stall_reprieve(self) -> None:
+        """[stale-stall] One command, before the turn is allowed to end.
+
+        Fires in place of the stall stop when edits have landed since the last
+        check, so the "still fails" claim would be about a file the model has
+        since changed. b121-aa killed 48 runs with that claim and 18 were
+        already green. The ask is deliberately a single command with nothing to
+        decide: the failure mode being corrected is a model that stops looking,
+        so offering it a choice is offering it another way not to look.
+        ROADMAP 5.61."""
+        what = (f"`{self._esc_stall_test}`" if self._esc_stall_test
+                else "the test that was failing")
+        self.history.append({
+            "role": "user",
+            "content": ("You have changed files since the last time you ran "
+                        f"anything, so you do not know whether {what} still "
+                        "fails — the last output you saw is out of date.\n"
+                        "Run it again NOW with bash, before doing anything "
+                        "else. Do not edit, and do not answer this in prose: "
+                        "the next thing you send must be that command.\n"
+                        "If it passes, you are done — say so. If it still "
+                        "fails, you will have its CURRENT output to work "
+                        "from."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "stall on a stale reading"})
 
     def _nudge_stall(self) -> None:
         """Build 111: the worst-converting steer in the system, reshaped.
