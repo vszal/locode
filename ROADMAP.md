@@ -2874,6 +2874,30 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.60 PRE-REGISTRATION — position or reasoning? (written before b122 finished)
+
+b122-v3probe is running: 48 runs of build 119 on exec-ambig v3, which lists the
+buggy twin first in two pairs of three. On v2 the model copied the first-listed
+block 66% of the time, and that was necessarily also the wrong twin.
+
+Two hypotheses, and they now predict different numbers:
+
+- **POSITION** — the model takes whichever block is listed first. Predicts the
+  picked-FIRST rate stays near 66% in BOTH rows, so on buggy-first pairs it
+  gets the right answer ~66% of the time by luck.
+- **REASONING** — the model is reading the docstring and preferring the twin
+  that looks correct. Predicts the picked-BUGGY rate stays near 34% in BOTH
+  rows, independent of order.
+
+Called in advance: I expect POSITION, because on v2 the wrong pick was total
+(65 of 65 wrong picks were first-listed) and nothing in the message ranks the
+blocks. If POSITION holds the fix is cheap — order the blocks, or label them —
+and it should recover a large share of the 66%. If REASONING holds, the model
+is actively mis-reading the docstrings and the fix is a harder prompt problem.
+
+Recording this before the numbers exist so the outcome cannot be narrated
+either way after the fact.
+
 ### 5.59 A/A calibration: build 119 is CREDITED, and the noise ran against it (2026-08-10)
 
 The A/A (`--base HEAD --allow-identical`, build 119 on both sides) came back
