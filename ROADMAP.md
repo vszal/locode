@@ -2874,6 +2874,48 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.68 lever candidate — the plan walk after a run has already proved success (2026-08-10)
+
+5.64 noticed this in passing and I have now measured it across every sweep with
+events (b121-aa, b122-aa, b123-stalestale, b124-noop).
+
+Take every run that ever reached a **green pytest** (n=19 — that is the honest
+denominator; most runs never get there). Count the tool calls issued after that
+first green:
+
+| | |
+|---|---|
+| median further tool calls | **4** |
+| p90 / max | 4 / 4 |
+| stopped immediately | **0 / 19** |
+| total further calls | 49 |
+| …that were `update_plan` | 29 (59%) |
+| …`read_file` | 10 (20%) |
+| …`bash` (re-running what it just ran) | 10 (20%) |
+
+Attribution is not ambiguous: **19 of 19** of those runs get an `open plan
+tasks` nudge after the green, and **19 of 19** answer it with `update_plan`.
+
+**The candidate.** Once a verify command has come back green, the run has its
+proof. Walking the plan to closure afterwards is bookkeeping, and it costs a
+fixed ~4 calls at exactly the point where the budget is most likely to run out —
+which is how a finished run turns into a truncated one.
+
+**What stops this being a finding yet — and it must not be written up as one.**
+There is no control group: 0 of 19 green runs escaped the nudge, so the archive
+cannot say what those runs would have done without it. "Wasted" is my inference,
+not a measurement. Two specific things to check before building anything:
+
+1. Does the loop currently *require* a closed plan to declare DONE? If so these
+   calls are not waste, they are the exit protocol, and the lever is a different
+   one (let a green verify close the plan implicitly).
+2. Of the 10 post-green `bash` calls, how many re-run the same command? A model
+   re-verifying once is cheap insurance, not a defect.
+
+**Do not pre-register this until both are answered.** Rule 46 — I have now been
+wrong twice about a lever whose prose argument sounded finished (5.63's premise,
+5.66's option 2), and both times ten minutes of counting settled it.
+
 ### 5.67 pre-registration — build 123, the `occurrence` selector (2026-08-10)
 
 Written and committed BEFORE `b125-occurrence` starts. Every baseline figure
