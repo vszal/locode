@@ -2874,6 +2874,83 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.55 b120: the metric moved, the lever didn't fire, do not credit it (2026-08-10)
+
+Graded by `grade120.py`, written and validated against b119 *before* the sweep
+finished (it reproduces b119's 7/14 vs 0/14 at p=0.0058 exactly).
+
+**Primary looks like a big win and is not one.** VERIFIED base 2/14 → cand
+9/14, Fisher p=0.018. `ab.py` itself returned **INCONCLUSIVE**: delta +0.25
+clears the noise floor 0.1429 but falls short of the 0.4287 required at k=1
+A/A calibration.
+
+Then the branch mix, per rule 36:
+
+| arm | edit-first | read-first | ambiguous messages | VERIFIED |
+|---|---:|---:|---:|---:|
+| base | 8 | **6** | 12 | 2/14 |
+| cand | 13 | **1** | **3** | 9/14 |
+
+**The lever fired in one of fourteen candidate runs, and that run lost.** Zero
+edit-first runs saw an ambiguous message in either arm — 5.52's perfect
+collinearity holds exactly. So the entire VERIFIED gap lives in the branch
+draw, and the branch **cannot** be caused by this change: it is fixed at tool
+call 3, the message cannot fire before call 4, and the prior context is
+byte-identical between arms (5.48). Inside the edit-first stratum — runs that
+never see the message at all — base 2/8 vs cand 9/13, p=0.08: not significant,
+and not attributable to the change in either direction.
+
+By the pre-registered rule in 5.53: *primary up + mechanism flat ⇒ the message
+is not what moved it, and I will say so.* Mechanism was worse than flat — it
+was **unevaluable**, at n=1. Saying so. **Not credited.**
+
+Guardrail clean (0 syntax rejections both arms) but on 3 events, so it has no
+power to detect the b97 regression either.
+
+**What the one firing run actually shows** — worth more than the headline. The
+message rendered exactly as designed, with the buggy line sitting in the block:
+
+```
+  ── match at line 24 — these are lines 23-25, copy all 3 of them ──
+            current = [word]
+            current_len = len(word)
+        elif current_len + 1 + len(word) < width:
+```
+
+The model did not copy the block. Across every ambiguous event in the sweep:
+
+| route taken next | base (b118) | cand (b119) |
+|---|---:|---:|
+| `replace_lines` | 11/12 | 0 |
+| `edit_file` + `replace_all` | 0 | **3/3** |
+| **copy the block verbatim — the route promoted to FIRST** | — | **0/3** |
+
+**This refutes build 98's rule.** "The model takes whichever route is named
+first" held when the first route was cheap (b118: replace_lines first, taken
+11/12). It fails here: copy-a-3-line-block-with-exact-leading-whitespace is
+first and is taken zero times, and the model falls to `replace_all` — which is
+second in my message, and which it can satisfy by adding one boolean.
+
+Corrected rule: **position selects among the routes the model can afford;
+an unaffordable route is skipped regardless of position.** Both routes ever
+observed being taken — `replace_lines` and `replace_all` — are near-zero
+effort. Reordering a high-effort route to the top does not get it taken; the
+cheap alternatives have to be *removed* from the menu. n=3 in cand, but
+consistent with all 42 events in 5.28 and all 12 in base here.
+
+And `replace_all` is the worse outcome: it applied the model's wrong one-line
+fix to **both** sites instead of one.
+
+**Do not iterate the wording tonight.** The instrument cannot resolve this
+lever: it fires in the minority branch, and the branch draw (6 vs 1 here)
+dominates the metric it would be graded on. That is 5.48 and rule 36 in their
+sharpest form yet — **an A/B cannot grade a lever whose population is itself
+the dominant source of outcome variance.** The fix is an instrument where the
+ambiguous message fires on nearly every run, not more r14 sweeps on this one.
+
+Build 119 is left in place: unvalidated but not condemned, and the gutter
+removal stands on 5.28's own reasoning independent of the route order.
+
 ### 5.54 The archive cannot license 5.52, because both powered cases are rigged for it (2026-08-09)
 
 Run while b120 swept, read-only. 5.52 flagged its own threat to validity —
