@@ -10,18 +10,31 @@ arms of 14) dominates the VERIFIED metric it would be graded on. The lever
 fired in ONE of fourteen candidate runs. No amount of extra r on exec-bugfix
 fixes that — the instrument has to make the message fire.
 
-The three seeded bugs are copy-paste errors, each on a line that is CORRECT
-somewhere else in the file:
+Version 2. The first cut of this case duplicated the single WRONG line
+(`return 100` twice, `return 0` four times) and fired zero ambiguous messages
+in a pilot, because that is not the granularity the model edits at: every edit
+it made anchored on the enclosing guard, `if x > 255:\n    return 100`, which
+was unique. Duplicate the unit the model actually copies, not the line that
+happens to be wrong.
 
-  * clamp_byte   `return 100` should be `return 255` — that exact line occurs 2x
-  * clamp_ratio  `return 0`   should be `return 1`   — that exact line occurs 4x
-  * clamp_signed `return 128` should be `return 127` — unique, the control bug
+So v2 duplicates whole function BODIES. Six functions in three pairs; in each
+pair the buggy one's body is byte-identical to its correct twin's, and the only
+thing that distinguishes them is a one-line docstring naming the real range:
 
-So any `old` the model copies off a failing line is ambiguous by construction,
-and `replace_all` is an active trap rather than a shortcut: applying it to
-`return 100` fixes clamp_byte and breaks clamp_percent in the same edit, for
-net zero progress. Verified before landing — targeted fixes reach 13/13, and
-the replace_all route stays at 3 failed.
+  * clamp_score  [0, 50]  carries clamp_percent's body — clamps at 100
+  * clamp_nibble [0, 15]  carries clamp_byte's body    — clamps at 255
+  * clamp_minute [0, 59]  carries clamp_hour's body    — clamps at 23
+
+Three bugs, four failing tests (clamp_minute(45) is inside [0, 59] but outside
+the copied [0, 23] guard, so its inside-range test fails too).
+
+Every granularity is now ambiguous — the bare return line, the guard plus its
+return, and the entire four-line body all occur exactly 2x. Disambiguating
+REQUIRES widening out to the docstring, which is the whole behaviour the
+build-119 message is supposed to teach. And `replace_all` is an active trap
+rather than a shortcut: applied to a guard it fixes the buggy twin and breaks
+the correct one in the same edit, for net zero progress. Both verified before
+landing — targeted fixes reach 13/13, the replace_all route stays at 4 failed.
 
 That makes this the case that can actually grade a disambiguation message: the
 lever fires in nearly every run, and the cheap wrong route is punished by the
