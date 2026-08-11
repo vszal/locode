@@ -6595,63 +6595,85 @@ The audit's real yield was not its own list. It was the habit of checking
 exposure before believing a defect — which is what turned up the echo bug
 (5.80), a correctness failure that no reading of the text could have found.
 
-## 5.85 LEVER 0e — the best early signal in the product is acted on at 94% of the run (2026-08-11)
+## 5.85 LEVER 0e — the repeat detector fires nine iterations after the signal (2026-08-11)
 
-Fell out of declining D3 (5.83). The `repeated call` nudge is the most frequent
-in the product and it fires as a death rattle. Measured on b125–b128, 240 runs,
-87 firings:
+Fell out of declining D3 (5.83), and **corrected the same day** — the first
+version of this section was wrong in two ways that both changed what it
+recommended. The corrections are kept in place rather than edited away.
 
-| | |
-|---|---|
-| nudge fires at | median **0.94** of the run (mean 0.87) |
-| iterations remaining after it | median **1** |
-| firings in the final 10% of the run | 54/87 (62%) |
-| **first duplicate call appears at** | median **0.32** of the run |
-| **wasted window** | median **0.56 of the run** |
+### The claim that survives, in absolute iterations
+Measured on b125–b128, 240 runs:
 
-The signal is readable at a third of the way in. We intervene when there is one
-iteration left. Everything between is a run we watched die.
+| | median | p25 | p75 |
+|---|---|---|---|
+| **first duplicate tool call** (name+args identical) | iteration **6** | 5 | 7 |
+| **`repeated call` nudge fires** | iteration **15** | 13 | 23 |
+| gap | **9 iterations** | | |
 
-### How informative is that early signal
-Duplicate tool calls (name + args identical) in the **first half** of a run,
-against final `fully_fixed`, stratified by build (rule 49):
+The first duplicate lands at iteration 6 and is tightly concentrated. We
+intervene nine iterations later. That is the lever: **the detector is late, not
+wrong.**
 
-| dups in first half | b125 | b126 | b127 | b128 | **pooled** |
-|---|---|---|---|---|---|
-| 0 | 21/21 | 17/17 | — | 16/16 | **54/54 (100%)** |
-| 1 | 7/24 | 3/11 | 12/18 | 3/20 | **25/73 (34%)** |
-| 2+ | 1/3 | 5/20 | 11/30 | 17/60 | **34/113 (30%)** |
+### CORRECTION 1 — "32% of the run" was not a real-time quantity
+The first version reported the duplicate at 0.32 of the run and the nudge at
+0.94, a "wasted window of 0.56". Those fractions are computed against the run's
+**final** length, which is only knowable once the run is over. No detector can
+use them. The absolute-iteration table above is the same finding stated in
+terms a running loop can actually observe, and it is the only version that
+should be built on.
 
-Zero duplicates in the first half is a **perfect** predictor of success in every
-stratum that contains the cell — 54 for 54. One duplicate drops it to a third.
-b127 has no zero-dup runs at all, so it neither supports nor contradicts.
+### CORRECTION 2 — "zero duplicates predicts success 54/54" is mostly run length
+The first version reported 0 duplicates in the first half → 54/54 (100%) fixed,
+1 → 34%, 2+ → 30%, and called it a near-perfect predictor. Controlling for how
+many calls the first half actually contained dissolves most of it:
 
-### What this does and does not license
-**Not a causal claim, and the distinction matters (rule 50).** A duplicate is
-partly a *symptom* of a hard run: an easy task never needs a retry. Firing the
-nudge earlier will not convert 34% into 100%, and anyone reading this table as
-"stop the duplicates and the runs succeed" has the arrow backwards.
+| first-half calls | 0 dups | ≥1 dup |
+|---|---|---|
+| 0–5 | 46/46 (100%) | — |
+| 6–9 | 8/8 (100%) | 10/77 (13%) |
+| 10–14 | — | 37/77 (48%) |
+| 15+ | — | 12/32 (38%) |
 
-What it does license is the **timing**, which is indefensible on either reading.
-Whether the duplicate causes the death or merely announces it, we have a signal
-at 32% that separates 100% from 34%, and we spend it at 94%. As a pure
-predictor it is already enough to act on: at the halfway mark we know, with the
-strongest confidence any marker in this project has offered, which runs are in
-trouble while they still have iterations to spend.
+**There are no runs with 10+ first-half calls and zero duplicates.** "Zero
+duplicates" is very nearly a synonym for "short run", and 46 of the 54 finished
+in five calls or fewer — they are the easy runs. The honest residue is the 6–9
+bin, the only one supporting a fair comparison: 8/8 against 10/77. A real gap,
+on n=8.
+
+Note also that within the duplicate group, *more* calls is not worse (13% →
+48% → 38%). Survivorship again: a run still issuing calls at 15 is a run that
+has not died.
+
+### What this licenses
+**The timing, and nothing about causation.** A duplicate is partly a symptom of
+a hard run — that was flagged in the first version and still holds — and it is
+now additionally clear that most of the apparent predictive power was run
+length. Do not build anything that assumes suppressing duplicates converts
+failures into successes.
+
+What is unconfounded and actionable is the nine-iteration gap. Whatever the
+first duplicate means, the loop already treats it as meaningful enough to nudge
+about; it just waits nine iterations to say so, by which point (5.83) the median
+run has zero further tool calls left.
 
 ### Design constraints, before anyone writes code
 1. **Do not simply move the existing nudge earlier.** Its text is written for a
-   terminal moment ("try a genuinely different approach"). At 32% the right
-   message is different, and D3 is now moot precisely because that text never
-   reaches a model with room to act.
-2. **Escalate, don't fire once.** A single duplicate is weak evidence in
-   isolation — legitimate retries exist. The design should treat an early
-   duplicate as a cue to steer and a late one as grounds to stop.
+   terminal moment ("try a genuinely different approach"). At iteration 6 the
+   right message is a different one.
+2. **Escalate, don't fire once.** A single duplicate at iteration 6 is weak
+   evidence — legitimate retries exist, and the 6–9 bin rests on n=8. Early
+   duplicate → steer; late duplicate → stop.
 3. **b126 is the cautionary case.** An intervention the model *obeys into a
-   worse place* is the failure mode of this whole class of change. Report
-   not-found rate and aim depth (lever 0d) alongside the outcome.
-4. **Pre-register with a REJECT line**, per 5.76/5.81. This touches the loop,
-   which is the highest-risk surface after the tool descriptions.
+   worse place* is this class's failure mode. Report not-found rate and aim
+   depth (lever 0d) alongside the outcome.
+4. **Pre-register with a REJECT line**, per 5.76/5.81. This touches the loop.
+
+### Method note (rule 56)
+Any per-run statistic expressed as a FRACTION OF THE RUN is retrospective and
+cannot drive a runtime decision — restate it in absolute iterations before
+designing against it. And before crediting a marker, bin by how many
+opportunities the run had to exhibit it: "never repeated" and "barely ran" are
+the same population until proven otherwise.
 
 Queued behind b130 — one experiment at a time.
 
