@@ -6275,4 +6275,73 @@ locode, which is a little pointed.
   checklist, end-of-turn summary, louder nudges. +9 tests. Directly targets the
   user's "poor visibility" + "mid-task flailing" feedback.
 
+## 5.78 b128 VERDICT — REJECTED, reverted as build 127 (2026-08-11)
+
+The 5.76 pre-registration is discharged. Build 126 made uniqueness the binding
+constraint on `old`: *"just long enough to appear EXACTLY ONCE — a few lines,
+extended up to the `def` line IF a shorter snippet would match in more than one
+place"*. Base `fa12194` (build 125), cand = working tree, qwencoder14,
+exec-ambig + exec-bugfix, r24 each (96 runs).
+
+| | exec-ambig base | cand | exec-bugfix base | cand |
+|---|---|---|---|---|
+| fully_fixed | 17/24 (71%) | **8/24 (33%)** | 8/24 (33%) | 3/24 (12%) |
+| first aim WIDE | 16/24 (67%) | **0/24 (0%)** | 6/24 (25%) | 0/24 (0%) |
+| `old` not found | 0/134 (0%) | **74/119 (62%)** | 0/176 | 0/163 |
+
+exec-ambig fixed p=0.0199, wide p=6.5e-07. The pre-registered REJECT line was
+`exec-ambig fixed < 13/24`; it came in at 8. **Reverted in build 127**, byte-
+exact against `fa12194` (verified by comparing the four runtime description
+strings, not the source — rule 51).
+
+### Why it lost — read off the calls, not inferred
+The first `edit_file` per run collapses to one snippet in each arm:
+
+- base: `def clamp_score(value):\n    return value` (16x) — def-anchored, column 0.
+- cand: `if x > 100:\n    return 100` (21x) — inner block, **4-space** body.
+
+The seed has **8 spaces** (`limits.py:14`). So cand mis-indents almost every
+first edit and the match fails outright — hence 62% not-found, and hence wide
+aim reading 0/24 (the detector looks at the first `old`, and those calls now
+never land).
+
+**The defect is the conditional.** "extended up to the `def` line IF a shorter
+snippet would match in more than one place" is an escape hatch: the model
+evaluates the antecedent, judges `if x > 100:` unique enough, and stays inside
+the function body — where indentation is 8 spaces and it gets it wrong. Build
+125's UNCONDITIONAL "smallest unique snippet" wording somehow keeps it
+def-anchored, and column 0 cannot be mis-indented. This also retro-explains the
+b126 finding that the schema property *without* the sentence produced
+mis-indented `old` in 19/24 runs: the same failure, reached by a different route.
+
+**Generalised lever (0d): indentation depth of the aim point is a hidden
+confound in every `old`-sizing experiment on this model.** Wording that moves
+the aim shallower wins for a reason that has nothing to do with uniqueness.
+Any future `old`-sizing candidate must report not-found rate alongside wide aim.
+
+### Two things the coded verdict got slightly wrong, recorded for honesty
+1. The script printed **VOID** because the false-completion guard is "nonzero in
+   any arm". Six fired: **5 of them in the BASE arm** of exec-bugfix (unchanged
+   code) and 1 in cand. That is base-arm variance, not fabrication introduced by
+   the candidate, so VOID misattributes. It does not change the decision — the
+   independent REJECT line is met on its own. Future guards must be
+   arm-directional: only *candidate* false completions can void a candidate.
+2. exec-bugfix base showing 5 false completions when b125/b126/b127 showed 0 is
+   unexplained and is its own open item (5.79).
+
+### Discipline note
+5.76 said in advance: "No further argument, no re-reading of the trajectories to
+find a reason to keep it." Honoured — the trajectories were read only to explain
+the loss, after the decision was already fixed by the numbers.
+
+## 5.79 OPEN — 5 false completions in an UNCHANGED arm (2026-08-11)
+
+b128's exec-bugfix base arm is build 125, the same code that scored 0 false
+completions in three prior sweeps. Five runs ended with no `stopped` event and
+`fully_fixed` false. Either the detector is wrong on this case (it was written
+for exec-ambig, where "no stop event" means the model declared victory), or
+build 125 can end a turn believing exec-bugfix is done. Cheap to settle: read
+the tail of those 5 trajectories. Do it before the next exec-bugfix sweep, since
+it sets the baseline everything else is measured against.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*

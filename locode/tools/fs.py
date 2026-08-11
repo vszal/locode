@@ -1230,10 +1230,8 @@ class EditFile:
         "separate deletes each still match (line-number deletes renumber every "
         "line below and drift). Otherwise `new` has to carry your actual change; "
         "an edit whose `new` equals `old` does nothing and is "
-        "rejected. Make `old` just long enough to appear EXACTLY ONCE — a few "
-        "lines, extended up to the `def` line if a shorter snippet would match "
-        "in more than one place — NOT the whole file. Large blocks waste "
-        "tokens and risk "
+        "rejected. Keep `old` to the SMALLEST unique snippet that needs changing "
+        "(a few lines), NOT the whole file — large blocks waste tokens and risk "
         "being cut off; make several small edit_file calls instead of one giant "
         "one. IMPORTANT: this editor PRESERVES the file's existing indentation "
         "and tolerates whitespace differences, so it CANNOT make an "
@@ -1251,13 +1249,19 @@ class EditFile:
         # upstream of everything it mentions: a model told that `old` can match
         # more than once picks a bigger `old` to begin with, and never reaches
         # the ambiguous branch at all. ROADMAP 5.71.
-        # [b128] `still` added, and the SMALLEST-snippet clause above rewritten
-        # to make uniqueness the binding constraint. 5.74: build 120 carries
-        # the smallest-snippet clause and aims wide 18/24 on exec-bugfix; adding
-        # the rescue below dropped it to 10/24. The rescue did not introduce the
-        # go-small instruction, it removed the DOWNSIDE of obeying it. ROADMAP
-        # 5.76 — if b128 loses exec-ambig, revert BOTH clauses together.
-        "If `old` still turns out to appear more than once, do NOT rewrite it: resend "
+        # [b128 REVERTED — build 127] The b128 sweep tried to make uniqueness the
+        # binding constraint here: "just long enough to appear EXACTLY ONCE — a
+        # few lines, extended up to the `def` line IF a shorter snippet would
+        # match in more than one place". It lost, decisively, on the case it was
+        # aimed at: exec-ambig fully_fixed 17/24 -> 8/24, and the FIRST `old`
+        # reaching the def/docstring went 16/24 -> 0/24. Mechanism, read off the
+        # calls: the conditional is an escape hatch. The model judged the inner
+        # `if x > 100:` unique enough, skipped the def line, and then got the
+        # 8-space body indentation wrong — not-found on `old` went 0/134 -> 74/119
+        # (62%). The UNCONDITIONAL smallest-snippet wording above keeps it
+        # def-anchored, where indentation is column 0 and cannot be missed.
+        # Do not re-litigate this without a new sweep. ROADMAP 5.78.
+        "If `old` turns out to appear more than once, do NOT rewrite it: resend "
         "the same call with `occurrence` set to which one you mean."
     )
     permission = "ask"
