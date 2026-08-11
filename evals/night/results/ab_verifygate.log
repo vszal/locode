@@ -1,0 +1,62 @@
+
+=== rep 1/3 ===
+  [C] syntax-fix      gemmacoder12  done=N  5it f0 n0 r1       the model repeated the same to
+  [C] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [C] logic-bug       gemmacoder12  done=Y  6it f1 n0 r1       answered
+  [C] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [C] undefined-vars  gemmacoder12  done=Y 12it f3 n0 r3       answered
+  [C] undefined-vars  qythos9       done=Y  8it f3 n0 r2       answered
+  [C] new-module      gemmacoder12  done=Y  6it f3 n0 r1       the model repeated the same to
+  [C] new-module      qythos9       done=Y  3it f0 n0 r0       answered
+  [T] syntax-fix      gemmacoder12  done=N  5it f0 n0 r1       the model repeated the same to
+  [T] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [T] logic-bug       gemmacoder12  done=Y  4it f1 n0 r0       answered
+  [T] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [T] undefined-vars  gemmacoder12  done=Y 10it f3 n0 r3       the model repeated the same to
+  [T] undefined-vars  qythos9       done=Y  4it f1 n0 r0       answered
+  [T] new-module      gemmacoder12  done=Y  4it f1 n0 r0       answered
+  [T] new-module      qythos9       done=Y  3it f0 n0 r0       answered
+
+=== rep 2/3 ===
+  [C] syntax-fix      gemmacoder12  done=N  2it f0 n0 r0       answered
+  [C] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [C] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [C] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [C] undefined-vars  gemmacoder12  done=Y  7it f2 n2 r1       the model repeated the same to
+  [C] undefined-vars  qythos9       done=Y  8it f2 n0 r2       answered
+  [C] new-module      gemmacoder12  done=Y  6it f1 n0 r1       the model repeated the same to
+  [C] new-module      qythos9       done=Y  3it f0 n0 r0       answered
+  [T] syntax-fix      gemmacoder12  done=N  6it f0 n0 r1       answered
+  [T] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [T] logic-bug       gemmacoder12  done=Y  9it f4 n2 r2       the model repeated the same to
+  [T] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [T] undefined-vars  gemmacoder12  done=Y 10it f3 n0 r3       the model repeated the same to
+  [T] undefined-vars  qythos9       done=Y  6it f1 n0 r1       answered
+  [T] new-module      gemmacoder12  done=Y  4it f1 n0 r0       answered
+  [T] new-module      qythos9       done=Y  3it f0 n0 r0       answered
+
+=== rep 3/3 ===
+  [C] syntax-fix      gemmacoder12  done=N  5it f0 n0 r1       answered
+  [C] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [C] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [C] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [C] undefined-vars  gemmacoder12  done=Y 10it f3 n0 r3       the model repeated the same to
+  [C] undefined-vars  qythos9       done=Y  5it f1 n0 r0       answered
+  [C] new-module      gemmacoder12  done=Y  3it f0 n0 r0       answered
+  [C] new-module      qythos9       done=Y  3it f0 n0 r0       answered
+  [T] syntax-fix      gemmacoder12  done=Y  7it f1 n0 r2       the model repeated the same to
+  [T] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [T] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [T] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [T] undefined-vars  gemmacoder12  done=Y 10it f3 n0 r3       the model repeated the same to
+  [T] undefined-vars  qythos9       done=Y  7it f2 n0 r1       answered
+  [T] new-module      gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [T] new-module      qythos9       done=Y  3it f0 n0 r0       answered
+
+================ A/B RESULT ================
+                 CONTROL      TREATMENT
+  runs                24            24
+  done                21            22
+  repeat-stops         5             6
+  total repeats       16            17
+  avg iters          5.2           5.4

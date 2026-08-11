@@ -1,0 +1,37 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r8-55_5_ltf/textkit.py"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"[ ] Run tests and fix bugs in textkit.py": "[>]"}}}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[ ] Run tests and fix bugs in textkit.py"]}}
+```Looking at the test failures:
+
+1. **`test_word_wrap_exact_fit_stays_on_one_line`**: The function splits "abcd efgh" (9 chars) into two lines when width is 9. The issue is in the condition on line 25: `current_len + 1 + len(word) < width`. This uses `<` instead of `<=`, so when the total would equal exactly `width`, it still tries to add the word to the current line, causing it to overflow and start a new line.
+
+2. **`test_truncate_shortens_and_appends_suffix_at_exact_limit`**: The function truncates "abcdefghij" (10 chars) with limit 5 and suffix "..." (3 chars). Expected output is "ab..." (5 chars), but we get "abc..." (6 chars). The issue is in line 48: `cut = limit - len(suffix) + 1`. This adds 1 to the cut position, making it too large. The correct formula should be `cut = limit - len(suffix)` to ensure the total length equals exactly `limit`.
+
+3. **`test_title_case_first_word_always_capitalized`**: The function returns "a Tale of Two Cities" instead of "A Tale of Two Cities". The issue is in the `title_case` function: when a word is in `SMALL_WORDS`, it's left lowercase even if it's the first word. The code needs to check if it's the first word and capitalize it regardless of whether it's in `SMALL_WORDS`.
+
+Let me fix these issues:
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r8-55_5_ltf/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r8-55_5_ltf/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r8-55_5_ltf/textkit.py", "old": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())", "new": "    for word in words:\n        lower = word.lower()\n        if word == words[0]:\n            result.append(lower.capitalize())\n        elif lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60}}
+```All tests pass now. The three bugs in `textkit.py` were:
+
+1. **`word_wrap`**: The condition `current_len + 1 + len(word) < width` should have been `<= width` to allow exact fits.
+2. **`truncate`**: The formula `limit - len(suffix) + 1` was off by one; it should be `limit - len(suffix)`.
+3. **`title_case`**: The first word was being lowercased when it was in `SMALL_WORDS`. I added a check to capitalize the first word regardless of its membership in `SMALL_WORDS`.```tool
+{"name": "update_plan", "args": {"tasks": ["[x] Run tests and fix bugs in textkit.py"]}}
+```All tests pass. The three bugs in `textkit.py` were:
+
+1. **`word_wrap`**: The condition `current_len + 1 + len(word) < width` should have been `<= width` to allow exact fits.
+2. **`truncate`**: The formula `limit - len(suffix) + 1` was off by one; it should be `limit - len(suffix)`.
+3. **`title_case`**: The first word was being lowercased when it was in `SMALL_WORDS`. I added a check to capitalize the first word regardless of its membership in `SMALL_WORDS`.

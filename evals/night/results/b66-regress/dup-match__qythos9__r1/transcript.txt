@@ -1,0 +1,18 @@
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/b66-regress/dup-match__qythos9__r1/workdir/net.py
+    ✓ 1	def fetch(url):  (+9 more lines)
+
+  ⚙ edit_file /Users/vszalvay/Code/locode/evals/night/results/b66-regress/dup-match__qythos9__r1/workdir/net.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+6 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/b66-regress/dup-match__qythos9__r1/workdir/net.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/b66-regress/dup-match__qythos9__r1/workdir/net.py
+    @@ -1,4 +1,4 @@
+     def fetch(url):
+    -    timeout = 30
+    +    timeout = 60
+         return _get(url, timeout)
+     
+
+  ⚙ bash python3 -c "import net; print(net.fetch('u'), net.poll('u'))"
+    ✓ ('u', 60) ('u', 30)
+The timeout in `fetch` is now 60 and the timeout in `poll` remains 30, as verified by the output `('u', 60) ('u', 30)`.

@@ -1,0 +1,19 @@
+
+  ⚙ read_file orders.py
+    ✓ 1	TAX_RATE = 0.1  (+27 more lines)
+
+  ⚙ edit_file orders.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+8 more lines)
+    --- orders.py
+    +++ orders.py
+    @@ -12,5 +12,5 @@
+     def apply_discount(amount, pct):
+         # pct is a percentage off, e.g. 20 means 20% off
+    -    return round(amount + amount * (pct / 100), 2)
+    +    return round(amount - amount * (pct / 100), 2)
+     
+     def shipping(amount):
+
+  ⚙ bash python3 -c "import orders; print(orders.apply_discount(200, 25))"
+    ✓ 150.0
+The `apply_discount` function now correctly subtract the percentage instead of adding it, and the verification command returns `150.0` as expected.

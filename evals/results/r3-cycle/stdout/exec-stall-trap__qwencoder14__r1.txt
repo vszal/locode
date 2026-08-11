@@ -1,0 +1,7 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "parser.py"}}
+``````tool
+{"name": "edit_file", "args": {"path": "parser.py", "old": "records.append(current)\ncurrent = {}", "new": "if current:\n    records.append(current)\ncurrent = {}}}
+```

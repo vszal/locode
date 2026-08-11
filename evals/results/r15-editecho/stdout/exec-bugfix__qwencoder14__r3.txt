@@ -1,0 +1,29 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current = [word]", "new": "current = [word] if word else []"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current = [word]", "new": "current = [word] if word else []", "replace_all": true}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower)", "new": "result.append(lower if word in SMALL_WORDS and word != words[0] else lower.capitalize())"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower if word in SMALL_WORDS and word != words[0] else lower.capitalize())", "new": "result.append(lower if word in SMALL_WORDS and word != words[0] else lower.capitalize())"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower if word in SMALL_WORDS and word != words[0] else lower.capitalize())", "new": "result.append(lower if word in SMALL_WORDS and word != words[0] else lower.capitalize())"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower if word in SMALL_WORDS and word != words[0] else lower.capitalize())", "new": "result.append(lower if word in SMALL_WORDS and word != words[0] else lower.capitalize())"}}
+```It seems like the previous edits did not resolve the issues. Let's take a different approach. I'll focus on fixing the `word_wrap` function to ensure it handles the exact fit case correctly.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "if current_len + 1 + len(word) < width:", "new": "if current_len + len(word) <= width:"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests now pass. The issues have been resolved.

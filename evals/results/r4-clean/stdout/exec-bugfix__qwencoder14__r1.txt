@@ -1,0 +1,47 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current = [word]", "new": "current = [word]", "replace_all": false}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "lines.append(\" \".join(current))", "new": "lines.append(\" \".join(current))", "replace_all": false}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower)", "new": "result.append(lower.capitalize())", "replace_all": false}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower.capitalize())", "new": "result.append(lower.capitalize() if i != 0 else lower.capitalize())", "replace_all": false}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower.capitalize())", "new": "result.append(lower.capitalize() if i != 0 else lower.capitalize())", "replace_all": true}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower.capitalize() if i != 0 else lower.capitalize())", "new": "result.append(lower.capitalize() if i != 0 else lower.capitalize())", "replace_all": true}}
+```I see the issue. The `title_case` function is trying to use the variable `i`, which is not defined. This variable is likely intended to track the index of the word in the list. Let's rewrite the `title_case` function to fix this issue.
+
+```tool
+{"name": "write_file", "args": {"path": "textkit.py", "content": "from typing import List\n\nSMALL_WORDS = {\"a\", \"an\", \"and\", \"the\", \"of\", \"in\", \"on\", \"or\", \"to\", \"at\", \"by\", \"for\"}\n\ndef title_case(text: str) -> str:\n    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS and i != 0:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)\n"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```It seems that the `textkit.py` file has been overwritten with only the `title_case` function, which caused the import errors in the test file. Let's restore the original `textkit.py` file and then make the necessary changes to fix the `title_case` function.
+
+First, let's restore the original `textkit.py` file.
+
+```tool
+{"name": "write_file", "args": {"path": "textkit.py", "content": "from typing import List\n\nSMALL_WORDS = {\"a\", \"an\", \"and\", \"the\", \"of\", \"in\", \"on\", \"or\", \"to\", \"at\", \"by\", \"for\"}\n\ndef word_wrap(text: str, width: int) -> List[str]:\n    words = text.split()\n    lines = []\n    current = []\n    current_len = 0\n    for word in words:\n        if not current:\n            current = [word]\n            current_len = len(word)\n        elif current_len + 1 + len(word) < width:\n            current.append(word)\n            current_len += 1 + len(word)\n        else:\n            lines.append(\" \".join(current))\n            current = [word]\n            current_len = len(word)\n    if current:\n        lines.append(\" \".join(current))\n    return lines\n\ndef truncate(text: str, limit: int, suffix: str = \"...\") -> str:\n    if len(text) <= limit:\n        return text\n    cut = limit - len(suffix) + 1\n    if cut < 0:\n        cut = 0\n    return text[:cut] + suffix\n\ndef title_case(text: str) -> str:\n    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS and i != 0:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)\n\ndef dedupe_spaces(text: str) -> str:\n    return \" \".join(text.split())\n"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```It appears that the `word_wrap` function still has an issue. Let's fix the `word_wrap` function to ensure it handles the exact fit case correctly.
+
+```tool
+{"name": "write_file", "args": {"path": "textkit.py", "content": "from typing import List\n\nSMALL_WORDS = {\"a\", \"an\", \"and\", \"the\", \"of\", \"in\", \"on\", \"or\", \"to\", \"at\", \"by\", \"for\"}\n\ndef word_wrap(text: str, width: int) -> List[str]:\n    words = text.split()\n    lines = []\n    current = []\n    current_len = 0\n    for word in words:\n        if not current:\n            current = [word]\n            current_len = len(word)\n        elif current_len + 1 + len(word) <= width:\n            current.append(word)\n            current_len += 1 + len(word)\n        else:\n            lines.append(\" \".join(current))\n            current = [word]\n            current_len = len(word)\n    if current:\n        lines.append(\" \".join(current))\n    return lines\n\ndef truncate(text: str, limit: int, suffix: str = \"...\") -> str:\n    if len(text) <= limit:\n        return text\n    cut = limit - len(suffix) + 1\n    if cut < 0:\n        cut = 0\n    return text[:cut] + suffix\n\ndef title_case(text: str) -> str:\n    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS and i != 0:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)\n\ndef dedupe_spaces(text: str) -> str:\n    return \" \".join(text.split())\n"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```It appears that the `truncate` function still has an issue. Let's fix the `truncate` function to ensure it handles the exact fit case correctly.
+
+```tool
+{"name": "write_file", "args": {"path": "textkit.py", "content": "from typing import List\n\nSMALL_WORDS = {\"a\", \"an\", \"and\", \"the\", \"of\", \"in\", \"on\", \"or\", \"to\", \"at\", \"by\", \"for\"}\n\ndef word_wrap(text: str, width: int) -> List[str]:\n    words = text.split()\n    lines = []\n    current = []\n    current_len = 0\n    for word in words:\n        if not current:\n            current = [word]\n            current_len = len(word)\n        elif current_len + 1 + len(word) <= width:\n            current.append(word)\n            current_len += 1 + len(word)\n        else:\n            lines.append(\" \".join(current))\n            current = [word]\n            current_len = len(word)\n    if current:\n        lines.append(\" \".join(current))\n    return lines\n\ndef truncate(text: str, limit: int, suffix: str = \"...\") -> str:\n    if len(text) <= limit:\n        return text\n    cut = limit - len(suffix)\n    if cut < 0:\n        cut = 0\n    return text[:cut] + suffix\n\ndef title_case(text: str) -> str:\n    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS and i != 0:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)\n\ndef dedupe_spaces(text: str) -> str:\n    return \" \".join(text.split())\n"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests have passed. The `textkit.py` file has been successfully updated to fix the bugs.

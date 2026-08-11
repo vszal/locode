@@ -681,14 +681,27 @@ completion. **The repeat death is still the dominant ending.**
    narrow `old`, build 125 would be net HARMFUL. Not observed, not hypothetical
    either — the trade is measured. Watch it on any new case.
 
-0b-vii. **NEXT CANDIDATE, not yet pre-registered: re-phrase, do not remove.**
-   The sentence currently reads as unconditional permission to send a small
-   `old` because a rescue exists. Keep the rescue, state the preference for a
-   unique `old` FIRST, offer `occurrence` only as fallback. Must beat build 125
-   on exec-bugfix WITHOUT losing exec-ambig => two-case sweep, and the
-   pre-registration must say in advance what a mixed result means. Do NOT ship
-   on the reasoning alone; 5.74 is the record of what one-case generalising
-   costs. (ROADMAP 5.75)
+0b-vii. **UNIQUENESS-FIRST — build 126, b128 IN FLIGHT.** 5.74 found the
+   description CONTRADICTS ITSELF: it has always said "Keep `old` to the
+   SMALLEST unique snippet", and build 120 carries that while still aiming wide
+   18/24 on exec-bugfix. The b123 rescue sentence did not add the go-small
+   instruction — it removed the DOWNSIDE of obeying it, so "smallest" wins the
+   tie and the model drops the word "unique". Build 126 makes uniqueness the
+   binding constraint and adds one word, "still", to mark the rescue as a
+   fallback. Every word b126 credited is intact.
+   - `--base fa12194` (build 125 code), **exec-ambig AND exec-bugfix**, r24
+     each = 96 runs, ~5h. Log `$CLAUDE_JOB_DIR/tmp/ab128.log`, grader
+     `$CLAUDE_JOB_DIR/tmp/grade128.py` (written before the sweep; the decision
+     rule is CODED, so it cannot be softened after seeing numbers).
+   - **No source edits until it exits.**
+   - Decision rule, fixed in ROADMAP 5.76 in advance: exec-ambig fixed < 13/24
+     REJECTS outright, whatever exec-bugfix does — that result is a banked
+     asset and is not tradeable. Ship needs ambig >= 15/24 AND bugfix wide
+     >= 15/24 AND bugfix fixed not down by more than 1.
+   - If bugfix wide does NOT recover, the 5.74 licensing story is WRONG: record
+     it, stop tuning this sentence, go to lever 0c.
+   - Attribution between the two clauses is DEFERRED ON PURPOSE and said so in
+     advance. Establish the effect first; split it after, if it survives.
 
 0c. **POSITION VS REASONING — now INSTRUMENTED, and the first datum is in.**
    b122 could not test it because reordering the case destroys it. The

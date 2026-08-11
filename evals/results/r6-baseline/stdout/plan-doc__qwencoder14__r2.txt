@@ -1,0 +1,195 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+```
+
+```tool
+{"name": "read_file", "args": {"path": "DESIGN.md"}}
+``````tool
+{"name": "read_file", "args": {"path": "DESIGN.md"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[ ] Define the overall architecture of the task queue",
+    "[ ] Design the database schema",
+    "[ ] Implement the Queue class",
+    "[ ] Implement the register method",
+    "[ ] Implement the enqueue method",
+    "[ ] Implement the start and stop methods",
+    "[ ] Implement the stats method",
+    "[ ] Implement the dead_letters method",
+    "[ ] Implement the claiming mechanism",
+    "[ ] Implement the retry and backoff logic",
+    "[ ] Implement the crash recovery mechanism",
+    "[ ] Write unit tests for each component",
+    "[ ] Integrate all components into a working system",
+    "[ ] Write documentation for the library"
+]}}
+``````tool
+{"name": "write_file", "args": {"path": "PLAN.md", "content": "# Task Queue Implementation Plan\n\n## Milestone 1: Define the overall architecture\n\n- **Task Queue Overview**: Describe the core components and their interactions.\n- **Component Breakdown**: Identify the main classes and functions.\n- **Data Flow Diagram**: Create a simple diagram showing how data moves through the system.\n\n## Milestone 2: Design the database schema\n\n- **Schema Design**: Define the structure of the SQLite database.\n- **Indexes and Constraints**: Identify necessary indexes and constraints for performance and data integrity.\n\n## Milestone 3: Implement core functionality\n\n- **Queue Class**: Implement the main class with basic methods.\n- **Register Method**: Implement the method to register task handlers.\n- **Enqueue Method**: Implement the method to enqueue tasks.\n- **Start and Stop Methods**: Implement the methods to start and stop the worker pool.\n- **Stats Method**: Implement the method to retrieve task statistics.\n- **Dead Letters Method**: Implement the method to retrieve dead tasks.\n\n## Milestone 4: Implement advanced features\n\n- **Claiming Mechanism**: Implement the logic for claiming tasks by workers.\n- **Retry and Backoff Logic**: Implement the logic for retrying failed tasks with backoff.\n- **Crash Recovery Mechanism**: Implement the logic to handle task recovery after a crash.\n\n## Milestone 5: Testing and Documentation\n\n- **Unit Tests**: Write unit tests for each component.\n- **Integration Tests**: Write integration tests to ensure components work together.\n- **Documentation**: Write documentation for the library.\n\n## Milestone 6: Final Integration and Review\n\n- **Final Integration**: Integrate all components into a working system.\n- **Code Review**: Perform a code review to ensure quality and adherence to best practices.\n- **Final Testing**: Perform final testing to ensure the system meets all requirements.\n\n## Deliverables\n\n- **PLAN.md**: This implementation plan.\n- **taskq.py**: The main implementation file.\n- **tests/**: Directory containing unit and integration tests.\n- **docs/**: Directory containing documentation.\n\n## Next Steps\n\n1. Define the overall architecture of the task queue.\n2. Design the database schema.\n3. Implement the Queue class.\n4. Implement the register method.\n5. Implement the enqueue method.\n6. Implement the start and stop methods.\n7. Implement the stats method.\n8. Implement the dead_letters method.\n9. Implement the claiming mechanism.\n10. Implement the retry and backoff logic.\n11. Implement the crash recovery mechanism.\n12. Write unit tests for each component.\n13. Integrate all components into a working system.\n14. Write documentation for the library.\n"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[>] Define the overall architecture of the task queue",
+    "[ ] Design the database schema",
+    "[ ] Implement the Queue class",
+    "[ ] Implement the register method",
+    "[ ] Implement the enqueue method",
+    "[ ] Implement the start and stop methods",
+    "[ ] Implement the stats method",
+    "[ ] Implement the dead_letters method",
+    "[ ] Implement the claiming mechanism",
+    "[ ] Implement the retry and backoff logic",
+    "[ ] Implement the crash recovery mechanism",
+    "[ ] Write unit tests for each component",
+    "[ ] Integrate all components into a working system",
+    "[ ] Write documentation for the library"
+]}}
+```# Task Queue Implementation Plan
+
+## Milestone 1: Define the overall architecture
+
+### Task Queue Overview
+The task queue library, `taskq`, will allow a single application to enqueue background work and process it reliably. It will use SQLite for storage and support multiple worker threads within the same process. The library will provide methods for enqueuing tasks, registering task handlers, and managing worker threads.
+
+### Component Breakdown
+- **Queue Class**: Manages the task queue, including enqueuing tasks, starting/stopping workers, and retrieving statistics.
+- **Worker Threads**: Execute registered task handlers.
+- **Database Layer**: Handles interactions with the SQLite database to store and retrieve tasks.
+- **Error Handling**: Manages task retries and failures.
+- **Observability**: Provides methods to retrieve task statistics.
+
+### Data Flow Diagram
+```
+[Application] -> [Queue Class] -> [Database Layer] -> [Worker Threads] -> [Task Handlers]
+```
+
+1. **Application** enqueues tasks using the `Queue` class.
+2. **Queue Class** stores tasks in the database.
+3. **Worker Threads** claim tasks from the database and execute them using registered handlers.
+4. **Task Handlers** process the tasks and return results.
+5. **Queue Class** updates the database with the task status (success, failure, etc.).
+
+Next: Design the database schema. Do it now.```tool
+{"name": "write_file", "args": {"path": "ARCHITECTURE.md", "content": "# Task Queue Architecture\n\n## Overview\nThe task queue library, `taskq`, allows a single application to enqueue background work and process it reliably. It uses SQLite for storage and supports multiple worker threads within the same process. The library provides methods for enqueuing tasks, registering task handlers, and managing worker threads.\n\n## Components\n\n### Queue Class\n- Manages the task queue, including enqueuing tasks, starting/stopping workers, and retrieving statistics.\n\n### Worker Threads\n- Execute registered task handlers.\n\n### Database Layer\n- Handles interactions with the SQLite database to store and retrieve tasks.\n\n### Error Handling\n- Manages task retries and failures.\n\n### Observability\n- Provides methods to retrieve task statistics.\n\n## Data Flow Diagram\n```\n[Application] -> [Queue Class] -> [Database Layer] -> [Worker Threads] -> [Task Handlers]\n```\n\n1. **Application** enqueues tasks using the `Queue` class.\n2. **Queue Class** stores tasks in the database.\n3. **Worker Threads** claim tasks from the database and execute them using registered handlers.\n4. **Task Handlers** process the tasks and return results.\n5. **Queue Class** updates the database with the task status (success, failure, etc.).\n"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Define the overall architecture of the task queue",
+    "[ ] Design the database schema",
+    "[ ] Implement the Queue class",
+    "[ ] Implement the register method",
+    "[ ] Implement the enqueue method",
+    "[ ] Implement the start and stop methods",
+    "[ ] Implement the stats method",
+    "[ ] Implement the dead_letters method",
+    "[ ] Implement the claiming mechanism",
+    "[ ] Implement the retry and backoff logic",
+    "[ ] Implement the crash recovery mechanism",
+    "[ ] Write unit tests for each component",
+    "[ ] Integrate all components into a working system",
+    "[ ] Write documentation for the library"
+]}}
+```# Task Queue Database Schema Design
+
+## Schema Design
+The SQLite database will have one table, `tasks`, to store all task-related information.
+
+### Table: tasks
+- **id** (INTEGER PRIMARY KEY): Unique identifier for each task.
+- **name** (TEXT NOT NULL): Name of the task handler.
+- **payload** (TEXT NOT NULL): JSON-serializable payload for the task.
+- **state** (TEXT NOT NULL): Current state of the task (pending, running, done, dead).
+- **attempts** (INTEGER NOT NULL DEFAULT 0): Number of attempts made to execute the task.
+- **max_attempts** (INTEGER NOT NULL): Maximum number of attempts allowed for the task.
+- **run_at** (REAL NOT NULL): Unix timestamp when the task is eligible to run.
+- **claimed_until** (REAL): Unix timestamp when the task claim expires (NULL if not running).
+- **idempotency_key** (TEXT): Optional key to ensure idempotent enqueuing.
+- **last_error** (TEXT): Last error message if the task failed.
+- **created_at** (REAL NOT NULL): Unix timestamp when the task was created.
+
+## Indexes
+- **(state, run_at)**: For efficient selection of eligible tasks.
+- **idempotency_key** (partial UNIQUE): Ensures idempotent enqueuing by restricting the key to states pending and running.
+
+## Database Configuration
+- **WAL Mode**: Enable Write-Ahead Logging for better concurrency.
+- **busy_timeout**: Set a timeout to handle busy database errors gracefully.
+
+Next: Implement the Queue class. Do it now.```tool
+{"name": "write_file", "args": {"path": "SCHEMA.md", "content": "# Task Queue Database Schema\n\n## Table: tasks\n- **id** (INTEGER PRIMARY KEY): Unique identifier for each task.\n- **name** (TEXT NOT NULL): Name of the task handler.\n- **payload** (TEXT NOT NULL): JSON-serializable payload for the task.\n- **state** (TEXT NOT NULL): Current state of the task (pending, running, done, dead).\n- **attempts** (INTEGER NOT NULL DEFAULT 0): Number of attempts made to execute the task.\n- **max_attempts** (INTEGER NOT NULL): Maximum number of attempts allowed for the task.\n- **run_at** (REAL NOT NULL): Unix timestamp when the task is eligible to run.\n- **claimed_until** (REAL): Unix timestamp when the task claim expires (NULL if not running).\n- **idempotency_key** (TEXT): Optional key to ensure idempotent enqueuing.\n- **last_error** (TEXT): Last error message if the task failed.\n- **created_at** (REAL NOT NULL): Unix timestamp when the task was created.\n\n## Indexes\n- **(state, run_at)**: For efficient selection of eligible tasks.\n- **idempotency_key** (partial UNIQUE): Ensures idempotent enqueuing by restricting the key to states pending and running.\n\n## Database Configuration\n- **WAL Mode**: Enable Write-Ahead Logging for better concurrency.\n- **busy_timeout**: Set a timeout to handle busy database errors gracefully.\n"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Define the overall architecture of the task queue",
+    "[x] Design the database schema",
+    "[ ] Implement the Queue class",
+    "[ ] Implement the register method",
+    "[ ] Implement the enqueue method",
+    "[ ] Implement the start and stop methods",
+    "[ ] Implement the stats method",
+    "[ ] Implement the dead_letters method",
+    "[ ] Implement the claiming mechanism",
+    "[ ] Implement the retry and backoff logic",
+    "[ ] Implement the crash recovery mechanism",
+    "[ ] Write unit tests for each component",
+    "[ ] Integrate all components into a working system",
+    "[ ] Write documentation for the library"
+]}}
+``````tool
+{"name": "write_file", "args": {"path": "taskq.py", "content": "# taskq.py\n\nimport sqlite3\nimport time\nimport threading\nimport json\nimport random\n\nclass Queue:\n    def __init__(self, path, *, default_max_attempts=5):\n        self.path = path\n        self.default_max_attempts = default_max_attempts\n        self.db = sqlite3.connect(path, isolation_level='IMMEDIATE')\n        self.db.execute('PRAGMA journal_mode=WAL')\n        self.db.execute('PRAGMA busy_timeout=1000')\n        self.db.execute('''\n            CREATE TABLE IF NOT EXISTS tasks (\n                id INTEGER PRIMARY KEY,\n                name TEXT NOT NULL,\n                payload TEXT NOT NULL,\n                state TEXT NOT NULL DEFAULT 'pending',\n                attempts INTEGER NOT NULL DEFAULT 0,\n                max_attempts INTEGER NOT NULL,\n                run_at REAL NOT NULL,\n                claimed_until REAL,\n                idempotency_key TEXT,\n                last_error TEXT,\n                created_at REAL NOT NULL DEFAULT CURRENT_TIMESTAMP\n            )\n        ''')\n        self.db.execute('''\n            CREATE UNIQUE INDEX IF NOT EXISTS idx_idempotency_key\n            ON tasks(idempotency_key) WHERE state IN ('pending', 'running')\n        ''')\n        self.db.execute('''\n            CREATE INDEX IF NOT EXISTS idx_state_run_at\n            ON tasks(state, run_at)\n        ''')\n        self.db.commit()\n        self.handlers = {}\n        self.workers = []\n        self.running = False\n\n    def register(self, name, handler):\n        self.handlers[name] = handler\n\n    def enqueue(self, name, payload, *, run_at=None, key=None):\n        if run_at is None:\n            run_at = time.time()\n        payload_json = json.dumps(payload)\n        with self.db:\n            cursor = self.db.execute('''\n                INSERT INTO tasks (name, payload, max_attempts, run_at, idempotency_key)\n                VALUES (?, ?, ?, ?, ?)\n                ON CONFLICT(idempotency_key) DO UPDATE SET run_at = excluded.run_at\n                WHERE state IN ('pending', 'running')\n                RETURNING id\n            ''', (name, payload_json, self.default_max_attempts, run_at, key))\n            return cursor.fetchone()[0]\n\n    def start(self, workers=4):\n        if self.running:\n            raise RuntimeError('Queue is already running')\n        self.running = True\n        for _ in range(workers):\n            worker = threading.Thread(target=self.worker)\n            worker.start()\n            self.workers.append(worker)\n\n    def stop(self, timeout=None):\n        if not self.running:\n            raise RuntimeError('Queue is not running')\n        self.running = False\n        for worker in self.workers:\n            worker.join(timeout)\n        self.workers = []\n\n    def stats(self):\n        with self.db:\n            cursor = self.db.execute('''\n                SELECT state, COUNT(*) FROM tasks GROUP BY state\n            ''')\n            return dict(cursor.fetchall())\n\n    def dead_letters(self, limit=100):\n        with self.db:\n            cursor = self.db.execute('''\n                SELECT id, name, payload, last_error FROM tasks\n                WHERE state = 'dead'\n                ORDER BY created_at DESC\n                LIMIT ?\n            ''', (limit,))\n            return cursor.fetchall()\n\n    def worker(self):\n        while self.running:\n            with self.db:\n                cursor = self.db.execute('''\n                    SELECT id, name, payload FROM tasks\n                    WHERE state = 'pending' AND run_at <= ?\n                    ORDER BY id ASC\n                    LIMIT 1\n                ''', (time.time(),))\n                task = cursor.fetchone()\n                if task is None:\n                    time.sleep(0.1)\n                    continue\n                task_id, task_name, task_payload = task\n                self.db.execute('''\n                    UPDATE tasks SET state = 'running', claimed_until = ?, attempts = attempts + 1\n                    WHERE id = ? AND state = 'pending'\n                ''', (time.time() + 300, task_id))\n            try:\n                handler = self.handlers[task_name]\n                payload = json.loads(task_payload)\n                handler(payload)\n                with self.db:\n                    self.db.execute('''\n                        UPDATE tasks SET state = 'done'\n                        WHERE id = ?\n                    ''', (task_id,))\n            except Exception as e:\n                with self.db:\n                    self.db.execute('''\n                        UPDATE tasks SET state = 'pending', last_error = ?, run_at = ?\n                        WHERE id = ?\n                    ''', (str(e), time.time() + min(1 * 2 ** (attempts - 1), 300) * random.uniform(0.5, 1.5), task_id))\n\nif __name__ == '__main__':\n    # Example usage\n    def my_handler(payload):\n        print(f'Handling task with payload: {payload}')\n\n    queue = Queue('taskq.db')\n    queue.register('my_task', my_handler)\n    queue.enqueue('my_task', {'key': 'value'})\n    queue.start()\n    time.sleep(10)\n    queue.stop()\n"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Define the overall architecture of the task queue",
+    "[x] Design the database schema",
+    "[x] Implement the Queue class",
+    "[ ] Implement the register method",
+    "[ ] Implement the enqueue method",
+    "[ ] Implement the start and stop methods",
+    "[ ] Implement the stats method",
+    "[ ] Implement the dead_letters method",
+    "[ ] Implement the claiming mechanism",
+    "[ ] Implement the retry and backoff logic",
+    "[ ] Implement the crash recovery mechanism",
+    "[ ] Write unit tests for each component",
+    "[ ] Integrate all components into a working system",
+    "[ ] Write documentation for the library"
+]}}
+```The `register` method is already implemented in the `Queue` class as shown in the `taskq.py` file:
+
+```python
+def register(self, name, handler):
+    self.handlers[name] = handler
+```
+
+This method registers a task handler for a given task name. No further action is needed for this task.```tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Define the overall architecture of the task queue",
+    "[x] Design the database schema",
+    "[x] Implement the Queue class",
+    "[x] Implement the register method",
+    "[ ] Implement the enqueue method",
+    "[ ] Implement the start and stop methods",
+    "[ ] Implement the stats method",
+    "[ ] Implement the dead_letters method",
+    "[ ] Implement the claiming mechanism",
+    "[ ] Implement the retry and backoff logic",
+    "[ ] Implement the crash recovery mechanism",
+    "[ ] Write unit tests for each component",
+    "[ ] Integrate all components into a working system",
+    "[ ] Write documentation for the library"
+]}}
+```The `enqueue` method is already implemented in the `Queue` class as shown in the `taskq.py` file:
+
+```python
+def enqueue(self, name, payload, *, run_at=None, key=None):
+    if run_at is None:
+        run_at = time.time()
+    payload_json = json.dumps(payload)
+    with self.db:
+        cursor = self.db.execute('''
+            INSERT INTO tasks (name, payload, max_attempts, run_at, idempotency_key)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(idempotency_key) DO UPDATE SET run_at = excluded.run_at
+            WHERE state IN ('pending', 'running')
+            RETURNING id
+        ''', (name, payload_json, self.default_max_attempts, run_at, key))
+        return cursor.fetchone()[0]
+```
+
+This method enqueues a task with a given name, payload, run_at time, and idempotency key. No further action is needed for this task.

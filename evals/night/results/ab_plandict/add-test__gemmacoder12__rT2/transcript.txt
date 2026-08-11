@@ -1,0 +1,51 @@
+
+  ⚙ write_file primes.py
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab_plandict/add-test__gem…
+    --- primes.py
+    +++ primes.py
+    @@ -0,0 +1,7 @@
+    +def is_prime(n):
+    +    if n < 2:
+    +        return False
+    +    for i in range(2, int(n**0.5) + 1):
+    +        if n % i == 0:
+    +            return False
+    +    return True
+
+  ⚙ write_file test_primes.py
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab_plandict/add-test__gem…
+    --- test_primes.py
+    +++ test_primes.py
+    @@ -0,0 +1,10 @@
+    +import pytest
+    +from primes import is_prime
+    +
+    +@pytest.mark.parametrize('n', [2, 3, 5, 7, 11, 13, 17, 19])
+    +def test_is_prime_prime(n):
+    +    assert is_prime(n) is True
+    +
+    +@pytest.mark.parametrize('n', [0, 1, 4, 6, 8, 9, 10, 15, 21])
+    +def test_is_prime_not_prime(n):
+    +    assert is_prime(n) is False
+
+  ⚙ bash /Users/vszalvay/Code/locode/.venv/bin/python -m pytest test_primes.py -q
+    ✓ 17 passed in 0.01s  (+1 more lines)
+All tests passed.
+
+
+  ▤ plan 3/3 done
+    ☑ write primes.py
+    ☑ write test_primes.py
+    ☑ run pytest tests
+I've implemented `is_prime` in `primes.py` with the standard primality test (checking divisors up to √n) and added a suite of 17 parameterized tests in `test_primes.py` covering both prime and composite cases. All tests passed.
+
+```python
+# primes.py
+def is_prime(n):
+    if n < 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+```

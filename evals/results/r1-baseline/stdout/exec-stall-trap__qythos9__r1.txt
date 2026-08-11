@@ -1,0 +1,22 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__qythos9__r1-9txiwr7p/parser.py"}}
+```The bug is that the parser appends `current` whenever it sees a blank line, even if `current` is empty. This leads to two problems:
+
+1. The last record (if there's no trailing blank line) is never added.
+2. Extra blank lines at the end create empty records.
+
+I need to reorganize the control flow: only append a record when it has at least one field, and ensure the final record is added even if there's no trailing blank line.
+
+I'll replace the entire `parse_records` function with a corrected version that:
+- Tracks whether the current record has any fields.
+- Only appends when a blank line is encountered **and** the current record has fields.
+- After the loop, appends the final record if it has fields.
+- Strips trailing blank lines before processing to avoid empty records from them.
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-stall-trap__qythos9__r1-9txiwr7p/parser.py", "old": "def parse_records(text):\n    \"\"\"Parse `text` into a list of record dicts.\n\n    Format: `text` is a sequence of lines. Each non-blank line is a\n    \"key: value\" pair belonging to the current record -- the key is\n    everything before the first colon, the value is everything after,\n    both stripped of surrounding whitespace. One or more consecutive\n    blank lines separate one record from the next (multiple blank lines\n    in a row are equivalent to a single separator and never produce an\n    empty record on their own). A record with at least one field is\n    included in the result, in the order it was encountered, as a dict\n    of its fields. Leading/trailing blank lines in `text` do not produce\n    empty records. If `text` has no fields at all, an empty list is\n    returned.\n    \"\"\"\n    records = []\n    current = {}\n    for raw_line in text.splitlines():\n        line = raw_line.strip()\n        if line == \"\":\n            records.append(current)\n            current = {}\n        else:\n            key, _, value = line.partition(\":\")\n            current[key.strip()] = value.strip()\n    return records", "new": "def parse_records(text):\n    \"\"\"Parse `text` into a list of record dicts.\n\n    Format: `text` is a sequence of lines. Each non-blank line is a\n    \"key: value\" pair belonging to the current record -- the key is\n    everything before the first colon, the value is everything after,\n    both stripped of surrounding whitespace. One or more consecutive\n    blank lines separate one record from the next (multiple blank lines\n    in a row are equivalent to a single separator and never produce an\n    empty record on their own). A record with at least one field is\n    included in the result, in the order it was encountered, as a dict\n    of its fields. Leading/trailing blank lines in `text` do not produce\n    empty records. If `text` has no fields at all, an empty list is\n    returned.\n    \"\"\"\n    records = []\n    current = {}\n    has_fields = False\n    for raw_line in text.splitlines():\n        line = raw_line.strip()\n        if line == \"\":\n            if has_fields:\n                records.append(current)\n            current = {}\n            has_fields = False\n        else:\n            key, _, value = line.partition(\":\")\n            current[key.strip()] = value.strip()\n            has_fields = True\n    if has_fields:\n        records.append(current)\n    return records"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60}}
+```All 6 tests now pass. The fix was to track whether the current record has any fields, only append on blank lines when `has_fields` is true, and ensure the final record is added even if there's no trailing blank line.

@@ -1,0 +1,58 @@
+
+=== rep 1/5 ===
+  [C] syntax-fix      gemmacoder12  done=N  2it f0 n0 r0       answered
+  [C] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [C] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [C] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [T] syntax-fix      gemmacoder12  done=Y  8it f1 n0 r2       answered
+  [T] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [T] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [T] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+
+=== rep 2/5 ===
+  [C] syntax-fix      gemmacoder12  done=N  3it f0 n0 r0       answered
+  [C] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [C] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [C] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [T] syntax-fix      gemmacoder12  done=Y  8it f1 n0 r1       answered
+  [T] syntax-fix      qythos9       done=Y  5it f1 n0 r1       answered
+  [T] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [T] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+
+=== rep 3/5 ===
+  [C] syntax-fix      gemmacoder12  done=N  4it f3 n3 r1       the model kept submitting edit
+  [C] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [C] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [C] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [T] syntax-fix      gemmacoder12  done=N  5it f2 n2 r1       the model repeated the same to
+  [T] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [T] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [T] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+
+=== rep 4/5 ===
+  [C] syntax-fix      gemmacoder12  done=N  2it f0 n0 r0       answered
+  [C] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [C] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [C] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [T] syntax-fix      gemmacoder12  done=Y  7it f1 n0 r2       the model repeated the same to
+  [T] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [T] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [T] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+
+=== rep 5/5 ===
+  [C] syntax-fix      gemmacoder12  done=N  2it f0 n0 r0       answered
+  [C] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [C] logic-bug       gemmacoder12  done=Y  8it f1 n0 r1       answered
+  [C] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+  [T] syntax-fix      gemmacoder12  done=Y  8it f1 n0 r1       answered
+  [T] syntax-fix      qythos9       done=Y  4it f0 n0 r0       answered
+  [T] logic-bug       gemmacoder12  done=Y  5it f1 n0 r0       answered
+  [T] logic-bug       qythos9       done=Y  4it f0 n0 r0       answered
+
+================ A/B RESULT ================
+                 CONTROL      TREATMENT
+  runs                20            20
+  done                15            19
+  repeat-stops         0             2
+  total repeats        2             8
+  avg iters          4.0           5.1

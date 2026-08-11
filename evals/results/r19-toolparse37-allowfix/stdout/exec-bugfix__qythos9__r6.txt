@@ -1,0 +1,59 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60000}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-mpiz_8zw/textkit.py"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[ ] fix word_wrap exact-fit edge case", "[ ] fix truncate exact-limit edge case", "[ ] fix title_case first-word edge case", "[ ] run tests until all pass"]}}
+```Looking at the failures:
+
+1. **test_word_wrap_exact_fit_stays_on_one_line**: `word_wrap("abcd efgh", 9)` should return `["abcd efgh"]` but returns `["abcd", "efgh"]`. The issue is in line 25: `elif current_len + 1 + len(word) < width:`. When `current_len + 1 + len(word) == width`, the condition is false, so it goes to the else branch and wraps. But the docstring says "a line containing exactly `width` characters is allowed", so we should allow equality. The fix is to change `<` to `<=`.
+
+2. **test_truncate_shortens_and_appends_suffix_at_exact_limit**: `truncate("abcdefghij", 5)` should return `"ab..."` but returns `"abc..."`. Looking at line 48: `cut = limit - len(suffix) + 1`. For limit=5, suffix="...", len(suffix)=3, cut = 5 - 3 + 1 = 3. So it takes 3 characters. But the expected is 2 characters ("ab..."). The formula should be `cut = limit - len(suffix)`, not `+ 1`. Let me verify: if cut = 5 - 3 = 2, then text[:2] + "..." = "ab...". That matches. So the bug is the extra `+ 1`.
+
+3. **test_title_case_first_word_always_capitalized**: `title_case("a tale of two cities")` should return `"A Tale of Two Cities"` but returns `"a Tale of Two Cities"`. The issue is that "a" is in SMALL_WORDS, so it's lowercased. But the docstring says: "Words are separated by single spaces in the output." and the first word should always be capitalized. Looking at the implementation, it lowercases the word first (`lower = word.lower()`), then checks if it's in SMALL_WORDS. If it is, it appends `lower` (which is "a"). But the first word should be capitalized regardless. The fix should be to capitalize the first word even if it's in SMALL_WORDS. Let me check: for the first word, we should do `result.append(lower.capitalize())` regardless of SMALL_WORDS membership. So we need to track if it's the first word.
+
+Let me implement these fixes:
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-mpiz_8zw/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-mpiz_8zw/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-mpiz_8zw/textkit.py", "old": "    words = text.split()\n    result = []\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "new": "    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS and i > 0:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60000}}
+```All tests pass. Here's what I fixed in `textkit.py`:
+
+1. **`word_wrap`**: Changed the comparison from `< width` to `<= width` so that a line that exactly fits the width is allowed (the docstring explicitly says "a line containing exactly `width` characters is allowed").
+
+2. **`truncate`**: Removed the erroneous `+ 1` from the cut calculation. The formula should be `cut = limit - len(suffix)`, not `cut = limit - len(suffix) + 1`. The extra `+ 1` was causing one extra character to be included.
+
+3. **`title_case`**: Added an index check so that the first word is always capitalized, even if it's a small word like "a". The condition `lower in SMALL_WORDS and i > 0` ensures that only non-first words in SMALL_WORDS are left lowercase.
+
+All three bugs have been corrected and the test suite now passes.```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-mpiz_8zw/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-mpiz_8zw/textkit.py"}}
+```All three fixes have already been applied to `textkit.py`:
+
+1. **`word_wrap`**: Line 25 now uses `<= width` instead of `< width`, allowing exact-fit lines.
+2. **`truncate`**: Line 48 now uses `cut = limit - len(suffix)` without the erroneous `+ 1`.
+3. **`title_case`**: Lines 68-73 now use `enumerate` with an index check `i > 0` so the first word is always capitalized.
+
+I verified by reading the file that these changes are present. Let me run the tests to confirm everything passes.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60000}}
+```All tests pass. Let me update the plan to reflect completion.
+
+```tool
+{"name": "update_plan", "args": {"tasks": ["[x] fix word_wrap exact-fit edge case", "[x] fix truncate exact-limit edge case", "[x] fix title_case first-word edge case", "[x] run tests until all pass"]}}
+```All tests pass. Here's what I fixed in `textkit.py`:
+
+1. **`word_wrap`**: Changed the comparison from `< width` to `<= width` so that a line that exactly fits the width is allowed (the docstring explicitly says "a line containing exactly `width` characters is allowed").
+
+2. **`truncate`**: Removed the erroneous `+ 1` from the cut calculation. The formula should be `cut = limit - len(suffix)`, not `cut = limit - len(suffix) + 1`. The extra `+ 1` was causing one extra character to be included.
+
+3. **`title_case`**: Added an index check so that the first word is always capitalized, even if it's a small word like "a". The condition `lower in SMALL_WORDS and i > 0` ensures that only non-first words in SMALL_WORDS are left lowercase.
+
+All three bugs have been corrected and the test suite now passes.

@@ -1,0 +1,19 @@
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/b64-regress/locate-in-large__qythos9__r1/workdir/or…
+    ✓ 1	TAX_RATE = 0.1  (+27 more lines)
+
+  ⚙ edit_file /Users/vszalvay/Code/locode/evals/night/results/b64-regress/locate-in-large__qythos9__r1/workdir/or…
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+8 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/b64-regress/locate-in-large__qythos9__r1/workdir/orders.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/b64-regress/locate-in-large__qythos9__r1/workdir/orders.py
+    @@ -12,5 +12,5 @@
+     def apply_discount(amount, pct):
+         # pct is a percentage off, e.g. 20 means 20% off
+    -    return round(amount + amount * (pct / 100), 2)
+    +    return round(amount - amount * (pct / 100), 2)
+     
+     def shipping(amount):
+
+  ⚙ bash python3 -c "import orders; print(orders.apply_discount(200, 25))"
+    ✓ 150.0
+The bug is fixed. The `apply_discount` function now correctly subtracts the discount percentage from the amount. Verification: `orders.apply_discount(200, 25)` returns `150.0` as expected.

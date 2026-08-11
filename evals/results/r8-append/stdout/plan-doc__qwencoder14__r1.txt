@@ -1,0 +1,37 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+```
+
+```tool
+{"name": "read_file", "args": {"path": "DESIGN.md"}}
+``````tool
+{"name": "read_file", "args": {"path": "DESIGN.md"}}
+``````tool
+{"name": "write_file", "args": {"path": "PLAN.md", "content": "# Implementation Plan for taskq\n\n## Milestone 1: Initial Setup\n\n- [ ] Create a new Python file `taskq.py`.\n- [ ] Define the `Queue` class with the public API methods.\n- [ ] Initialize the SQLite database with the `tasks` table.\n- [ ] Implement the `register` method to bind task names to handlers.\n- [ ] Implement the `enqueue` method to insert tasks into the database.\n- [ ] Implement the `start` method to initialize the worker pool.\n- [ ] Implement the `stop` method to drain the worker pool.\n- [ ] Implement the `stats` method to return task counts by state.\n- [ ] Implement the `dead_letters` method to return dead tasks.\n\n## Milestone 2: Task Claiming and Execution\n\n- [ ] Implement the `claim` method to atomically select and update a pending task.\n- [ ] Implement the worker thread logic to run claimed tasks.\n- [ ] Implement the `Permanent` exception class.\n- [ ] Implement the retry logic with exponential backoff and jitter.\n- [ ] Implement the reaper thread to handle expired claims.\n\n## Milestone 3: Testing and Finalization\n\n- [ ] Write unit tests for all implemented methods.\n- [ ] Ensure all tasks are idempotent.\n- [ ] Finalize the implementation with any necessary optimizations.\n- [ ] Write documentation for the `taskq` library.\n\n## Smallest Shippable Milestone\n\nThe smallest shippable milestone is Milestone 1, which includes setting up the basic structure of the `taskq` library and implementing the initial methods."}}
+```The implementation plan has been written to `PLAN.md`. Here is a summary of the tasks:
+
+### Milestone 1: Initial Setup
+1. Create a new Python file `taskq.py`.
+2. Define the `Queue` class with the public API methods.
+3. Initialize the SQLite database with the `tasks` table.
+4. Implement the `register` method to bind task names to handlers.
+5. Implement the `enqueue` method to insert tasks into the database.
+6. Implement the `start` method to initialize the worker pool.
+7. Implement the `stop` method to drain the worker pool.
+8. Implement the `stats` method to return task counts by state.
+9. Implement the `dead_letters` method to return dead tasks.
+
+### Milestone 2: Task Claiming and Execution
+1. Implement the `claim` method to atomically select and update a pending task.
+2. Implement the worker thread logic to run claimed tasks.
+3. Implement the `Permanent` exception class.
+4. Implement the retry logic with exponential backoff and jitter.
+5. Implement the reaper thread to handle expired claims.
+
+### Milestone 3: Testing and Finalization
+1. Write unit tests for all implemented methods.
+2. Ensure all tasks are idempotent.
+3. Finalize the implementation with any necessary optimizations.
+4. Write documentation for the `taskq` library.
+
+The smallest shippable milestone is Milestone 1, which includes setting up the basic structure of the `taskq` library and implementing the initial methods.

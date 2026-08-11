@@ -1,0 +1,55 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-movvgyk5/textkit.py"}}
+}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"tasks": "[ ] run tests to verify all pass"}}}}
+}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-movvgyk5/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-movvgyk5/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r6-movvgyk5/textkit.py", "old": "    words = text.split()\n    result = []\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "new": "    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower.capitalize() if i == 0 else lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)"}}
+}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+```All tests pass now.```tool
+{"name": "update_plan", "args": {"tasks": {"tasks": "[x] run tests to verify all pass"}}}}
+}
+```All tests pass. The three bugs in `textkit.py` were:
+
+1. **`word_wrap`** – the condition for adding a word to the current line used `< width` instead of `<= width`. This caused a line that would exactly fit the width to be split prematurely. Changed:
+   ```python
+   elif current_len + 1 + len(word) < width:
+   ```
+   to:
+   ```python
+   elif current_len + 1 + len(word) <= width:
+   ```
+
+2. **`truncate`** – the cut point was computed as `limit - len(suffix) + 1`, which made the result one character too long. The correct formula is simply `limit - len(suffix)`. Changed:
+   ```python
+   cut = limit - len(suffix) + 1
+   ```
+   to:
+   ```python
+   cut = limit - len(suffix)
+   ```
+
+3. **`title_case`** – small words (like "a") were lowercased even when they appeared as the first word of the sentence. The spec requires the first word to always be capitalized. Added an index check:
+   ```python
+   for i, word in enumerate(words):
+       lower = word.lower()
+       if lower in SMALL_WORDS:
+           result.append(lower.capitalize() if i == 0 else lower)
+       else:
+           result.append(lower.capitalize())
+   ```
+
+With these fixes, all 13 tests in `test_textkit.py` now pass.

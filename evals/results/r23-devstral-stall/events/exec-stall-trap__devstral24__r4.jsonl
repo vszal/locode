@@ -1,0 +1,11 @@
+{"seq": 1, "t": 0.0, "phase": "turn_start", "model": "devstral24", "prompt_chars": 277}
+{"seq": 2, "t": 0.0, "phase": "busy_start", "text": "loading devstral24…"}
+{"seq": 3, "t": 0.048, "phase": "busy_stop"}
+{"seq": 4, "t": 0.048, "phase": "iteration", "n": 0, "elapsed": 0.0}
+{"seq": 5, "t": 0.048, "phase": "assistant_start"}
+{"seq": 6, "t": 11.387, "phase": "assistant_end", "chars": 122}
+{"seq": 7, "t": 11.387, "phase": "nudge", "reason": "announced intent, no action"}
+{"seq": 8, "t": 11.387, "phase": "iteration", "n": 1, "elapsed": 11.34}
+{"seq": 9, "t": 11.387, "phase": "assistant_start"}
+{"seq": 10, "t": 14.3, "phase": "assistant_end", "chars": 83}
+{"seq": 11, "t": 14.3, "phase": "turn_end", "result": "I'll run the tests to see which ones are failing. Let's start by running the tests."}

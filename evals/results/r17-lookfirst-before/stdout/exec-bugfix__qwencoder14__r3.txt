@@ -1,0 +1,9 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[>] Fix the word_wrap function to handle exact fit cases correctly.",
+    "[ ] Fix the truncate function to append the correct suffix.",
+    "[ ] Fix the title_case function to capitalize the first word."
+]}
+```

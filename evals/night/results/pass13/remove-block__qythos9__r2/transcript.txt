@@ -1,0 +1,31 @@
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/pass13/remove-block__qythos9__r2/workdir/app.py
+    ✓ 1	def main():  (+11 more lines)
+
+  ⚙ edit_file /Users/vszalvay/Code/locode/evals/night/results/pass13/remove-block__qythos9__r2/workdir/app.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+7 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/pass13/remove-block__qythos9__r2/workdir/app.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/pass13/remove-block__qythos9__r2/workdir/app.py
+    @@ -1,5 +1,5 @@
+     def main():
+         setup()
+    -    print('DEBUG: entering main')
+    +
+         result = compute()
+         print('DEBUG: computed', result)
+
+  ⚙ edit_file /Users/vszalvay/Code/locode/evals/night/results/pass13/remove-block__qythos9__r2/workdir/app.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+8 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/pass13/remove-block__qythos9__r2/workdir/app.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/pass13/remove-block__qythos9__r2/workdir/app.py
+    @@ -3,5 +3,5 @@
+     
+         result = compute()
+    -    print('DEBUG: computed', result)
+    +
+         return result
+     
+
+  ⚙ bash python3 -c "import app; print(app.main())"
+    ✓ 42
+Both DEBUG print lines have been removed. The function still works correctly, returning 42.

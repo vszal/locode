@@ -1,0 +1,41 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[ ] Fix word wrap exact fit", "[ ] Fix truncate suffix length", "[ ] Fix title case first word", "[ ] Verify all tests pass"]}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "elif current_len + 1 + len(word) < width:", "new": "elif current_len + 1 + len(word) <= width:", "replace_all": true}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word wrap exact fit", "[ ] Fix truncate suffix length", "[ ] Fix title case first word", "[ ] Verify all tests pass"]}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)", "replace_all": true}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word wrap exact fit", "[x] Fix truncate suffix length", "[ ] Fix title case first word", "[ ] Verify all tests pass"]}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "if lower in SMALL_WORDS:", "new": "if lower in SMALL_WORDS and i > 0:", "replace_all": true}}
+```The `title_case` implementation is broken because `i` is undefined and the logic for the first word is missing. I will fix it by tracking the word index and always capitalizing the first word.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "    result = []\n    for word in words:", "new": "    result = []\n    for i, word in enumerate(words):", "replace_all": true}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word wrap exact fit", "[x] Fix truncate suffix length", "[x] Fix title case first word", "[ ] Verify all tests pass"]}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests now pass.
+
+- `word_wrap`: Changed the comparison from `<` to `<=`` so that a text whose length equals `width` is not split.
+- `truncate`: Removed the `+ 1` from the cut calculation so the total length equals `limit` exactly.
+- `title_case`: Added a word index `i` and a condition so the first word is always capitalized, while subsequent small words remain lowercase.
+
+```tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word wrap exact fit", "[x] Fix truncate suffix length", "[x] Fix title case first word", "[x] Verify all tests pass"]}}
+```All tests now pass.
+
+- `word_wrap`: Changed the comparison from `<` to `<=`` so that a text whose length equals `width` is not split.
+- `truncate`: Removed the `+ 1` from the cut calculation so the total length equals `limit` exactly.
+- `title_case`: Added a word index `i` and a condition so the first word is always capitalized, while subsequent small words remain lowercase.
+
+```tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word wrap exact fit", "[x] Fix truncate suffix length", "[x] Fix title case first word", "[x] Verify all tests pass"]}}
+```

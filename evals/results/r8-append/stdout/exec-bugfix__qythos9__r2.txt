@@ -1,0 +1,80 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r2-fl97b_w0/textkit.py"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"[ ] Run tests to see failures": "done", "[>] Fix word_wrap exact-fit edge case": "needs fix: when text length equals width, should stay on one line", "[ ] Fix truncate exact-limit edge case": "needs fix: when text length equals limit, should return unchanged", "[ ] Fix title_case first-word edge case": "needs fix: first word should always be capitalized even if it's a small word"}}}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[x] Run tests to see failures\n[>] Fix word_wrap exact-fit edge case\n[ ] Fix truncate exact-limit edge case\n[ ] Fix title_case first-word edge case"}}
+```Looking at the test failures:
+
+1. **`test_word_wrap_exact_fit_stays_on_one_line`**: When text is exactly `width` characters, it should stay on one line. Currently it wraps.
+2. **`test_truncate_shortens_and_appends_suffix_at_exact_limit`**: When text is exactly `limit` characters, it should return unchanged. Currently it truncates.
+3. **`test_title_case_first_word_always_capitalized`**: First word should always be capitalized even if it's a small word. Currently it's lowercased.
+
+Let me fix each issue:
+
+**Fix 1: `word_wrap` - exact fit should stay on one line**
+
+The issue is in the condition on line 25:
+```python
+elif current_len + 1 + len(word) < width:
+```
+
+This uses `<` which means it will wrap when the line would be exactly `width`. It should use `<=` to allow exact fit.
+
+**Fix 2: `truncate` - exact limit should return unchanged**
+
+The issue is in the logic. When `len(text) <= limit`, it returns unchanged (line 46-47). But the test expects that when `len(text) == limit`, it should return unchanged. Let me check the current code:
+
+```python
+if len(text) <= limit:
+    return text
+```
+
+This should already handle the exact limit case. Let me re-read the test:
+
+```python
+def test_truncate_shortens_and_appends_suffix_at_exact_limit():
+    result = truncate("abcdefghij", 5)
+    assert result == "ab..."
+```
+
+The input is 10 characters, limit is 5. So it should truncate. The expected output is "ab..." which is 5 characters (2 + 3). Let me check the current implementation:
+
+```python
+cut = limit - len(suffix) + 1
+if cut < 0:
+    cut = 0
+return text[:cut] + suffix
+```
+
+With `limit=5`, `suffix="..."` (length 3):
+- `cut = 5 - 3 + 1 = 3`
+- So it returns `text[:3] + "..."` = "abc..."
+
+But the test expects "ab..." (length 5). So the issue is that the current implementation leaves one extra character. The formula should be `cut = limit - len(suffix)` (without the `+1`).
+
+**Fix 3: `title_case` - first word should always be capitalized**
+
+The issue is that the function lowercases small words even when they're the first word. The fix is to check if it's the first word and capitalize it regardless.
+
+Let me implement these fixes:
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r2-fl97b_w0/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r2-fl97b_w0/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r2-fl97b_w0/textkit.py", "old": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())", "new": "    for i, word in enumerate(words):\n        lower = word.lower()\n        if i == 0:\n            result.append(lower.capitalize())\n        elif lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[x] Run tests to see failures\n[x] Fix word_wrap exact-fit edge case\n[x] Fix truncate exact-limit edge case\n[x] Fix title_case first-word edge case"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60}}
+```All 13 tests pass now. The three bugs were:
+
+1. **`word_wrap`**: The condition used `< width` instead of `<= width`, causing exact-fit text to wrap. Fixed by changing `<` to `<=`.
+
+2. **`truncate`**: The formula `limit - len(suffix) + 1` left one extra character. Fixed by removing the `+ 1`, making it `limit - len(suffix)`.
+
+3. **`title_case`**: Small words were lowercased even when they were the first word. Fixed by checking the index and capitalizing the first word regardless of whether it's a small word.

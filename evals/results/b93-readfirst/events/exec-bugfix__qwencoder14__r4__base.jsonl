@@ -1,0 +1,21 @@
+{"seq": 1, "t": 0.0, "phase": "turn_start", "model": "qwencoder14", "prompt_chars": 284}
+{"seq": 2, "t": 0.0, "phase": "busy_start", "text": "loading qwencoder14…"}
+{"seq": 3, "t": 0.07, "phase": "busy_stop"}
+{"seq": 4, "t": 0.07, "phase": "iteration", "n": 0, "elapsed": 0.0}
+{"seq": 5, "t": 0.07, "phase": "assistant_start"}
+{"seq": 6, "t": 20.208, "phase": "assistant_end", "chars": 69}
+{"seq": 7, "t": 20.208, "phase": "run", "name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+{"seq": 8, "t": 20.635, "phase": "result", "name": "bash", "error": true, "content": "[exit 1]\nF....F...F...                                                            [100%]\n=================================== FAILURES ===================================\n__________________ test_word_wrap_exact_fit_stays_on_one_line __________________\n\n    def test_word_wrap_exact_fit_stays_on_one_line():\n        # \"abcd efgh\" is exactly 9 characters -> should NOT wrap at width 9.\n>       assert word_wrap(\"abcd efgh\", 9) == [\"abcd efgh\"]\nE       AssertionError: assert ['abcd', 'efgh'] == ['abcd efgh']\nE         \nE         At index 0 diff: 'abcd' != 'abcd efgh'\nE         Left contains one more item: 'efgh'\nE         Use -v to get more diff\n\n/Users/vszalvay/Code/locode/evals/cases/exec-bugfix/seed/test_textkit.py:9: AssertionError\n___________ test_truncate_shortens_and_appends_suffix_at_exact_limit ___________\n\n    def test_truncate_shortens_and_appends_suffix_at_exact_limit():\n        result = truncate(\"abcdefghij\", 5)\n>       assert result == \"ab...\"\nE       AssertionError: assert 'abc...' == 'ab...'\nE         \nE         - ab...\nE         + abc...\nE         ?   +\n\n/Users/vszalvay/Code/locode/evals/cases/exec-bugfix/seed/test_textkit.py:35: AssertionError\n________________ test_title_case_first_word_always_capitalized _________________\n\n    def test_title_case_first_word_always_capitalized():\n>       assert title_case(\"a tale of two cities\") == \"A Tale of Two Cities\"\nE       AssertionError: assert 'a Tale of Two Cities' == 'A Tale of Two Cities'\nE         \nE         - A Tale of Two Cities\nE         ? ^\nE         + a Tale of Two Cities\nE         ? ^\n\n/Users/vszalvay/Code/locode/evals/cases/exec-bugfix/seed/test_textkit.py:55: AssertionError\n=========================== short test summary info ============================\nFAILED test_textkit.py::test_word_wrap_exact_fit_stays_on_one_line - Assertio...\nFAILED test_textkit.py::test_truncate_shortens_and_appends_suffix_at_exact_limit\nFAILED test_textkit.py::test_title_case_first_word_always_capitalized - Asser...\n3 failed, 1…<clipped 17 chars>", "seconds": 0.427}
+{"seq": 9, "t": 20.635, "phase": "iteration", "n": 1, "elapsed": 20.57}
+{"seq": 10, "t": 20.635, "phase": "assistant_start"}
+{"seq": 11, "t": 33.32, "phase": "assistant_end", "chars": 983}
+{"seq": 12, "t": 33.32, "phase": "nudge", "reason": "tool object missing a name"}
+{"seq": 13, "t": 33.32, "phase": "iteration", "n": 2, "elapsed": 33.25}
+{"seq": 14, "t": 33.32, "phase": "assistant_start"}
+{"seq": 15, "t": 43.641, "phase": "assistant_end", "chars": 983}
+{"seq": 16, "t": 43.641, "phase": "nudge", "reason": "tool object missing a name"}
+{"seq": 17, "t": 43.641, "phase": "iteration", "n": 3, "elapsed": 43.57}
+{"seq": 18, "t": 43.641, "phase": "assistant_start"}
+{"seq": 19, "t": 54.02, "phase": "assistant_end", "chars": 983}
+{"seq": 20, "t": 54.02, "phase": "stopped", "reason": "the model kept emitting unparseable tool calls"}
+{"seq": 21, "t": 54.02, "phase": "turn_end", "result": "⏹ stopped (the model kept emitting unparseable tool calls)"}

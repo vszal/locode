@@ -1,0 +1,61 @@
+
+  ⚙ write_file primes.py
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test_…
+    --- primes.py
+    +++ primes.py
+    @@ -0,0 +1,7 @@
+    +def is_prime(n):
+    +    if n < 2:
+    +        return False
+    +    for i in range(2, int(n**0.5) + 1):
+    +        if n % i == 0:
+    +            return False
+    +    return True
+
+  ⚙ write_file test_primes.py
+    ✗ ⚠ warning: test_primes.py has a SyntaxError at line 338…  (+3 more lines)
+    --- test_primes.py
+    +++ test_primes.py
+    @@ -0,0 +1,338 @@
+    +import pytest
+    +from primes import is_prime
+    +
+    +def test_prime_values():
+    +    assert is_prime(2) is True
+    +    assert is_prime(3) is True
+    +    assert is_prime(5) is True
+    +    assert is_prime(7) is True
+    +    assert is_prime(11) is True
+    +    assert is_prime(13) is True
+    +    assert is_prime(17) is True
+    +    assert is_prime(19) is True
+    +    assert is_prime(23) is True
+    +    assert is_prime(29) is True
+    +    assert is_prime(31) is True
+    +    assert is_prime(37) is True
+    +    assert is_prime(41) is True
+    +    assert is_prime(43) is True
+    +    assert is_prime(47) is True
+    +    assert is_prime(53) is True
+    +    assert is_prime(59) is True
+    +    assert is_prime(61) is True
+    +    assert is_prime(67) is True
+    +    assert is_prime(71) is True
+    +    assert is_prime(73) is True
+    +    assert is_prime(79) is True
+    +    assert is_prime(83) is True
+    +    assert is_prime(89) is True
+    +    assert is_prime(97) is True
+    +    assert is_prime(101) is True
+    +    assert is_prime(103) is True
+    +    assert is_prime(107) is True
+    +    assert is_prime(109) is True
+    +    assert is_prime(113) is True
+    +    assert is_prime(127) is True
+    +    assert is_prime(131) is True
+    +    assert is_prime(137) is True
+    … (diff truncated)
+
+    ⟳ ⏹ budget: the turn's wallclock ran out while generating (~11,518 chars into this reply) —…
+
+⏹ stopped (budget: the turn's wallclock ran out while generating (~11,518 chars into this reply) — landed its partial file first)

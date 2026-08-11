@@ -1,0 +1,47 @@
+
+  ⚙ write_file primes.py
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test_…
+    --- primes.py
+    +++ primes.py
+    @@ -0,0 +1,7 @@
+    +def is_prime(n):
+    +    if n < 2:
+    +        return False
+    +    for i in range(2, int(n**0.5) + 1):
+    +        if n % i == 0:
+    +            return False
+    +    return True
+
+  ⚙ write_file test_primes.py
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test_…
+    --- test_primes.py
+    +++ test_primes.py
+    @@ -0,0 +1,10 @@
+    +import pytest
+    +from primes import is_prime
+    +
+    +@pytest.mark.parametrize('n', [2, 3, 5, 7, 11, 13, 17, 19, 23])
+    +def test_is_prime_true(n):
+    +    assert is_prime(n) is True
+    +
+    +@pytest.mark.parametrize('n', [0, 1, 4, 6, 8, 9, 10, 12, 14, 15, 16, 18, 20, 21, 22])
+    +def test_is_prime_false(n):
+    +    assert is_prime(n) is False
+
+  ⚙ bash /Users/vszalvay/Code/locode/.venv/bin/python -m pytest test_primes.py -q
+    ✓ 24 passed in 0.01s  (+1 more lines)
+All tests passed.
+
+
+  ▤ plan 3/3 done
+    ☑ Create primes.py with is_prime
+    ☑ Create test_primes.py with pytest tests
+    ☑ Run tests with pytest
+All tasks are complete: `primes.py` implements `is_prime`, `test_primes.py` provides comprehensive coverage, and all tests passed.
+
+
+  ▤ plan 3/3 done
+    ☑ Create primes.py with is_prime
+    ☑ Create test_primes.py with pytest tests
+    ☑ Run tests with pytest
+All tasks are complete: `primes.py` implements `is_prime`, `test_primes.py` provides comprehensive coverage, and all tests passed.

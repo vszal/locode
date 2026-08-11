@@ -1,0 +1,27 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r4-8g903od4/textkit.py"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"tasks": "[x] Run tests to see failures", "[x] Read textkit.py", "[>] Fix word_wrap exact-fit edge case", "[ ] Fix truncate exact-limit edge case", "[ ] Fix title_case first-word edge case", "[ ] Re-run tests until all pass"]}}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r4-8g903od4/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r4-8g903od4/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r4-8g903od4/textkit.py", "old": "        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())", "new": "        if lower in SMALL_WORDS and not is_first:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r4-8g903od4/textkit.py", "old": "def title_case(text):\n    \"\"\"Capitalize each word, lowercasing common small words.\n\n    Every word is capitalized (first letter upper, rest lower) EXCEPT\n    words in `SMALL_WORDS`, which are left lowercase -- unless that word\n    is the first word of the text, which is always capitalized regardless\n    of `SMALL_WORDS` membership. Words are separated by single spaces in\n    the output.\n    \"\"\"\n    words = text.split()\n    result = []\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "new": "def title_case(text):\n    \"\"\"Capitalize each word, lowercasing common small words.\n\n    Every word is capitalized (first letter upper, rest lower) EXCEPT\n    words in `SMALL_WORDS`, which are left lowercase -- unless that word\n    is the first word of the text, which is always capitalized regardless\n    of `SMALL_WORDS` membership. Words are separated by single spaces in\n    the output.\n    \"\"\"\n    words = text.split()\n    is_first = True\n    result = []\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS and not is_first:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n        is_first = False\n    return \" \".join(result)"}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r4-8g903od4/textkit.py", "offset": 57, "limit": 20}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r4-8g903od4/textkit.py", "old": "    words = text.split()\n    result = []\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS and not is_first:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "new": "    words = text.split()\n    is_first = True\n    result = []\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS and not is_first:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n        is_first = False\n    return \" \".join(result)"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+```All tests pass.```tool
+{"name": "update_plan", "args": {"tasks": {"tasks": "[x] Run tests to see failures", "[x] Fix word_wrap exact-fit edge case", "[x] Fix truncate exact-limit edge case", "[x] Fix title_case first-word edge case", "[x] Re-run tests until all pass"]}}}
+```All tests pass.```tool
+{"name": "update_plan", "args": {"tasks": {"tasks": "[x] Run tests to see failures", "[x] Fix word_wrap exact-fit edge case", "[x] Fix truncate exact-limit edge case", "[x] Fix title_case first-word edge case", "[x] Re-run tests until all pass"]}}}
+```All tests pass.```tool
+{"name": "update_plan", "args": {"tasks": {"tasks": "[x] Run tests to see failures", "[x] Fix word_wrap exact-fit edge case", "[x] Fix truncate exact-limit edge case", "[x] Fix title_case first-word edge case", "[x] Re-run tests until all pass"]}}}
+```All tests pass.

@@ -1,0 +1,18 @@
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/ab_parsenote/indent-bug__qythos9__rT2/workdir/io_ut…
+    ✓ 1	def read_all(path):  (+3 more lines)
+
+  ⚙ replace_lines path='/Users/vszalvay/Code/locode/evals/night/results/ab_parsenote/indent-bug__qythos9__rT2/workdir…
+    ✓ replaced lines 2–4 in /Users/vszalvay/Code/locode/evals…  (+7 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/ab_parsenote/indent-bug__qythos9__rT2/workdir/io_util.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/ab_parsenote/indent-bug__qythos9__rT2/workdir/io_util.py
+    @@ -1,4 +1,4 @@
+     def read_all(path):
+         with open(path) as f:
+    -data = f.read()
+    +        data = f.read()
+         return data
+
+  ⚙ bash python3 -m py_compile io_util.py
+    ✓ (exit 0 — command succeeded, no output)
+Fixed the indentation in `io_util.py` and verified it compiles cleanly with `python3 -m py_compile io_util.py`.

@@ -1,0 +1,36 @@
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__qythos9__r1/workdir/io_util.py
+    ✓ 1	def read_all(path):  (+3 more lines)
+
+  ⚙ replace_lines path='/Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__qythos9__r1/workdir/io_uti…
+    ✗ ⚠ warning: io_util.py has a SyntaxError at line 3: expe…  (+10 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__qythos9__r1/workdir/io_util.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__qythos9__r1/workdir/io_util.py
+    @@ -1,4 +1,5 @@
+     def read_all(path):
+         with open(path) as f:
+    -data = f.read()
+    +    data = f.read()
+    +
+         return data
+
+  ⚙ replace_lines path='/Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__qythos9__r1/workdir/io_uti…
+    ✓ replaced lines 3–3 in /Users/vszalvay/Code/locode/evals…  (+8 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__qythos9__r1/workdir/io_util.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__qythos9__r1/workdir/io_util.py
+    @@ -1,5 +1,6 @@
+     def read_all(path):
+         with open(path) as f:
+    -    data = f.read()
+    +        data = f.read()
+    +
+     
+         return data
+
+  ⚙ bash python3 -m py_compile /Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__qythos9__r…
+    ✓ (exit 0 — command succeeded, no output)
+The indentation is now correct. The file compiles cleanly:
+
+```
+$ python3 -m py_compile io_util.py
+```

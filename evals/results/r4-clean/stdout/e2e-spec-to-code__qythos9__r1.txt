@@ -1,0 +1,114 @@
+```tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qythos9__r1-oatsituu/SPEC.md"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"task1": "[>] Write DESIGN.md — the approach, the public API, the precedence rules, the coercion rules, and how errors are reported."}}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[>] Write DESIGN.md — the approach, the public API, the precedence rules, the coercion rules, and how errors are reported."]}
+``````markdown
+# DESIGN.md — envcfg configuration loader
+
+## Overview
+
+`envcfg` assembles a single configuration dictionary from three layers:
+1. **Defaults** – a plain dict supplied by the caller.
+2. **TOML file** – parsed with the standard library `tomllib`.
+3. **Environment variables** – read under a caller-chosen prefix.
+
+Layers are merged key-by-key, with later layers overriding earlier ones. Missing
+TOML files are silently ignored; missing environment keys are errors.
+
+## Public API
+
+```python
+class EnvCfgError(Exception):
+    """Raised when a configuration value cannot be coerced or an env key has
+    no default."""
+    pass
+
+def load(
+    defaults: dict,
+    toml_path: str | None = None,
+    env_prefix: str = "APP",
+    env: dict[str, str] | None = None,
+) -> dict:
+    """
+    Merge defaults, optional TOML, and environment variables.
+
+    Parameters
+    ----------
+    defaults : dict
+        Base configuration.
+    toml_path : str | None
+        Path to a TOML file. If None or missing, that layer is skipped.
+    env_prefix : str
+        Prefix for environment variables. Nested keys are joined with "__" and
+        uppercased. Example: ``APP__SERVER__PORT`` maps to ``defaults["server"]["port"]``.
+    env : dict[str, str] | None
+        Mapping of environment variable names to strings. If None, ``os.environ``
+        is used.
+
+    Returns
+    -------
+    dict
+        The merged configuration.
+
+    Raises
+    ------
+    EnvCfgError
+        If any environment variable cannot be coerced to the expected type, or
+        if an environment variable is present but has no corresponding default.
+    """
+```
+
+## Precedence Rules
+
+- **Defaults** are the floor. Every key that appears in `defaults` is present in
+  the final result.
+- **TOML** overrides defaults for any matching key path.
+- **Environment** overrides both defaults and TOML for any matching key path.
+- If a key path exists in the environment but not in `defaults`, raise `EnvCfgError`.
+- If a key path exists in `defaults` but not in the environment, keep the default.
+- If a key path exists in `defaults` and the environment, coerce the env value to
+  the type of the default and use it; otherwise raise `EnvCfgError`.
+
+## Coercion Rules
+
+Environment values are strings and must be coerced to the type of the default:
+
+| Target type | Accepted strings (case‑insensitive) |
+|-------------|--------------------------------------|
+| `int`       | any valid integer literal (e.g. `"42"`, `"-7"`) |
+| `float`     | any valid float literal (e.g. `"3.14"`, `"-0.5"`) |
+| `bool`      | `"true"`, `"false"`, `"1"`, `"0"`, `"yes"`, `"no"` |
+| `str`       | any non‑empty string (the value is used as‑is) |
+
+Coercion is strict: if the string cannot be parsed as the target type, raise
+`EnvCfgError`.
+
+## Error Reporting
+
+All configuration problems are collected and raised together as a single
+`EnvCfgError`. The exception message lists each offending key path and the
+expected type, e.g.:
+
+```
+EnvCfgError: invalid value for 'server.port' (expected int), invalid value for 'cache.enabled' (expected bool)
+```
+
+This allows the caller to fix all issues in one pass.
+
+## Implementation Notes
+
+- Use `tomllib.load()` for TOML parsing (Python 3.11+).
+- Keep the module under ~150 lines.
+- Tests must cover: precedence order, nested overrides, all coercion types,
+  both error cases, and the missing‑file case.
+``````tool
+{"name": "write_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qythos9__r1-oatsituu/DESIGN.md", "content": "# DESIGN.md — envcfg configuration loader\n\n## Overview\n\n`envcfg` assembles a single configuration dictionary from three layers:\n1. **Defaults** – a plain dict supplied by the caller.\n2. **TOML file** – parsed with the standard library `tomllib`.\n3. **Environment variables** – read under a caller-chosen prefix.\n\nLayers are merged key-by-key, with later layers overriding earlier ones. Missing\nTOML files are silently ignored; missing environment keys are errors.\n\n## Public API\n\n```python\nclass EnvCfgError(Exception):\n    \"\"\"Raised when a configuration value cannot be coerced or an env key has\n    no default.\"\"\"\n    pass\n\ndef load(\n    defaults: dict,\n    toml_path: str | None = None,\n    env_prefix: str = \"APP\",\n    env: dict[str, str] | None = None,\n) -> dict:\n    \"\"\"\n    Merge defaults, optional TOML, and environment variables.\n\n    Parameters\n    ----------\n    defaults : dict\n        Base configuration.\n    toml_path : str | None\n        Path to a TOML file. If None or missing, that layer is skipped.\n    env_prefix : str\n        Prefix for environment variables. Nested keys are joined with \"__\" and\n        uppercased. Example: ``APP__SERVER__PORT`` maps to ``defaults[\"server\"][\"port\"]``.\n    env : dict[str, str] | None\n        Mapping of environment variable names to strings. If None, ``os.environ``\n        is used.\n\n    Returns\n    -------\n    dict\n        The merged configuration.\n\n    Raises\n    ------\n    EnvCfgError\n        If any environment variable cannot be coerced to the expected type, or\n        if an environment variable is present but has no corresponding default.\n    \"\"\"\n```\n\n## Precedence Rules\n\n- **Defaults** are the floor. Every key that appears in `defaults` is present in\n  the final result.\n- **TOML** overrides defaults for any matching key path.\n- **Environment** overrides both defaults and TOML for any matching key path.\n- If a key path exists in the environment but not in `defaults`, raise `EnvCfgError`.\n- If a key path exists in `defaults` but not in the environment, keep the default.\n- If a key path exists in `defaults` and the environment, coerce the env value to\n  the type of the default and use it; otherwise raise `EnvCfgError`.\n\n## Coercion Rules\n\nEnvironment values are strings and must be coerced to the type of the default:\n\n| Target type | Accepted strings (case‑insensitive) |\n|-------------|--------------------------------------|\n| `int`       | any valid integer literal (e.g. `\"42\"`, `\"-7\"`) |\n| `float`     | any valid float literal (e.g. `\"3.14\"`, `\"-0.5\"`) |\n| `bool`      | `\"true\"`, `\"false\"`, `\"1\"`, `\"0\"`, `\"yes\"`, `\"no\"` |\n| `str`       | any non‑empty string (the value is used as‑is) |\n\nCoercion is strict: if the string cannot be parsed as the target type, raise\n`EnvCfgError`.\n\n## Error Reporting\n\nAll configuration problems are collected and raised together as a single\n`EnvCfgError`. The exception message lists each offending key path and the\nexpected type, e.g.:\n\n```\nEnvCfgError: invalid value for 'server.port' (expected int), invalid value for 'cache.enabled' (expected bool)\n```\n\nThis allows the caller to fix all issues in one pass.\n\n## Implementation Notes\n\n- Use `tomllib.load()` for TOML parsing (Python 3.11+).\n- Keep the module under ~150 lines.\n- Tests must cover: precedence order, nested overrides, all coercion types,\n  both error cases, and the missing‑file case.\n```
+``````tool
+{"name": "write_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qythos9__r1-oatsituu/DESIGN.md", "content": "# DESIGN.md — envcfg configuration loader\n\n## Overview\n\n`envcfg` assembles a single configuration dictionary from three layers:\n1. **Defaults** – a plain dict supplied by the caller.\n2. **TOML file** – parsed with the standard library `tomllib`.\n3. **Environment variables** – read under a caller-chosen prefix.\n\nLayers are merged key-by-key, with later layers overriding earlier ones. Missing\nTOML files are silently ignored; missing environment keys are errors.\n\n## Public API\n\n```python\nclass EnvCfgError(Exception):\n    \"\"\"Raised when a configuration value cannot be coerced or an env key has\n    no default.\"\"\"\n    pass\n\ndef load(\n    defaults: dict,\n    toml_path: str | None = None,\n    env_prefix: str = \"APP\",\n    env: dict[str, str] | None = None,\n) -> dict:\n    \"\"\"\n    Merge defaults, optional TOML, and environment variables.\n\n    Parameters\n    ----------\n    defaults : dict\n        Base configuration.\n    toml_path : str | None\n        Path to a TOML file. If None or missing, that layer is skipped.\n    env_prefix : str\n        Prefix for environment variables. Nested keys are joined with \"__\" and\n        uppercased. Example: ``APP__SERVER__PORT`` maps to ``defaults[\"server\"][\"port\"]``.\n    env : dict[str, str] | None\n        Mapping of environment variable names to strings. If None, ``os.environ``\n        is used.\n\n    Returns\n    -------\n    dict\n        The merged configuration.\n\n    Raises\n    ------\n    EnvCfgError\n        If any environment variable cannot be coerced to the expected type, or\n        if an environment variable is present but has no corresponding default.\n    \"\"\"\n```\n\n## Precedence Rules\n\n- **Defaults** are the floor. Every key that appears in `defaults` is present in\n  the final result.\n- **TOML** overrides defaults for any matching key path.\n- **Environment** overrides both defaults and TOML for any matching key path.\n- If a key path exists in the environment but not in `defaults`, raise `EnvCfgError`.\n- If a key path exists in `defaults` but not in the environment, keep the default.\n- If a key path exists in `defaults` and the environment, coerce the env value to\n  the type of the default and use it; otherwise raise `EnvCfgError`.\n\n## Coercion Rules\n\nEnvironment values are strings and must be coerced to the type of the default:\n\n| Target type | Accepted strings (case‑insensitive) |\n|-------------|--------------------------------------|\n| `int`       | any valid integer literal (e.g. `\"42\"`, `\"-7\"`) |\n| `float`     | any valid float literal (e.g. `\"3.14\"`, `\"-0.5\"`) |\n| `bool`      | `\"true\"`, `\"false\"`, `\"1\"`, `\"0\"`, `\"yes\"`, `\"no\"` |\n| `str`       | any non‑empty string (the value is used as‑is) |\n\nCoercion is strict: if the string cannot be parsed as the target type, raise\n`EnvCfgError`.\n\n## Error Reporting\n\nAll configuration problems are collected and raised together as a single\n`EnvCfgError`. The exception message lists each offending key path and the\nexpected type, e.g.:\n\n```\nEnvCfgError: invalid value for 'server.port' (expected int), invalid value for 'cache.enabled' (expected bool)\n```\n\nThis allows the caller to fix all issues in one pass.\n\n## Implementation Notes\n\n- Use `tomllib.load()` for TOML parsing (Python 3.11+).\n- Keep the module under ~150 lines.\n- Tests must cover: precedence order, nested overrides, all coercion types,\n  both error cases, and the missing‑file case.\n```
+``````tool
+{"name": "write_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qythos9__r1-oatsituu/DESIGN.md", "content": "# DESIGN.md — envcfg configuration loader\n\n## Overview\n\n`envcfg` assembles a single configuration dictionary from three layers:\n1. **Defaults** – a plain dict supplied by the caller.\n2. **TOML file** – parsed with the standard library `tomllib`.\n3. **Environment variables** – read under a caller-chosen prefix.\n\nLayers are merged key-by-key, with later layers overriding earlier ones. Missing\nTOML files are silently ignored; missing environment keys are errors.\n\n## Public API\n\n```python\nclass EnvCfgError(Exception):\n    \"\"\"Raised when a configuration value cannot be coerced or an env key has\n    no default.\"\"\"\n    pass\n\ndef load(\n    defaults: dict,\n    toml_path: str | None = None,\n    env_prefix: str = \"APP\",\n    env: dict[str, str] | None = None,\n) -> dict:\n    \"\"\"\n    Merge defaults, optional TOML, and environment variables.\n\n    Parameters\n    ----------\n    defaults : dict\n        Base configuration.\n    toml_path : str | None\n        Path to a TOML file. If None or missing, that layer is skipped.\n    env_prefix : str\n        Prefix for environment variables. Nested keys are joined with \"__\" and\n        uppercased. Example: ``APP__SERVER__PORT`` maps to ``defaults[\"server\"][\"port\"]``.\n    env : dict[str, str] | None\n        Mapping of environment variable names to strings. If None, ``os.environ``\n        is used.\n\n    Returns\n    -------\n    dict\n        The merged configuration.\n\n    Raises\n    ------\n    EnvCfgError\n        If any environment variable cannot be coerced to the expected type, or\n        if an environment variable is present but has no corresponding default.\n    \"\"\"\n```\n\n## Precedence Rules\n\n- **Defaults** are the floor. Every key that appears in `defaults` is present in\n  the final result.\n- **TOML** overrides defaults for any matching key path.\n- **Environment** overrides both defaults and TOML for any matching key path.\n- If a key path exists in the environment but not in `defaults`, raise `EnvCfgError`.\n- If a key path exists in `defaults` but not in the environment, keep the default.\n- If a key path exists in `defaults` and the environment, coerce the env value to\n  the type of the default and use it; otherwise raise `EnvCfgError`.\n\n## Coercion Rules\n\nEnvironment values are strings and must be coerced to the type of the default:\n\n| Target type | Accepted strings (case‑insensitive) |\n|-------------|--------------------------------------|\n| `int`       | any valid integer literal (e.g. `\"42\"`, `\"-7\"`) |\n| `float`     | any valid float literal (e.g. `\"3.14\"`, `\"-0.5\"`) |\n| `bool`      | `\"true\"`, `\"false\"`, `\"1\"`, `\"0\"`, `\"yes\"`, `\"no\"` |\n| `str`       | any non‑empty string (the value is used as‑is) |\n\nCoercion is strict: if the string cannot be parsed as the target type, raise\n`EnvCfgError`.\n\n## Error Reporting\n\nAll configuration problems are collected and raised together as a single\n`EnvCfgError`. The exception message lists each offending key path and the\nexpected type, e.g.:\n\n```\nEnvCfgError: invalid value for 'server.port' (expected int), invalid value for 'cache.enabled' (expected bool)\n```\n\nThis allows the caller to fix all issues in one pass.\n\n## Implementation Notes\n\n- Use `tomllib.load()` for TOML parsing (Python 3.11+).\n- Keep the module under ~150 lines.\n- Tests must cover: precedence order, nested overrides, all coercion types,\n  both error cases, and the missing‑file case.\n```
+``````tool
+{"name": "write_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-e2e-spec-to-code__qythos9__r1-oatsituu/DESIGN.md", "content": "# DESIGN.md — envcfg configuration loader\n\n## Overview\n\n`envcfg` assembles a single configuration dictionary from three layers:\n1. **Defaults** – a plain dict supplied by the caller.\n2. **TOML file** – parsed with the standard library `tomllib`.\n3. **Environment variables** – read under a caller-chosen prefix.\n\nLayers are merged key-by-key, with later layers overriding earlier ones. Missing\nTOML files are silently ignored; missing environment keys are errors.\n\n## Public API\n\n```python\nclass EnvCfgError(Exception):\n    \"\"\"Raised when a configuration value cannot be coerced or an env key has\n    no default.\"\"\"\n    pass\n\ndef load(\n    defaults: dict,\n    toml_path: str | None = None,\n    env_prefix: str = \"APP\",\n    env: dict[str, str] | None = None,\n) -> dict:\n    \"\"\"\n    Merge defaults, optional TOML, and environment variables.\n\n    Parameters\n    ----------\n    defaults : dict\n        Base configuration.\n    toml_path : str | None\n        Path to a TOML file. If None or missing, that layer is skipped.\n    env_prefix : str\n        Prefix for environment variables. Nested keys are joined with \"__\" and\n        uppercased. Example: ``APP__SERVER__PORT`` maps to ``defaults[\"server\"][\"port\"]``.\n    env : dict[str, str] | None\n        Mapping of environment variable names to strings. If None, ``os.environ``\n        is used.\n\n    Returns\n    -------\n    dict\n        The merged configuration.\n\n    Raises\n    ------\n    EnvCfgError\n        If any environment variable cannot be coerced to the expected type, or\n        if an environment variable is present but has no corresponding default.\n    \"\"\"\n```\n\n## Precedence Rules\n\n- **Defaults** are the floor. Every key that appears in `defaults` is present in\n  the final result.\n- **TOML** overrides defaults for any matching key path.\n- **Environment** overrides both defaults and TOML for any matching key path.\n- If a key path exists in the environment but not in `defaults`, raise `EnvCfgError`.\n- If a key path exists in `defaults` but not in the environment, keep the default.\n- If a key path exists in `defaults` and the environment, coerce the env value to\n  the type of the default and use it; otherwise raise `EnvCfgError`.\n\n## Coercion Rules\n\nEnvironment values are strings and must be coerced to the type of the default:\n\n| Target type | Accepted strings (case‑insensitive) |\n|-------------|--------------------------------------|\n| `int`       | any valid integer literal (e.g. `\"42\"`, `\"-7\"`) |\n| `float`     | any valid float literal (e.g. `\"3.14\"`, `\"-0.5\"`) |\n| `bool`      | `\"true\"`, `\"false\"`, `\"1\"`, `\"0\"`, `\"yes\"`, `\"no\"` |\n| `str`       | any non‑empty string (the value is used as‑is) |\n\nCoercion is strict: if the string cannot be parsed as the target type, raise\n`EnvCfgError`.\n\n## Error Reporting\n\nAll configuration problems are collected and raised together as a single\n`EnvCfgError`. The exception message lists each offending key path and the\nexpected type, e.g.:\n\n```\nEnvCfgError: invalid value for 'server.port' (expected int), invalid value for 'cache.enabled' (expected bool)\n```\n\nThis allows the caller to fix all issues in one pass.\n\n## Implementation Notes\n\n- Use `tomllib.load()` for TOML parsing (Python 3.11+).\n- Keep the module under ~150 lines.\n- Tests must cover: precedence order, nested overrides, all coercion types,\n  both error cases, and the missing‑file case.\n```
+```

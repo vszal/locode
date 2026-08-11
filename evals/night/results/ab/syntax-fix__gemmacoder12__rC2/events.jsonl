@@ -1,0 +1,13 @@
+{"seq": 1, "t": 0.001, "phase": "turn_start", "model": "gemmacoder12", "prompt_chars": 108}
+{"seq": 2, "t": 0.001, "phase": "busy_start", "text": "loading gemmacoder12…"}
+{"seq": 3, "t": 34.343, "phase": "busy_stop"}
+{"seq": 4, "t": 34.344, "phase": "iteration", "n": 0, "elapsed": 0.0}
+{"seq": 5, "t": 34.344, "phase": "assistant_start"}
+{"seq": 6, "t": 44.068, "phase": "assistant_end", "chars": 182}
+{"seq": 7, "t": 44.069, "phase": "run", "name": "read_file", "args": {"path": "parser.py"}}
+{"seq": 8, "t": 44.069, "phase": "result", "name": "read_file", "error": false, "content": "     1\tdef parse(line)\n     2\t    parts = line.split(',')\n     3\t    return parts", "seconds": 0.0}
+{"seq": 9, "t": 44.069, "phase": "iteration", "n": 1, "elapsed": 9.73}
+{"seq": 10, "t": 44.07, "phase": "assistant_start"}
+{"seq": 11, "t": 47.36, "phase": "assistant_end", "chars": 219}
+{"seq": 12, "t": 47.36, "phase": "turn_end", "result": "(no result)"}
+{"seq": 13, "t": 47.36, "phase": "error", "text": "'list' object has no attribute 'lower'"}

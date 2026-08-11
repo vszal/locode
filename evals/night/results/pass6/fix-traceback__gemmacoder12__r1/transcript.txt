@@ -1,0 +1,18 @@
+
+  ⚙ bash python3 report.py
+    ✗ KeyError: 'amount'  (+11 more lines)
+
+  ⚙ edit_file report.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+6 more lines)
+    --- report.py
+    +++ report.py
+    @@ -1,4 +1,4 @@
+     def total(rows):
+    -    return sum(r['amount'] for r in rows)
+    +    return sum(r.get('amount', 0) for r in rows)
+     
+     data = [{'amount': 5}, {'amount': 7}, {'cost': 3}]
+
+  ⚙ bash python3 report.py
+    ✓ 12
+The `total` function now uses `r.get('amount', 0)` instead of direct indexing, so the row missing the `amount` key is treated as 0 rather than raising a `KeyError`. Running `python3 report.py` now correctly prints 12.

@@ -1,0 +1,18 @@
+     ok | mid-block       gemmacoder12  | done=Y |  4it   53s | f0 n0 r0       | answered                           | out="('START', [1, 4, 9], 'END')"
+     ok | mid-block       gemmacoder12  | done=Y |  4it   16s | f0 n0 r0       | answered                           | out="('START', [1, 4, 9], 'END')"
+     ok | mid-block       qythos9       | done=Y |  4it   51s | f0 n0 r0       | answered                           | out="('START', [1, 4, 9], 'END')"
+     ok | mid-block       qythos9       | done=Y |  4it   14s | f0 n0 r0       | answered                           | out="('START', [1, 4, 9], 'END')"
+PROBLEM | insert-const    gemmacoder12  | done=N |  7it   63s | f0 n0 r2       | the model repeated the same tool c | out='Traceback (most recent call last):\
+PROBLEM | insert-const    gemmacoder12  | done=N |  7it   27s | f0 n0 r2       | the model repeated the same tool c | out='Traceback (most recent call last):\
+     ok | insert-const    qythos9       | done=Y |  6it   60s | f0 n0 r0       | answered                           | out='1, 2, 3'
+     ok | insert-const    qythos9       | done=Y |  6it   22s | f0 n0 r0       | answered                           | out='1, 2, 3'
+PROBLEM | append-func     gemmacoder12  | done=Y |  9it   75s | f2 n0 r1       | the model repeated the same tool c | out='9 27'
+PROBLEM | append-func     gemmacoder12  | done=Y | 11it   50s | f4 n2 r1       | answered                           | out='9 27'
+     ok | append-func     qythos9       | done=Y |  4it   52s | f0 n0 r0       | answered                           | out='9 27'
+     ok | append-func     qythos9       | done=Y |  4it   15s | f0 n0 r0       | answered                           | out='9 27'
+
+=== 4/12 problem rows ===
+  insert-const__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass14/insert-const__gemmacoder12__r1/events.jsonl
+  insert-const__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass14/insert-const__gemmacoder12__r2/events.jsonl
+  append-func__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass14/append-func__gemmacoder12__r1/events.jsonl
+  append-func__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass14/append-func__gemmacoder12__r2/events.jsonl

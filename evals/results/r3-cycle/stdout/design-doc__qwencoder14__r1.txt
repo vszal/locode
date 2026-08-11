@@ -1,0 +1,124 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[>] Write an overview of the approach",
+    "[ ] Describe the public API",
+    "[ ] Define the persistence schema",
+    "[ ] Explain how retries and backoff are decided",
+    "[ ] Describe how crash recovery works",
+    "[ ] Outline the failure modes and how the design handles each",
+    "[ ] List the trade-offs rejected and why"
+]}}
+```# Overview of the Approach
+
+The `taskq` library is designed to provide a reliable in-process task queue using SQLite for persistence and Python's standard library for concurrency. The library allows users to enqueue tasks with JSON-serializable payloads and process them with registered handler functions. The design ensures that tasks are not lost if the process is killed and that no task is executed by two workers simultaneously. The library supports scheduled tasks and prevents duplicate work. Retries are implemented with exponential backoff, and crash recovery is handled by SQLite's transactional nature. The design also includes observability features to monitor task states.```tool
+{"name": "write_file", "args": {"path": "DESIGN.md", "content": "# Overview of the Approach\n\nThe `taskq` library is designed to provide a reliable in-process task queue using SQLite for persistence and Python's standard library for concurrency. The library allows users to enqueue tasks with JSON-serializable payloads and process them with registered handler functions. The design ensures that tasks are not lost if the process is killed and that no task is executed by two workers simultaneously. The library supports scheduled tasks and prevents duplicate work. Retries are implemented with exponential backoff, and crash recovery is handled by SQLite's transactional nature. The design also includes observability features to monitor task states.\n\n## Public API\n\n## Persistence Schema\n\n## Retries and Backoff\n\n## Crash Recovery\n\n## Failure Modes and Handling\n\n## Trade-offs Rejected and Why\n"}}
+```Next, I will describe the public API for the `taskq` library.```tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Write an overview of the approach",
+    "[>] Describe the public API",
+    "[ ] Define the persistence schema",
+    "[ ] Explain how retries and backoff are decided",
+    "[ ] Describe how crash recovery works",
+    "[ ] Outline the failure modes and how the design handles each",
+    "[ ] List the trade-offs rejected and why"
+]}}
+```# Public API
+
+The `taskq` library provides a simple and intuitive public API for enqueuing and processing tasks. The API includes the following functions:
+
+1. **enqueue(task_name, payload)**
+   - **Parameters:**
+     - `task_name` (str): The name of the task to be enqueued.
+     - `payload` (dict): A JSON-serializable payload containing task-specific data.
+   - **Returns:**
+     - `task_id` (str): A unique identifier for the enqueued task.
+
+2. **register_handler(task_name, handler_function)**
+   - **Parameters:**
+     - `task_name` (str): The name of the task for which the handler is being registered.
+     - `handler_function` (function): A function that takes a `payload` and processes the task.
+   - **Returns:**
+     - None
+
+3. **start_workers(num_workers)**
+   - **Parameters:**
+     - `num_workers` (int): The number of worker threads to start.
+   - **Returns:**
+     - None
+
+4. **enqueue_later(task_name, payload, delay)**
+   - **Parameters:**
+     - `task_name` (str): The name of the task to be enqueued.
+     - `payload` (dict): A JSON-serializable payload containing task-specific data.
+     - `delay` (int): The delay in seconds before the task is executed.
+   - **Returns:**
+     - `task_id` (str): A unique identifier for the enqueued task.
+
+5. **get_task_status(task_id)**
+   - **Parameters:**
+     - `task_id` (str): The unique identifier of the task.
+   - **Returns:**
+     - `status` (str): The current status of the task (e.g., 'pending', 'running', 'failed', 'dead').
+
+6. **get_task_count(status)**
+   - **Parameters:**
+     - `status` (str): The status of tasks to count (e.g., 'pending', 'running', 'failed', 'dead').
+   - **Returns:**
+     - `count` (int): The number of tasks with the specified status.
+
+These functions provide a comprehensive interface for managing tasks, registering handlers, and monitoring task states.```tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Write an overview of the approach",
+    "[x] Describe the public API",
+    "[>] Define the persistence schema",
+    "[ ] Explain how retries and backoff are decided",
+    "[ ] Describe how crash recovery works",
+    "[ ] Outline the failure modes and how the design handles each",
+    "[ ] List the trade-offs rejected and why"
+]}}
+```# Persistence Schema
+
+The `taskq` library uses SQLite to store task metadata and payloads. The schema consists of the following tables:
+
+1. **tasks**
+   - **Columns:**
+     - `task_id` (TEXT, PRIMARY KEY): A unique identifier for the task.
+     - `task_name` (TEXT): The name of the task.
+     - `payload` (TEXT): The JSON-serialized payload of the task.
+     - `status` (TEXT): The current status of the task (e.g., 'pending', 'running', 'failed', 'dead').
+     - `claim_id` (TEXT): A unique identifier for the worker claiming the task.
+     - `claim_expiration` (INTEGER): The timestamp when the task claim expires.
+     - `retry_count` (INTEGER): The number of times the task has been retried.
+     - `enqueue_time` (INTEGER): The timestamp when the task was enqueued.
+     - `next_run_time` (INTEGER): The timestamp when the task is scheduled to run next.
+
+2. **handlers**
+   - **Columns:**
+     - `task_name` (TEXT, PRIMARY KEY): The name of the task for which the handler is registered.
+     - `handler_function` (TEXT): The name of the handler function.
+
+This schema ensures that tasks are stored persistently and can be retrieved and updated atomically. The use of SQLite also allows for efficient querying and indexing of tasks based on various criteria.```tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Write an overview of the approach",
+    "[x] Describe the public API",
+    "[x] Define the persistence schema",
+    "[>] Explain how retries and backoff are decided",
+    "[ ] Describe how crash recovery works",
+    "[ ] Outline the failure modes and how the design handles each",
+    "[ ] List the trade-offs rejected and why"
+]}}
+```# Retries and Backoff
+
+The `taskq` library implements a retry mechanism with exponential backoff to handle transient failures. When a task raises an exception, it is retried after a delay that increases exponentially with each retry attempt. The delay is calculated using the formula:
+
+\[ \text{delay} = \text{base\_delay} \times 2^{\text{retry\_count}} \]
+
+Where:
+- `base_delay` is a configurable base delay in seconds (e.g., 1 second).
+- `retry_count` is the number of times the task has been retried.
+
+The maximum number of retries is also configurable. Once a task reaches the maximum retry count, it is marked as 'failed' and set aside for manual inspection.
+
+This approach ensures that transient failures are retried with increasing delays, reducing the load on the system and giving failing dependencies time to recover. At the same time, it prevents tasks from being retried indefinitely in the face of persistent failures.

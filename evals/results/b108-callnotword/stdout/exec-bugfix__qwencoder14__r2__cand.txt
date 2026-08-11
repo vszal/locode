@@ -1,0 +1,86 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[>] Fix the word_wrap function to handle exact fit cases correctly",
+    "[ ] Fix the truncate function to handle the exact limit case correctly",
+    "[ ] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Re-run tests to ensure all pass"
+]}
+``````read_file
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "if current_len + 1 + len(word) < width:",
+    "new": "if current_len + len(word) < width:"
+}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[>] Fix the truncate function to handle the exact limit case correctly",
+    "[ ] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Re-run tests to ensure all pass"
+]}
+``````read_file
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "cut = limit - len(suffix) + 1",
+    "new": "cut = limit - len(suffix)"
+}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[>] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Re-run tests to ensure all pass"
+]}
+``````read_file
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "if lower in SMALL_WORDS:",
+    "new": "if lower in SMALL_WORDS and index != 0:"
+}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[x] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Re-run tests to ensure all pass"
+]}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````read_file
+{"name": "read_file", "args": {"path": "test_textkit.py", "offset": 48, "limit": 20}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "if lower in SMALL_WORDS and index != 0:",
+    "new": "if lower in SMALL_WORDS and words.index(word) != 0:"
+}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[x] Fix the title_case function to capitalize the first word correctly",
+    "[x] Re-run tests to ensure all pass"
+]}
+```All tests have passed successfully. The issues in `textkit.py` have been resolved:
+
+1. The `word_wrap` function now correctly handles cases where the text fits exactly within the specified width.
+2. The `truncate` function now correctly appends the suffix at the exact limit.
+3. The `title_case` function now correctly capitalizes the first word of the text, regardless of whether it is a small word or not.
+
+The final state of the `textkit.py` file and the test results confirm that all functions behave as expected.

@@ -1,0 +1,327 @@
+```json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[ ] Fix word_wrap function to handle exact fit correctly",
+      "[ ] Fix truncate function to append suffix correctly",
+      "[ ] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "def word_wrap(text, width):\n    words = text.split()\n    lines = []\n    current_line = []\n    current_length = 0\n    for word in words:\n        if current_length + len(word) + len(current_line) > width:\n            lines.append(' '.join(current_line))\n            current_line = [word]\n            current_length = len(word)\n        else:\n            current_line.append(word)\n            current_length += len(word)\n    if current_line:\n        lines.append(' '.join(current_line))\n    return lines",
+    "new": "def word_wrap(text, width):\n    words = text.split()\n    lines = []\n    current_line = []\n    current_length = 0\n    for word in words:\n        if current_length + len(word) + len(current_line) > width:\n            lines.append(' '.join(current_line))\n            current_line = [word]\n            current_length = len(word)\n        else:\n            current_line.append(word)\n            current_length += len(word)\n    if current_line:\n        lines.append(' '.join(current_line))\n    return lines if len(lines) > 1 else [' '.join(current_line)]"
+  }
+}
+``````json
+{
+  "name": "read_file",
+  "arguments": {
+    "path": "textkit.py"
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "if current:\n    lines.append(\" \".join(current))\nreturn lines",
+    "new": "if current:\n    lines.append(\" \".join(current))\nreturn lines if len(lines) > 1 else [' '.join(current)]"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[ ] Fix truncate function to append suffix correctly",
+      "[ ] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "cut = limit - len(suffix) + 1",
+    "new": "cut = limit - len(suffix)"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[ ] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "if lower in SMALL_WORDS:",
+    "new": "if lower in SMALL_WORDS and i != 0:"
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[ ] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "for word in words:",
+    "new": "for i, word in enumerate(words):"
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "for word in words:",
+    "new": "for i, word in enumerate(words):",
+    "occurrence": 2
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[x] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+```It seems that the changes made to the `word_wrap` function did not resolve the issue. Let's take a closer look at the `word_wrap` function and ensure it handles the exact fit correctly.
+
+Here is the current implementation of `word_wrap`:
+
+```python
+def word_wrap(text, width):
+    """Wrap `text` on word boundaries into lines no longer than `width`.
+    
+    Splits `text` on whitespace and greedily packs words onto a line,
+    separated by single spaces, such that each line's length is at most
+    `width` (a line containing exactly `width` characters is allowed).
+    A single word longer than `width` is placed alone on its own line
+    (it is never split). Returns a list of line strings.
+    """
+    words = text.split()
+    lines = []
+    current = []
+    current_len = 0
+    for word in words:
+        if not current:
+            current = [word]
+            current_len = len(word)
+        elif current_len + 1 + len(word) < width:
+            current.append(word)
+            current_len += 1 + len(word)
+        else:
+            lines.append(" ".join(current))
+            current = [word]
+            current_len = len(word)
+    if current:
+        lines.append(" ".join(current))
+    return lines if len(lines) > 1 else [' '.join(current)]
+```
+
+The issue seems to be that the function is splitting the words into lines correctly, but it is not handling the case where the text fits exactly into the width. Let's modify the function to handle this case correctly.
+
+```json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "if current_len + 1 + len(word) < width:",
+    "new": "if current_len + len(word) < width:"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[x] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+```It seems that the `word_wrap` function still has an issue with handling empty text. Let's fix this by ensuring that if the input text is empty, the function returns an empty list.
+
+```json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "words = text.split()",
+    "new": "if not text.strip():\n    return []\nwords = text.split()"
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "words = text.split()",
+    "new": "if not text.strip():\n    return []\nwords = text.split()",
+    "occurrence": 1
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[x] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+```All tests have passed. The `textkit.py` file has been successfully updated to fix the issues with `word_wrap`, `truncate`, and `title_case` functions. The final implementation is as follows:
+
+```python
+def word_wrap(text, width):
+    """Wrap `text` on word boundaries into lines no longer than `width`.
+    
+    Splits `text` on whitespace and greedily packs words onto a line,
+    separated by single spaces, such that each line's length is at most
+    `width` (a line containing exactly `width` characters is allowed).
+    A single word longer than `width` is placed alone on its own line
+    (it is never split). Returns a list of line strings.
+    """
+    if not text.strip():
+        return []
+    words = text.split()
+    lines = []
+    current = []
+    current_len = 0
+    for word in words:
+        if not current:
+            current = [word]
+            current_len = len(word)
+        elif current_len + len(word) < width:
+            current.append(word)
+            current_len += 1 + len(word)
+        else:
+            lines.append(" ".join(current))
+            current = [word]
+            current_len = len(word)
+    if current:
+        lines.append(" ".join(current))
+    return lines if len(lines) > 1 else [' '.join(current)]
+
+def truncate(text, limit, suffix="..."):
+    """Shorten `text` to fit within `limit` characters.
+    
+    If `text` already fits (len(text) <= limit), it is returned unchanged.
+    Otherwise the text is cut short and `suffix` is appended such that the
+    TOTAL length of the returned string equals exactly `limit` (never
+    longer). If `suffix` alone is longer than `limit`, the cut point is
+    clamped to 0.
+    """
+    if len(text) <= limit:
+        return text
+    cut = limit - len(suffix)
+    if cut < 0:
+        cut = 0
+    return text[:cut] + suffix
+
+SMALL_WORDS = {"a", "an", "and", "the", "of", "in", "on", "or", "to", "at", "by", "for"}
+
+def title_case(text):
+    """Capitalize each word, lowercasing common small words.
+    
+    Every word is capitalized (first letter upper, rest lower) EXCEPT
+    words in `SMALL_WORDS`, which are left lowercase -- unless that word
+    is the first word of the text, which is always capitalized regardless
+    of `SMALL_WORDS` membership. Words are separated by single spaces in
+    the output.
+    """
+    words = text.split()
+    result = []
+    for i, word in enumerate(words):
+        lower = word.lower()
+        if lower in SMALL_WORDS and i != 0:
+            result.append(lower)
+        else:
+            result.append(lower.capitalize())
+    return " ".join(result)
+
+def dedupe_spaces(text):
+    """Collapse any run of whitespace (spaces, tabs, newlines) into one space.
+    
+    Leading and trailing whitespace is stripped entirely. Returns the
+    resulting string.
+    """
+    return " ".join(text.split())
+```
+
+All tests have passed, and the functions now work as intended.

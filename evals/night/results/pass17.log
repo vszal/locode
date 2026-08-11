@@ -1,0 +1,10 @@
+PROBLEM | deep-nest       gemmacoder12  | done=Y | 11it   40s | f3 n2 r2       | the model repeated the same tool c | out='3'
+     ok | deep-nest       gemmacoder12  | done=Y |  7it   25s | f1 n0 r0       | answered                           | out='3'
+PROBLEM | deep-nest       gemmacoder12  | done=Y | 10it   39s | f1 n0 r1       | the model repeated the same tool c | out='3'
+     ok | deep-nest       qythos9       | done=Y |  4it   51s | f0 n0 r0       | answered                           | out='3'
+     ok | deep-nest       qythos9       | done=Y |  4it   14s | f0 n0 r0       | answered                           | out='3'
+     ok | deep-nest       qythos9       | done=Y |  4it   14s | f0 n0 r0       | answered                           | out='3'
+
+=== 2/6 problem rows ===
+  deep-nest__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass17/deep-nest__gemmacoder12__r1/events.jsonl
+  deep-nest__gemmacoder12__r3  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass17/deep-nest__gemmacoder12__r3/events.jsonl

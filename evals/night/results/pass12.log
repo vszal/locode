@@ -1,0 +1,30 @@
+PROBLEM | diff-report     gemmacoder12  | done=N |  8it   93s | f1 n0 r0       | the model repeated the same tool c | out="RC 1\n''"
+PROBLEM | diff-report     gemmacoder12  | done=N |  8it   56s | f1 n0 r0       | the model repeated the same tool c | out="RC 1\n''"
+     ok | diff-report     qythos9       | done=Y |  4it   57s | f0 n0 r0       | answered                           | out="RC 0\n'added: d.txt\\nmodified: b.t
+     ok | diff-report     qythos9       | done=Y |  4it   20s | f0 n0 r0       | answered                           | out="RC 0\n'added: d.txt\\nmodified: b.t
+     ok | emits-nothing   gemmacoder12  | done=Y |  5it   56s | f0 n0 r0       | answered                           | out="RC 0\n'item: 1\\nitem: 2\\n'"
+     ok | emits-nothing   gemmacoder12  | done=Y |  5it   19s | f0 n0 r0       | answered                           | out="RC 0\n'item: 1\\nitem: 2\\n'"
+     ok | emits-nothing   qythos9       | done=Y |  4it   51s | f0 n0 r0       | answered                           | out="RC 0\n'item: 1\\nitem: 2\\n'"
+     ok | emits-nothing   qythos9       | done=Y |  4it   14s | f0 n0 r0       | answered                           | out="RC 0\n'item: 1\\nitem: 2\\n'"
+PROBLEM | dedup-order     gemmacoder12  | done=N |  9it   99s | f0 n0 r2       | the model repeated the same tool c | out='[1, 2, 3]'
+PROBLEM | dedup-order     gemmacoder12  | done=N |  9it   63s | f0 n0 r2       | the model repeated the same tool c | out='[1, 2, 3]'
+     ok | dedup-order     qythos9       | done=Y |  4it   53s | f0 n0 r0       | answered                           | out='[3, 1, 2]'
+     ok | dedup-order     qythos9       | done=Y |  4it   16s | f0 n0 r0       | answered                           | out='[3, 1, 2]'
+PROBLEM | indent-bug      gemmacoder12  | done=Y |  6it   58s | f1 n1 r0       | the model repeated the same tool c | compiles
+PROBLEM | indent-bug      gemmacoder12  | done=Y |  6it   21s | f1 n1 r0       | the model repeated the same tool c | compiles
+     ok | indent-bug      qythos9       | done=Y |  5it   56s | f0 n0 r0       | answered                           | compiles
+     ok | indent-bug      qythos9       | done=Y |  5it   18s | f0 n0 r0       | answered                           | compiles
+PROBLEM | undefined-vars  gemmacoder12  | done=Y | 15it  127s | f5 n2 r2       | the model repeated the same tool c | rc=0 "['a']"
+PROBLEM | undefined-vars  gemmacoder12  | done=Y | 15it   89s | f5 n2 r2       | the model repeated the same tool c | rc=0 "['a']"
+     ok | undefined-vars  qythos9       | done=Y |  5it   56s | f1 n0 r0       | answered                           | rc=0 '[]'
+     ok | undefined-vars  qythos9       | done=Y |  5it   18s | f1 n0 r0       | answered                           | rc=0 '[]'
+
+=== 8/20 problem rows ===
+  diff-report__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass12/diff-report__gemmacoder12__r1/events.jsonl
+  diff-report__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass12/diff-report__gemmacoder12__r2/events.jsonl
+  dedup-order__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass12/dedup-order__gemmacoder12__r1/events.jsonl
+  dedup-order__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass12/dedup-order__gemmacoder12__r2/events.jsonl
+  indent-bug__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__gemmacoder12__r1/events.jsonl
+  indent-bug__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass12/indent-bug__gemmacoder12__r2/events.jsonl
+  undefined-vars__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass12/undefined-vars__gemmacoder12__r1/events.jsonl
+  undefined-vars__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass12/undefined-vars__gemmacoder12__r2/events.jsonl

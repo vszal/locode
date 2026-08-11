@@ -1,0 +1,50 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current = [word]", "new": "current = [word]"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current.append(word)", "new": "current.append(word)"}}```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "lines.append(" ".join(current))", "new": "lines.append(" ".join(current))"}}
+```I see the issue. The `word_wrap` function is not handling the case where a word is exactly equal to the width. Let's rewrite the `word_wrap` function to fix this.
+
+```tool
+{"name": "write_file", "args": {"path": "textkit.py", "content": "def word_wrap(text, width):\n    words = text.split()\n    lines = []\n    current = []\n    current_len = 0\n    for word in words:\n        if not current:\n            current = [word]\n            current_len = len(word)\n        elif current_len + 1 + len(word) <= width:\n            current.append(word)\n            current_len += 1 + len(word)\n        else:\n            lines.append(\" \".join(current))\n            current = [word]\n            current_len = len(word)\n    if current:\n        lines.append(\" \".join(current))\n    return lines"}}
+```Let's run the tests again to see if the issue is resolved.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```It seems there was an issue with the import of the `truncate` function. Let's ensure that the `truncate` function is correctly defined and included in the `textkit.py` file.
+
+```tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```The `truncate` function is missing from the `textkit.py` file. Let's add it back.
+
+```tool
+{"name": "write_file", "args": {"path": "textkit.py", "content": "def word_wrap(text, width):\n    words = text.split()\n    lines = []\n    current = []\n    current_len = 0\n    for word in words:\n        if not current:\n            current = [word]\n            current_len = len(word)\n        elif current_len + 1 + len(word) <= width:\n            current.append(word)\n            current_len += 1 + len(word)\n        else:\n            lines.append(\" \".join(current))\n            current = [word]\n            current_len = len(word)\n    if current:\n        lines.append(\" \".join(current))\n    return lines\n\n\ndef truncate(text, limit, suffix=\"...\"):\n    if len(text) <= limit:\n        return text\n    cut = limit - len(suffix) + 1\n    if cut < 0:\n        cut = 0\n    return text[:cut] + suffix"}}
+```Let's run the tests again to see if the issue is resolved.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```It seems there was an issue with the import of the `title_case` function. Let's ensure that the `title_case` function is correctly defined and included in the `textkit.py` file.
+
+```tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```The `title_case` function is missing from the `textkit.py` file. Let's add it back.
+
+```tool
+{"name": "write_file", "args": {"path": "textkit.py", "content": "def word_wrap(text, width):\n    words = text.split()\n    lines = []\n    current = []\n    current_len = 0\n    for word in words:\n        if not current:\n            current = [word]\n            current_len = len(word)\n        elif current_len + 1 + len(word) <= width:\n            current.append(word)\n            current_len += 1 + len(word)\n        else:\n            lines.append(\" \".join(current))\n            current = [word]\n            current_len = len(word)\n    if current:\n        lines.append(\" \".join(current))\n    return lines\n\n\ndef truncate(text, limit, suffix=\"...\"):\n    if len(text) <= limit:\n        return text\n    cut = limit - len(suffix) + 1\n    if cut < 0:\n        cut = 0\n    return text[:cut] + suffix\n\n\ndef title_case(text):\n    SMALL_WORDS = {\"a\", \"an\", \"and\", \"the\", \"of\", \"in\", \"on\", \"or\", \"to\", \"at\", \"by\", \"for\"}\n    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if i == 0 or lower not in SMALL_WORDS:\n            result.append(lower.capitalize())\n        else:\n            result.append(lower)\n    return \" \".join(result)\n\n\ndef dedupe_spaces(text):\n    return \" \".join(text.split())"}}
+```Let's run the tests again to see if the issue is resolved.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```The `truncate` function is still not working as expected. Let's fix it.
+
+```tool
+{"name": "write_file", "args": {"path": "textkit.py", "content": "def word_wrap(text, width):\n    words = text.split()\n    lines = []\n    current = []\n    current_len = 0\n    for word in words:\n        if not current:\n            current = [word]\n            current_len = len(word)\n        elif current_len + 1 + len(word) <= width:\n            current.append(word)\n            current_len += 1 + len(word)\n        else:\n            lines.append(\" \".join(current))\n            current = [word]\n            current_len = len(word)\n    if current:\n        lines.append(\" \".join(current))\n    return lines\n\n\ndef truncate(text, limit, suffix=\"...\"):\n    if len(text) <= limit:\n        return text\n    cut = limit - len(suffix)\n    if cut < 0:\n        cut = 0\n    return text[:cut] + suffix\n\n\ndef title_case(text):\n    SMALL_WORDS = {\"a\", \"an\", \"and\", \"the\", \"of\", \"in\", \"on\", \"or\", \"to\", \"at\", \"by\", \"for\"}\n    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if i == 0 or lower not in SMALL_WORDS:\n            result.append(lower.capitalize())\n        else:\n            result.append(lower)\n    return \" \".join(result)\n\n\ndef dedupe_spaces(text):\n    return \" \".join(text.split())"}}
+```Let's run the tests again to see if the issue is resolved.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests have passed. The `textkit.py` file has been updated and the issues have been resolved.

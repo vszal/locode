@@ -1,0 +1,35 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__cand-dikvqzst/textkit.py"}}
+}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"[ ] Run tests and fix bugs in textkit.py": "[>]", "[ ] Verify all tests pass": "[ ]"}}}
+}
+```Looking at the test failures:
+
+1. **test_word_wrap_exact_fit_stays_on_one_line**: "abcd efgh" (9 chars) should stay on one line at width 9, but it's being split. The issue is in line 25: `current_len + 1 + len(word) < width` uses `<` instead of `<=`. When the total equals exactly `width`, it should still fit on the current line.
+
+2. **test_truncate_shortens_and_appends_suffix_at_exact_limit**: "abcdefghij" truncated to 5 should give "ab..." (5 chars), but it's giving "abc..." (6 chars). Looking at line 48: `cut = limit - len(suffix) + 1`. For limit=5 and suffix="...", this gives `5 - 3 + 1 = 3`, so it takes `text[:3] + "..."` = "abc...". The `+ 1` is wrong - it should just be `cut = limit - len(suffix)`.
+
+3. **test_title_case_first_word_always_capitalized**: "a tale of two cities" should become "A Tale of Two Cities", but it's becoming "a Tale of Two Cities". Looking at lines 70-71: when a word is in SMALL_WORDS, it's left lowercase. But the first word should always be capitalized regardless. The current code doesn't check if it's the first word.
+
+Let me fix these issues:
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__cand-dikvqzst/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__cand-dikvqzst/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+}
+``````tool
+{"name": "edit_file", "args": {"new": "    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            if i == 0:\n                result.append(lower.capitalize())\n            else:\n                result.append(lower)\n        else:\n            result.append(lower.capitalize())", "old": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())", "path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__cand-dikvqzst/textkit.py"}}
+}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+```All tests pass.```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+```All tests pass.

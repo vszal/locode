@@ -1,0 +1,28 @@
+
+  ⚙ glob **/broken_handler
+    ✓ (no matches)
+
+  ⚙ glob **/broken_handler*
+    ✓ (no matches)
+
+  ⚙ glob **/*.py
+    ✓ /Users/vszalvay/Code/locode/evals/night/results/compact…  (+6 more lines)
+
+  ⚙ grep def broken_handler  **/*.py
+    ✓ /Users/vszalvay/Code/locode/evals/night/results/compaction1/long-context-find__…
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/compaction1/long-context-find__qythos9__r1/workdir/…
+    ✓ 245	    return {"status": "ok", "handled_by": "foxtrot_…  (+9 more lines)
+
+  ⚙ edit_file /Users/vszalvay/Code/locode/evals/night/results/compaction1/long-context-find__qythos9__r1/workdir/…
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+9 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/compaction1/long-context-find__qythos9__r1/workdir/notes/foxtrot.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/compaction1/long-context-find__qythos9__r1/workdir/notes/foxtrot.py
+    @@ -246,4 +246,6 @@
+     
+     
+    +    # FIXME unreviewed
+    +
+     def broken_handler(request, context=None):
+         """Handle a drain request for the foxtrot subsystem.
+Done. Added the comment `# FIXME unreviewed` directly above the `def broken_handler` line in `notes/foxtrot.py`.

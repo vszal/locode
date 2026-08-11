@@ -1,0 +1,61 @@
+
+  ▤ plan 0/3 done
+    ▶ Rename get_user to fetch_user in models.py
+    ☐ Rename get_user to fetch_user in views.py
+    ☐ Verify with python3 -c "import views; print(views.show(3))"
+
+  ⚙ read_file models.py
+    ✓ 1	def get_user(uid):  (+1 more lines)
+
+  ⚙ edit_file models.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+4 more lines)
+    --- models.py
+    +++ models.py
+    @@ -1,2 +1,2 @@
+    -def get_user(uid):
+    +def fetch_user(uid):
+         return uid * 10
+
+  ⚙ read_file views.py
+    ✓ 1	from models import get_user  (+3 more lines)
+
+  ⚙ edit_file views.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+5 more lines)
+    --- views.py
+    +++ views.py
+    @@ -1,3 +1,3 @@
+    -from models import get_user
+    +from models import fetch_user
+     
+     def show(uid):
+
+  ⚙ edit_file views.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+6 more lines)
+    --- views.py
+    +++ views.py
+    @@ -2,3 +2,3 @@
+     
+     def show(uid):
+    -    return get_user(uid)
+    +    return fetch_user(uid)
+
+  ▤ plan 2/3 done
+    ☑ Rename get_user to fetch_user in models.py
+    ☑ Rename get_user to fetch_user in views.py
+    ▶ Verify with python3 -c "import views; print(views.show(3))"
+
+  ⚙ bash python3 -c "import views; print(views.show(3))"
+    ✓ 30
+
+  ▤ plan 3/3 done
+    ☑ Rename get_user to fetch_user in models.py
+    ☑ Rename get_user to fetch_user in views.py
+    ☑ Verify with python3 -c "import views; print(views.show(3))"
+Renamed `get_user` to `fetch_user` in both `models.py` and `views.py` (definition, import, and call site). Verified with `python3 -c "import views; print(views.show(3))"` which correctly prints `30`.
+
+
+  ▤ plan 3/3 done
+    ☑ Rename get_user to fetch_user in models.py
+    ☑ Rename get_user to fetch_user in views.py
+    ☑ Verify with python3 -c "import views; print(views.show(3))"
+Renamed `get_user` to `fetch_user` in both `models.py` and `views.py` (definition, import, and call site). Verified with `python3 -c "import views; print(views.show(3))"` which correctly prints `30`.

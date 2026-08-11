@@ -1,0 +1,117 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```Let's address each of the failing tests one by one.
+
+### 1. `test_word_wrap_exact_fit_stays_on_one_line`
+The test `test_word_wrap_exact_fit_stays_on_one_line` is failing because the `word_wrap` function is splitting the string "abcd efgh" into two lines when it should stay on one line.
+
+```bash
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```
+
+### 2. `test_truncate_shortens_and_appends_suffix_at_exact_limit`
+The test `test_truncate_shortens_and_appends_suffix_at_exact_limit` is failing because the `truncate` function is appending "..." instead of "ab...".
+
+```bash
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```
+
+### 3. `test_title_case_first_word_always_capitalized`
+The test `test_title_case_first_word_always_capitalized` is failing because the `title_case` function is not capitalizing the first word.
+
+```bash
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```
+
+After reviewing the code, we can make the necessary changes to fix these issues.
+
+### Fixing the `word_wrap` function
+The `word_wrap` function should not split the string if it fits exactly within the width.
+
+```bash
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "if len(line) > width:",
+    "new": "if len(line) > width and line != line.strip():"
+}}
+```
+
+### Fixing the `truncate` function
+The `truncate` function should append "ab..." instead of "..." when the limit is exactly reached.
+
+```bash
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "return text[:limit] + suffix",
+    "new": "if len(text) == limit: return text[:limit-3] + suffix\nreturn text[:limit] + suffix"
+}}
+```
+
+### Fixing the `title_case` function
+The `title_case` function should capitalize the first word.
+
+```bash
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "return ' '.join(word.capitalize() for word in text.split())",
+    "new": "return text[0].upper() + text[1:].capitalize()"
+}}
+```
+
+After making these changes, let's run the tests again to ensure they pass.
+
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```Let's address the issues one by one.
+
+### 1. `test_word_wrap_exact_fit_stays_on_one_line`
+The function `word_wrap` is splitting the text "abcd efgh" into two lines instead of keeping it as one line. This is because the condition to check if the word fits exactly on the line is missing.
+
+```tool
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "if current_len + 1 + len(word) < width:",
+    "new": "if current_len + 1 + len(word) <= width:",
+    "replace_all": false
+}}
+```
+
+### 2. `test_truncate_shortens_and_appends_suffix_at_exact_limit`
+The function `truncate` is appending "ab..." instead of "abc...". This is because the cut point is calculated incorrectly.
+
+```tool
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "cut = limit - len(suffix) + 1",
+    "new": "cut = limit - len(suffix)",
+    "replace_all": false
+}}
+```
+
+### 3. `test_title_case_first_word_always_capitalized`
+The function `title_case` is not capitalizing the first word correctly.
+
+```tool
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "if lower in SMALL_WORDS:",
+    "new": "if lower in SMALL_WORDS and word != words[0]:",
+    "replace_all": false
+}}
+```
+
+After making these changes, let's run the tests again to ensure they pass.
+
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "if lower in SMALL_WORDS:", "new": "if lower in SMALL_WORDS and word != words[0]:", "replace_all": false}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)", "replace_all": false}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests now pass. The issues have been resolved in `textkit.py`.

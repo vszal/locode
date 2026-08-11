@@ -1,0 +1,222 @@
+```json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[ ] Fix word_wrap function to handle exact fit correctly",
+      "[ ] Fix truncate function to append suffix correctly",
+      "[ ] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "read_file",
+  "arguments": {
+    "path": "textkit.py"
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "lines.append(\" \".join(current))",
+    "new": "lines.append(\" \".join(current) if current_len < width else current[0])"
+  }
+}
+``````json
+{
+  "name": "replace_lines",
+  "arguments": {
+    "path": "textkit.py",
+    "start": 29,
+    "end": 29,
+    "new": "lines.append(\" \".join(current) if current_len < width else current[0])"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[ ] Fix truncate function to append suffix correctly",
+      "[ ] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "cut = limit - len(suffix) + 1",
+    "new": "cut = limit - len(suffix)"
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[ ] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "result.append(lower)",
+    "new": "result.append(lower if i != 0 and lower in SMALL_WORDS else lower.capitalize())"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[x] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "result.append(lower if i != 0 and lower in SMALL_WORDS else lower.capitalize())",
+    "new": "result.append(lower if i != 0 and lower in SMALL_WORDS else lower.capitalize())"
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+``````json
+{
+  "name": "read_file",
+  "arguments": {
+    "path": "test_textkit.py",
+    "offset": 8,
+    "limit": 10
+  }
+}
+``````json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "lines.append(\" \".join(current) if current_len < width else current[0])",
+    "new": "lines.append(\" \".join(current) if current_len <= width else current[0])"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[x] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+``````json
+{
+  "name": "read_file",
+  "arguments": {
+    "path": "textkit.py",
+    "offset": 7,
+    "limit": 20
+  }
+}
+```The error in `test_word_wrap_exact_fit_stays_on_one_line` suggests that the `word_wrap` function is not handling the case where the text fits exactly within the specified width. The issue seems to be in the logic that appends words to the current line.
+
+Let's fix the `word_wrap` function to handle this case correctly by ensuring that if the current line length is exactly equal to the width, it appends the word to the current line.
+
+```json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "elif current_len + 1 + len(word) < width:",
+    "new": "elif current_len + 1 + len(word) <= width:"
+  }
+}
+``````json
+{
+  "name": "update_plan",
+  "arguments": {
+    "tasks": [
+      "[x] Fix word_wrap function to handle exact fit correctly",
+      "[x] Fix truncate function to append suffix correctly",
+      "[x] Fix title_case function to capitalize the first word correctly",
+      "[ ] Re-run tests to verify fixes"
+    ]
+  }
+}
+``````json
+{
+  "name": "bash",
+  "arguments": {
+    "cmd": "python3 -m pytest -q"
+  }
+}
+```The error in `test_title_case_keeps_interior_small_words_lowercase` and `test_title_case_first_word_always_capitalized` suggests that the `title_case` function is not correctly handling the index `i`. The variable `i` is not defined in the `title_case` function.
+
+Let's fix the `title_case` function to correctly handle the index by using `enumerate` to get both the index and the word.
+
+```json
+{
+  "name": "edit_file",
+  "arguments": {
+    "path": "textkit.py",
+    "old": "for word in words:",
+    "new": "for i, word in enumerate(words):"
+  }
+}
+```
+⏹ stopped (`textkit.py` still fails — 10 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea)

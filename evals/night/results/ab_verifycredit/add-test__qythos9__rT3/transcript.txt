@@ -1,0 +1,46 @@
+
+  ▤ plan 0/1 done
+    ▶ [ ]
+
+  ⚙ write_file /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test__qythos9__rT3/workdir/prim…
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test_…
+    --- /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test__qythos9__rT3/workdir/primes.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test__qythos9__rT3/workdir/primes.py
+    @@ -0,0 +1,11 @@
+    +def is_prime(n):
+    +    if n < 2:
+    +        return False
+    +    if n == 2:
+    +        return True
+    +    if n % 2 == 0:
+    +        return False
+    +    for i in range(3, int(n**0.5) + 1, 2):
+    +        if n % i == 0:
+    +            return False
+    +    return True
+
+  ⚙ write_file /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test__qythos9__rT3/workdir/test…
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test_…
+    --- /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test__qythos9__rT3/workdir/test_primes.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/ab_verifycredit/add-test__qythos9__rT3/workdir/test_primes.py
+    @@ -0,0 +1,12 @@
+    +import pytest
+    +from primes import is_prime
+    +
+    +# Prime numbers
+    +@pytest.mark.parametrize("n", [2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
+    +def test_is_prime_true(n):
+    +    assert is_prime(n) is True
+    +
+    +# Non-prime numbers
+    +@pytest.mark.parametrize("n", [0, 1, 4, 6, 8, 9, 10, 12, 14, 15, 16, 18, 20, 21, 22, 24, 25, 26, 27, 28, 30])
+    +def test_is_prime_false(n):
+    +    assert is_prime(n) is False
+
+  ⚙ bash /Users/vszalvay/Code/locode/.venv/bin/python -m pytest test_primes.py -q
+    ✓ 31 passed in 0.01s  (+1 more lines)
+All 31 tests passed. The `is_prime` function correctly identifies prime and non-prime numbers.    ⟳ open plan tasks
+
+  ▤ plan 1/1 done
+    ☑ [x]
+All tasks completed. I created `primes.py` with an `is_prime` function that correctly handles numbers less than 2, 2, even numbers, and odd composites using trial division up to √n. I then wrote `test_primes.py` with pytest parametrized tests covering 10 primes and 21 non-primes (31 total). Running `pytest test_primes.py -q` returned 31 passed in 0.01s, confirming the implementation is correct.

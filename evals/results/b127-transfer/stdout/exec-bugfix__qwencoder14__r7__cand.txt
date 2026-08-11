@@ -1,0 +1,99 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```Let's address the issues one by one:
+
+1. **test_word_wrap_exact_fit_stays_on_one_line**: The function `word_wrap` is splitting words that fit exactly on the width boundary.
+2. **test_truncate_shortens_and_appends_suffix_at_exact_limit**: The function `truncate` is not correctly handling the suffix when the text is exactly at the limit.
+3. **test_title_case_first_word_always_capitalized**: The function `title_case` is not capitalizing the first word correctly if it is in `SMALL_WORDS`.
+
+Let's fix these issues step by step.
+
+### Fix for `word_wrap`
+
+The issue is that `word_wrap` is splitting words that fit exactly on the width boundary. We need to ensure that if a word fits exactly, it stays on one line.
+
+```tool
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "current_len + 1 + len(word) < width",
+    "new": "current_len + len(word) <= width"
+}}
+```
+
+### Fix for `truncate`
+
+The issue is that `truncate` is not correctly handling the suffix when the text is exactly at the limit. We need to ensure that the suffix is appended correctly.
+
+```tool
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "cut = limit - len(suffix) + 1",
+    "new": "cut = limit - len(suffix)"
+}}
+```
+
+### Fix for `title_case`
+
+The issue is that `title_case` is not capitalizing the first word correctly if it is in `SMALL_WORDS`. We need to ensure that the first word is always capitalized regardless of `SMALL_WORDS` membership.
+
+```tool
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "if lower in SMALL_WORDS:",
+    "new": "if lower in SMALL_WORDS and word != words[0]:"
+}}
+```
+
+After making these changes, let's run the tests again to ensure they pass.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower)", "new": "result.append(lower if i == 0 else lower.capitalize())", "occurrence": 1}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower if i == 0 else lower.capitalize())", "new": "result.append(lower if i == 0 else lower.capitalize())", "occurrence": 1}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "test_textkit.py", "offset": 50, "limit": 10}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower if i == 0 else lower.capitalize())", "new": "result.append(lower if i == 0 else lower.capitalize())", "occurrence": 1}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py", "offset": 57, "limit": 20}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower if i == 0 else lower.capitalize())", "new": "result.append(lower if i == 0 else lower.capitalize())", "occurrence": 1}}
+```It seems that the error is due to the variable `i` not being defined in the `title_case` function. The variable `i` is not used anywhere in the function, so it should be replaced with the correct variable that keeps track of the index of the word in the list.
+
+Let's fix the `title_case` function by using the `enumerate` function to get both the index and the word, and then use the index to determine whether the word is the first word or not.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "for word in words:", "new": "for i, word in enumerate(words):"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "for word in words:", "new": "for i, word in enumerate(words):", "occurrence": 2}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```The error is due to the incorrect handling of the first word in the `title_case` function. The first word should always be capitalized regardless of whether it is a small word or not.
+
+Let's fix the `title_case` function by ensuring that the first word is always capitalized.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower if i == 0 else lower.capitalize())", "new": "result.append(word.capitalize() if i == 0 else (lower if i == 0 else lower.capitalize()))", "occurrence": 1}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "test_textkit.py", "offset": 50, "limit": 10}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(word.capitalize() if i == 0 else (lower if i == 0 else lower.capitalize()))", "new": "result.append(word.capitalize() if i == 0 else (lower if i != 0 and lower in SMALL_WORDS else lower.capitalize()))", "occurrence": 1}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests have passed. The `textkit.py` file has been successfully fixed.

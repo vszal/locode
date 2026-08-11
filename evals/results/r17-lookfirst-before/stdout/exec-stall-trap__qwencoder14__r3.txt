@@ -1,0 +1,58 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```The tests are failing due to issues in the `parse_records` function in `parser.py`. Let's update the plan to fix these issues:
+
+1. Read the current content of `parser.py`.
+2. Identify the issues in the `parse_records` function based on the test failures.
+3. Fix the `parse_records` function.
+4. Re-run the tests to ensure all tests pass.
+
+```bash
+{"name": "read_file", "args": {"path": "parser.py"}}
+```The `parse_records` function needs to be fixed to handle the cases where the last record does not have a trailing separator and where extra blank lines do not create empty records. Let's update the function accordingly.
+
+```python
+def parse_records(text):
+    """Parse `text` into a list of record dicts.
+    
+    Format: `text` is a sequence of lines. Each non-blank line is a
+    "key: value" pair belonging to the current record -- the key is
+    everything before the first colon, the value is everything after,
+    both stripped of surrounding whitespace. One or more consecutive
+    blank lines separate one record from the next (multiple blank lines
+    in a row are equivalent to a single separator and never produce an
+    empty record on their own). A record with at least one field is
+    included in the result, in the order it was encountered, as a dict
+    of its fields. Leading/trailing blank lines in `text` do not produce
+    empty records. If `text` has no fields at all, an empty list is
+    returned.
+    """
+    records = []
+    current = {}
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line == "":
+            if current:
+                records.append(current)
+                current = {}
+        else:
+            key, _, value = line.partition(":")
+            current[key.strip()] = value.strip()
+    if current:
+        records.append(current)
+    return records
+```
+
+Now, let's write this updated function back to `parser.py`.
+
+```bash
+{"name": "write_file", "args": {"path": "parser.py", "content": "def parse_records(text):\n    records = []\n    current = {}\n    for raw_line in text.splitlines():\n        line = raw_line.strip()\n        if line == \"\":\n            if current:\n                records.append(current)\n                current = {}\n        else:\n            key, _, value = line.partition(\":\")\n            current[key.strip()] = value.strip()\n    if current:\n        records.append(current)\n    return records"}}
+```
+
+After writing the updated function, let's re-run the tests to ensure all tests pass.
+
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests now pass. The `parse_records` function has been successfully fixed.

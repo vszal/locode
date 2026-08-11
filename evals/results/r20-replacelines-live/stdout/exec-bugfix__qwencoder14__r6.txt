@@ -1,0 +1,112 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```Let's address the issues one by one:
+
+1. **`test_word_wrap_exact_fit_stays_on_one_line`**: The function `word_wrap` is splitting the text "abcd efgh" into two lines because it is adding a space between "abcd" and "efgh". We need to ensure that if the text fits exactly into the width, it stays on one line.
+
+2. **`test_truncate_shortens_and_appends_suffix_at_exact_limit`**: The function `truncate` is appending "..." instead of "..." because it is adding an extra character. We need to ensure that the suffix is appended correctly without extra characters.
+
+3. **`test_title_case_first_word_always_capitalized`**: The function `title_case` is not capitalizing the first word if it is in `SMALL_WORDS`. We need to ensure that the first word is always capitalized regardless of its membership in `SMALL_WORDS`.
+
+Let's fix these issues in `textkit.py`.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current.append(word)", "new": "current.append(word)"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current_len += 1 + len(word)", "new": "current_len += len(word)"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "if lower in SMALL_WORDS:", "new": "if lower in SMALL_WORDS and index != 0:"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower)", "new": "result.append(lower.capitalize())"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower.capitalize())", "new": "result.append(lower.capitalize())"}}
+```
+
+After making these changes, let's run the tests again to ensure they pass.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```Let's address the first failure:
+
+```
+__________________ test_word_wrap_exact_fit_stays_on_one_line __________________
+    def test_word_wrap_exact_fit_stays_on_one_line():
+        # "abcd efgh" is exactly 9 characters -> should NOT wrap at width 9.
+>       assert word_wrap("abcd efgh", 9) == ["abcd efgh"]
+E       AssertionError: assert ['abcd', 'efgh'] == ['abcd efgh']
+E         
+E         At index 0 diff: 'abcd' != 'abcd efgh'
+E         Left contains one more item: 'efgh'
+E         Use -v to get more diff
+```
+
+The issue is that the `word_wrap` function is splitting the text into two lines when it should stay on one line if the text fits exactly within the width.
+
+Let's fix this by ensuring that if the current line length plus the next word length equals the width, we append the word to the current line without adding a newline.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "elif current_len + 1 + len(word) < width:", "new": "elif current_len + len(word) <= width:"}}
+```Now let's address the second failure:
+
+```
+___________ test_truncate_shortens_and_appends_suffix_at_exact_limit ___________
+    def test_truncate_shortens_and_appends_suffix_at_exact_limit():
+        result = truncate("abcdefghij", 5)
+>       assert result == "ab..."
+E       AssertionError: assert 'abc...' == 'ab...'
+E         
+E         - ab...
+E         ?   +
+E         + abc...
+E         ?   +
+
+/Users/vszalvay/Code/locode/evals/cases/exec-bugfix/seed/test_textkit.py:35: AssertionError
+```
+
+The issue here is that the `truncate` function is not correctly handling the case where the text fits exactly within the limit minus the suffix length. We need to ensure that the text is truncated correctly and the suffix is appended.
+
+Let's fix this by adjusting the `cut` calculation to ensure it correctly handles the case where the text fits exactly within the limit minus the suffix length.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)"}}
+```Now let's address the third failure:
+
+```
+________________ test_title_case_first_word_always_capitalized _________________
+
+    def test_title_case_first_word_always_capitalized():
+>       assert title_case("a tale of two cities") == "A Tale of Two Cities"
+E       AssertionError: assert 'a Tale of Two Cities' == 'A Tale of Two Cities'
+E         
+E         - A Tale of Two Cities
+E         ? ^
+E         + a Tale of Two Cities
+E         ? ^
+
+/Users/vszalvay/Code/locode/evals/cases/exec-bugfix/seed/test_textkit.py:55: AssertionError
+```
+
+The issue here is that the `title_case` function is not capitalizing the first word of the text. We need to ensure that the first word is always capitalized regardless of whether it is in the `SMALL_WORDS` set.
+
+Let's fix this by modifying the `title_case` function to capitalize the first word regardless of its membership in `SMALL_WORDS`.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "if lower in SMALL_WORDS:", "new": "if lower in SMALL_WORDS and index != 0:"}}
+```Now let's run the tests again to see if all the issues are resolved.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```The `title_case` function is missing the `index` variable, which is used to track the position of each word in the list. We need to add this variable to the loop.
+
+Let's fix this by adding the `index` variable to the `title_case` function.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "for word in words:", "new": "for index, word in enumerate(words):"}}
+```Let's fix the `title_case` function by adding the `index` variable to the loop.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "for word in words:", "new": "for index, word in enumerate(words):", "replace_all": true}}
+```Now let's run the tests again to see if all the issues are resolved.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests have passed. The `textkit.py` file has been successfully updated to fix the bugs.

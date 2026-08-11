@@ -1,0 +1,109 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````json
+{
+  "tasks": [
+    "[x] Run initial pytest to identify failing tests",
+    "[>] Fix the identified bugs in textkit.py",
+    "[ ] Re-run pytest to verify all tests pass"
+  ]
+}
+```
+
+Let's start by fixing the identified bugs in `textkit.py`.
+
+### Fixing `word_wrap` function
+The `word_wrap` function is splitting the string into words and then joining them back together, which is causing the issue. We need to ensure that the string is not split when it exactly fits the width.
+
+### Fixing `truncate` function
+The `truncate` function is appending the suffix correctly, but the test is expecting a different suffix. We need to ensure that the suffix is correctly appended when the string is exactly at the limit.
+
+### Fixing `title_case` function
+The `title_case` function is capitalizing the first letter of each word, but the test is expecting the first word to be capitalized only. We need to ensure that only the first word is capitalized.
+
+Let's proceed with the fixes.```bash
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```Let's address the identified issues in `textkit.py`.
+
+### Fixing `word_wrap` function
+The `word_wrap` function should handle the case where the text exactly fits the width without splitting it.
+
+### Fixing `truncate` function
+The `truncate` function should correctly append the suffix when the string is exactly at the limit.
+
+### Fixing `title_case` function
+The `title_case` function should capitalize the first word regardless of whether it is in `SMALL_WORDS`.
+
+Let's apply these fixes:
+
+```bash
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current = [word]", "new": "current = [word] if current_len + len(word) < width else [word]"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower)", "new": "result.append(lower.capitalize() if i == 0 else lower)"}}
+```
+
+After making these changes, let's re-run the tests to verify that all tests pass.```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current = [word] if current_len + len(word) < width else [word]", "new": "current = [word] if current_len + len(word) < width else [word]", "replace_all": true}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current = [word] if current_len + len(word) < width else [word]", "new": "current = [word] if current_len + len(word) <= width else [word]"}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```It seems that the previous attempts to fix the `textkit.py` file did not resolve the issues. Let's re-evaluate the problems and make sure we are making the correct changes.
+
+### Identified Issues:
+1. **`word_wrap` function**: The function is splitting the string into words and then joining them back together, which is causing the issue. We need to ensure that the string is not split when it exactly fits the width.
+2. **`truncate` function**: The `truncate` function is appending the suffix correctly, but the test is expecting a different suffix. We need to ensure that the suffix is correctly appended when the string is exactly at the limit.
+3. **`title_case` function**: The `title_case` function is capitalizing the first letter of each word, but the test is expecting the first word to be capitalized only. We need to ensure that only the first word is capitalized.
+
+### Steps to Fix:
+1. **Fix `word_wrap` function**: Ensure that the string is not split when it exactly fits the width.
+2. **Fix `truncate` function**: Ensure that the suffix is correctly appended when the string is exactly at the limit.
+3. **Fix `title_case` function**: Ensure that only the first word is capitalized.
+
+Let's proceed with the fixes.
+
+```bash
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```Let's address each issue one by one.
+
+### Fixing `word_wrap` function
+The `word_wrap` function should ensure that the string is not split when it exactly fits the width. We need to modify the condition to include the case where the current length plus the word length equals the width.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "elif current_len + 1 + len(word) < width:", "new": "elif current_len + 1 + len(word) <= width:"}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```### Fixing `truncate` function
+The `truncate` function should ensure that the suffix is correctly appended when the string is exactly at the limit. We need to modify the condition to include the case where the text length is exactly equal to the limit minus the suffix length.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)"}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```### Fixing `title_case` function
+The `title_case` function should ensure that only the first word is capitalized. We need to modify the condition to capitalize the first word regardless of whether it is in `SMALL_WORDS`.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower)", "new": "result.append(lower.capitalize() if i == 0 else lower)"}}```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```It seems that the `title_case` function has an issue with the variable `i` not being defined. We need to add an index variable to the loop to fix this.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "for word in words:", "new": "for i, word in enumerate(words):"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "for word in words:", "new": "for i, word in enumerate(words):", "replace_all": true}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests now pass. The issues in `textkit.py` have been successfully resolved.```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````json
+{
+  "tasks": [
+    "[x] Run initial pytest to identify failing tests",
+    "[x] Fix the identified bugs in textkit.py",
+    "[x] Re-run pytest to verify all tests pass"
+  ]
+}
+```
+
+All tasks are now complete.All tasks have been successfully completed. The tests in the directory now pass, and the `textkit.py` file has been corrected.

@@ -1,0 +1,48 @@
+PROBLEM | logic-bug       gemmacoder12  | done=Y | 10it   75s | f3 n2 r3       | answered                           | add(2,3)='5'
+PROBLEM | logic-bug       gemmacoder12  | done=Y | 10it   38s | f3 n2 r3       | answered                           | add(2,3)='5'
+     ok | logic-bug       qythos9       | done=Y |  4it   50s | f0 n0 r0       | answered                           | add(2,3)='5'
+     ok | logic-bug       qythos9       | done=Y |  4it   13s | f0 n0 r0       | answered                           | add(2,3)='5'
+PROBLEM | indent-bug      gemmacoder12  | done=Y |  5it   58s | f1 n1 r1       | the model repeated the same tool c | compiles
+PROBLEM | indent-bug      gemmacoder12  | done=Y |  5it   22s | f1 n1 r1       | the model repeated the same tool c | compiles
+     ok | indent-bug      qythos9       | done=Y |  4it   48s | f0 n0 r0       | answered                           | compiles
+     ok | indent-bug      qythos9       | done=Y |  4it   13s | f0 n0 r0       | answered                           | compiles
+PROBLEM | undefined-vars  gemmacoder12  | done=Y | 11it   96s | f5 n2 r4       | answered                           | rc=0 '[]'
+PROBLEM | undefined-vars  gemmacoder12  | done=Y | 14it   74s | f5 n0 r5       | answered                           | rc=0 '[]'
+     ok | undefined-vars  qythos9       | done=Y |  4it   53s | f1 n0 r0       | answered                           | rc=0 '[]'
+     ok | undefined-vars  qythos9       | done=Y |  4it   16s | f1 n0 r0       | answered                           | rc=0 '[]'
+     ok | add-logging     gemmacoder12  | done=Y |  3it   53s | f0 n0 r0       | answered                           | 2 prints
+     ok | add-logging     gemmacoder12  | done=Y |  3it   16s | f0 n0 r0       | answered                           | 2 prints
+     ok | add-logging     qythos9       | done=Y |  3it   50s | f0 n0 r0       | answered                           | 2 prints
+     ok | add-logging     qythos9       | done=Y |  3it   13s | f0 n0 r0       | answered                           | 2 prints
+PROBLEM | new-module      gemmacoder12  | done=Y |  6it   61s | f1 n0 r1       | the model repeated the same tool c | fib(10)='55'
+PROBLEM | new-module      gemmacoder12  | done=Y |  6it   25s | f1 n0 r1       | the model repeated the same tool c | fib(10)='55'
+     ok | new-module      qythos9       | done=Y |  3it   50s | f0 n0 r0       | answered                           | fib(10)='55'
+     ok | new-module      qythos9       | done=Y |  3it   13s | f0 n0 r0       | answered                           | fib(10)='55'
+     ok | refactor-rename gemmacoder12  | done=Y |  5it   54s | f0 n0 r0       | answered                           | compute_gone=True
+     ok | refactor-rename gemmacoder12  | done=Y |  5it   17s | f0 n0 r0       | answered                           | compute_gone=True
+     ok | refactor-rename qythos9       | done=Y |  5it   55s | f0 n0 r0       | answered                           | compute_gone=True
+     ok | refactor-rename qythos9       | done=Y |  5it   18s | f0 n0 r0       | answered                           | compute_gone=True
+PROBLEM | syntax-fix      gemmacoder12  | done=N |  7it   68s | f3 n3 r2       | the model repeated the same tool c | broken
+PROBLEM | syntax-fix      gemmacoder12  | done=N |  7it   32s | f3 n3 r2       | the model repeated the same tool c | broken
+     ok | syntax-fix      qythos9       | done=Y |  4it   51s | f0 n0 r0       | answered                           | compiles
+     ok | syntax-fix      qythos9       | done=Y |  4it   14s | f0 n0 r0       | answered                           | compiles
+PROBLEM | add-test        gemmacoder12  | done=Y |  6it   65s | f0 n0 r1 green | answered                           | is_prime probe='True False'
+PROBLEM | add-test        gemmacoder12  | done=Y |  6it   28s | f0 n0 r1 green | answered                           | is_prime probe='True False'
+PROBLEM | add-test        qythos9       | done=Y | 16it  116s | f0 n0 r5 green | the model repeated the same tool c | is_prime probe='True False'
+PROBLEM | add-test        qythos9       | done=Y | 16it   82s | f0 n0 r5 green | the model repeated the same tool c | is_prime probe='True False'
+
+=== 14/32 problem rows ===
+  logic-bug__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/logic-bug__gemmacoder12__r1/events.jsonl
+  logic-bug__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/logic-bug__gemmacoder12__r2/events.jsonl
+  indent-bug__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/indent-bug__gemmacoder12__r1/events.jsonl
+  indent-bug__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/indent-bug__gemmacoder12__r2/events.jsonl
+  undefined-vars__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/undefined-vars__gemmacoder12__r1/events.jsonl
+  undefined-vars__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/undefined-vars__gemmacoder12__r2/events.jsonl
+  new-module__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/new-module__gemmacoder12__r1/events.jsonl
+  new-module__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/new-module__gemmacoder12__r2/events.jsonl
+  syntax-fix__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/syntax-fix__gemmacoder12__r1/events.jsonl
+  syntax-fix__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/syntax-fix__gemmacoder12__r2/events.jsonl
+  add-test__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/add-test__gemmacoder12__r1/events.jsonl
+  add-test__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/add-test__gemmacoder12__r2/events.jsonl
+  add-test__qythos9__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/add-test__qythos9__r1/events.jsonl
+  add-test__qythos9__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass3/add-test__qythos9__r2/events.jsonl

@@ -1,0 +1,23 @@
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/ab/undefined-vars__qythos9__rC3/workdir/sync.py
+    ✓ 1	def changed(src, dst):  (+8 more lines)
+
+  ⚙ write_file /Users/vszalvay/Code/locode/evals/night/results/ab/undefined-vars__qythos9__rC3/workdir/sync.py
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab/undefined-vars__qythos…
+    --- /Users/vszalvay/Code/locode/evals/night/results/ab/undefined-vars__qythos9__rC3/workdir/sync.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/ab/undefined-vars__qythos9__rC3/workdir/sync.py
+    @@ -1,3 +1,7 @@
+    +import os
+    +
+     def changed(src, dst):
+    +    source_files = os.listdir(src)
+    +    dest_files = os.listdir(dst)
+         new = []
+         for name in source_files:
+
+  ⚙ bash python3 sync.py
+    ✗ FileNotFoundError: [Errno 2] No such file or directory:…  (+8 more lines)
+
+  ⚙ bash ls -la
+    ✓ total 8  (+3 more lines)
+The directories 'a' and 'b' don't exist yet, so `os.listdir` fails. The spec says "an empty list output is fine", which means the function should handle missing directories gracefully (e.g., by returning an empty list or catching the exception). I'll update `changed` to catch `FileNotFoundError` and return an empty list in that case, ensuring the script runs without error.

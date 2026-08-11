@@ -1,0 +1,88 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```The tests are failing due to issues in the `parse_records` function in `parser.py`. Let's update the plan to fix these issues.
+
+```json
+{
+  "tasks": [
+    "[>] Read the current implementation of `parse_records` in `parser.py`.",
+    "[ ] Identify the issues causing the test failures.",
+    "[ ] Fix the `parse_records` function to handle the cases described in the failing tests.",
+    "[ ] Run the tests again to ensure all tests pass."
+  ]
+}
+```
+
+Let's start by reading the current implementation of `parse_records` in `parser.py`.
+
+```bash
+{"name": "read_file", "args": {"path": "parser.py"}}
+``````bash
+{"name": "read_file", "args": {"path": "parser.py"}}
+```The current implementation of `parse_records` has a few issues:
+
+1. It appends the current record to the list when it encounters a blank line, which can lead to an empty record if the text ends with a blank line.
+2. It does not handle the case where the last record does not have a trailing separator correctly.
+
+Let's fix these issues by modifying the `parse_records` function.
+
+```python
+def parse_records(text):
+    """Parse `text` into a list of record dicts.
+    
+    Format: `text` is a sequence of lines. Each non-blank line is a
+    "key: value" pair belonging to the current record -- the key is
+    everything before the first colon, the value is everything after,
+    both stripped of surrounding whitespace. One or more consecutive
+    blank lines separate one record from the next (multiple blank lines
+    in a row are equivalent to a single separator and never produce an
+    empty record on their own). A record with at least one field is
+    included in the result, in the order it was encountered, as a dict
+    of its fields. Leading/trailing blank lines in `text` do not produce
+    empty records. If `text` has no fields at all, an empty list is
+    returned.
+    """
+    records = []
+    current = {}
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line == "":
+            if current:
+                records.append(current)
+                current = {}
+        else:
+            key, _, value = line.partition(":")
+            current[key.strip()] = value.strip()
+    if current:
+        records.append(current)
+    return records
+```
+
+Now, let's update the file with the new implementation.
+
+```bash
+{"name": "write_file", "args": {"path": "parser.py", "content": "def parse_records(text):\n    records = []\n    current = {}\n    for raw_line in text.splitlines():\n        line = raw_line.strip()\n        if line == \"\":\n            if current:\n                records.append(current)\n                current = {}\n        else:\n            key, _, value = line.partition(\":\")\n            current[key.strip()] = value.strip()\n    if current:\n        records.append(current)\n    return records"}}
+```
+
+After updating the file, let's run the tests again to ensure all tests pass.
+
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```All tests now pass. The `parse_records` function has been successfully updated to handle the cases described in the failing tests.
+
+```json
+{
+  "tasks": [
+    "[x] Read the current implementation of `parse_records` in `parser.py`.",
+    "[x] Identify the issues causing the test failures.",
+    "[x] Fix the `parse_records` function to handle the cases described in the failing tests.",
+    "[x] Run the tests again to ensure all tests pass."
+  ]
+}
+```
+
+The task is complete.All tests now pass. The `parse_records` function has been successfully updated to handle the cases described in the failing tests.
+
+The task is complete.

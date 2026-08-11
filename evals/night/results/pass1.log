@@ -1,0 +1,26 @@
+     ok | logic-bug       gemmacoder12  | done=Y |  5it   18s | f1 n0 r0       | answered                           | add(2,3)='5'
+     ok | logic-bug       qythos9       | done=Y |  4it   51s | f0 n0 r0       | answered                           | add(2,3)='5'
+PROBLEM | indent-bug      gemmacoder12  | done=Y | 10it   68s | f1 n1 r3       | the model repeated the same tool c | compiles
+PROBLEM | indent-bug      qythos9       | done=N |  8it   69s | f1 n1 r3       | the model repeated the same tool c | still broken
+PROBLEM | undefined-vars  gemmacoder12  | done=Y |  9it   87s | f3 n1 r2       | answered                           | rc=0 '[]'
+PROBLEM | undefined-vars  qythos9       | done=Y |  6it   65s | f1 n0 r1       | answered                           | rc=0 '[]'
+     ok | add-logging     gemmacoder12  | done=Y |  6it   71s | f1 n1 r0       | answered                           | 2 prints
+     ok | add-logging     qythos9       | done=Y |  3it   50s | f0 n0 r0       | answered                           | 2 prints
+PROBLEM | new-module      gemmacoder12  | done=Y |  6it   62s | f1 n0 r1       | answered                           | fib(10)='55'
+     ok | new-module      qythos9       | done=Y |  3it   51s | f0 n0 r0       | answered                           | fib(10)='55'
+     ok | refactor-rename gemmacoder12  | done=Y |  7it   70s | f0 n0 r0       | answered                           | compute_gone=True
+     ok | refactor-rename qythos9       | done=Y |  5it   56s | f0 n0 r0       | answered                           | compute_gone=True
+PROBLEM | syntax-fix      gemmacoder12  | done=N |  3it   49s | f0 n0 r0       | answered                           | broken
+     ok | syntax-fix      qythos9       | done=Y |  4it   51s | f0 n0 r0       | answered                           | compiles
+PROBLEM | add-test        gemmacoder12  | done=Y |  7it   68s | f0 n0 r1 green | the model repeated the same tool c | is_prime probe='True False'
+PROBLEM | add-test        qythos9       | done=Y | 11it   92s | f0 n0 r1 green | answered                           | is_prime probe='True False'
+
+=== 8/16 problem rows ===
+  indent-bug__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass1/indent-bug__gemmacoder12__r1/events.jsonl
+  indent-bug__qythos9__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass1/indent-bug__qythos9__r1/events.jsonl
+  undefined-vars__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass1/undefined-vars__gemmacoder12__r1/events.jsonl
+  undefined-vars__qythos9__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass1/undefined-vars__qythos9__r1/events.jsonl
+  new-module__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass1/new-module__gemmacoder12__r1/events.jsonl
+  syntax-fix__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass1/syntax-fix__gemmacoder12__r1/events.jsonl
+  add-test__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass1/add-test__gemmacoder12__r1/events.jsonl
+  add-test__qythos9__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass1/add-test__qythos9__r1/events.jsonl

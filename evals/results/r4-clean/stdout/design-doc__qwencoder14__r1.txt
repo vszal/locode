@@ -1,0 +1,282 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Read SPEC.md",
+    "[>] Write an overview of the approach",
+    "[ ] Write the public API section",
+    "[ ] Write the persistence schema section",
+    "[ ] Write the retries and backoff section",
+    "[ ] Write the crash recovery section",
+    "[ ] Write the failure modes section",
+    "[ ] Write the trade-offs section"
+]}}
+```## Overview of the Approach
+
+The `taskq` library will be designed as a durable in-process task queue using Python's standard library, specifically the `sqlite3` module for persistence. The library will support multiple worker threads within a single process, ensuring thread safety for both enqueuing and processing tasks. The design will focus on reliability, ensuring that tasks are not lost if the process is killed mid-run and that no task is executed by two workers simultaneously.
+
+To achieve atomic task claiming and prevent tasks from being stuck indefinitely, we will use SQLite transactions and appropriate locking mechanisms. The library will implement a backoff strategy for retries to avoid hammering failing dependencies. Additionally, observability features will be included to allow operators to monitor the state of tasks, including pending, running, failed, and dead tasks.
+
+The design will address open questions such as task claiming, duplicate work prevention, handling of failed tasks, and the handler contract to distinguish between permanent and transient failures.```tool
+{"name": "write_file", "args": {"path": "DESIGN.md", "content": "## Overview of the Approach\n\nThe `taskq` library will be designed as a durable in-process task queue using Python's standard library, specifically the `sqlite3` module for persistence. The library will support multiple worker threads within a single process, ensuring thread safety for both enqueuing and processing tasks. The design will focus on reliability, ensuring that tasks are not lost if the process is killed mid-run and that no task is executed by two workers simultaneously.\n\nTo achieve atomic task claiming and prevent tasks from being stuck indefinitely, we will use SQLite transactions and appropriate locking mechanisms. The library will implement a backoff strategy for retries to avoid hammering failing dependencies. Additionally, observability features will be included to allow operators to monitor the state of tasks, including pending, running, failed, and dead tasks.\n\nThe design will address open questions such as task claiming, duplicate work prevention, handling of failed tasks, and the handler contract to distinguish between permanent and transient failures.\n\n## Public API\n\nTODO\n\n## Persistence Schema\n\nTODO\n\n## Retries and Backoff\n\nTODO\n\n## Crash Recovery\n\nTODO\n\n## Failure Modes\n\nTODO\n\n## Trade-offs\n\nTODO"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Read SPEC.md",
+    "[x] Write an overview of the approach",
+    "[>] Write the public API section",
+    "[ ] Write the persistence schema section",
+    "[ ] Write the retries and backoff section",
+    "[ ] Write the crash recovery section",
+    "[ ] Write the failure modes section",
+    "[ ] Write the trade-offs section"
+]}}
+```## Public API
+
+The `taskq` library will expose the following public API:
+
+### Enqueueing Tasks
+
+```python
+def enqueue(task_name: str, payload: dict, delay_seconds: int = 0) -> int:
+    """
+    Enqueues a task with the given name and JSON-serializable payload.
+    If delay_seconds is specified, the task will be run after that delay.
+    
+    Returns the task ID.
+    """
+```
+
+### Registering Task Handlers
+
+```python
+def register_handler(task_name: str, handler: Callable[[dict], None]) -> None:
+    """
+    Registers a handler function for the given task name.
+    The handler function takes a single argument, the task payload.
+    """
+```
+
+### Starting Workers
+
+```python
+def start_workers(num_workers: int) -> None:
+    """
+    Starts the specified number of worker threads to process tasks.
+    """
+```
+
+### Observability
+
+```python
+def get_task_stats() -> dict:
+    """
+    Returns a dictionary with the following keys:
+    - pending: number of tasks waiting to be processed
+    - running: number of tasks currently being processed
+    - failed: number of tasks that have failed
+    - dead: number of tasks that have been set aside for human inspection
+    """
+```
+
+### Example Usage
+
+```python
+import taskq
+
+def my_task_handler(payload):
+    print(f"Processing task with payload: {payload}")
+
+taskq.register_handler("my_task", my_task_handler)
+taskq.enqueue("my_task", {"data": "example"})
+taskq.start_workers(4)
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Read SPEC.md",
+    "[x] Write an overview of the approach",
+    "[x] Write the public API section",
+    "[>] Write the persistence schema section",
+    "[ ] Write the retries and backoff section",
+    "[ ] Write the crash recovery section",
+    "[ ] Write the failure modes section",
+    "[ ] Write the trade-offs section"
+]}}
+```## Persistence Schema
+
+The `taskq` library will use an SQLite database to store tasks and their state. The schema will include the following tables:
+
+### Tasks Table
+
+| Column Name | Type    | Description                     |
+|-------------|---------|---------------------------------|
+| id          | INTEGER | Unique identifier for the task  |
+| name        | TEXT    | Name of the task                |
+| payload     | TEXT    | JSON-serialized task payload    |
+| state       | TEXT    | Current state of the task (e.g., pending, running, failed, dead) |
+| claimant    | TEXT    | Identifier of the worker claiming the task |
+| claim_time  | INTEGER | Timestamp of when the task was claimed |
+| delay_until | INTEGER | Timestamp until which the task is delayed |
+
+### Workers Table
+
+| Column Name | Type    | Description                     |
+|-------------|---------|---------------------------------|
+| id          | INTEGER | Unique identifier for the worker  |
+| name        | TEXT    | Name of the worker                |
+
+### Claims Table
+
+| Column Name | Type    | Description                     |
+|-------------|---------|---------------------------------|
+| task_id     | INTEGER | Foreign key to Tasks.id         |
+| worker_id   | INTEGER | Foreign key to Workers.id       |
+| claim_time  | INTEGER | Timestamp of when the claim was made |
+
+### Example Schema Creation SQL
+
+```sql
+CREATE TABLE Tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    state TEXT NOT NULL,
+    claimant TEXT,
+    claim_time INTEGER,
+    delay_until INTEGER
+);
+
+CREATE TABLE Workers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE Claims (
+    task_id INTEGER,
+    worker_id INTEGER,
+    claim_time INTEGER,
+    FOREIGN KEY (task_id) REFERENCES Tasks(id),
+    FOREIGN KEY (worker_id) REFERENCES Workers(id)
+);
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Read SPEC.md",
+    "[x] Write an overview of the approach",
+    "[x] Write the public API section",
+    "[x] Write the persistence schema section",
+    "[>] Write the retries and backoff section",
+    "[ ] Write the crash recovery section",
+    "[ ] Write the failure modes section",
+    "[ ] Write the trade-offs section"
+]}}
+```## Retries and Backoff
+
+To handle retries and backoff, the `taskq` library will implement the following strategy:
+
+1. **Retry Logic**: When a task raises an exception, it will be retried a specified number of times (e.g., 5 times).
+2. **Backoff Strategy**: After each failure, the task will be retried after an exponentially increasing delay (e.g., 1 second, 2 seconds, 4 seconds, 8 seconds, etc.).
+
+### Example Implementation
+
+```python
+import time
+import random
+
+def retry_task(task_id, max_retries=5, backoff_factor=2):
+    retries = 0
+    while retries < max_retries:
+        try:
+            # Attempt to process the task
+            process_task(task_id)
+            break
+        except Exception as e:
+            retries += 1
+            if retries < max_retries:
+                delay = backoff_factor ** retries + random.uniform(0, 1)
+                time.sleep(delay)
+            else:
+                mark_task_as_failed(task_id)
+```
+
+### Configuration
+
+- **Max Retries**: The maximum number of retries for a task.
+- **Backoff Factor**: The factor by which the delay is increased after each failure.
+
+### Example Usage
+
+```python
+import taskq
+
+def my_task_handler(payload):
+    print(f"Processing task with payload: {payload}")
+    # Simulate a failure
+    raise Exception("Task failed")
+
+taskq.register_handler("my_task", my_task_handler)
+taskq.enqueue("my_task", {"data": "example"})
+taskq.start_workers(4)
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Read SPEC.md",
+    "[x] Write an overview of the approach",
+    "[x] Write the public API section",
+    "[x] Write the persistence schema section",
+    "[x] Write the retries and backoff section",
+    "[>] Write the crash recovery section",
+    "[ ] Write the failure modes section",
+    "[ ] Write the trade-offs section"
+]}}
+```## Crash Recovery
+
+To ensure crash recovery, the `taskq` library will implement the following mechanisms:
+
+1. **Atomic Task Claiming**: When a worker claims a task, it will use an SQLite transaction to mark the task as claimed and record the claimant's identifier.
+2. **Claim Expiration**: If a worker is killed (e.g., via SIGKILL or power loss), the claim will expire after a certain period (e.g., 1 minute). Other workers can then claim the task again.
+3. **Task Re-enqueueing**: After a crash, any tasks that were claimed but not completed will be re-enqueued for processing.
+
+### Example Implementation
+
+```python
+import time
+
+def claim_task(task_id, worker_id, claim_timeout=60):
+    with sqlite3.connect('taskq.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN TRANSACTION")
+        cursor.execute("UPDATE Tasks SET state='claimed', claimant=?, claim_time=? WHERE id=? AND state='pending'", (worker_id, int(time.time()), task_id))
+        if cursor.rowcount == 0:
+            raise Exception("Task already claimed or not found")
+        cursor.execute("INSERT INTO Claims (task_id, worker_id, claim_time) VALUES (?, ?, ?)", (task_id, worker_id, int(time.time())))
+        conn.commit()
+
+def release_task(task_id, worker_id):
+    with sqlite3.connect('taskq.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE Tasks SET state='pending', claimant=NULL, claim_time=NULL WHERE id=? AND claimant=?", (task_id, worker_id))
+        cursor.execute("DELETE FROM Claims WHERE task_id=? AND worker_id=?", (task_id, worker_id))
+        conn.commit()
+
+def check_and_reclaim_tasks(worker_id):
+    with sqlite3.connect('taskq.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM Tasks WHERE state='claimed' AND claim_time < ?", (int(time.time()) - 60,))
+        for row in cursor.fetchall():
+            task_id = row[0]
+            cursor.execute("UPDATE Tasks SET state='pending', claimant=NULL, claim_time=NULL WHERE id=? AND claimant=?", (task_id, worker_id))
+            cursor.execute("DELETE FROM Claims WHERE task_id=? AND worker_id=?", (task_id, worker_id))
+        conn.commit()
+```
+
+### Example Usage
+
+```python
+import taskq
+
+def my_task_handler(payload):
+    print(f"Processing task with payload: {payload}")
+    # Simulate a crash
+    raise Exception("Worker crashed")
+
+taskq.register_handler("my_task", my_task_handler)
+taskq.enqueue("my_task", {"data": "example"})
+taskq.start_workers(4)
+```

@@ -1,0 +1,22 @@
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/pass12/dedup-order__qythos9__r2/workdir/util.py
+    ✓ 1	def dedup(items):  (+1 more lines)
+
+  ⚙ edit_file /Users/vszalvay/Code/locode/evals/night/results/pass12/dedup-order__qythos9__r2/workdir/util.py
+    ✓ edited /Users/vszalvay/Code/locode/evals/night/results/…  (+10 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/pass12/dedup-order__qythos9__r2/workdir/util.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/pass12/dedup-order__qythos9__r2/workdir/util.py
+    @@ -1,2 +1,8 @@
+     def dedup(items):
+    -    return sorted(set(items))
+    +    seen = set()
+    +    result = []
+    +    for item in items:
+    +        if item not in seen:
+    +            seen.add(item)
+    +            result.append(item)
+    +    return result
+
+  ⚙ bash python3 -c "import util; print(util.dedup([3,1,3,2,1]))"
+    ✓ [3, 1, 2]
+The fix works. `util.dedup([3, 1, 3, 2, 1])` now returns `[3, 1, 2]`, preserving the order of first appearance.

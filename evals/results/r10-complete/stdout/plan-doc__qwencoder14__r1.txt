@@ -1,0 +1,31 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+``````tool
+{"name": "read_file", "args": {"path": "DESIGN.md"}}
+``````tool
+{"name": "write_file", "args": {"path": "PLAN.md", "content": "# Implementation Plan for taskq\n\n## Milestone 1: Initial Setup\n\n- [ ] Create the project structure\n  - `taskq/__init__.py`\n  - `taskq/taskq.py`\n  - `tests/__init__.py`\n  - `tests/test_taskq.py`\n- [ ] Initialize the SQLite database schema\n  - `taskq/taskq.py`\n  - Write the `Queue` class with the `__init__` method\n- [ ] Implement the `register` method\n  - `taskq/taskq.py`\n  - Ensure handlers are registered correctly\n- [ ] Implement the `enqueue` method\n  - `taskq/taskq.py`\n  - Ensure tasks are inserted into the database correctly\n- [ ] Implement the `start` and `stop` methods\n  - `taskq/taskq.py`\n  - Ensure worker threads are started and stopped correctly\n\n## Milestone 2: Task Claiming and Execution\n\n- [ ] Implement the `claim` method\n  - `taskq/taskq.py`\n  - Ensure tasks are claimed atomically\n- [ ] Implement the worker thread logic\n  - `taskq/taskq.py`\n  - Ensure workers run the correct handler and update the task state\n- [ ] Implement the `stats` method\n  - `taskq/taskq.py`\n  - Ensure task statistics are returned correctly\n- [ ] Implement the `dead_letters` method\n  - `taskq/taskq.py`\n  - Ensure dead tasks are returned correctly\n\n## Milestone 3: Retries, Backoff, and Crash Recovery\n\n- [ ] Implement the retry logic\n  - `taskq/taskq.py`\n  - Ensure tasks are retried with the correct backoff\n- [ ] Implement the crash recovery mechanism\n  - `taskq/taskq.py`\n  - Ensure tasks are returned to pending after a crash\n- [ ] Implement the `Permanent` exception\n  - `taskq/taskq.py`\n  - Ensure tasks can be marked as permanent failures\n\n## Milestone 4: Testing and Final Touches\n\n- [ ] Write unit tests for all implemented methods\n  - `tests/test_taskq.py`\n  - Ensure all tests pass\n- [ ] Refactor and optimize the code\n  - `taskq/taskq.py`\n  - Ensure the code is clean and efficient\n- [ ] Document the library\n  - `README.md`\n  - Ensure the documentation is clear and comprehensive\n\n## Smallest Shippable Product\n\nThe smallest shippable product is the initial setup with the `Queue` class, the `register` method, the `enqueue` method, and the `start` and `stop` methods. This allows for basic task enqueuing and worker management, which can be tested and verified before proceeding to further milestones.\n\n"}}The implementation plan has been written to `PLAN.md`. Here is a summary of the milestones and tasks:
+
+### Milestone 1: Initial Setup
+- Create the project structure.
+- Initialize the SQLite database schema.
+- Implement the `register` method.
+- Implement the `enqueue` method.
+- Implement the `start` and `stop` methods.
+
+### Milestone 2: Task Claiming and Execution
+- Implement the `claim` method.
+- Implement the worker thread logic.
+- Implement the `stats` method.
+- Implement the `dead_letters` method.
+
+### Milestone 3: Retries, Backoff, and Crash Recovery
+- Implement the retry logic.
+- Implement the crash recovery mechanism.
+- Implement the `Permanent` exception.
+
+### Milestone 4: Testing and Final Touches
+- Write unit tests for all implemented methods.
+- Refactor and optimize the code.
+- Document the library.
+
+The smallest shippable product is the initial setup with the `Queue` class, the `register` method, the `enqueue` method, and the `start` and `stop` methods. This allows for basic task enqueuing and worker management, which can be tested and verified before proceeding to further milestones.

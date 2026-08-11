@@ -1,0 +1,14 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+``````tool
+{"name": "write_file", "args": {"path": "DESIGN.md", "content": "# Task Queue Design\n\n## Overview\n`taskq` is a thread-safe, SQLite-backed task queue for a single process. Each task is a named handler with a JSON payload. Workers claim tasks atomically via SQLite's `BEGIN IMMEDIATE` transactions, which also updates a `claimed_at` timestamp. A claim expires after 30 seconds of no progress, and a cleanup worker reclaims stalled tasks. Retries use exponential backoff with a cap, and a handler can signal permanent failure via a `PermanentFailure` exception.\n\n## Public API\n\n`Queue(db_path)`\n- `db_path` (str): Path to the SQLite database file.\n\n`Queue.enqueue(task_name, payload)`\n- `task_name` (str): Name of the registered handler.\n- `payload` (dict): JSON-serializable task data.\n\n`Queue.register_handler(task_name, handler_func)`\n- `task_name` (str): Name of the task.\n- `handler_func` (callable): Function that takes the JSON payload.\n\n`Queue.claim_task()`\n- Returns a `Task` object or `None` if no runnable task exists.\n\n`Queue.get_stats()`\n- Returns a dict with counts of pending, running, failed, and dead tasks.\n\n`Task` class\n- `id` (int): Task ID.\n- `status` (str): Current status (PENDING, RUNNING, FAILED, DEAD).\n- `retry_count` (int): Number of retries.\
+- `claimed_at` (timestamp): When the task was last claimed.\
+\n## Persistence Schema\n\n`tasks` table:\n- `id` (INTEGER PRIMARY KEY)\
+- `name` (TEXT)\
+- `payload` (JSON)\
+- `status` (TEXT)\
+- `retry_count` (INTEGER)\
+- `claimed_at` (TIMESTAMP)\
+\n## Retries and Backoff\n\nEach task has a `retry_count`. On failure, the worker increments it and schedules a retry with exponential backoff (`2^retry_count` seconds). After 5 failed attempts, the task is marked `DEAD` and stops retrying.\\n\n## Crash Recovery\n\nWorkers use `BEGIN IMMEDIATE` to claim a task and set `claimed_at`. If a worker dies, a cleanup task periodically finds tasks with a `claimed_at` older than 30 seconds and resets them to `PENDING` so they can be retried.\\n\n## Failure Modes\n\n- **Worker dies while running**: Task is reclaimed by the cleanup worker after 30 seconds.\\n- **Handler raises permanent failure**: Task is marked `DEAD` after 5 retries.\n- **Database locked**: Retried with a short sleep until the transaction succeeds.\\n\n## Rejected Trade-offs\n\n- **Distributed coordination**: Rejected per spec; using SQLite's ACID guarantees instead.\\n- **Task cancellation**: Out of scope; no cancellation API or cancellation checks.\\
+- **Priority classes**: Out of scope; tasks are processed in FIFO order by ID.\"}}
+```The design document has been written to `DESIGN.md`. It covers the overview, public API, persistence schema, retry/backoff policy, crash recovery, failure modes, and rejected trade-offs as specified.

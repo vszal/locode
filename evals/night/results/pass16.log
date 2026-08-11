@@ -1,0 +1,17 @@
+PROBLEM | remove-block    gemmacoder12  | done=Y | 14it  101s | f2 n2 r2       | the model repeated the same tool c | out='42' debug_left=False
+PROBLEM | remove-block    gemmacoder12  | done=N | 10it   38s | f0 n0 r0       | the model repeated the same tool c | out='Traceback (most recent call last):\
+PROBLEM | remove-block    gemmacoder12  | done=N |  7it   26s | f0 n0 r0       | answered                           | out='Traceback (most recent call last):\
+PROBLEM | insert-const    gemmacoder12  | done=N |  9it   44s | f0 n0 r0       | the model repeated the same tool c | out='Traceback (most recent call last):\
+PROBLEM | insert-const    gemmacoder12  | done=N |  8it   37s | f0 n0 r0       | the model repeated the same tool c | out='Traceback (most recent call last):\
+PROBLEM | insert-const    gemmacoder12  | done=N |  5it   22s | f0 n0 r0       | the model repeated the same tool c | out='Traceback (most recent call last):\
+     ok | two-bugs        gemmacoder12  | done=Y | 10it   40s | f1 n0 r0       | answered                           | out='6 2.0'
+     ok | two-bugs        gemmacoder12  | done=Y |  9it   38s | f1 n0 r0       | answered                           | out='6 2.0'
+     ok | two-bugs        gemmacoder12  | done=Y | 10it   40s | f1 n0 r0       | answered                           | out='6 2.0'
+
+=== 6/9 problem rows ===
+  remove-block__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass16/remove-block__gemmacoder12__r1/events.jsonl
+  remove-block__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass16/remove-block__gemmacoder12__r2/events.jsonl
+  remove-block__gemmacoder12__r3  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass16/remove-block__gemmacoder12__r3/events.jsonl
+  insert-const__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass16/insert-const__gemmacoder12__r1/events.jsonl
+  insert-const__gemmacoder12__r2  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass16/insert-const__gemmacoder12__r2/events.jsonl
+  insert-const__gemmacoder12__r3  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass16/insert-const__gemmacoder12__r3/events.jsonl

@@ -1,0 +1,128 @@
+{
+  "kind": "paired-ab",
+  "label": "b128-uniquefirst",
+  "created": "2026-08-10 19:55:42",
+  "base_ref": "fa12194",
+  "base_sha": "fa12194",
+  "cand_desc": "/Users/vszalvay/Code/locode",
+  "server": {
+    "pid": "69851",
+    "started": "Sat Aug 8 16:18:10 2026",
+    "model": "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit",
+    "argv": "/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model mlx-community/Qwen2.5-Coder-14B-Instruct-4bit --host 127.0.0.1 --port 8081 --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 1610612736"
+  },
+  "pairs": [],
+  "dropped": [
+    {
+      "case": "exec-ambig",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "why": "incomplete pair: one arm never ran"
+    }
+  ],
+  "case_table": {},
+  "analysis": {
+    "n_pairs": 0,
+    "n_effective": 0,
+    "n_dropped": 1,
+    "min_pairs": 6,
+    "mean_delta": null,
+    "wins": 0,
+    "losses": 0,
+    "ties": 0,
+    "p": null,
+    "status": "inconclusive",
+    "why": "no pair had a verdict on both arms",
+    "calibrated": false
+  },
+  "runs": [
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "edit_file": 4,
+          "read_file": 1
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "unverified edits": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 72.5,
+        "model_seconds": 71.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 71.8,
+        "gen_chars": 2494,
+        "gen_chars_per_sec": 34.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 72.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwencoder14__r1__base-ich42m4i",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    }
+  ],
+  "summary": {
+    "overall_score": 1.0,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 1,
+    "total_iterations": 8,
+    "nudge_histogram": {
+      "unverified edits": 1
+    },
+    "n_runs": 1,
+    "n_valid": 1,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 34.7,
+    "gen_chars": 2494,
+    "rows": {
+      "exec-ambig::qwencoder14": {
+        "case": "exec-ambig",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 8,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 72.7,
+        "gen_rate_mean": 34.7,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "exec-ambig": 1.0
+    }
+  },
+  "floor_key": "exec-ambig,exec-bugfix|qwencoder14|r24",
+  "is_calibration": false
+}

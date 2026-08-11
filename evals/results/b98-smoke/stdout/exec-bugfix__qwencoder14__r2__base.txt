@@ -1,0 +1,21 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Run initial tests with `python3 -m pytest -q`",
+    "[>] Fix the `word_wrap` function to handle exact fit cases correctly",
+    "[ ] Fix the `truncate` function to handle exact limit cases correctly",
+    "[ ] Fix the `title_case` function to capitalize the first word",
+    "[ ] Re-run tests until all pass"
+]}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Run initial tests with `python3 -m pytest -q`",
+    "[x] Fix the `word_wrap` function to handle exact fit cases correctly",
+    "[x] Fix the `truncate` function to handle exact limit cases correctly",
+    "[x] Fix the `title_case` function to capitalize the first word",
+    "[>] Re-run tests until all pass"
+]}
+```

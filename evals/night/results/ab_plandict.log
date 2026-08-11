@@ -1,0 +1,26 @@
+
+=== rep 1/3 ===
+  [C] add-test        qythos9       done=Y  4it f0 n0 r0       budget: the turn's wallclock r
+  [C] add-test        gemmacoder12  done=Y  2it f0 n0 r0       budget: the turn's wallclock r
+  [T] add-test        qythos9       done=Y  7it f0 n0 r0 green answered
+  [T] add-test        gemmacoder12  done=Y  7it f0 n0 r1 green the model repeated the same to
+
+=== rep 2/3 ===
+  [C] add-test        qythos9       done=Y 11it f0 n0 r1 green answered
+  [C] add-test        gemmacoder12  done=Y  2it f0 n0 r0       budget: the turn's wallclock r
+  [T] add-test        qythos9       done=Y 13it f0 n0 r1 green answered
+  [T] add-test        gemmacoder12  done=Y  5it f0 n0 r0 green answered
+
+=== rep 3/3 ===
+  [C] add-test        qythos9       done=Y  3it f0 n0 r0       budget: the turn's wallclock r
+  [C] add-test        gemmacoder12  done=Y  2it f0 n0 r0       budget: the turn's wallclock r
+  [T] add-test        qythos9       done=Y  8it f1 n0 r0 green answered
+  [T] add-test        gemmacoder12  done=Y  4it f0 n0 r0 green answered
+
+================ A/B RESULT ================
+                 CONTROL      TREATMENT
+  runs                 6             6
+  done                 6             6
+  repeat-stops         0             1
+  total repeats        1             2
+  avg iters          4.0           7.3

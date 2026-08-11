@@ -1,0 +1,42 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py"}}
+```Let's address the issues one by one:
+
+1. **test_word_wrap_exact_fit_stays_on_one_line**: The function `word_wrap` is splitting words that fit exactly on the width boundary.
+2. **test_truncate_shortens_and_appends_suffix_at_exact_limit**: The function `truncate` is not correctly handling the suffix when the text is exactly at the limit.
+3. **test_title_case_first_word_always_capitalized**: The function `title_case` is not capitalizing the first word correctly.
+
+Let's fix these issues in `textkit.py`.
+
+```tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current.append(word)", "new": "current.append(word)\ncurrent_len += len(word)"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "cut = limit - len(suffix) + 1", "new": "cut = limit - len(suffix)"}}
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower)", "new": "if word == words[0]:\n    result.append(lower.capitalize())\nelse:\n    result.append(lower)"}}
+```
+
+After making these changes, let's run the tests again to ensure they pass.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current_len += 1 + len(word)", "new": ""}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "result.append(lower)", "new": "result.append(word)"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "test_textkit.py", "offset": 8, "limit": 20}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current.append(word)\ncurrent_len += len(word)", "new": "current.append(word)\ncurrent_len += len(word) + 1"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````tool
+{"name": "read_file", "args": {"path": "textkit.py", "offset": 8, "limit": 20}}
+``````tool
+{"name": "edit_file", "args": {"path": "textkit.py", "old": "current_len += len(word) + 1", "new": "current_len += len(word)"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```
+⏹ stopped (edits kept hitting the same error without making progress)

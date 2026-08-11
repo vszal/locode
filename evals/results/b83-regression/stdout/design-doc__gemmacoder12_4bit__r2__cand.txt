@@ -1,0 +1,16 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+``````tool
+{"name": "write_file", "args": {"path": "DESIGN.md", "content": "# Task Queue Design\n\n## Overview\n`taskq` is a thread-safe, SQLite-backed in-process task queue. Each task is a named handler with a JSON payload. Workers claim tasks atomically via SQLite's `UPDATE ... RETURNING` (or a transaction with `BEGIN IMMEDIATE`), which marks a task as `RUNNING` and sets a `claimed_at` timestamp. A claim expires after 30 seconds; a watchdog reclaims expired tasks as `PENDING` so a crashed worker doesn't lose a task forever.\\n\\
+## Public API\n\n`Queue` class:\n- `enqueue(task_name, payload)`: Enqueues a task. Returns a unique task ID.\n- `register_handler(task_name, handler_func)`: Registers a callable for a task name.\n- `get_stats()`: Returns a dict with counts of `pending`, `running`, `failed`, and `dead` tasks.\n\\
+## Persistence Schema\n\nTable `tasks`:\n- `id`: Primary key\n- `name`: Task name\n- `payload`: JSON blob\n- `status`: enum (`PENDING`, `RUNNING`, `FAILED`, `DEAD`)\n- `claimed_at`: Timestamp (nullable)\n- `retry_count`: Integer\n- `max_retries`: Integer (default 5)\n- `scheduled_at`: Timestamp (for future tasks)\n\\
+## Retries and Backoff\n\nOn handler exception: increment `retry_count`. If `< max_retries`, set status to `PEND_RETRY` with `scheduled_at = now + 2^retry_count` seconds (exponential backoff). After 5 failures, set status to `DEAD` and stop retrying.\n\\
+## Crash Recovery\n\nWorkers periodically scan for tasks with `status = 'RUNNING'` and `claimed_at < (now - 30s)` and reset them to `PENDING`. This recovers tasks from SIGKILL or power loss.\n\\
+## Failure Modes\n\n- **Worker dies mid-task**: Claim expires in 30s, task is requeued.\n- **Handler raises**: Incremented retry count with exponential backoff; eventually marked `DEAD`.\n- **Duplicate enqueues**: Each task gets a unique ID on enqueue; callers can use that ID to deduplicate at the source (not enforced by the queue itself).\
+\\
+## Rejected Trade-offs\n\n- **Distributed queue**: Rejected per spec; SQLite + threads is the constraint.\
+- **Priority classes**: Rejected per spec; keep the model simple.\
+- **Task cancellation**: Rejected per spec; no cancellation semantics.\
+- **Cron expressions**: Rejected per spec; use explicit `scheduled_at` instead.\
+- **Web UI**: Rejected per spec; operator uses `get_stats()` via the library."}}
+```The design document has been written to `DESIGN.md`. It covers the overview, public API, persistence schema, retry/backoff policy, crash recovery, failure modes, and rejected trade-offs as specified.

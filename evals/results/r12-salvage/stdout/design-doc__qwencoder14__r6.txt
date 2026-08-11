@@ -1,0 +1,28 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+``````tool
+{"name": "write_file", "args": {"path": "DESIGN.md", "content": "# taskq Design Document\n\n## Overview\n\nThe `taskq` library is a durable in-process task queue designed to handle background work reliably within a single application. It uses SQLite for persistence and supports multiple worker threads. The library ensures that tasks are not lost if the process is killed and prevents duplicate work execution.\n\n## Public API\n\n### enqueue(name, payload)\n- **Parameters**: `name` (str), `payload` (JSON-serializable)\n- **Returns**: None\n- **Description**: Enqueues a named task with a JSON-serializable payload.\n\n### register_handler(name, handler)\n- **Parameters**: `name` (str), `handler` (function)\n- **Returns**: None\n- **Description**: Registers a handler function for a specific task name.\n\n### run_workers(num_workers)\n- **Parameters**: `num_workers` (int)\n- **Returns**: None\n- **Description**: Starts a specified number of worker threads to process tasks.\n\n## Persistence Schema\n\nThe task queue uses an SQLite database with the following tables:\n\n- **tasks**: Stores task metadata including name, payload, status, and claim information.\n- **claims**: Manages task claims to prevent duplicate execution.\n\n## Retries and Backoff\n\nTasks that raise an exception are retried with an exponential backoff strategy. The initial delay is 1 second, and it doubles with each subsequent retry up to a maximum delay of 60 seconds.\n\n## Crash Recovery\n\nIn case of a crash, the task queue ensures that claimed tasks are not left indefinitely. Claims have an expiration time, and if a claim is not renewed within this time, the task becomes runnable again.\n\n## Failure Modes and Handling\n\n- **Task Failure**: Tasks that fail five times are marked as dead and set aside for human inspection.\n- **Duplicate Work**: The system ensures that duplicate work is not executed by using unique task identifiers and checking for existing claims.\n\n## Trade-offs Rejected\n\n- **Distributed System**: While a distributed system could offer higher availability, it introduces complexity and potential for data inconsistency. Given the constraints of a single machine and process, a simpler in-process solution is more appropriate.\n- **Advanced Backoff Strategies**: While more sophisticated backoff strategies could improve reliability, they add complexity and potential for tuning issues. A simple exponential backoff is sufficient for the modest throughput target.\n\n## Observability\n\nThe library provides observability through metrics that report the number of tasks in each state: pending, running, failed, and dead.\n\n"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": [
+    "[x] Read SPEC.md in this directory",
+    "[x] Write an overview of the approach to DESIGN.md",
+    "[x] Write the public API section to DESIGN.md",
+    "[x] Write the persistence schema section to DESIGN.md",
+    "[x] Write the retries and backoff section to DESIGN.md",
+    "[x] Write the crash recovery section to DESIGN.md",
+    "[x] Write the failure modes and handling section to DESIGN.md",
+    "[x] Write the trade-offs rejected section to DESIGN.md",
+    "[x] Write the observability section to DESIGN.md"
+]}}
+```The design document for the `taskq` library has been successfully created and saved as `DESIGN.md` in the current directory. The document covers the following sections:
+
+1. **Overview**: A brief introduction to the `taskq` library and its purpose.
+2. **Public API**: Details on the functions available for enqueuing tasks, registering handlers, and running workers.
+3. **Persistence Schema**: Description of the SQLite database schema used to store task metadata and claims.
+4. **Retries and Backoff**: Explanation of the exponential backoff strategy for handling task failures.
+5. **Crash Recovery**: How the system ensures that claimed tasks are not left indefinitely in a claimed state.
+6. **Failure Modes and Handling**: How the system handles tasks that fail multiple times and how it prevents duplicate work execution.
+7. **Trade-offs Rejected**: Decisions made to avoid more complex solutions like distributed systems and advanced backoff strategies.
+8. **Observability**: How the system provides metrics to report the number of tasks in each state.
+
+The document is now complete and ready for review.

@@ -1,0 +1,61 @@
+```tool
+{"name": "read_file", "args": {"path": "PLAN.md"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[>] Implement median", "[ ] Implement mode", "[ ] Implement summary", "[ ] Ensure no imports used"]}}
+``````tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "def mean(numbers):\n    if not numbers:\n        raise ValueError(\"Input list must not be empty\")\n    return sum(numbers) / len(numbers)\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n```tool
+{"name": "read_file", "args": {"path": "stats.py"}}
+``````tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "    raise NotImplementedError", "new": "    if not values:\n        raise ValueError(\"values must not be empty\")\n    sorted_values = sorted(values)\n    n = len(sorted_values)\n    mid = n // 2\n    if n % 2 == 1:\n        return float(sorted_values[mid])\n    return (sorted_values[mid - 1] + sorted_values[mid]) / 2", "replace_all": false}}
+``````tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "    raise NotImplementedError", "new": "    if not values:\n        raise ValueError(\"values must not be empty\")\n    sorted_values = sorted(values)\n    n = len(sorted_values)\n    mid = n // 2\n    if n % 2 == 1:\n        return float(sorted_values[mid])\n    return (sorted_values[mid - 1] + sorted_values[mid]) / 2", "replace_all": true}}
+```The previous edit replaced all three `NotImplementedError` stubs with the `median` implementation, which is incorrect. I need to restore each stub and implement the correct logic for `median`, `mode`, and `summary` individually.
+
+First, I'll restore the file to its original state.
+
+```tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "    if not values:\n        raise ValueError(\"values must not be empty\")\n    sorted_values = sorted(values)\n    n = len(sorted_values)\n    mid = n // 2\n    if n % 2 == 1:\n        return float(sorted_values[mid])\n    return (sorted_values[mid - 1] + sorted_values[mid]) / 2", "new": "    raise NotImplementedError", "replace_all": true}}
+```I'll implement each function one by one, starting with `median`.
+
+```tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "    raise NotImplementedError", "new": "    if not values:\n        raise ValueError(\"values must not be empty\")\n    sorted_values = sorted(values)\n    n = len(sorted_values)\n    mid = n // 2\n    if n % 2 == 1:\n        return float(sorted_values[mid])\n    return (sorted_values[mid - 1] + sorted_values[mid]) / 2", "replace_all": false}}
+```I'll use a more specific anchor for `median` so only that stub is replaced.
+
+```tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "def median(values):\n    \"\"\"Return the median of `values` as a float. See PLAN.md task 1.\"\"\"\n    raise NotImplementedError", "new": "def median(values):\n    \"\"\"Return the median of `values` as a float. See PLAN.md task 1.\"\"\"\n    if not values:\n        raise ValueError(\"values must not be empty\")\n    sorted_values = sorted(values)\n    n = len(sorted_values)\n    mid = n // 2\n    if n % 2 == 1:\n        return float(sorted_values[mid])\n    return (sorted_values[mid - 1] + sorted_values[mid]) / 2", "replace_all": false}}
+``````tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "def mode(values):\n    \"\"\"Return the most common value in `values`. See PLAN.md task 2.\"\"\"", "new": "def mode(values):\n    \"\"\"Return the most common value in `values`. See PLAN.md task 2.\"\"\"\n    if not values:\n        raise ValueError(\"values must not be empty\")\n    counts = {}\n    for v in values:\n        counts[v] = counts.get(v, 0) + 1\n    max_count = max(counts.values())\n    modes = [v for v, c in counts.items() if c == max_count]\n    return min(modes)", "replace_all": false}}
+```The previous edit left a dangling `NotImplementedError` at line 41 because the `mode` block was only partially replaced. I'll remove it and implement `summary` in one edit.
+
+```tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "    raise NotImplementedError\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nI'll implement `summary` next.
+
+```tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "def summary(values):\n    \"\"\"Return a dict summarizing `values`. See PLAN.md task 3.\"\"\"\n    raise NotImplementedError", "new": "def summary(values):\n    \"\"\"Return a dict summarizing `values`. See PLAN.md task 3.\"\"\"\n    if not values:\n        raise ValueError(\"values must not be empty\")\n    return {\n        \"n\": len(values),\
+        \"mean\": mean(values),\
+        \"median\": median(values),\
+        \"mode\": mode(values),\
+        \"min\": min(values),\
+        \"max\": max(values)\n    ", "replace_all": false}}
+```I'll implement `summary` with a valid dictionary literal.
+
+```tool
+{"name": "edit_file", "args": {"path": "stats.py", "old": "def summary(values):\n    \"\"\"Return a dict summarizing `values`. See PLAN.md task 3.\"\"\"\n    raise NotImplementedError", "new": "def summary(values):\n    \"\"\"Return a dict summarizing `values`. See PLAN.md task 3.\"\"\"\n    if not values:\n        raise ValueError(\"values must not be empty\")\n    return {\n        \"n\": len(values),\
+        \"mean\": mean(values),\
+        \"median\": median(values),\
+        \"mode\": mode(values),\
+        \"min\": min(values),\
+        \"max\": max(values)\n    }", "replace_all": false}}
+```All four tasks are complete: `median`, `mode`, and `summary` are implemented without imports, each raising `ValueError` on empty input and using the required logic. I'll now run the tests.
+
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 300}}
+```All tests pass.
+
+```tool
+{"name": "update_plan", "args": {"tasks": ["[x] Implement median", "[x] Implement mode", "[x] Implement summary", "[x] Ensure no imports used"]}}
+```All four tasks are complete: `median`, `mode`, and `summary` are implemented without imports, each raising `ValueError` on empty input and using the required logic. I ran the tests and all 14 passed.
+
+```tool
+{"name": "update_plan", "args": {"tasks": ["[x] Implement median", "[x] Implement mode", "[x] Implement summary", "[x] Ensure no imports used"]}}
+```

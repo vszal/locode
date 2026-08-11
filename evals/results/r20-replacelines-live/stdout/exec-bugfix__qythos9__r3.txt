@@ -1,0 +1,53 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-wiiqb4p1/textkit.py"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"tasks": "[ ] run tests to confirm fixes", "[ ] fix word_wrap exact fit edge case", "[ ] fix truncate exact limit edge case", "[ ] fix title_case first word capitalization", "[ ] run tests to confirm fixes"]}}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[ ] run tests to confirm fixes", "[ ] fix word_wrap exact fit edge case", "[ ] fix truncate exact limit edge case", "[ ] fix title_case first word capitalization", "[ ] run tests to confirm fixes"]}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[ ] run tests to confirm fixes", "[>] fix word_wrap exact fit edge case", "[ ] fix truncate exact limit edge case", "[ ] fix title_case first word capitalization", "[ ] run tests to confirm fixes"]}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[ ] run tests to confirm fixes", "[>] fix word_wrap exact fit edge case", "[ ] fix truncate exact limit edge case", "[ ] fix title_case first word capitalization", "[ ] run tests to confirm fixes"]}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[ ] run tests to confirm fixes", "[>] fix word_wrap exact fit edge case", "[ ] fix truncate exact limit edge case", "[ ] fix title_case first word capitalization", "[ ] run tests to confirm fixes"]}}
+```Looking at the test failures:
+
+1. `test_word_wrap_exact_fit_stays_on_one_line`: "abcd efgh" (9 chars) should NOT wrap at width 9, but it's being split.
+2. `test_truncate_shortens_and_appends_suffix_at_exact_limit`: truncate("abcdefghij", 5) should return "ab..." but returns "abc...".
+3. `test_title_case_first_word_always_capitalized`: "a tale of two cities" should become "A Tale of Two Cities" but becomes "a Tale of Two Cities".
+
+Let me analyze each bug:
+
+**Bug 1 - word_wrap**: The condition `current_len + 1 + len(word) < width` uses `<` instead of `<=`. When the exact fit would be `== width`, it still tries to add another word, causing the split. Should be `<=`.
+
+**Bug 2 - truncate**: The formula `cut = limit - len(suffix) + 1` is wrong. If limit=5 and suffix="..." (len=3), we want to keep 2 characters (5-3=2), so cut should be `limit - len(suffix)`. The `+1` is incorrect.
+
+**Bug 3 - title_case**: The function lowercases "a" (it's in SMALL_WORDS) before capitalizing. But "a" is the first word, so it should be capitalized to "A". The issue is that `lower = word.lower()` converts "a" to "a", then it's treated as a small word and left lowercase. Need to capitalize first word before checking SMALL_WORDS.
+
+Let me fix these:
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-wiiqb4p1/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-wiiqb4p1/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-wiiqb4p1/textkit.py", "old": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())", "new": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower.capitalize() if word == words[0] else lower)\n        else:\n            result.append(lower.capitalize())"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+```All tests pass. The three bugs were:
+
+1. **word_wrap**: The condition used `< width` instead of `<= width`, causing it to split text that exactly fits the width. Changed to `<=`.
+
+2. **truncate**: The formula `limit - len(suffix) + 1` was incorrect—it added an extra character. Changed to `limit - len(suffix)`.
+
+3. **title_case**: The function lowercased "a" (a small word) before capitalizing, so "a tale..." became "a Tale..." instead of "A Tale...". Fixed by capitalizing the first word even if it's a small word.```tool
+{"name": "update_plan", "args": {"tasks": "[x] run tests to confirm fixes", "[x] fix word_wrap exact fit edge case", "[x] fix truncate exact limit edge case", "[x] fix title_case first word capitalization", "[x] run tests to confirm fixes"]}}
+```All tests pass. The three bugs were:
+
+1. **word_wrap**: The condition used `< width` instead of `<= width`, causing it to split text that exactly fits the width. Changed to `<=`.
+
+2. **truncate**: The formula `limit - len(suffix) + 1` was incorrect—it added an extra character. Changed to `limit - len(suffix)`.
+
+3. **title_case**: The function lowercased "a" (a small word) before capitalizing, so "a tale..." became "a Tale..." instead of "A Tale...". Fixed by capitalizing the first word even if it's a small word.

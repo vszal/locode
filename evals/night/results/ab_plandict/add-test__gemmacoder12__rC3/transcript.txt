@@ -1,0 +1,61 @@
+
+  ⚙ write_file primes.py
+    ✓ wrote /Users/vszalvay/Code/locode/evals/night/results/ab_plandict/add-test__gem…
+    --- primes.py
+    +++ primes.py
+    @@ -0,0 +1,7 @@
+    +def is_prime(n):
+    +    if n < 2:
+    +        return False
+    +    for i in range(2, int(n**0.5) + 1):
+    +        if n % i == 0:
+    +            return False
+    +    return True
+
+  ⚙ write_file test_primes.py
+    ✗ ⚠ warning: test_primes.py has a SyntaxError at line 493…  (+3 more lines)
+    --- test_primes.py
+    +++ test_primes.py
+    @@ -0,0 +1,493 @@
+    +import pytest
+    +from primes import is_prime
+    +
+    +@pytest.mark.parametrize("is_prime", [
+    +    (2, True),
+    +    (3, True),
+    +    (5, True),
+    +    (7, True),
+    +    (11, True),
+    +    (13, True),
+    +    (17, True),
+    +    (19, True),
+    +    (23, True),
+    +    (29, True),
+    +    (31, True),
+    +    (37, True),
+    +    (41, True),
+    +    (43, True),
+    +    (47, True),
+    +    (53, True),
+    +    (59, True),
+    +    (61, True),
+    +    (67, True),
+    +    (71, True),
+    +    (73, True),
+    +    (79, True),
+    +    (83, True),
+    +    (89, True),
+    +    (97, True),
+    +    (101, True),
+    +    (103, True),
+    +    (107, True),
+    +    (109, True),
+    +    (113, True),
+    +    (127, True),
+    +    (131, True),
+    +    (137, True),
+    … (diff truncated)
+
+    ⟳ ⏹ budget: the turn's wallclock ran out while generating (~9,249 chars into this reply) — …
+
+⏹ stopped (budget: the turn's wallclock ran out while generating (~9,249 chars into this reply) — landed its partial file first)

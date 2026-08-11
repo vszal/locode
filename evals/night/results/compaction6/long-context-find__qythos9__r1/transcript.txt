@@ -1,0 +1,53 @@
+
+  ⚙ glob **/notes/**/*.py
+    ✓ /Users/vszalvay/Code/locode/evals/night/results/compact…  (+6 more lines)
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/…
+    ✓ 1	"""alpha — request handlers for the alpha subsystem.  (+365 more lines)
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/…
+    ✓ 1	"""bravo — request handlers for the bravo subsystem.  (+365 more lines)
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/…
+    ✓ 1	"""charlie — request handlers for the charlie subsyst…  (+365 more lines)
+    ⟳ auto-compacted context: 10 -> 10 messages, 59,439 -> 7,784 chars
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/…
+    ✓ 1	"""delta — request handlers for the delta subsystem.  (+365 more lines)
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/…
+    ✓ 1	"""echo — request handlers for the echo subsystem.  (+365 more lines)
+I've read through the notes directory handlers. Each handler function returns a dictionary with a `handled_by` field that correctly reports its own function name (e.g., `delta_00_handler`, `echo_00_handler`, etc.). 
+
+I need to find the one handler that reports the wrong name. Let me check the remaining files: delta, foxtrot, and the __init__.py.
+
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/…
+    ✓ 1	"""delta — request handlers for the delta subsystem.  (+365 more lines)
+    ⟳ auto-compacted context: 16 -> 16 messages, 60,507 -> 8,390 chars
+
+  ⚙ read_file /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/…
+    ✓ 1	"""foxtrot — request handlers for the foxtrot subsyst…  (+365 more lines)
+I found it. In `foxtrot.py`, the handler `foxtrot_12_handler` (lines 249-266) incorrectly reports `"handled_by": "foxtrot_11_handler"` instead of `"foxtrot_12_handler"`. This is the only handler with a wrong name.
+
+I will add a comment line `# FIXME unreviewed` directly above its `def` line (line 249).
+
+
+  ⚙ replace_lines path='/Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/wo…
+    ✓ replaced lines 249–249 in /Users/vszalvay/Code/locode/e…  (+8 more lines)
+    --- /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/notes/foxtrot.py
+    +++ /Users/vszalvay/Code/locode/evals/night/results/compaction6/long-context-find__qythos9__r1/workdir/notes/foxtrot.py
+    @@ -247,4 +247,5 @@
+     
+     
+    +# FIXME unreviewed
+     def foxtrot_12_handler(request, context=None):
+         """Handle a drain request for the foxtrot subsystem.
+The FIXME comment has been added above the incorrect handler. The file now shows:
+
+```
+# FIXME unreviewed
+def foxtrot_12_handler(request, context=None):
+```
+
+This marks the handler that incorrectly reports `"handled_by": "foxtrot_11_handler"` instead of `"foxtrot_12_handler"`. No other changes were made, and the wrong name itself was not corrected, as requested.

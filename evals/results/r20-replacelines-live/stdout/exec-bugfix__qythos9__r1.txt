@@ -1,0 +1,31 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-txbcw6z5/textkit.py"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[ ] fix word_wrap to allow exact fit on one line", "[ ] fix truncate to not add extra character when at exact limit", "[ ] fix title_case to always capitalize first word", "[ ] run tests to verify all fixes"]}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-txbcw6z5/textkit.py", "old": "        elif current_len + 1 + len(word) < width:\n            current.append(word)\n            current_len += 1 + len(word)", "new": "        elif current_len + 1 + len(word) <= width:\n            current.append(word)\n            current_len += 1 + len(word)"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-txbcw6z5/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-txbcw6z5/textkit.py", "old": "    words = text.split()\n    result = []\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "new": "    words = text.split()\n    result = []\n    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower.capitalize() if i == 0 else lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+```All tests pass. Here's a summary of the fixes:
+
+1. **word_wrap**: Changed `< width` to `<= width` so that text exactly fitting the width stays on one line.
+
+2. **truncate**: Removed the `+ 1` from the cut calculation. The original code was adding an extra character beyond the limit. Now `cut = limit - len(suffix)` correctly ensures the total length equals exactly `limit`.
+
+3. **title_case**: Added index tracking with `enumerate()` to properly capitalize the first word even when it's a small word like "a". The logic now capitalizes the first word unconditionally, while small words in other positions remain lowercase.```tool
+{"name": "update_plan", "args": {"tasks": ["[x] fix word_wrap to allow exact fit on one line", "[x] fix truncate to not add extra character when at exact limit", "[x] fix title_case to always capitalize first word", "[x] run tests to verify all fixes"]}}
+```All fixes have been applied and verified. Here's a summary:
+
+1. **word_wrap**: Changed `< width` to `<= width` so that text exactly fitting the width stays on one line.
+
+2. **truncate**: Removed the `+ 1` from the cut calculation. The original code was adding an extra character beyond the limit. Now `cut = limit - len(suffix)` correctly ensures the total length equals exactly `limit`.
+
+3. **title_case**: Added index tracking with `enumerate()` to properly capitalize the first word even when it's a small word like "a". The logic now capitalizes the first word unconditionally, while small words in other positions remain lowercase.
+
+All 13 tests pass.

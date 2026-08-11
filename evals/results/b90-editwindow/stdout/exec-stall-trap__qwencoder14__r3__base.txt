@@ -1,0 +1,86 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```The tests are failing due to issues in the `parse_records` function in `parser.py`. Let's first read the content of `parser.py` to understand the current implementation.
+
+```bash
+{"name": "read_file", "args": {"path": "parser.py"}}
+```The `parse_records` function has a structural bug. The current implementation appends a new record to the `records` list every time a blank line is encountered, which is incorrect. We need to ensure that a new record is only appended when a blank line is encountered after a non-empty record.
+
+Let's update the `parse_records` function to fix this issue.
+
+```bash
+{"name": "edit_file", "args": {"path": "parser.py", "old": "records.append(current)\ncurrent = {}", "new": "if current:\n    records.append(current)\ncurrent = {}"}}
+```Let's correct the indentation and try again.
+
+```bash
+{"name": "edit_file", "args": {"path": "parser.py", "old": "records.append(current)\ncurrent = {}", "new": "if current:\n    records.append(current)\n    current = {}"}}
+```Let's try a different approach. We'll use `replace_lines` to replace the specific lines in the `parse_records` function.
+
+First, let's read the relevant lines from `parser.py`.
+
+```bash
+{"name": "read_file", "args": {"path": "parser.py", "offset": 25, "limit": 6}}
+```Now, let's replace lines 28 and 29 with the corrected code.
+
+```bash
+{"name": "replace_lines", "args": {"path": "parser.py", "start": 28, "end": 29, "new": "if current:\n    records.append(current)\ncurrent = {}"}}
+```Let's correct the indentation and try again.
+
+```bash
+{"name": "replace_lines", "args": {"path": "parser.py", "start": 28, "end": 29, "new": "if current:\n    records.append(current)\ncurrent = {}"}}
+```Let's try a different approach. We'll use `edit_file` to replace the specific lines in the `parse_records` function.
+
+First, let's read the relevant lines from `parser.py`.
+
+```bash
+{"name": "read_file", "args": {"path": "parser.py", "offset": 25, "limit": 6}}
+```Now, let's replace lines 28 and 29 with the corrected code.
+
+```bash
+{"name": "edit_file", "args": {"path": "parser.py", "old": "records.append(current)\ncurrent = {}", "new": "if current:\n    records.append(current)\ncurrent = {}"}}
+```I understand the issue. The problem lies in the control flow of the `parse_records` function. The current implementation appends a new record to the `records` list every time a blank line is encountered, which is incorrect. We need to ensure that a new record is only appended when a blank line is encountered after a non-empty record.
+
+Let's rewrite the entire `parse_records` function.
+
+```bash
+{"name": "write_file", "args": {"path": "parser.py", "content": """
+"""A tiny line-oriented record parser.
+
+`parse_records` has a structural bug: fixing it requires reorganizing the
+loop's control flow, not tweaking a comparison or a string literal.
+"""
+
+def parse_records(text):
+    """Parse `text` into a list of record dicts.
+
+    Format: `text` is a sequence of lines. Each non-blank line is a
+    "key: value" pair belonging to the current record -- the key is
+    everything before the first colon, the value is everything after,
+    both stripped of surrounding whitespace. One or more consecutive
+    blank lines separate one record from the next (multiple blank lines
+    in a row are equivalent to a single separator and never produce an
+    empty record on their own). A record with at least one field is
+    included in the result, in the order it was encountered, as a dict
+    of its fields. Leading/trailing blank lines in `text` do not produce
+    empty records. If `text` has no fields at all, an empty list is
+    returned.
+    """
+    records = []
+    current = {}
+    in_record = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line == "":
+            if in_record:
+                records.append(current)
+                current = {}
+                in_record = False
+        else:
+            key, _, value = line.partition(":")
+            current[key.strip()] = value.strip()
+            in_record = True
+    if in_record:
+        records.append(current)
+    return records
+"""}}}
+```

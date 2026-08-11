@@ -1,0 +1,33 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-znupfape/textkit.py"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"[ ] Run tests to see failures": "done", "[>] Fix word_wrap exact-fit edge case": "needs fix: when a line fits exactly at width, it should stay on one line", "[ ] Fix truncate exact-limit edge case": "needs fix: truncate should produce exactly limit chars, not limit+1", "[ ] Fix title_case first-word capitalization": "needs fix: first word should always be capitalized even if it's a small word"}}}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[x] Run tests to see failures\n[>] Fix word_wrap exact-fit edge case\n[ ] Fix truncate exact-limit edge case\n[ ] Fix title_case first-word capitalization"}}
+```Looking at the test failures:
+
+1. **word_wrap**: "abcd efgh" (9 chars) should stay on one line at width 9, but it's being split. The issue is in the condition `current_len + 1 + len(word) < width` - it uses `<` instead of `<=`, so exact fits are rejected.
+
+2. **truncate**: "abcdefghij" (10 chars) with limit 5 should produce "ab..." (5 chars), but it's producing "abc..." (6 chars). The formula `cut = limit - len(suffix) + 1` adds an extra character.
+
+3. **title_case**: "a tale of two cities" should produce "A Tale of Two Cities" (first word capitalized), but it produces "a Tale of Two Cities". The issue is that the code checks if the word is in SMALL_WORDS and leaves it lowercase, without considering if it's the first word.
+
+Let me fix these issues:
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-znupfape/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-znupfape/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+``````tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r3-znupfape/textkit.py", "old": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())", "new": "    for i, word in enumerate(words):\n        lower = word.lower()\n        if i == 0:\n            result.append(lower.capitalize())\n        elif lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 60}}
+```All tests pass now.```tool
+{"name": "update_plan", "args": {"tasks": "[x] Run tests to see failures\n[x] Fix word_wrap exact-fit edge case\n[>] Fix truncate exact-limit edge case\n[ ] Fix title_case first-word capitalization"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[x] Run tests to see failures\n[x] Fix word_wrap exact-fit edge case\n[x] Fix truncate exact-limit edge case\n[>] Fix title_case first-word capitalization"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": "[x] Run tests to see failures\n[x] Fix word_wrap exact-fit edge case\n[x] Fix truncate exact-limit edge case\n[x] Fix title_case first-word capitalization"}}
+```All tests pass.

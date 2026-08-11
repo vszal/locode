@@ -1,0 +1,128 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__base-g1c4n2jo/textkit.py"}}
+}
+``````tool
+{"name": "update_plan", "args": {"tasks": {"[ ] Run tests and fix bugs in textkit.py": "[>]", "[ ] Verify all tests pass": "[ ]"}}}
+}
+```Looking at the test failures:
+
+1. **test_word_wrap_exact_fit_stays_on_one_line**: "abcd efgh" (9 chars) should stay on one line at width 9, but it's being split. The issue is in line 25: `current_len + 1 + len(word) < width` uses `<` instead of `<=`. When the total equals exactly `width`, it should still fit on the current line.
+
+2. **test_truncate_shortens_and_appends_suffix_at_exact_limit**: truncate("abcdefghij", 5) should return "ab..." (5 chars), but it's returning "abc..." (6 chars). Looking at line 48: `cut = limit - len(suffix) + 1`. With limit=5 and suffix="...", len(suffix)=3, this gives cut = 5 - 3 + 1 = 3. But it should be cut = 5 - 3 = 2 to get exactly 2 characters before the suffix. The `+ 1` is wrong.
+
+3. **test_title_case_first_word_always_capitalized**: "a tale of two cities" should become "A Tale of Two Cities", but it's becoming "a Tale of Two Cities". The issue is that "a" is in SMALL_WORDS, so it's being lowercased. But the first word should always be capitalized regardless of SMALL_WORDS membership.
+
+Let me fix these issues:
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__base-g1c4n2jo/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+}
+``````tool
+{"name": "edit_file", "args": {"new": "    cut = limit - len(suffix)", "old": "    cut = limit - len(suffix) + 1", "path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__base-g1c4n2jo/textkit.py"}}
+}
+``````tool
+{"name": "edit_file", "args": {"new": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS and not is_first:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "old": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__base-g1c4n2jo/textkit.py"}}
+}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+```I broke the `title_case` function by referencing `is_first` which doesn't exist. Let me re-read the current state of the file and fix it properly.
+
+```tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__base-g1c4n2jo/textkit.py"}}
+}
+```I see the issue - I introduced a reference to `is_first` which doesn't exist. I need to fix the `title_case` function properly. The logic should be:
+- First word is always capitalized (regardless of SMALL_WORDS)
+- Other SMALL_WORDS remain lowercase
+- All other words are capitalized
+
+Let me fix this:
+
+```tool
+{"name": "edit_file", "args": {"new": "    words = text.split()\n    result = []\n    is_first = True\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            if is_first:\n                result.append(lower.capitalize())\n                is_first = False\n            else:\n                result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "old": "    words = text.split()\n    result = []\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS and not is_first:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__base-g1c4n2jo/textkit.py"}}
+}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+```The `title_case` function is still failing. Looking at the test, "lord of the rings and me" should become "Lord of the Rings and Me". The issue is that "of" is a SMALL_WORD and should remain lowercase, but it's being capitalized. Let me check the current implementation and fix it.
+
+```tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__base-g1c4n2jo/textkit.py"}}
+}
+```Looking at the current `title_case` implementation, I can see the issue. The function is checking if a word is in `SMALL_WORDS`, and if it is, it either capitalizes it (if it's the first word) or leaves it lowercase. However, there's a subtle bug: when a SMALL_WORD appears as the first word, it gets capitalized, but then `is_first` is set to False. This means subsequent SMALL_WORDS will be left lowercase, which is correct.
+
+But wait, let me trace through the test case "lord of the rings and me":
+- "lord" -> not in SMALL_WORDS -> capitalized -> "Lord"
+- "of" -> in SMALL_WORDS -> not first -> lowercase -> "of"
+- "the" -> in SMALL_WORDS -> not first -> lowercase -> "the"
+- "rings" -> not in SMALL_WORDS -> capitalized -> "Rings"
+- "and" -> in SMALL_WORDS -> not first -> lowercase -> "and"
+- "me" -> not in SMALL_WORDS -> capitalized -> "Me"
+
+This should give "Lord of the Rings and Me", which matches the expected output. So why is the test failing?
+
+Let me re-read the test more carefully:
+
+```python
+def test_title_case_keeps_interior_small_words_lowercase():
+    # First word here ("lord") is not a small word, isolating the interior
+    # small-word behavior from the first-word exception tested below.
+    assert title_case("lord of the rings and me") == "Lord of the Rings and Me"
+```
+
+The expected output is "Lord of the Rings and Me". Let me manually check what the current implementation would produce:
+- "lord" -> "Lord"
+- "of" -> "of"
+- "the" -> "the"
+- "rings" -> "Rings"
+- "and" -> "and"
+- "me" -> "Me"
+
+That gives "Lord of the Rings and Me", which matches! So why is the test failing?
+
+Wait, I need to actually run the test to see what's happening. Let me check if there's something else going on. Actually, looking at the error message again:
+
+```
+E       AssertionError: assert 'Lord Of the Rings and Me' == 'Lord of the Rings and Me'
+```
+
+The actual output is "Lord Of the Rings and Me", not "Lord of the Rings and Me". So "of" is being capitalized instead of left lowercase.
+
+This suggests that the `is_first` flag is not being set correctly. Let me trace through the code again:
+- "lord" -> not in SMALL_WORDS -> capitalized -> "Lord", `is_first` remains True
+- "of" -> in SMALL_WORDS -> `is_first` is True -> capitalized -> "Of", `is_first` set to False
+
+Ah! I see the issue now. The `is_first` flag is only set to False when a SMALL_WORD is encountered as the first word. But "lord" is not a SMALL_WORD, so `is_first` remains True when we encounter "of".
+
+The fix is to set `is_first = False` after processing the first word, regardless of whether it's a SMALL_WORD or not. Let me update the code:
+
+```tool
+{"name": "edit_file", "args": {"new": "    words = text.split()\n    result = []\n    is_first = True\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            if is_first:\n                result.append(lower.capitalize())\n                is_first = False\n            else:\n                result.append(lower)\n        else:\n            result.append(lower.capitalize())\n            is_first = False\n    return \" \".join(result)", "old": "    words = text.split()\n    result = []\n    is_first = True\n    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            if is_first:\n                result.append(lower.capitalize())\n                is_first = False\n            else:\n                result.append(lower)\n        else:\n            result.append(lower.capitalize())\n    return \" \".join(result)", "path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1__base-g1c4n2jo/textkit.py"}}
+}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+```All 13 tests pass. The bugs in `textkit.py` have been fixed:
+
+1. **`word_wrap`**: Changed `<` to `<=` on line 25 so that a line exactly at `width` is allowed.
+
+2. **`truncate`**: Removed the erroneous `+ 1` on line 48 so that `truncate("abcdefghij", 5)` now correctly returns `"ab..."`.
+
+3. **`title_case`**: Fixed the logic so that the first word is always capitalized (even if it's a small word), and all other small words remain lowercase. Also ensured `is_first` is reset after processing any first word.```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+}
+```All tests pass.
+
+```tool
+{"name": "update_plan", "args": {"tasks": {"[x] Run tests and fix bugs in textkit.py": "[x]", "[x] Verify all tests pass": "[x]"}}}
+}
+```All tests pass. The bugs in `textkit.py` have been fixed:
+
+1. **`word_wrap`**: Changed `<` to `<=` on line 25 so that a line exactly at `width` is allowed.
+
+2. **`truncate`**: Removed the erroneous `+ 1` on line 48 so that `truncate("abcdefghij", 5)` now correctly returns `"ab..."`.
+
+3. **`title_case`**: Fixed the logic so that the first word is always capitalized (even if it's a small word), and all other small words remain lowercase. Also ensured `is_first` is reset after processing any first word.

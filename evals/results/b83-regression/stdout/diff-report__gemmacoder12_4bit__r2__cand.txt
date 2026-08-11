@@ -1,0 +1,31 @@
+I'll implement `compute_changes` by comparing the keys of the two snapshots: keys in `new` but not `old` are added, keys in `old` but not `new` are removed, and keys present in both with different values are modified.
+
+```python
+def compute_changes(old, new):
+    added = [name for name in new if name not in old]
+    removed = [name for name in old if name not in new]
+    modified = [name for name in old if name in new and old[name] != new[name]]
+    return added, modified, removed
+```
+
+After applying the fix, running `python3 changes.py` will correctly report the three changes.
+
+```tool
+{"name": "edit_file", "args": {"path": "changes.py", "old": "def compute_changes(old, new):\n    added = []\n    modified = []\n    removed = []\n    return added, modified, removed", "new": "def compute_changes(old, new):\n    added = [name for name in new if name not in old]\n    removed = [name for name in old if name not in new]\n    modified = [name for name in old if name in new and old[name] != new[name]]\n    return added, modified, removed", "replace_all": true}}
+```I'll use `replace_lines` instead, which is safer when the exact text is hard to reproduce. I'll read the file first to get the correct line numbers.
+
+```tool
+{"name": "read_file", "args": {"path": "changes.py"}}
+```I'll replace lines 6–10 with the correct logic: added are keys in `new` not in `old`, removed are keys in `old` not in `new`, and modified are keys in both with different values.
+
+```tool
+{"name": "replace_lines", "args": {"path": "changes.py", "start": 6, "end": 10, "new": "    added = [name for name in new if name not in old]\n    removed = [name for name in old if name not in new]\n    modified = [name for name in old if name in new and old[name] != new[name]]\n    return added, modified, removed"}}
+```I've updated `compute_changes` to correctly populate the added, removed, and modified lists by comparing the keys and values of the two snapshots.
+
+```python
+def compute_changes(old, new):
+    added = [name for name in new if name not in old]
+    removed = [name for name in old if name not in new]
+    modified = [name for name in old if name in new and old[name] != new[name]]
+    return added, modified, removed
+```

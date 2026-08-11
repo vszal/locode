@@ -1,0 +1,35 @@
+```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+``````tool
+{"name": "read_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-ou_h7bzq/textkit.py"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[ ] Fix word_wrap: exact fit should stay on one line", "[ ] Fix truncate: at exact limit, return text unchanged (no suffix)", "[ ] Fix title_case: first word always capitalized even if in SMALL_WORDS", "[ ] Run tests until all pass"]}}
+```Looking at `word_wrap`, the issue is in line 25: `elif current_len + 1 + len(word) < width:`. This uses `<` which means when the line would be exactly `width` characters, it won't add the word to the current line. It should be `<=` to allow exact fits.
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-ou_h7bzq/textkit.py", "old": "        elif current_len + 1 + len(word) < width:", "new": "        elif current_len + 1 + len(word) <= width:"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word_wrap: exact fit should stay on one line", "[ ] Fix truncate: at exact limit, return text unchanged (no suffix)", "[ ] Fix title_case: first word always capitalized even if in SMALL_WORDS", "[ ] Run tests until all pass"]}}
+```Looking at `truncate`, the issue is in line 48: `cut = limit - len(suffix) + 1`. This adds 1 to the cut position, which means when `limit` equals `len(text)`, it will still truncate and add the suffix. The formula should be `cut = limit - len(suffix)` to ensure that when `limit` equals `len(text)`, no truncation occurs.
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-ou_h7bzq/textkit.py", "old": "    cut = limit - len(suffix) + 1", "new": "    cut = limit - len(suffix)"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word_wrap: exact fit should stay on one line", "[x] Fix truncate: at exact limit, return text unchanged (no suffix)", "[ ] Fix title_case: first word always capitalized even if in SMALL_WORDS", "[ ] Run tests until all pass"]}}
+```Looking at `title_case`, the issue is that the first word is always lowercased when it's in `SMALL_WORDS`. The docstring says "unless that word is the first word of the text, which is always capitalized regardless of `SMALL_WORDS` membership." So I need to add a check for whether it's the first word.
+
+```tool
+{"name": "edit_file", "args": {"path": "/private/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qythos9__r1-ou_h7bzq/textkit.py", "old": "    for word in words:\n        lower = word.lower()\n        if lower in SMALL_WORDS:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())", "new": "    for i, word in enumerate(words):\n        lower = word.lower()\n        if lower in SMALL_WORDS and i > 0:\n            result.append(lower)\n        else:\n            result.append(lower.capitalize())"}}
+``````tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word_wrap: exact fit should stay on one line", "[x] Fix truncate: at exact limit, return text unchanged (no suffix)", "[x] Fix title_case: first word always capitalized even if in SMALL_WORDS", "[ ] Run tests until all pass"]}}
+``````tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+```All tests pass now.```tool
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q", "timeout": 30000}}
+```All tests pass.```tool
+{"name": "update_plan", "args": {"tasks": ["[x] Fix word_wrap: exact fit should stay on one line", "[x] Fix truncate: at exact limit, return text unchanged (no suffix)", "[x] Fix title_case: first word always capitalized even if in SMALL_WORDS", "[x] Run tests until all pass"]}}
+```All tests pass. The bugs in `textkit.py` have been fixed:
+
+1. **`word_wrap`**: Changed `<` to `<=` so that a line that fits exactly at `width` characters stays on one line.
+2. **`truncate`**: Removed the `+ 1` from the cut calculation so that when `limit` equals `len(text)`, the text is returned unchanged (no suffix added).
+3. **`title_case`**: Added a check `i > 0` so that the first word is always capitalized even if it's in `SMALL_WORDS`.

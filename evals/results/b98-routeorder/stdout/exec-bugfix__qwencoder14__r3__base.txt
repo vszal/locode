@@ -1,0 +1,21 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Run initial tests with `python3 -m pytest -q`",
+    "[>] Fix the bug in `word_wrap` function",
+    "[ ] Fix the bug in `truncate` function",
+    "[ ] Fix the bug in `title_case` function",
+    "[ ] Re-run tests to ensure all pass"
+]}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Run initial tests with `python3 -m pytest -q`",
+    "[>] Fix the bug in `word_wrap` function",
+    "[ ] Fix the bug in `truncate` function",
+    "[ ] Fix the bug in `title_case` function",
+    "[ ] Re-run tests to ensure all pass"
+]}
+```

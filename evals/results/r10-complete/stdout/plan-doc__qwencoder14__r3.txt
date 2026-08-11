@@ -1,0 +1,30 @@
+```tool
+{"name": "read_file", "args": {"path": "SPEC.md"}}
+``````tool
+{"name": "read_file", "args": {"path": "DESIGN.md"}}
+``````tool
+{"name": "write_file", "args": {"path": "PLAN.md", "content": "# Implementation Plan for taskq\n\n## Milestone 1: Initial Setup\n\n- [ ] Create the project structure\n  - `taskq/__init__.py`\n  - `taskq/taskq.py`\n  - `tests/__init__.py`\n  - `tests/test_taskq.py`\n- [ ] Initialize the SQLite database schema\n  - `taskq/taskq.py`\n  - Write the `Queue` class with the `__init__` method\n- [ ] Implement the `register` method\n  - `taskq/taskq.py`\n  - Ensure handlers are registered correctly\n- [ ] Implement the `enqueue` method\n  - `taskq/taskq.py`\n  - Ensure tasks are inserted into the database correctly\n- [ ] Implement the `start` and `stop` methods\n  - `taskq/taskq.py`\n  - Ensure worker threads are started and stopped correctly\n\n## Milestone 2: Task Claiming and Execution\n\n- [ ] Implement the `claim` method\n  - `taskq/taskq.py`\n  - Ensure tasks are claimed atomically\n- [ ] Implement the `run` method\n  - `taskq/taskq.py`\n  - Ensure tasks are executed by the correct handler\n- [ ] Implement the `reaper` method\n  - `taskq/taskq.py`\n  - Ensure expired claims are returned to pending\n\n## Milestone 3: Retries and Failure Handling\n\n- [ ] Implement the retry mechanism\n  - `taskq/taskq.py`\n  - Ensure tasks are retried with backoff\n- [ ] Implement the `Permanent` exception\n  - `taskq/taskq.py`\n  - Ensure tasks are marked as dead when `Permanent` is raised\n- [ ] Implement the `stats` method\n  - `taskq/taskq.py`\n  - Ensure task statistics are returned correctly\n- [ ] Implement the `dead_letters` method\n  - `taskq/taskq.py`\n  - Ensure dead tasks are returned correctly\n\n## Milestone 4: Testing and Refinement\n\n- [ ] Write unit tests for all implemented methods\n  - `tests/test_taskq.py`\n  - Ensure all tests pass\n- [ ] Refine the implementation based on test results\n  - `taskq/taskq.py`\n  - Ensure the implementation meets the spec\n\n## Smallest Shippable Product\n\nThe smallest shippable product is the initial setup with the `Queue` class, the `register` method, the `enqueue` method, and the `start` and `stop` methods. This allows for enqueuing tasks and starting/stopping the worker pool, but does not yet handle task claiming, execution, or retries.\n\n"}}The implementation plan has been written to `PLAN.md`. Here is a summary of the milestones and tasks:
+
+### Milestone 1: Initial Setup
+- Create the project structure
+- Initialize the SQLite database schema
+- Implement the `register` method
+- Implement the `enqueue` method
+- Implement the `start` and `stop` methods
+
+### Milestone 2: Task Claiming and Execution
+- Implement the `claim` method
+- Implement the `run` method
+- Implement the `reaper` method
+
+### Milestone 3: Retries and Failure Handling
+- Implement the retry mechanism
+- Implement the `Permanent` exception
+- Implement the `stats` method
+- Implement the `dead_letters` method
+
+### Milestone 4: Testing and Refinement
+- Write unit tests for all implemented methods
+- Refine the implementation based on test results
+
+The smallest shippable product is the initial setup with the `Queue` class, the `register` method, the `enqueue` method, and the `start` and `stop` methods. This allows for enqueuing tasks and starting/stopping the worker pool, but does not yet handle task claiming, execution, or retries.

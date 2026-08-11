@@ -1,0 +1,11 @@
+PROBLEM | locate-in-large gemmacoder12  | done=Y |  8it   77s | f3 n2 r1       | the model repeated the same tool c | out='150.0'
+     ok | locate-in-large gemmacoder12  | done=Y |  4it   16s | f0 n0 r0       | answered                           | out='150.0'
+     ok | locate-in-large qythos9       | done=Y |  4it   56s | f0 n0 r0       | answered                           | out='150.0'
+     ok | locate-in-large qythos9       | done=Y |  4it   19s | f0 n0 r0       | answered                           | out='150.0'
+     ok | two-bugs        gemmacoder12  | done=Y |  9it   69s | f1 n0 r0       | answered                           | out='6 2.0'
+     ok | two-bugs        gemmacoder12  | done=Y |  9it   31s | f1 n0 r0       | answered                           | out='6 2.0'
+     ok | two-bugs        qythos9       | done=Y |  5it   55s | f0 n0 r0       | answered                           | out='6 2.0'
+     ok | two-bugs        qythos9       | done=Y |  5it   19s | f0 n0 r0       | answered                           | out='6 2.0'
+
+=== 1/8 problem rows ===
+  locate-in-large__gemmacoder12__r1  -> replay: python evals/replay.py /Users/vszalvay/Code/locode/evals/night/results/pass15/locate-in-large__gemmacoder12__r1/events.jsonl

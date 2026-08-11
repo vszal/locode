@@ -1,0 +1,155 @@
+```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[>] Fix the word_wrap function to handle exact fit cases correctly",
+    "[ ] Fix the truncate function to handle the exact limit case correctly",
+    "[ ] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Run tests again to ensure all tests pass"
+]}
+``````read_file
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "lines.append(\" \".join(current))",
+    "new": "lines.append(\" \".join(current) if current_len < width else current[0])"
+}}
+``````replace_lines
+{"name": "replace_lines", "args": {
+    "path": "textkit.py",
+    "start": 29,
+    "end": 29,
+    "new": "lines.append(\" \".join(current) if current_len < width else current[0])"
+}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[>] Fix the truncate function to handle the exact limit case correctly",
+    "[ ] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Run tests again to ensure all tests pass"
+]}
+``````read_file
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "cut = limit - len(suffix) + 1",
+    "new": "cut = limit - len(suffix)"
+}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[>] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Run tests again to ensure all tests pass"
+]}
+``````read_file
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "result.append(lower)",
+    "new": "result.append(lower if index == 0 else lower)"
+}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[x] Fix the title_case function to capitalize the first word correctly",
+    "[>] Run tests again to ensure all tests pass"
+]}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[ ] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Run tests again to ensure all tests pass"
+]}
+``````read_file
+{"name": "read_file", "args": {"path": "textkit.py"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "result.append(lower if index == 0 else lower)",
+    "new": "result.append(lower if index == 0 else lower.capitalize())"
+}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[x] Fix the title_case function to capitalize the first word correctly",
+    "[>] Run tests again to ensure all tests pass"
+]}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````read_file
+{"name": "read_file", "args": {"path": "test_textkit.py", "pattern": "test_word_wrap_exact_fit_stays_on_one_line|test_title_case_keeps_interior_small_words_lowercase"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "result.append(lower if index == 0 else lower.capitalize())",
+    "new": "result.append(lower if index == 0 else lower.capitalize())"
+}}
+``````read_file
+{"name": "read_file", "args": {"path": "textkit.py", "pattern": "test_word_wrap_exact_fit_stays_on_one_line|test_title_case_keeps_interior_small_words_lowercase"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "result.append(lower if index == 0 else lower.capitalize())",
+    "new": "result.append(lower if index == 0 else lower.capitalize())"
+}}
+``````replace_lines
+{"name": "replace_lines", "args": {
+    "path": "textkit.py",
+    "start": 68,
+    "end": 68,
+    "new": "    for index, word in enumerate(words):"
+}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[x] Fix the title_case function to capitalize the first word correctly",
+    "[>] Run tests again to ensure all tests pass"
+]}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[x] Fix the title_case function to capitalize the first word correctly",
+    "[ ] Run tests again to ensure all tests pass"
+]}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````read_file
+{"name": "read_file", "args": {"path": "test_textkit.py", "pattern": "test_word_wrap_exact_fit_stays_on_one_line|test_title_case_keeps_interior_small_words_lowercase"}}
+``````edit_file
+{"name": "edit_file", "args": {
+    "path": "textkit.py",
+    "old": "lines.append(\" \".join(current) if current_len < width else current[0])",
+    "new": "lines.append(\" \".join(current))"
+}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[x] Fix the title_case function to capitalize the first word correctly",
+    "[>] Run tests again to ensure all tests pass"
+]}
+``````bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+```I cannot fix the issue. The errors persist despite my attempts to correct the code. The problem seems to be structural and beyond simple text substitutions. I recommend reviewing the logic and control flow of the functions in question.```bash
+{"name": "bash", "args": {"cmd": "python3 -m pytest -q"}}
+``````update_plan
+{"tasks": [
+    "[x] Fix the word_wrap function to handle exact fit cases correctly",
+    "[x] Fix the truncate function to handle the exact limit case correctly",
+    "[x] Fix the title_case function to capitalize the first word correctly",
+    "[x] Run tests again to ensure all tests pass (unsuccessful)"
+]}
+```I have attempted to fix the issues in the `textkit.py` file, but the tests are still failing. The errors persist despite my efforts to correct the code. The problem seems to be structural and beyond simple text substitutions. I recommend reviewing the logic and control flow of the functions in question.

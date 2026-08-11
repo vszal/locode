@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python -m pytest -q)",
+      "Bash(grep -n '`\\\\[ \\\\]`' ROADMAP.md)",
+      "Bash(grep -n '`\\\\[~\\\\]`\\\\|`\\\\[!\\\\]`' ROADMAP.md)"
+    ]
+  }
+}
