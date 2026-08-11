@@ -6445,4 +6445,51 @@ re-sizing `old`.
 A base-arm false completion no longer voids the sweep — build 129 fixed the
 cause — but if one appears anyway it is a new bug and gets its own entry.
 
+## 5.82 D11 DECLINED on measurement, and a rule-55 sweep of assistant-role text (2026-08-11)
+
+### D11 — closed, no change
+The worry: `write_file` tells the model to split a long document across
+`append_file` calls; for a `.py` file the first section cannot parse, so
+`_syntax_warning` fires "SyntaxError at line N" on a file that is merely
+incomplete, and the model might chase a phantom bug. 5.77 said measure before
+touching it. Measured across 1754 runs:
+
+| | |
+|---|---|
+| runs using `append_file` at all | 30 (1.7%) |
+| runs seeing a SyntaxError warning | 441 (25.1%) |
+| both — the D11 population | **13 (0.7%)** |
+| tool calls after the first warning, split runs | median **11** (n=13) |
+| …warned runs generally | median **14** (n=428) |
+
+The hypothesised repair loop does not exist: split runs grind *less* after a
+warning, not more. With 1.7% exposure and the effect pointing the wrong way,
+**DECLINED — do not touch it.** Recorded so it is not rediscovered as an
+obvious-looking bug a third time.
+
+This is the payoff from rule 52's exposure-first ranking: it read like a clear
+defect, and editing a tool description on that reasoning is exactly what cost
+9 points in b128.
+
+### Rule-55 sweep — every string this harness writes into the ASSISTANT role
+Prompted by 5.80. Anything in the assistant role is training the next token, so
+each one is a potential echo. Three sites exist:
+
+1. **The no-op marker** (`_elide_noop_calls`) — the confirmed bug. Guarded in
+   build 129.
+2. **`_render_calls_as_fenced`** — renders the model's own calls back as fenced
+   JSON. Copyable, but a copy *is* a tool call: it parses, runs, and lands in
+   the existing repeat guards. Not an echo hazard.
+3. **`"⛔ interrupted"`** (`loop.py`, the `CancelledByUser` path) — **a latent
+   instance of the same bug.** It persists in history, so a later turn shows the
+   model an assistant message consisting solely of that string. Echoing it would
+   end the turn and return `⛔ interrupted` as the answer — a session that
+   reports itself cancelled when nobody cancelled it. Never observed; the token
+   sequence is unusual. Cheap to close by adding it to `_is_harness_echo`.
+   **Deferred: `loop.py` is source and b130 is mid-sweep.** Do it the moment
+   b130 exits, with a test, no A/B — like 5.80 it is a correctness guard.
+
+Standing consequence: any new assistant-role injection is checked against rule
+55 before it ships.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
