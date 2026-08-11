@@ -2935,6 +2935,124 @@ Build 125's exec-ambig result (18/24 and 22/24 fixed, two replications) is a
 Noise bars unchanged: |Δfixed| < 15 pts on exec-bugfix is noise at n=24; on
 exec-ambig the observed effects have been 40+ pts, so the bar there is real.
 
+## 5.77 INSTRUCTION-SURFACE AUDIT — every contradiction the model actually reads (2026-08-10)
+
+Prompted by 5.74, which showed that two clauses of one description can pull in
+opposite directions and that the *net* effect is invisible until measured. This
+is a systematic sweep of every surface the model reads: tool descriptions,
+schema arg descriptions, the system prompt, and all 31 nudge texts.
+
+Method: descriptions checked against their **runtime assembled strings**, not
+the source (they are split across source lines, so `grep` misses them — three
+of these were invisible to a naive search). Exposure measured across **1701
+archived runs**. Prioritised by *exposure × strength of evidence*, not by how
+bad each one reads.
+
+### P0 — tool descriptions. Read by 100% of runs, and b126 proved this surface is the strongest lever in the product.
+
+**D1. `edit_file` states a falsehood, and states it first.**
+At 23% into the description: *"must match once unless replace_all is true."*
+That has been untrue since build 123 — `occurrence` is the third path, and it
+is the one b125 credited with 7/24 → 22/24. The correction sits at **56%** into
+the same string, and the word `occurrence` does not appear in the first 400
+characters at all. So the model reads a false constraint before it reads the
+true one, on the surface where position demonstrably matters.
+
+**D2. `replace_lines` claims the case `edit_file` now owns.**
+Verbatim: *"This is the RIGHT tool for … a snippet that isn't unique."* That is
+precisely what `occurrence` was built for. `replace_lines`'s description never
+mentions `occurrence` at all. This is not cosmetic: archived exec-bugfix runs
+that used `replace_lines` and never hit a syntax reject — i.e. did exactly what
+this sentence tells them, single-line patching — are **0/132 fixed, in every
+one of 15 strata** (5.73). The description routes the model into a strategy
+that has never once worked on that case.
+
+### P1 — a nudge fighting the highest-value instruction in the codebase
+
+**D3. The `repeated call` nudge contradicts the ambiguous-match message.**
+Exposure: **47.4% of all runs** — the most-fired nudge there is. It says *"try a
+genuinely different approach (different arguments, a different tool …)"*. The
+ambiguous message says *"Do NOT rewrite your edit … send the SAME call again,
+with the same `old` and the same `new`, and ADD one field."* Of the 639 runs
+that see the ambiguous message, **388 (61%) also get this nudge**.
+
+Honest scoping: the guard itself is **not** buggy — `_call_identity` includes
+the args, so adding `occurrence` reads as a new call and never false-fires. And
+the two messages land *adjacently* (within 4 events) only **31 times in 1701
+runs**. So the collision is common at run scope and rare at adjacent scope; the
+wording is wrong either way, but I am not claiming the 61% is all harm.
+
+**D4. The truncation nudge still ships the clause build 126 deleted.**
+`loop.py:1573` says, verbatim, *"keep `old` to the SMALLEST unique snippet that
+needs changing (a few lines), not the whole file"* — the exact text build 126
+rewrote because it loses the word *unique* and drives narrow aim (5.76). Low
+exposure (**2.7% of runs**) but it is delivered at the precise moment the model
+is re-deciding how to aim, and it now contradicts the shipped description.
+
+### P2 — the stated finish protocol is not the enforced one
+
+**D5.** The system prompt says: *"After you have everything you need, reply
+normally with no tool block."* The model does that, and the loop **rejects it**
+while `plan.open`, firing "open plan tasks" — **17.9% of runs**, 461 times.
+`update_plan`'s description says to call it "each time a task's state changes"
+but never says that finishing requires every task closed. 5.68 measured the
+cost: a median of **4 extra tool calls** after the suite is already green. The
+model is not being wasteful; it is obeying the prompt and being punished by the
+loop.
+
+### P3 — nudge stacking (a structural defect, not a wording one)
+
+**D6.** **649** nudges land back-to-back with no tool call in between, and
+**224 of those stacks demand different next actions** — several using the
+absolute phrasing *"the next thing you send must be …"*. Worst pairs: same-
+failure (wants `read_file`) + open-plan-tasks (wants any tool call), 72×;
+open-plan-tasks + repeated-call (wants different args or finish), 86× in both
+orders; error-unchanged + repeated-call, 23×.
+
+**D7.** The single most common stack is "same failure (3 in a row)" → "error
+unchanged across edits", **170×**. These do not conflict — both want a
+`read_file` — but they are two long directives making the same demand, which
+dilutes both. One should suppress the other.
+
+### P4 — real but smaller, or needing measurement first
+
+- **D8.** `replace_lines`: *"never re-issue the same start/end after an edit"* is
+  over-broad. After a **rejected** call nothing changed, so the numbers are
+  still valid — and 45% of `replace_lines` calls are rejected (5.73), so this
+  tells the model to discard good line numbers routinely.
+- **D9.** `replace_lines` never warns that the line at `start` is itself
+  destroyed, nor against beginning or ending a range inside a docstring. That
+  single off-by-one is **278 of 470** archived syntax rejects (5.73).
+- **D10.** `read_file` does not mention that its line-number prefixes must not
+  be copied into an edit; the warning exists only in the two editors that suffer
+  from it.
+- **D11. Needs measurement, do not touch on reasoning.** `write_file` instructs
+  the model to split any document over ~6000 chars across `append_file` calls.
+  For a `.py` file the first section will not parse, so `_syntax_warning` fires
+  "SyntaxError at line N" on a file that is merely incomplete. It is advisory by
+  design and may be harmless; measure the repair-loop rate before changing it.
+
+### How these get fixed — NOT all at once
+
+5.74 is the standing reminder that a plausible wording fix can have opposite
+sign on a different case. Shipping eleven of them on reasoning alone would
+repeat exactly the mistake this session was spent uncovering. So:
+
+1. **D1, D2, D4 are corrections of statements that are FALSE or contradict
+   shipped behaviour.** Leaving a falsehood in place is not the conservative
+   option. They go in one build and get one sweep together.
+2. **D6/D7 are a code fix, not a wording bet** — emit at most one directive
+   nudge per turn, ranked. Low risk, testable by unit test, and it cannot make
+   any individual message worse.
+3. **D3 and D5 are wording bets** on high-exposure surfaces. Each needs its own
+   pre-registration, and D5 should be considered together with 5.68's plan-
+   credit lever rather than separately.
+4. **D8/D9/D10** ride along with the next `replace_lines` change.
+5. **D11** is a measurement task first.
+
+**Blocked until b128 exits** — it is mid-sweep and D1/D2 sit in the very
+description its candidate arm is testing.
+
 ### 5.74 b127 verdict — the sentence does NOT transfer, and it is case-dependent in DIRECTION (2026-08-10)
 
 `b127-transfer`, `--base a175ed7` (build 120) vs build 125, **exec-bugfix**, r24.
