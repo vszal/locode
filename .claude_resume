@@ -591,6 +591,24 @@ completion. **The repeat death is still the dominant ending.**
     line of both trajectories. Third time this rule has paid: see the
     `read-a-winning-run-before-crediting-it` note. (ROADMAP 5.73)
 
+51. AUDIT MODEL-FACING TEXT VIA THE RUNTIME STRING, NOT THE SOURCE. Every tool
+    description in this repo is a parenthesised concatenation split across
+    source lines, so `grep` for any phrase spanning a line break finds NOTHING.
+    Three of 5.77's defects were invisible that way, including `edit_file`
+    asserting "must match once unless replace_all is true" — false since build
+    123. Import the class and search `Tool.description`; and check WHERE in the
+    string a claim sits, because position demonstrably matters (the falsehood
+    is at 23%, its correction at 56%). (ROADMAP 5.77)
+
+52. PRIORITISE INSTRUCTION FIXES BY EXPOSURE x EVIDENCE, NOT BY HOW BAD THEY
+    READ. The worst-reading defect in 5.77 (the truncation nudge still shipping
+    a deleted clause) fires in 2.7% of runs; the highest-value ones are in tool
+    descriptions, which 100% of runs read and which b126 proved are the
+    strongest surface in the product. Count nudge frequency across the archive
+    before ranking anything. And separate FALSEHOODS from OMISSIONS: correcting
+    a false statement is not a behavioural bet and can ship together, while an
+    omission is a new instruction and needs its own build to stay attributable.
+
 ## Next levers, in order
 0. ~~STALE-STALL BUG~~ — **SHIPPED as build 120 (`54b594b`) and CREDITED by
    b123.** DONE 0/24 -> 8/24, Fisher p=0.0039, and the mechanism is 1:1: the 8
