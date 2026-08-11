@@ -2874,6 +2874,85 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.74 b127 verdict — the sentence does NOT transfer, and it is case-dependent in DIRECTION (2026-08-10)
+
+`b127-transfer`, `--base a175ed7` (build 120) vs build 125, **exec-bugfix**, r24.
+The pre-registered NULL fired on the primary outcome. The mechanism did
+something I did not predict.
+
+| call | base (b120) | cand (b125) | |
+|---|---|---|---|
+| 0 `fully_fixed` (primary) | 12/24 | 11/24 | −4 pts, **p = 1** |
+| 1 first aim WIDE | 18/24 | **10/24** | −33 pts, **p = 0.039** |
+| 2 false completions | 0 | 0 | clean |
+| score | 0.750 | 0.729 | W7/L8/T9, p = 1.0 |
+
+**Verdict on the pre-registered question: NULL. The description-audit plan is
+dead**, and it died for £0 of implementation. That was the point of running it.
+
+#### It is worse than null: the same sentence has the OPPOSITE sign on the two cases
+
+| | sentence absent | sentence present |
+|---|---|---|
+| exec-ambig (b125/b126) | wide **0/24**, 0/24 | wide 21/24, 15/24 |
+| exec-bugfix (b127) | wide **18/24** | wide 10/24 |
+
+Not a general "aim wide" lever. **Case-dependent in direction**, which is a
+stronger and more useful claim than "it didn't help."
+
+The mechanism that explains both: the sentence makes the model reason about
+`old` **multiplicity**. On exec-ambig the intended `old` genuinely is ambiguous,
+so thinking about multiplicity pushes it to a bigger, unique `old` — wide. On
+exec-bugfix the fragments fail by *indentation and not-found*, not multiplicity,
+so the same framing instead **licenses a smaller `old`** — narrow. One sentence,
+two cases, opposite effects, same mechanism.
+
+#### Why the outcome stayed flat anyway: the selector paid for the damage
+
+Wide aim is still strongly causal on this case *within this very sweep* — wide
+20/28 fixed (71%) vs narrow 3/20 (15%), Fisher p = 0.00014. So losing 8 runs of
+wide aim should have cost ~4 fixes. It cost 1, because:
+
+| narrow-aim runs | fixed |
+|---|---|
+| base, no selector available | **0/6** |
+| cand, sent `occurrence` | 3/9 (33%) |
+| cand, didn't | 0/5 |
+
+Build 125 talks the model out of the 71% strategy and into a 33% one, and the
+selector is *just* good enough to cover the loss. **That is a latent risk, not a
+success**: on a case where the selector cannot rescue, this bundle would be net
+harmful. Recorded as lever 0b-vi.
+
+**Slot bias ruled out** before believing any of it (rule 49): archived
+exec-bugfix wide-aim by slot is 77/234 base vs 78/234 cand, **p = 1**.
+
+#### Build 125 stays shipped
+
+Strongly positive where it was measured (exec-ambig 22/24 and 18/24), outcome-
+neutral here, 0 false completions in all four arms. Nothing in this result
+justifies a revert. What it justifies is **not generalising**, and fixing the
+sentence's phrasing rather than its presence — 5.75.
+
+### 5.75 next candidate — stop the sentence licensing narrow aim (NOT YET RUN)
+
+Hypothesis from 5.74, to be pre-registered before any code: the sentence
+currently reads as an unconditional permission —
+
+> "If `old` turns out to appear more than once, do NOT rewrite it: resend the
+> same call with `occurrence` set to which one you mean."
+
+It buys the exec-ambig win by making the model think about multiplicity, and
+pays for it on exec-bugfix by implying a small `old` is fine because there is a
+rescue. The candidate keeps the rescue but stops it reading as a preference:
+state that `old` should be big enough to be unique *first*, and offer
+`occurrence` only as the fallback when it isn't.
+
+**Do not ship this on the reasoning above.** It must beat build 125 on
+exec-bugfix *without* losing exec-ambig, which means a two-case sweep and a
+pre-registration that says in advance what a mixed result means. 5.74 is
+precisely a record of what happens when one case is treated as the world.
+
 ### 5.72 pre-registration — b127, THE TRANSFER TEST (2026-08-10)
 
 5.70 pre-committed: *"if the sentence wins, the next move is to test the same
