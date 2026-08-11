@@ -212,6 +212,7 @@ class AgentLoop:
         self._wallclock_pause = 0.0
         nudged_empty = False
         truncated_nudges = 0
+        harness_echo_nudges = 0
         salvage_writes = 0
         repetition_aborts = 0
         self._denials = 0
@@ -684,6 +685,31 @@ class AgentLoop:
                             self._nudge_empty()
                             continue
                         return "(the model returned an empty response)"
+                    # A reply that is nothing but text THIS HARNESS wrote is not
+                    # an answer, and must never end the turn.
+                    #
+                    # Found in b128's exec-bugfix base arm: 5 of 24 runs ended
+                    # with `fully_fixed` false, no stop event, and an assistant
+                    # message 77 chars long — byte-identical to the no-op marker
+                    # `_elide_noop_calls` had injected into the model's OWN prior
+                    # turn. The model saw a previous assistant message consisting
+                    # solely of that marker and did the obvious autoregressive
+                    # thing: emitted it again. No fence, so the loop read it as a
+                    # deliberate final answer and returned success on a red suite.
+                    #
+                    # Build 80 removed the copyable JSON from a rejected call and
+                    # left a copyable MARKER in its place; this closes that. The
+                    # guard is on the echo, not on the marker's wording, because
+                    # any fixed string we write into assistant history is
+                    # copyable — rewording it just moves the attractor. ROADMAP
+                    # 5.80.
+                    if _is_harness_echo(content):
+                        if harness_echo_nudges < 2:
+                            harness_echo_nudges += 1
+                            self._nudge_harness_echo()
+                            continue
+                        return self._stop("the model kept echoing the harness's "
+                                          "own rejection notice back as its reply")
                     # The same dead-end as a repeated tool call, one level up:
                     # the model repeats ITSELF rather than a call. Every stuck-
                     # detector below keys on a call signature, so a reply that
@@ -1534,6 +1560,23 @@ class AgentLoop:
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "empty response"})
+
+    def _nudge_harness_echo(self) -> None:
+        """The model repeated our rejection notice instead of answering. Say
+        whose text it is — the model cannot tell from the transcript, where the
+        marker sits inside its own assistant turn — and name the one thing that
+        actually clears the rejection: a `new` that differs from `old`."""
+        self.history.append({
+            "role": "user",
+            "content": ("That line was written by the tool harness, not by you "
+                        "— it is the notice that your last edit_file changed "
+                        "nothing. Repeating it does not fix anything. Your "
+                        "previous edit had `new` identical to `old`. Send the "
+                        "edit again with `new` carrying the actual change, or "
+                        "read the file first if you are unsure what to change."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge", "reason": "echoed harness notice"})
 
     def _nudge_continue_salvaged(self, call) -> None:
         path = call.args.get("path", "the file")
@@ -2516,6 +2559,28 @@ def _forgive_nudged_verifies(repeat_streaks: dict, nudged_repeat: set,
 # Every ```tool fence in an assistant message, so a rejected call can be lifted
 # back out of the history it was already written into.
 _TOOL_FENCE_RE = re.compile(r"```tool\b.*?```", re.S)
+
+# The no-op marker `_elide_noop_calls` writes into the model's own assistant
+# turn. Tolerant on the dash and on inner whitespace, because the echo comes
+# back through a tokenizer: em dash, en dash and hyphen all appear, and line
+# wrapping can turn a single space into a newline.
+_HARNESS_MARKER_RE = re.compile(
+    r"\[\s*\w+\s*:\s*rejected\s*[—–-]\s*this call changed nothing,\s*"
+    r"so it is not\s+repeated here\s*\]", re.I)
+
+
+def _is_harness_echo(content: str) -> bool:
+    """True when the model's reply is made of nothing but text this harness
+    injected — the no-op markers and, defensively, whitespace or bare bullets
+    around them.
+
+    Deliberately strict: a reply that quotes a marker AND says something else is
+    left alone, because that can be a real answer explaining why it gave up. The
+    failure this catches is the pure echo, where removing every marker leaves
+    nothing behind."""
+    residue = _HARNESS_MARKER_RE.sub("", _TOOL_FENCE_RE.sub("", content))
+    return bool(_HARNESS_MARKER_RE.search(content)) and not residue.strip(
+        " \t\r\n-*·•>`\"'")
 
 
 def redact_noop_calls(content: str, calls, noop_calls: list) -> str:

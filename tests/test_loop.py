@@ -3902,3 +3902,44 @@ async def test_a_real_edit_still_counts_as_landed(tmp_path):
     assert loop._landed_edits == 1
     assert loop._landed_edit is True
     assert loop._last_edit_file == "a.py"
+
+
+async def test_echoed_noop_marker_is_not_a_final_answer(tmp_path):
+    # b128 regression. `_elide_noop_calls` rewrites a rejected no-op edit inside
+    # the model's OWN assistant turn, leaving a bare marker there. The model then
+    # copies that marker as its next reply; it carries no fence, so the loop used
+    # to read it as a deliberate final answer and return success on a red suite.
+    # 5 of 24 exec-bugfix base runs ended exactly this way. It must nudge instead.
+    marker = ("[edit_file: rejected — this call changed nothing, so it is not "
+              "repeated here]")
+    loop = make_loop(tmp_path, [
+        {"role": "assistant", "content": marker},
+        {"role": "assistant", "content": "Fixed it: `<` should be `<=`."},
+    ])
+    out = await loop.run_turn("fix textkit.py")
+    assert out == "Fixed it: `<` should be `<=`."      # did NOT end on the echo
+    assert any("written by the tool harness" in m["content"]
+               for m in loop.history if m["role"] == "user")
+
+
+async def test_relentless_marker_echo_stops_instead_of_grinding(tmp_path):
+    # If the nudge is inert, the loop must stop with a reason naming the echo
+    # rather than eventually returning the harness's own text to the caller.
+    marker = ("[edit_file: rejected — this call changed nothing, so it is not "
+              "repeated here]")
+    loop = make_loop(tmp_path, [{"role": "assistant", "content": marker}] * 5)
+    out = await loop.run_turn("fix textkit.py")
+    assert "rejection notice" in out
+    assert marker not in out
+
+
+async def test_marker_plus_real_prose_is_still_a_valid_answer(tmp_path):
+    # The guard is on the PURE echo. A reply that quotes the marker and then says
+    # something substantive is a real answer — explaining why it gave up — and
+    # must be returned untouched.
+    reply = ("[edit_file: rejected — this call changed nothing, so it is not "
+             "repeated here]\n\nI could not fix word_wrap; the boundary test "
+             "expects <= width and I could not locate the comparison.")
+    loop = make_loop(tmp_path, [{"role": "assistant", "content": reply}])
+    out = await loop.run_turn("fix textkit.py")
+    assert out == reply

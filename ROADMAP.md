@@ -6344,4 +6344,61 @@ build 125 can end a turn believing exec-bugfix is done. Cheap to settle: read
 the tail of those 5 trajectories. Do it before the next exec-bugfix sweep, since
 it sets the baseline everything else is measured against.
 
+## 5.80 THE ECHO BUG — the model parrots our rejection notice and the loop calls it done (build 129, 2026-08-11)
+
+5.79 is closed, and it was not a detector artefact. All five of b128's
+unexplained exec-bugfix base endings are the same three-line shape: read the
+file, emit a 77-character assistant message, turn ends. The message is
+byte-identical to
+
+    [edit_file: rejected — this call changed nothing, so it is not repeated here]
+
+— the marker `_elide_noop_calls` writes into the model's **own assistant turn**
+when it rejects a no-op edit. The model sees a previous assistant message
+consisting of nothing but that marker and does the obvious autoregressive thing:
+it emits the marker again. There is no tool fence, so `if not calls` reads it as
+a deliberate final answer and the turn returns **successfully, on a red suite**.
+
+**Build 80 caused this.** It removed the copyable JSON from a rejected call —
+correctly; that was a measured win — and left a copyable *marker* where the JSON
+had been. The attractor moved rather than disappearing.
+
+### Exposure
+| | |
+|---|---|
+| runs producing ≥1 no-op edit (marker injected) | 338/1753 (19.3%) |
+| runs ending on a pure echo of it | 5/1753 (0.3%), conditional 1.5% |
+| …in b128's exec-bugfix base arm alone | **5/24 (21%)** |
+
+Rare in aggregate, bursty in practice, and it landed entirely inside one
+baseline — which is how it was found. Two reasons it outranks its 0.3%:
+it reports success on failing work (the worst failure class this project has),
+and a 21% burst is large enough to move a sweep's baseline and make an unrelated
+candidate look good or bad.
+
+### The fix (build 129)
+`_is_harness_echo` + `_nudge_harness_echo` in `agent/loop.py`. A reply made of
+nothing but harness-authored markers is not an answer: nudge twice naming whose
+text it is (the model cannot tell from the transcript — the marker sits inside
+its own turn) and what actually clears the rejection, then stop with a reason
+rather than returning our own text as the result.
+
+**The guard is on the echo, not on the marker's wording.** Rewording is the
+tempting fix and it is wrong: any fixed string written into assistant history is
+copyable, so rewording just relocates the attractor — exactly what build 80 did.
+Deliberately strict: a reply that quotes the marker *and* says something
+substantive is left alone, since that can be a genuine explanation of giving up.
+
+3 regression tests. 1197 pass. No sweep needed — a turn that returns success on
+a red suite is a correctness bug, not a wording bet.
+
+### Method note (rule 53)
+A guard that voids an experiment must be **arm-directional**. b128's VOID fired
+on "false completions nonzero in any arm", and 5 of the 6 were in the *unchanged
+base* arm — the guard was reporting a pre-existing bug in the baseline, not
+misconduct by the candidate. Reading it as a candidate problem would have been
+backwards, and chasing it as noise would have missed a real bug. Split the guard
+by arm: candidate false completions void the candidate; base false completions
+invalidate the *baseline* and are their own bug report.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
