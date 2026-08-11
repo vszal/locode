@@ -1,4 +1,4 @@
-# locode resume — build 125 (2026-08-10)
+# locode resume — build 125 (2026-08-10) · b127 landed, sentence does NOT transfer
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -659,20 +659,36 @@ completion. **The repeat death is still the dominant ending.**
    - NEXT, pre-committed in 5.70 and NOT yet done: the **transfer test** — same
      idea, DIFFERENT tool, DIFFERENT case, before claiming anything general.
 
-0b-v. **TRANSFER TEST — b127 IN FLIGHT.** Does the build-123 sentence, tuned
-   on exec-ambig, help a case it was never designed for? `--base a175ed7`
-   (build 120, sentence absent, verified by grep) vs working tree (build 125),
-   case **exec-bugfix**, qwencoder14, r24, log `$CLAUDE_JOB_DIR/tmp/ab127.log`,
-   grader `$CLAUDE_JOB_DIR/tmp/grade127.py`. Pre-registered ROADMAP 5.72.
-   - **No source edits needed** — this measures already-shipped code.
-   - Archive support (correlational, 488 runs): wide first aim -> fixed 54% vs
-     21%, pooled OR 11.15 across 9 strata, clean in 7.
-   - **A NULL is expected-ish and is a real result.** exec-bugfix already aims
-     wide 57-79% at build 120, vs 0/24 on exec-ambig, so there is little
-     headroom. Null => the sentence supplies a MISSING strategy rather than
-     being a general aim lever, and the description-audit plan dies cheaply.
-   - Read |delta fixed| < 15 pts as noise at n=24 (base arms on this case have
-     ranged 14%-50% across sweeps).
+0b-v. **TRANSFER TEST — LANDED, and it is a NULL. The sentence does NOT
+   generalise.** b127, `--base a175ed7` (build 120) vs build 125, exec-bugfix,
+   r24. `fully_fixed` 12/24 -> 11/24, **p = 1**. The description-audit plan is
+   DEAD, and it died before costing any implementation. (ROADMAP 5.74)
+   - **The unpredicted part: wide aim went BACKWARDS, 18/24 -> 10/24
+     (p=0.039).** Slot bias ruled out first (rule 49): archived exec-bugfix
+     wide-aim by slot is 77/234 base vs 78/234 cand, p=1. It is real.
+   - So the SAME sentence has **opposite sign on the two cases**. Mechanism
+     that explains both: it makes the model reason about `old` MULTIPLICITY.
+     On exec-ambig the target really is ambiguous, so that pushes it to a
+     bigger unique `old` (wide). On exec-bugfix the fragments fail by
+     INDENTATION, not multiplicity, so the same framing licenses a smaller
+     `old` (narrow).
+   - Outcome stayed flat only because the selector paid for it: wide aim is
+     still 71% vs 15% fixed WITHIN this sweep (p=0.00014), and narrow runs went
+     0/6 (base) -> 3/9 (cand, sending `occurrence`). Build 125 talks the model
+     out of a 71% strategy into a 33% one and just about breaks even.
+
+0b-vi. **LATENT RISK, from 0b-v.** On a case where the selector cannot rescue a
+   narrow `old`, build 125 would be net HARMFUL. Not observed, not hypothetical
+   either — the trade is measured. Watch it on any new case.
+
+0b-vii. **NEXT CANDIDATE, not yet pre-registered: re-phrase, do not remove.**
+   The sentence currently reads as unconditional permission to send a small
+   `old` because a rescue exists. Keep the rescue, state the preference for a
+   unique `old` FIRST, offer `occurrence` only as fallback. Must beat build 125
+   on exec-bugfix WITHOUT losing exec-ambig => two-case sweep, and the
+   pre-registration must say in advance what a mixed result means. Do NOT ship
+   on the reasoning alone; 5.74 is the record of what one-case generalising
+   costs. (ROADMAP 5.75)
 
 0c. **POSITION VS REASONING — now INSTRUMENTED, and the first datum is in.**
    b122 could not test it because reordering the case destroys it. The
