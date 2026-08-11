@@ -2874,6 +2874,67 @@ three. Recalibration re-queued as lever 0.
 Noticed only because I read the log rather than trusting the process-exit
 notification — a sweep that exits does not mean a sweep that ran.
 
+### 5.76 pre-registration — b128, UNIQUENESS-FIRST (two cases at once)
+
+Written before the code change and before any data. Base = `fa12194` (build 125
+code), cand = working tree (build 126). Cases **exec-ambig AND exec-bugfix**,
+qwencoder14, r24 each — 96 runs. 5.75 required a two-case sweep and this is it.
+
+#### What 5.74 actually exposed: the description contradicts itself
+
+`edit_file`'s description has said this since long before the selector:
+
+> "Keep `old` to the SMALLEST unique snippet that needs changing (a few lines),
+> NOT the whole file"
+
+Build 120 carries that clause and still aims wide **18/24** on exec-bugfix. Add
+the rescue sentence and it drops to **10/24**. The rescue did not introduce the
+"go small" instruction — it **removed the downside of obeying it**. A short
+`old` that matched twice used to be a hard failure; now it is recoverable, so
+"smallest" wins the tie and the model drops the word *unique*.
+
+#### The change
+
+One semantic move — make uniqueness the binding constraint and the selector an
+explicit fallback — expressed in two clauses:
+
+1. "Keep `old` to the SMALLEST unique snippet that needs changing (a few
+   lines), NOT the whole file" → **"Make `old` just long enough to appear
+   EXACTLY ONCE — a few lines, extended up to the `def` line if a shorter
+   snippet would match in more than one place — NOT the whole file"**
+2. The rescue sentence keeps every word b126 credited, plus one: "If `old`
+   **still** turns out to appear more than once…"
+
+**Attribution is deliberately deferred and I am saying so in advance.** If b128
+wins I will not know which clause did it. That is acceptable *here* because the
+two clauses are one instruction, and 5.71 is the record that splitting a
+sentence from its context is itself a separate, runnable experiment. Establish
+the effect on both cases first; attribute after, if it survives.
+
+#### Calls, per case
+
+0. **Primary, population-independent:** `fully_fixed`.
+1. **Mechanism:** first `edit_file` `old` reaches def/docstring.
+2. **Guard, new for this sweep:** `edit_file` not-found rate. A longer `old` is
+   harder to match exactly. If not-found spikes, the change costs what it buys.
+3. **Guard:** false completions. Nonzero in any arm voids the result.
+
+#### The decision rule, fixed now
+
+Build 125's exec-ambig result (18/24 and 22/24 fixed, two replications) is a
+**banked asset**. It is not tradeable for a speculative gain elsewhere.
+
+- **exec-ambig fixed < 13/24 → REJECT**, whatever exec-bugfix does. No further
+  argument, no re-reading of the trajectories to find a reason to keep it.
+- **exec-ambig holds (≥ 15/24) AND exec-bugfix wide ≥ 15/24 AND exec-bugfix
+  fixed not down > 1 run → SHIP build 126.**
+- **exec-bugfix wide does NOT recover (< 15/24) → the 5.74 licensing story is
+  WRONG.** Record that, stop tuning this sentence, and go back to lever 0c.
+- Anything else → no ship, write it up, no third guess at the wording.
+
+Noise bars unchanged: |Δfixed| < 15 pts on exec-bugfix is noise at n=24; on
+exec-ambig the observed effects have been 40+ pts, so the bar there is real.
+
 ### 5.74 b127 verdict — the sentence does NOT transfer, and it is case-dependent in DIRECTION (2026-08-10)
 
 `b127-transfer`, `--base a175ed7` (build 120) vs build 125, **exec-bugfix**, r24.
