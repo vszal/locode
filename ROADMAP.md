@@ -6492,4 +6492,58 @@ each one is a potential echo. Three sites exist:
 Standing consequence: any new assistant-role injection is checked against rule
 55 before it ships.
 
+## 5.83 D3 DECLINED — the nudge it contradicts has no room to act (2026-08-11)
+
+D3's claim: the `repeated call` nudge says *"try a genuinely different approach
+(different arguments, a different tool…)"* while the ambiguity message says
+*"resend the SAME call and ADD `occurrence`"* — a direct contradiction, and the
+repeat nudge is the most frequent in the product (47.4% of runs).
+
+The contradiction is real as text. It is unreachable in practice. Measured on
+b125–b128, the only builds where `occurrence` exists (stratified, rule 49):
+
+**Does the repeat nudge ever land between an ambiguity message and the model's
+next edit — the moment where it could override the advice?**
+
+| | |
+|---|---|
+| ambiguity → next `edit_file`, with a repeat nudge in between | **0** |
+| ambiguity → next `edit_file`, clean | 201 (61% carry `occurrence`) |
+
+Zero. The two never meet at the decision point.
+
+**Why: the repeat nudge is terminal.** Across 87 firings —
+
+| | |
+|---|---|
+| tool calls issued after it | median **0**, mean 1.2 |
+| firings with nothing after them at all | 49/87 (56%) |
+| runs reaching a `stopped` event afterwards | 81/87 (**93%**) |
+
+Partly by construction — the guard nudges once and stops if the repeat persists
+— but that is exactly the point: **a nudge with a median of zero remaining
+actions cannot be reworded into a better outcome.** DECLINED. This is the third
+5.77 item closed by exposure rather than by argument (with D11), and the second
+where the text reads worse than it behaves.
+
+### The real finding underneath it (new lever 0e)
+The most frequent nudge in the product is spent as a **death rattle**. It fires
+when the run is already over, so its 47.4% incidence buys nothing. The valuable
+question is not what it says but **when it fires**: could the repeat detector
+intervene while the model still has iterations left, where a steer has somewhere
+to go? That is a mechanism change, not a wording change, and it is a bigger
+lever than every remaining 5.77 item combined.
+
+Do not start it before b130 lands — it touches the loop, and one experiment at
+a time.
+
+### 5.77 scoreboard
+| | |
+|---|---|
+| D1 | build 130, in flight (5.81) |
+| D2 | landed unmeasured, zero baseline exposure (build 128) |
+| D4 | **void** — the revert restored the clause it flagged as missing |
+| D3, D11 | DECLINED on measurement |
+| D5, D6/D7, D8–D10 | open; all touch source, all wait for b130 |
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
