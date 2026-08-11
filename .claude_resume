@@ -627,6 +627,14 @@ completion. **The repeat death is still the dominant ending.**
     re-reading of the trajectories to find a reason to keep it", and the value
     of saying that in advance is entirely in honouring it afterwards.
 
+56. A PER-RUN STATISTIC EXPRESSED AS A FRACTION OF THE RUN IS RETROSPECTIVE.
+    "The nudge fires at 0.94 of the run" divides by the FINAL length, which no
+    running loop knows — it cannot drive a runtime decision. Restate in
+    absolute iterations before designing against it. Corollary: before
+    crediting a marker, bin by how many OPPORTUNITIES the run had to exhibit
+    it. "Never repeated a call" and "barely ran" are the same population until
+    shown otherwise, and that mistake inflated lever 0e from 8/8 to 54/54.
+
 55. NEVER LET HARNESS TEXT BECOME A MODEL UTTERANCE. Anything written into the
     ASSISTANT role — elision markers, placeholders, summaries — is training the
     next token. The model will copy it, and a copy with no tool call reads as a
@@ -767,6 +775,19 @@ completion. **The repeat death is still the dominant ending.**
    - Rule fixed in ROADMAP 5.81: exec-ambig fixed <13/24 REJECTS. SHIP needs
      ambig >=15/24 AND not-found <=10% AND zero CANDIDATE false completions.
      Anything between -> **stop editing this string.**
+
+0e. **THE REPEAT DETECTOR IS NINE ITERATIONS LATE.** First duplicate tool call
+   lands at absolute iteration **6** (p25 5, p75 7); the `repeated call` nudge
+   fires at **15** (p25 13, p75 23). By then the median run has **0** further
+   tool calls and 93% reach a stop — so its 47.4% incidence buys nothing and
+   D3's wording never reaches a model with room to act (5.83).
+   - **Do NOT claim the predictive story.** "0 dups in the first half = 54/54
+     fixed" is mostly run length: no run has 10+ first-half calls and zero
+     duplicates, and 46/54 finished in <=5 calls. Fair comparison exists in one
+     bin only (6-9 calls): 8/8 vs 10/77. Corrected in 5.85, see rule 56.
+   - Build: escalate (early duplicate steers, late one stops), new text — not
+     the terminal text moved earlier — and pre-register a REJECT line.
+   - **Queued behind b130.**
 
 0d. **INDENTATION DEPTH IS A HIDDEN CONFOUND in every `old`-sizing
    experiment.** Wording that moves the aim shallower wins for reasons that
