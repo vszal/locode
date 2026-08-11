@@ -3000,19 +3000,49 @@ cost: a median of **4 extra tool calls** after the suite is already green. The
 model is not being wasteful; it is obeying the prompt and being punished by the
 loop.
 
-### P3 — nudge stacking (a structural defect, not a wording one)
+### P3 — nudge stacking. CORRECTED after re-measuring; the first reading was wrong.
 
-**D6.** **649** nudges land back-to-back with no tool call in between, and
-**224 of those stacks demand different next actions** — several using the
-absolute phrasing *"the next thing you send must be …"*. Worst pairs: same-
-failure (wants `read_file`) + open-plan-tasks (wants any tool call), 72×;
-open-plan-tasks + repeated-call (wants different args or finish), 86× in both
-orders; error-unchanged + repeated-call, 23×.
+My first pass counted 649 "back-to-back" nudges and reported that 224 of them
+demand different next actions. **That detector was wrong.** A prose-only model
+reply emits no event, so it counted two *separate turns* as a stack. Re-measured
+against `iteration` boundaries:
 
-**D7.** The single most common stack is "same failure (3 in a row)" → "error
-unchanged across edits", **170×**. These do not conflict — both want a
-`read_file` — but they are two long directives making the same demand, which
-dilutes both. One should suppress the other.
+| | count |
+|---|---|
+| consecutive nudges **within one iteration** (true stacking) | **242** |
+| consecutive nudges **across a turn boundary** | **407** |
+
+Both defects are real, but they are different problems and want different fixes.
+
+**D6 (revised). True same-turn stacking is almost entirely ONE redundant pair.**
+"same failure (N in a row)" + "error unchanged across edits" accounts for
+**210 of 242 (87%)**. They do not conflict — both demand a `read_file` — they
+are two long directives making the same demand in the same message, which
+dilutes both. The conflicting-demand pairs I first reported are nearly all
+cross-turn, not stacked. *Fix: suppress one when the other fires.* Small, safe,
+unit-testable.
+
+**D7 (revised, and the more interesting one). The nudges do not CONVERGE
+across turns — 407 cases.** The model is nudged, replies in prose without a tool
+call, and is nudged again, often by a *different* guard:
+
+| sequence | count |
+|---|---|
+| same failure → open plan tasks | 72 |
+| repeated call ↔ open plan tasks (both orders) | 86 |
+| **repeated call → repeated call** | 56 |
+| error unchanged → open plan tasks | 29 |
+
+This is not "contradictory orders in one message". It is a model that cannot
+satisfy two guards in sequence: it is told to read a file, then told it has open
+plan tasks, then told it is repeating itself — each guard correct alone, no path
+through all of them. Note "repeated call → repeated call" (56): the same guard
+firing twice with no progress between, which by its own logic means the first
+message did not work.
+
+*Fix: needs design, not a wording tweak* — escalation and suppression across
+turns (a guard that has just fired and not been obeyed should escalate or stand
+down, not repeat verbatim). This is agent-loop work and stays on the top tier.
 
 ### P4 — real but smaller, or needing measurement first
 

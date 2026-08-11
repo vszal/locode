@@ -1,7 +1,7 @@
 {
   "kind": "paired-ab",
   "label": "b128-uniquefirst",
-  "created": "2026-08-10 22:00:01",
+  "created": "2026-08-10 22:01:33",
   "base_ref": "fa12194",
   "base_sha": "fa12194",
   "cand_desc": "/Users/vszalvay/Code/locode",
@@ -189,7 +189,14 @@
       "delta": -0.5
     }
   ],
-  "dropped": [],
+  "dropped": [
+    {
+      "case": "exec-ambig",
+      "model": "qwencoder14",
+      "repeat": 23,
+      "why": "incomplete pair: one arm never ran"
+    }
+  ],
   "case_table": {
     "exec-ambig": {
       "n": 22,
@@ -201,7 +208,7 @@
   "analysis": {
     "n_pairs": 22,
     "n_effective": 11,
-    "n_dropped": 0,
+    "n_dropped": 1,
     "min_pairs": 6,
     "mean_delta": -0.2045,
     "wins": 1,
@@ -2316,13 +2323,57 @@
       "error": "",
       "invalid": "",
       "arm": "base"
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 23,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 12,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "bash": 4,
+          "read_file": 1,
+          "edit_file": 6
+        },
+        "tool_errors": 6,
+        "tool_error_rate": 0.545,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 92.3,
+        "model_seconds": 90.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 90.8,
+        "gen_chars": 2885,
+        "gen_chars_per_sec": 31.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 92.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwencoder14__r23__base-cwbbopu2",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
     }
   ],
   "summary": {
-    "overall_score": 0.761,
-    "clean_finish_rate": 0.545,
+    "overall_score": 0.767,
+    "clean_finish_rate": 0.556,
     "total_nudges": 104,
-    "total_iterations": 1013,
+    "total_iterations": 1025,
     "nudge_histogram": {
       "unverified edits": 61,
       "repeated call": 19,
@@ -2333,22 +2384,22 @@
       "repeated edit": 2,
       "never seen green": 1
     },
-    "n_runs": 44,
-    "n_valid": 44,
+    "n_runs": 45,
+    "n_valid": 45,
     "invalid_runs": 0,
     "invalid_rate": 0.0,
     "invalid_reasons": {},
     "gen_rate": 31.1,
-    "gen_chars": 230762,
+    "gen_chars": 233647,
     "rows": {
       "exec-ambig::qwencoder14": {
         "case": "exec-ambig",
         "track": "execute",
         "model": "qwencoder14",
-        "n": 44,
+        "n": 45,
         "n_invalid": 0,
         "invalid_reasons": {},
-        "score_mean": 0.761,
+        "score_mean": 0.767,
         "score_min": 0.5,
         "scores": [
           1.0,
@@ -2394,12 +2445,13 @@
           1.0,
           0.5,
           0.5,
+          1.0,
           1.0
         ],
-        "iterations_mean": 23.0,
-        "nudges_mean": 2.4,
-        "clean_finish_rate": 0.545,
-        "seconds_mean": 170.8,
+        "iterations_mean": 22.8,
+        "nudges_mean": 2.3,
+        "clean_finish_rate": 0.556,
+        "seconds_mean": 169.0,
         "gen_rate_mean": 31.1,
         "stop_reasons": [
           "the model repeated the same tool call without making progress",
