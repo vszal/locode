@@ -1,4 +1,4 @@
-# locode resume — build 125 (2026-08-10) · b127 landed, sentence does NOT transfer
+# locode resume — build 130 (2026-08-11) · b126 REVERTED; echo bug fixed; b130 IN FLIGHT
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -605,9 +605,33 @@ completion. **The repeat death is still the dominant ending.**
     a deleted clause) fires in 2.7% of runs; the highest-value ones are in tool
     descriptions, which 100% of runs read and which b126 proved are the
     strongest surface in the product. Count nudge frequency across the archive
-    before ranking anything. And separate FALSEHOODS from OMISSIONS: correcting
-    a false statement is not a behavioural bet and can ship together, while an
-    omission is a new instruction and needs its own build to stay attributable.
+    before ranking anything. And separate FALSEHOODS from OMISSIONS — but
+    **AMENDED 2026-08-11**: the original wording said correcting a falsehood is
+    "not a behavioural bet and can ship together". b128 falsified that. A TRUE
+    statement can do harm: what the model does with a sentence is independent
+    of its truth value. Correct falsehoods, but in a high-exposure string
+    (anything 100% of runs read) give the correction its own build and its own
+    A/B. Ship several corrections together only where exposure is measurably
+    ZERO on the graded cases — as D2 was.
+
+53. A GUARD THAT VOIDS AN EXPERIMENT MUST BE ARM-DIRECTIONAL. b128's VOID fired
+    on "false completions nonzero in ANY arm", and 5 of the 6 were in the
+    UNCHANGED base arm. Candidate false completions void the CANDIDATE; base
+    false completions invalidate the BASELINE and are their own bug report.
+    Reading the base's number as candidate misconduct is backwards, and
+    dismissing it as noise would have missed a real correctness bug.
+
+54. WHEN A PRE-REGISTERED RULE FIRES, EXECUTE IT, THEN EXPLAIN. b128 was
+    rejected on the numbers before a single trajectory was opened; the
+    trajectories were read only to explain the loss. 5.76 said in advance "no
+    re-reading of the trajectories to find a reason to keep it", and the value
+    of saying that in advance is entirely in honouring it afterwards.
+
+55. NEVER LET HARNESS TEXT BECOME A MODEL UTTERANCE. Anything written into the
+    ASSISTANT role — elision markers, placeholders, summaries — is training the
+    next token. The model will copy it, and a copy with no tool call reads as a
+    finished turn. Rewording is not a fix; guard the echo. Check any new
+    assistant-role injection against this before shipping it.
 
 ## Next levers, in order
 0. ~~STALE-STALL BUG~~ — **SHIPPED as build 120 (`54b594b`) and CREDITED by
@@ -699,27 +723,56 @@ completion. **The repeat death is still the dominant ending.**
    narrow `old`, build 125 would be net HARMFUL. Not observed, not hypothetical
    either — the trade is measured. Watch it on any new case.
 
-0b-vii. **UNIQUENESS-FIRST — build 126, b128 IN FLIGHT.** 5.74 found the
-   description CONTRADICTS ITSELF: it has always said "Keep `old` to the
-   SMALLEST unique snippet", and build 120 carries that while still aiming wide
-   18/24 on exec-bugfix. The b123 rescue sentence did not add the go-small
-   instruction — it removed the DOWNSIDE of obeying it, so "smallest" wins the
-   tie and the model drops the word "unique". Build 126 makes uniqueness the
-   binding constraint and adds one word, "still", to mark the rescue as a
-   fallback. Every word b126 credited is intact.
-   - `--base fa12194` (build 125 code), **exec-ambig AND exec-bugfix**, r24
-     each = 96 runs, ~5h. Log `$CLAUDE_JOB_DIR/tmp/ab128.log`, grader
-     `$CLAUDE_JOB_DIR/tmp/grade128.py` (written before the sweep; the decision
-     rule is CODED, so it cannot be softened after seeing numbers).
-   - **No source edits until it exits.**
-   - Decision rule, fixed in ROADMAP 5.76 in advance: exec-ambig fixed < 13/24
-     REJECTS outright, whatever exec-bugfix does — that result is a banked
-     asset and is not tradeable. Ship needs ambig >= 15/24 AND bugfix wide
-     >= 15/24 AND bugfix fixed not down by more than 1.
-   - If bugfix wide does NOT recover, the 5.74 licensing story is WRONG: record
-     it, stop tuning this sentence, go to lever 0c.
-   - Attribution between the two clauses is DEFERRED ON PURPOSE and said so in
-     advance. Establish the effect first; split it after, if it survives.
+0b-vii. **UNIQUENESS-FIRST — build 126, REJECTED and REVERTED (build 127).**
+   b128 discharged 5.76 on its own pre-registered line: exec-ambig fully_fixed
+   17/24 -> 8/24 (p=0.0199), first aim wide 16/24 -> 0/24, `old` not-found
+   0/134 -> 74/119 (**62%**). REJECT line was <13/24; it came in at 8.
+   - **Mechanism, read off the calls (rule 50).** The clause added a
+     CONDITIONAL — "extended up to the `def` line IF a shorter snippet would
+     match in more than one place" — and the conditional is an escape hatch.
+     The model evaluates it, judges the inner `if x > 100:` unique enough,
+     stays in the function body, and sends a **4-space** indent where the seed
+     has **8**. Base's dominant first `old` is `def clamp_score(value):...`
+     (16/24) at column 0, which cannot be mis-indented.
+   - The b126 finding that the schema property WITHOUT the sentence produced
+     mis-indented `old` in 19/24 runs is the SAME failure by another route.
+   - Reverted byte-exact against fa12194, verified on the runtime description
+     strings for all four fs tools (rule 51), not the source.
+
+0b-viii. **THE ECHO BUG — found in b128's BASE arm, fixed as build 129.**
+   The 5 "false completions" in the unchanged arm were not detector noise. The
+   model was emitting, as its whole reply, the 77-char marker
+   `[edit_file: rejected — this call changed nothing, so it is not repeated
+   here]` — which `_elide_noop_calls` writes into the model's OWN assistant
+   turn. No fence, so the loop returned it as a final answer, **successfully,
+   on a red suite**. Build 80 removed copyable JSON and left a copyable MARKER;
+   the attractor moved rather than disappearing.
+   - Exposure: 338/1753 runs (19.3%) get the marker injected; 5 echo it (0.3%
+     overall, 1.5% conditional) — but all 5 in ONE arm, 5/24 = 21%. Bursty
+     enough to corrupt a baseline, which is how it surfaced.
+   - Fixed by `_is_harness_echo` + `_nudge_harness_echo`. The guard is on the
+     ECHO, not the wording: any fixed string in assistant history is copyable,
+     so rewording only relocates the attractor. 3 regression tests.
+
+0b-ix. **D1 — build 130, b130 IN FLIGHT.** The last 5.77 P0: `edit_file` says
+   `old` "must match once unless replace_all is true", false since build 123,
+   and `occurrence` never appears in the first 400 chars. The fix states the
+   rule truthfully and moves `occurrence` from 56% to **25%** of the string.
+   - `--base 5a97a06` (build 129), exec-ambig + exec-bugfix, r24 = 96 runs,
+     ~4h. Log `$CLAUDE_JOB_DIR/tmp/ab130.log`. **No source edits until it
+     exits.**
+   - This is a BET, not bookkeeping (see rule 52 as amended). 5.74 + lever 0d
+     predict the failure: naming the rescue earlier LICENSES a narrower aim,
+     narrower is deeper, deeper is more indented, this model mis-indents.
+   - Rule fixed in ROADMAP 5.81: exec-ambig fixed <13/24 REJECTS. SHIP needs
+     ambig >=15/24 AND not-found <=10% AND zero CANDIDATE false completions.
+     Anything between -> **stop editing this string.**
+
+0d. **INDENTATION DEPTH IS A HIDDEN CONFOUND in every `old`-sizing
+   experiment.** Wording that moves the aim shallower wins for reasons that
+   have nothing to do with uniqueness; wording that moves it deeper loses to
+   mis-indentation, not to ambiguity. Any `old`-sizing candidate MUST report
+   not-found rate alongside wide aim, or its result is uninterpretable.
 
 0c. **POSITION VS REASONING — now INSTRUMENTED, and the first datum is in.**
    b122 could not test it because reordering the case destroys it. The
