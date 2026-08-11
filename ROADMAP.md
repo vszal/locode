@@ -6401,4 +6401,48 @@ backwards, and chasing it as noise would have missed a real bug. Split the guard
 by arm: candidate false completions void the candidate; base false completions
 invalidate the *baseline* and are their own bug report.
 
+## 5.81 PRE-REGISTRATION — D1, the last P0 (build 130, written before the edit)
+
+The remaining 5.77 P0. `edit_file`'s description says, at 23% into the string:
+
+> …and must match once unless replace_all is true.
+
+**False since build 123**, which added `occurrence`. The correction also pulls
+`occurrence` into the first 400 characters, where it currently never appears:
+
+> …It must match EXACTLY ONCE — unless you set `occurrence` to say which of
+> several matches you mean, or `replace_all` to change every one.
+
+Base `5a97a06` (build 129), cand = working tree, qwencoder14, exec-ambig +
+exec-bugfix, r24. Base exec-ambig fully_fixed should land near 17/24; if it
+does not, the sweep is unreadable and nothing below grades.
+
+### Why this is a real bet and not bookkeeping
+Correcting a falsehood sounds free. It is not, and 5.74 says which way it can
+go: naming the `occurrence` rescue **licenses a narrower aim**. Build 120 aimed
+wide 18/24 on exec-bugfix; adding the rescue sentence dropped it to 10/24. D1
+moves that same licence 33 points earlier in the string, to before the model
+picks its `old`. Lever 0d then supplies the damage: a narrower aim is a deeper
+aim, deeper is more indented, and this model mis-indents — that is precisely how
+build 126 turned a 16/24 wide aim into 62% not-found.
+
+So the predicted failure is specific: **wide aim down, not-found up,
+fully_fixed down, with `occurrence` usage up** — a change the model obeys into a
+worse place. The predicted success is equally specific: `occurrence` usage up
+with wide aim and not-found FLAT, meaning it rescued ambiguity without
+re-sizing `old`.
+
+### Decision rule, fixed now
+- **exec-ambig fully_fixed < 13/24 → REJECT**, whatever else moves. Same banked-
+  asset line as 5.76, and it is not negotiable after the fact.
+- **SHIP** only on all three: exec-ambig fixed ≥ 15/24, `old` not-found ≤ 10%,
+  and zero **candidate** false completions (arm-directional, per rule 53).
+- Anything between → do not ship, write it up, and **stop editing this string**.
+  Three sweeps will have been spent on it; the marginal wording is not where the
+  remaining value is.
+- Report not-found rate next to wide aim in every table (lever 0d, mandatory).
+
+A base-arm false completion no longer voids the sweep — build 129 fixed the
+cause — but if one appears anyway it is a new bug and gets its own entry.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
