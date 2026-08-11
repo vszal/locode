@@ -6546,4 +6546,53 @@ a time.
 | D3, D11 | DECLINED on measurement |
 | D5, D6/D7, D8–D10 | open; all touch source, all wait for b130 |
 
+## 5.84 D5 DECLINED — a real contradiction that resolves itself for ~2 calls (2026-08-11)
+
+D5: the system prompt's finish protocol says *"After you have everything you
+need, reply normally with no tool block"*, but the loop refuses to end a turn
+while `plan.open`. A model that obeys the instruction gets refused.
+
+Unlike D3, this one is **reachable** — and that is why it needed measuring
+rather than declining by symmetry. On b125–b128 (240 runs):
+
+| | D3 (repeat nudge) | D5 (open plan tasks) |
+|---|---|---|
+| runs hit | — | 24 (10.0%), 36 firings |
+| tool calls after it | median **0** | median **2**, mean 3.9 |
+| firings with nothing after | 56% | **0/24** |
+| run later stops | 93% | **4%** |
+
+So the model does act on it, every time. What it does is benign: the 36 post-
+nudge calls are `update_plan` 36, `bash` 25, `read_file` 16, `edit_file` 16 —
+it ticks the plan off and verifies. That is the behaviour we want, arrived at
+by an awkward route. Cost is roughly two calls in one run in ten.
+
+### The trap in this data — recording it because I nearly walked into it
+Runs hit by the nudge are `fully_fixed` **23/24 (96%)** against **90/216 (42%)**
+for the rest. Read naively that is a spectacular endorsement of the nudge.
+It is a **survivor marker** (rule 50): the nudge can only fire when the model
+*attempts to finish*, which requires it to have got that far. Runs that die
+early are structurally incapable of appearing in the numerator. The association
+is evidence of nothing about the nudge, in either direction.
+
+### Verdict
+**DECLINED as a behavioural bet.** 10% exposure, self-correcting resolution,
+and the only measurable cost is two calls that we would want anyway.
+
+The prompt does still state something the loop does not honour, and the truthful
+version is one clause — *finish by replying with no tool block once your plan
+has no open tasks*. But rule 52 as amended says a correction to a string 100% of
+runs read is a behavioural bet and needs its own A/B, and the expected value
+here does not justify a 4-hour sweep. **Queued behind lever 0e**, to ride along
+if the system prompt is opened for a better reason.
+
+### 5.77 audit — closed
+Eleven defects. One shipped (D2), one in flight (D1, build 130), one void (D4),
+**four declined on measurement** (D3, D5, D11, and the P3 stacking claim already
+corrected in 5.77 itself), three still open and queued (D6/D7, D8–D10).
+
+The audit's real yield was not its own list. It was the habit of checking
+exposure before believing a defect — which is what turned up the echo bug
+(5.80), a correctness failure that no reading of the text could have found.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
