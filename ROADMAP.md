@@ -6595,4 +6595,64 @@ The audit's real yield was not its own list. It was the habit of checking
 exposure before believing a defect — which is what turned up the echo bug
 (5.80), a correctness failure that no reading of the text could have found.
 
+## 5.85 LEVER 0e — the best early signal in the product is acted on at 94% of the run (2026-08-11)
+
+Fell out of declining D3 (5.83). The `repeated call` nudge is the most frequent
+in the product and it fires as a death rattle. Measured on b125–b128, 240 runs,
+87 firings:
+
+| | |
+|---|---|
+| nudge fires at | median **0.94** of the run (mean 0.87) |
+| iterations remaining after it | median **1** |
+| firings in the final 10% of the run | 54/87 (62%) |
+| **first duplicate call appears at** | median **0.32** of the run |
+| **wasted window** | median **0.56 of the run** |
+
+The signal is readable at a third of the way in. We intervene when there is one
+iteration left. Everything between is a run we watched die.
+
+### How informative is that early signal
+Duplicate tool calls (name + args identical) in the **first half** of a run,
+against final `fully_fixed`, stratified by build (rule 49):
+
+| dups in first half | b125 | b126 | b127 | b128 | **pooled** |
+|---|---|---|---|---|---|
+| 0 | 21/21 | 17/17 | — | 16/16 | **54/54 (100%)** |
+| 1 | 7/24 | 3/11 | 12/18 | 3/20 | **25/73 (34%)** |
+| 2+ | 1/3 | 5/20 | 11/30 | 17/60 | **34/113 (30%)** |
+
+Zero duplicates in the first half is a **perfect** predictor of success in every
+stratum that contains the cell — 54 for 54. One duplicate drops it to a third.
+b127 has no zero-dup runs at all, so it neither supports nor contradicts.
+
+### What this does and does not license
+**Not a causal claim, and the distinction matters (rule 50).** A duplicate is
+partly a *symptom* of a hard run: an easy task never needs a retry. Firing the
+nudge earlier will not convert 34% into 100%, and anyone reading this table as
+"stop the duplicates and the runs succeed" has the arrow backwards.
+
+What it does license is the **timing**, which is indefensible on either reading.
+Whether the duplicate causes the death or merely announces it, we have a signal
+at 32% that separates 100% from 34%, and we spend it at 94%. As a pure
+predictor it is already enough to act on: at the halfway mark we know, with the
+strongest confidence any marker in this project has offered, which runs are in
+trouble while they still have iterations to spend.
+
+### Design constraints, before anyone writes code
+1. **Do not simply move the existing nudge earlier.** Its text is written for a
+   terminal moment ("try a genuinely different approach"). At 32% the right
+   message is different, and D3 is now moot precisely because that text never
+   reaches a model with room to act.
+2. **Escalate, don't fire once.** A single duplicate is weak evidence in
+   isolation — legitimate retries exist. The design should treat an early
+   duplicate as a cue to steer and a late one as grounds to stop.
+3. **b126 is the cautionary case.** An intervention the model *obeys into a
+   worse place* is the failure mode of this whole class of change. Report
+   not-found rate and aim depth (lever 0d) alongside the outcome.
+4. **Pre-register with a REJECT line**, per 5.76/5.81. This touches the loop,
+   which is the highest-risk surface after the tool descriptions.
+
+Queued behind b130 — one experiment at a time.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
