@@ -1203,6 +1203,18 @@ def cmd_run(args) -> int:
               "fresh locode and imports the tree AS IT IS THEN, so edits made "
               "during this sweep change what is being measured. Fine for a "
               "probe; do not use these numbers as a baseline.\n", flush=True)
+    # Independent of the agent, and the reason this is a SEPARATE check: a
+    # frozen --agent-root freezes the agent and nothing else. Cases and checkers
+    # are still read live, per run, at the moment that run is graded. Editing a
+    # check.py mid-sweep therefore grades the first runs with one rubric and the
+    # rest with another, and the results file shows one score column as though
+    # they were comparable. Cost me exactly one sweep's score column: the
+    # --agent-root branch above had suppressed the only warning that fired.
+    if _cases_dirty():
+        print(f"!! evals/cases is dirty at {_git_head()} — cases and checkers "
+              "are read PER RUN, so editing one during this sweep grades "
+              "different runs against different rubrics. The score column will "
+              "not be comparable across this sweep.\n", flush=True)
 
     on_ac, power = _power_state()
     if on_ac is False and not args.force:
@@ -1296,6 +1308,23 @@ def _git_dirty() -> bool:
     """
     try:
         out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+                             cwd=REPO_ROOT, capture_output=True, text=True,
+                             timeout=10).stdout.strip()
+        return bool(out)
+    except Exception:
+        return False
+
+
+def _cases_dirty() -> bool:
+    """Is anything under evals/cases modified relative to HEAD?
+
+    Narrower than _git_dirty on purpose, and checked even when the agent is
+    frozen with --agent-root: freezing the agent does nothing for the rubric.
+    Untracked files count here, unlike _git_dirty — a brand-new case directory
+    appearing mid-sweep is the same hazard as an edited one.
+    """
+    try:
+        out = subprocess.run(["git", "status", "--porcelain", "--", "evals/cases"],
                              cwd=REPO_ROOT, capture_output=True, text=True,
                              timeout=10).stdout.strip()
         return bool(out)
