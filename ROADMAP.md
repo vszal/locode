@@ -8397,6 +8397,23 @@ This is a **blinding failure**, the plain kind: the treatment label reached the
 subject. It has been in the rig since the harness was written, which means every
 paired A/B in the archive ran unblinded.
 
+The channel is **verified, not inferred** — reading three files and concluding
+they compose is exactly how 5.103 went wrong. `harness.py:411` launches the
+agent with `cwd=workdir`, and calling `build_system_prompt` with a realistic
+eval workdir returns a prompt containing, verbatim:
+
+```
+Working directory: /var/folders/…/locode-eval-exec-bugfix__qwencoder14__r3__cand-8a4f
+```
+
+Two things that would have been natural to suspect are ruled out: the model
+never echoes the path back anywhere in 32 aa16-slot logs, and `prompt_chars` is
+284 in both arms — though that last one proves nothing, since it counts only
+`len(user_text)` (`loop.py:191`) and the leak is in the *system* prompt. Note
+also that `base` and `cand` are both four characters and `mkdtemp` suffixes are
+both eight, so the two arms' prompts are the same length. Any effect here is
+semantic, not a tokenisation artifact.
+
 > **Rule 68.** The treatment label must never reach the subject. No arm name,
 > build number, or condition tag may appear in anything the model can read — the
 > prompt, the cwd, filenames, or tool output — and a rig change that touches any
