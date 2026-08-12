@@ -557,6 +557,7 @@ async def test_repeated_identical_call_bails(tmp_path):
     (tmp_path / "a.txt").write_text("hello")
     cfg = Config()
     cfg.agent.max_repeat_calls = 3
+    cfg.agent.early_repeat_warn = True   # default is False since build 133
     cfg.agent.max_iterations = 25
     loop = make_loop(tmp_path, [
         native_call("edit_file", path="a.txt", old="hello", new="hello"),
@@ -644,6 +645,7 @@ def _executed(loop):
 async def test_early_repeat_warn_fires_on_the_second_mutating_edit(tmp_path):
     cfg = Config()
     cfg.agent.max_repeat_calls = 3
+    cfg.agent.early_repeat_warn = True   # default is False since build 133
     loop = _noop_edit_loop(tmp_path, cfg)
     events = []
     loop._on_event = events.append
@@ -679,6 +681,7 @@ async def test_early_repeat_warn_leaves_the_stop_on_the_old_schedule(tmp_path):
     # Warning earlier must not kill earlier. Same stop, same iteration budget.
     cfg = Config()
     cfg.agent.max_repeat_calls = 3
+    cfg.agent.early_repeat_warn = True   # default is False since build 133
     cfg.agent.max_iterations = 25
     loop = _noop_edit_loop(tmp_path, cfg, n=8)
     out = await loop.run_turn("fix it")
@@ -701,9 +704,29 @@ async def test_early_repeat_warn_ignores_read_only_repeats(tmp_path):
     assert _early(events) == []
 
 
+async def test_early_repeat_warn_ignores_repeated_bash(tmp_path):
+    # This, not the read_file case above, is what the _MUTATING_EDIT_TOOLS
+    # clause actually guards. Repeated pure READS never reach the early-warn
+    # block at all, so that test passes with the clause deleted; a repeated
+    # `bash` does reach it and must still be left alone, because re-running the
+    # test suite is the behaviour every nudge in the system asks for.
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    cfg.agent.early_repeat_warn = True
+    loop = make_loop_with_bash(tmp_path, [
+        native_call("bash", cmd="python3 -m pytest -q")] * 3
+        + [{"role": "assistant", "content": "done"}],
+        FakeBash("1 failed"), cfg=cfg)
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("fix it")
+    assert _early(events) == []
+
+
 async def test_early_repeat_warn_fires_once_per_signature(tmp_path):
     cfg = Config()
     cfg.agent.max_repeat_calls = 3
+    cfg.agent.early_repeat_warn = True   # default is False since build 133
     loop = _noop_edit_loop(tmp_path, cfg, n=8)
     events = []
     loop._on_event = events.append
@@ -718,6 +741,7 @@ async def test_raising_max_repeat_calls_still_disables_the_warning(tmp_path):
     # quietly re-arm a nudge in that regime.
     cfg = Config()
     cfg.agent.max_repeat_calls = 999
+    cfg.agent.early_repeat_warn = True   # default is False since build 133
     loop = _noop_edit_loop(tmp_path, cfg, n=5)
     events = []
     loop._on_event = events.append

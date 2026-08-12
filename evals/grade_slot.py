@@ -96,7 +96,9 @@ def main(label):
     print(f"{'mean landed edits':<30}{base['landed']/base['n']:>12.2f}"
           f"{cand['landed']/cand['n']:>12.2f}")
     print(f"{'gave up':<30}{base['gaveup']:>12}{cand['gaveup']:>12}")
-    print(f"{'stopped by a guard':<30}{base['stopped']:>12}{cand['stopped']:>12}")
+    # armstats has no 'stopped' key -- it counts stop REASONS in a Counter.
+    print(f"{'stopped by a guard':<30}"
+          f"{sum(base['stops'].values()):>12}{sum(cand['stops'].values()):>12}")
     print(f"{'clean finishes (done)':<30}{base['done']:>12}{cand['done']:>12}")
 
     print("\n=== gate (fixed in advance) ===")

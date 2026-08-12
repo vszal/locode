@@ -3,11 +3,11 @@
     "labels": [
       "b121-aa"
     ],
+    "note": "b122-v3probe dropped: it calibrated the reverted v3 ordering, a degenerate case in which every run tied at 0.5, so its 0.0 floor is an artifact of the case having no variance rather than a measurement of this setup's noise. See ROADMAP 5.61.",
     "samples": [
       0.125
     ],
-    "updated": "2026-08-10",
-    "note": "b122-v3probe dropped: it calibrated the reverted v3 ordering, a degenerate case in which every run tied at 0.5, so its 0.0 floor is an artifact of the case having no variance rather than a measurement of this setup's noise. See ROADMAP 5.61."
+    "updated": "2026-08-10"
   },
   "exec-bugfix|qwencoder14|r14": {
     "labels": [
@@ -17,6 +17,15 @@
       0.1429
     ],
     "updated": "2026-08-08"
+  },
+  "exec-bugfix|qwencoder14|r16": {
+    "labels": [
+      "aa16-slot"
+    ],
+    "samples": [
+      0.0312
+    ],
+    "updated": "2026-08-12"
   },
   "exec-bugfix|qwencoder14|r8": {
     "labels": [

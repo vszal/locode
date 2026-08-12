@@ -348,25 +348,47 @@ class CheckCtx:
                               capture_output=True, text=True)
 
 
+def run_names(case_id: str, model: str, repeat: int, arm: str = "") -> tuple[str, str]:
+    """`(run_id, stamp)` — the results-file name and the temp-dir name.
+
+    They differ in exactly one way and it is load-bearing both directions.
+
+    `run_id` IS arm-tagged: base and cand must not write to the same event log.
+
+    `stamp` is NOT. The temp dir becomes the agent's cwd, and
+    `build_system_prompt` writes "Working directory: {cwd}" into the system
+    prompt — so an arm-tagged temp dir tells the model which side of the A/B it
+    is on, in its own prompt, before the first token of work. Measured on
+    `aa16-slot`, whose arms were byte-identical: runs landing >=1 edit came out
+    12/16 base vs 1/16 cand, +68.8pp at Fisher p=0.0002, and gave-up flipped
+    3 vs 12. See ROADMAP 5.105 and rule 68.
+
+    Both arms still draw DIFFERENT random tempdir suffixes, which is correct:
+    that is unsystematic noise, where the arm name was a constant signal.
+    """
+    return (f"{case_id}__{model}__r{repeat}" + (f"__{arm}" if arm else ""),
+            f"{case_id}__{model}__r{repeat}")
+
+
 def run_case(case: Case, model: str, repeat: int, results_dir: Path,
              keep: bool = True, agent_root: Path | None = None,
              arm: str = "") -> RunResult:
     """Run one case once. `agent_root` selects WHICH locode source tree runs it
     (a git worktree, for the paired A/B); None means the installed one."""
-    stamp = f"{case.id}__{model}__r{repeat}" + (f"__{arm}" if arm else "")
+    run_id, stamp = run_names(case.id, model, repeat, arm)
     workdir = Path(tempfile.mkdtemp(prefix=f"locode-eval-{stamp}-"))
     seed = case.path / "seed"
     if seed.is_dir():
         shutil.copytree(seed, workdir, dirs_exist_ok=True)
 
-    log_path = results_dir / "events" / f"{stamp}.jsonl"
+    log_path = results_dir / "events" / f"{run_id}.jsonl"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     # --log-events APPENDS (a user's session log must not be destroyed by
     # pointing at it twice). Re-running a label would then splice two runs into
     # one file and double-count every metric mined from it, so the harness owns
     # clearing the slot.
     log_path.unlink(missing_ok=True)
-    out_path = results_dir / "stdout" / f"{stamp}.txt"
+    out_path = results_dir / "stdout" / f"{run_id}.txt"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     launch = ([str(LOCODE_BIN)] if agent_root is None else
@@ -1324,11 +1346,10 @@ def cmd_rescore(args) -> int:
         case = cases.get(raw["case"])
         workdir = Path(raw.get("workdir", ""))
 
-        arm = raw.get("arm", "")
-        stamp = (f"{raw['case']}__{raw['model']}__r{raw['repeat']}"
-                 + (f"__{arm}" if arm else ""))
-        events = parse_events(results_dir / "events" / f"{stamp}.jsonl")
-        out_path = results_dir / "stdout" / f"{stamp}.txt"
+        run_id, _ = run_names(raw["case"], raw["model"], raw["repeat"],
+                              raw.get("arm", ""))
+        events = parse_events(results_dir / "events" / f"{run_id}.jsonl")
+        out_path = results_dir / "stdout" / f"{run_id}.txt"
         stdout = out_path.read_text(errors="replace") if out_path.is_file() else ""
 
         # Metrics are mined from the event log and NOTHING else, so they can

@@ -821,3 +821,36 @@ def test_the_opening_ignores_non_call_events_between_the_calls():
 def test_a_run_too_short_to_have_a_third_call_has_no_opening():
     assert armstats._opening(_calls("bash", "update_plan")) is None
     assert armstats._opening([]) is None
+
+
+# --- run_names: the arm must reach the RESULTS file and never the temp dir ---
+# ROADMAP 5.105 / rule 68. The temp dir becomes the agent's cwd and cwd is
+# written into the system prompt, so an arm-tagged temp dir told the model which
+# side of the A/B it was on. On byte-identical arms that was worth +68.8pp.
+
+class TestRunNames:
+    def test_results_name_is_arm_tagged_so_arms_cannot_collide(self):
+        base, _ = harness.run_names("exec-bugfix", "qwencoder14", 3, "base")
+        cand, _ = harness.run_names("exec-bugfix", "qwencoder14", 3, "cand")
+        assert base.endswith("__base") and cand.endswith("__cand")
+        assert base != cand, "both arms would write to one event log"
+
+    def test_tempdir_stamp_is_identical_across_arms(self):
+        _, sb = harness.run_names("exec-bugfix", "qwencoder14", 3, "base")
+        _, sc = harness.run_names("exec-bugfix", "qwencoder14", 3, "cand")
+        assert sb == sc
+
+    @pytest.mark.parametrize("arm", ["base", "cand", "control", "x"])
+    def test_no_arm_tag_ever_reaches_the_tempdir_stamp(self, arm):
+        # The `__{arm}` suffix, not the bare word: a single letter like "x" is
+        # a substring of "exec-bugfix" and asserting on that tests nothing.
+        _, stamp = harness.run_names("exec-bugfix", "qwencoder14", 3, arm)
+        assert f"__{arm}" not in stamp
+
+    def test_stamp_still_identifies_the_run_for_debugging(self):
+        _, stamp = harness.run_names("exec-bugfix", "qwencoder14", 3, "base")
+        assert stamp == "exec-bugfix__qwencoder14__r3"
+
+    def test_no_arm_leaves_both_names_equal(self):
+        run_id, stamp = harness.run_names("exec-bugfix", "qwencoder14", 3)
+        assert run_id == stamp == "exec-bugfix__qwencoder14__r3"

@@ -98,7 +98,10 @@ max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 # Warn one occurrence early on repeated mutating edits (at the 2nd identical
 # call, not the 3rd) without suppressing the call. The late nudge fires a median
 # of 1 iteration before the repeat-kill, which is too late to act on.
-early_repeat_warn = true
+# DEFAULT OFF since build 133: graded NO SHIP (ROADMAP 5.104). It fired in 16/16
+# candidate runs and moved the repeat-stop share +0.0pp (p=1.0), while surrender
+# rose 0/16 -> 11/16 in the same slot. Kept for re-testing inside an A/B.
+early_repeat_warn = false
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 max_nochange_edits = 2          # redirect/bail if edits keep changing nothing
 # Iterations a turn may still spend after the escalated same-failure steer (the

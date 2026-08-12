@@ -176,8 +176,21 @@ class AgentConfig:
     # early lands ~5 iterations sooner in 40% more runs. It deliberately does
     # NOT block: the second identical mutating call reports SUCCESS 60% of the
     # time, so suppressing here would bundle an unbounded behaviour change into
-    # a timing fix. Off restores the pre-build-133 schedule for an A/B.
-    early_repeat_warn: bool = True
+    # a timing fix.
+    #
+    # DEFAULT OFF as of build 133 — b132-early0e graded it NO SHIP on the rule
+    # fixed in advance (ROADMAP 5.104). Both gates passed, so this is a real
+    # negative and not a void sweep: the lever fired in 16/16 candidate runs and
+    # the gating metric, the share of runs ending in the repeat-stop, moved
+    # +0.0pp (3/16 vs 3/16, Fisher p=1.0). That metric is one of the few this
+    # project has shown to be slot-UNbiased (2/16 vs 2/16 on the aa16-slot A/A),
+    # so the tie is trustworthy. Worse, surrender rose: within the candidate
+    # slot, gave-up went 0/16 at build 131 to 11/16 and 12/16 at build 132.
+    # An extra nudge reads as permission to stop.
+    #
+    # Kept behind the flag, with its tests, so the timing can be re-tested by a
+    # future design without rebuilding it. Turn it on only inside an A/B.
+    early_repeat_warn: bool = False
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing
