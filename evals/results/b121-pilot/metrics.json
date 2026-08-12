@@ -8,7 +8,7 @@
     "started": "Sat Aug 8 16:18:10 2026",
     "model": "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
   },
-  "generated": "2026-08-11T23:06:36",
+  "generated": "2026-08-11T23:14:42",
   "total_runs": 2,
   "invalid_runs": 0,
   "models": [
@@ -22,14 +22,17 @@
         "per_run": {
           "fully_fixed": 1,
           "false_completions": 0,
-          "runs_touching_replace_lines": 0
+          "runs_touching_replace_lines": 0,
+          "runs_with_duplicate_call": 1
         },
         "per_call": {
           "edit_file_calls": 3,
+          "duplicate_calls": 1,
           "edits_with_occurrence": 0,
           "edits_with_replace_all": 0,
           "edits_old_not_found": 0,
           "edits_hit_ambiguity": 0,
+          "total_tool_calls": 9,
           "tool_calls": {
             "edit_file": 3,
             "bash": 2,
@@ -40,6 +43,14 @@
         "iterations": {
           "median": 11,
           "total": 11
+        },
+        "repeat_timing": {
+          "first_duplicate_iter_median": 8,
+          "first_repeat_nudge_iter_median": null,
+          "gap_median": null,
+          "runs_with_both": 0,
+          "runs_with_duplicate": 1,
+          "runs_with_repeat_nudge": 0
         },
         "nudges": {
           "unverified edits": 1,
@@ -54,14 +65,17 @@
         "per_run": {
           "fully_fixed": 1,
           "false_completions": 0,
-          "runs_touching_replace_lines": 0
+          "runs_touching_replace_lines": 0,
+          "runs_with_duplicate_call": 1
         },
         "per_call": {
           "edit_file_calls": 3,
+          "duplicate_calls": 1,
           "edits_with_occurrence": 0,
           "edits_with_replace_all": 0,
           "edits_old_not_found": 0,
           "edits_hit_ambiguity": 0,
+          "total_tool_calls": 9,
           "tool_calls": {
             "edit_file": 3,
             "bash": 2,
@@ -72,6 +86,14 @@
         "iterations": {
           "median": 11,
           "total": 11
+        },
+        "repeat_timing": {
+          "first_duplicate_iter_median": 8,
+          "first_repeat_nudge_iter_median": null,
+          "gap_median": null,
+          "runs_with_both": 0,
+          "runs_with_duplicate": 1,
+          "runs_with_repeat_nudge": 0
         },
         "nudges": {
           "unverified edits": 1,
@@ -132,6 +154,19 @@
           "base_pct": 0.0,
           "cand_pct": 0.0,
           "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "duplicate_calls": {
+          "base": [
+            1,
+            9
+          ],
+          "cand": [
+            1,
+            9
+          ],
+          "base_pct": 11.1,
+          "cand_pct": 11.1,
+          "readable": "per-call, denominator is ALL tool calls (not just edit_file) \u2014 the lever 0e channel (5.85)"
         }
       }
     }

@@ -8,7 +8,7 @@
     "started": null,
     "model": null
   },
-  "generated": "2026-08-11T23:06:36",
+  "generated": "2026-08-11T23:14:42",
   "total_runs": 16,
   "invalid_runs": 0,
   "models": [
@@ -22,14 +22,17 @@
         "per_run": {
           "fully_fixed": 0,
           "false_completions": 4,
-          "runs_touching_replace_lines": 8
+          "runs_touching_replace_lines": 8,
+          "runs_with_duplicate_call": 8
         },
         "per_call": {
           "edit_file_calls": 78,
+          "duplicate_calls": 107,
           "edits_with_occurrence": 0,
           "edits_with_replace_all": 0,
           "edits_old_not_found": 4,
           "edits_hit_ambiguity": 9,
+          "total_tool_calls": 246,
           "tool_calls": {
             "edit_file": 78,
             "bash": 57,
@@ -42,6 +45,14 @@
         "iterations": {
           "median": 40,
           "total": 280
+        },
+        "repeat_timing": {
+          "first_duplicate_iter_median": 7,
+          "first_repeat_nudge_iter_median": 38,
+          "gap_median": 31,
+          "runs_with_both": 6,
+          "runs_with_duplicate": 8,
+          "runs_with_repeat_nudge": 6
         },
         "nudges": {
           "unverified edits": 16,
@@ -67,14 +78,17 @@
         "per_run": {
           "fully_fixed": 0,
           "false_completions": 5,
-          "runs_touching_replace_lines": 6
+          "runs_touching_replace_lines": 6,
+          "runs_with_duplicate_call": 8
         },
         "per_call": {
           "edit_file_calls": 42,
+          "duplicate_calls": 74,
           "edits_with_occurrence": 0,
           "edits_with_replace_all": 0,
           "edits_old_not_found": 0,
           "edits_hit_ambiguity": 6,
+          "total_tool_calls": 180,
           "tool_calls": {
             "bash": 45,
             "update_plan": 45,
@@ -87,6 +101,14 @@
         "iterations": {
           "median": 24,
           "total": 206
+        },
+        "repeat_timing": {
+          "first_duplicate_iter_median": 7,
+          "first_repeat_nudge_iter_median": 25,
+          "gap_median": 20,
+          "runs_with_both": 3,
+          "runs_with_duplicate": 8,
+          "runs_with_repeat_nudge": 3
         },
         "nudges": {
           "same failure (2 runs in a row)": 12,
@@ -156,6 +178,19 @@
           "base_pct": 11.5,
           "cand_pct": 14.3,
           "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "duplicate_calls": {
+          "base": [
+            107,
+            246
+          ],
+          "cand": [
+            74,
+            180
+          ],
+          "base_pct": 43.5,
+          "cand_pct": 41.1,
+          "readable": "per-call, denominator is ALL tool calls (not just edit_file) \u2014 the lever 0e channel (5.85)"
         }
       }
     }

@@ -455,3 +455,117 @@ class TestServerIdentity:
                                                              monkeypatch, metrics):
         out = self._sweep(tmp_path, monkeypatch, metrics, {})
         assert any("server pid" in n for n in out["READ_FIRST"])
+
+
+class TestRepeatTiming:
+    """Lever 0e (5.85): the repeat detector fires ~9 iterations after the signal.
+
+    The gap is a median of per-run paired differences, not a difference of two
+    medians — those are computed over different run populations and their
+    difference means nothing.
+    """
+
+    @staticmethod
+    def _run(metrics, tmp_path, monkeypatch, events):
+        root = tmp_path / "s"
+        (root / "events").mkdir(parents=True)
+        monkeypatch.setattr(metrics, "RESULTS", str(tmp_path))
+        (root / "ab.json").write_text(json.dumps({"base_ref": "abc1234", "runs": [
+            {"case": "c", "arm": "base", "model": "m", "repeat": 1,
+             "checks": {"fully_fixed": False}}]}))
+        (root / "events" / "c__m__r1__base.jsonl").write_text(
+            "".join(json.dumps(e) + "\n" for e in events))
+        return metrics.derive("s")["cases"]["c"]["base"]
+
+    @staticmethod
+    def _call(name, **args):
+        return [{"phase": "iteration"}, {"phase": "run", "name": name, "args": args}]
+
+    def test_identical_name_and_args_is_a_duplicate(self, tmp_path, monkeypatch,
+                                                    metrics):
+        ev = (self._call("read_file", path="a.py") * 1
+              + self._call("read_file", path="a.py"))
+        a = self._run(metrics, tmp_path, monkeypatch, ev)
+        assert a["per_call"]["duplicate_calls"] == 1
+        assert a["per_call"]["total_tool_calls"] == 2
+        assert a["per_run"]["runs_with_duplicate_call"] == 1
+
+    def test_same_name_different_args_is_not_a_duplicate(self, tmp_path,
+                                                         monkeypatch, metrics):
+        ev = self._call("read_file", path="a.py") + self._call("read_file", path="b.py")
+        a = self._run(metrics, tmp_path, monkeypatch, ev)
+        assert a["per_call"]["duplicate_calls"] == 0
+        assert a["repeat_timing"]["first_duplicate_iter_median"] is None
+
+    def test_arg_key_order_does_not_create_a_false_duplicate(self, tmp_path,
+                                                             monkeypatch, metrics):
+        # dicts compare by content; the canonical key must sort, or two calls
+        # written in different key order would look distinct.
+        ev = [{"phase": "iteration"},
+              {"phase": "run", "name": "edit_file", "args": {"a": 1, "b": 2}},
+              {"phase": "iteration"},
+              {"phase": "run", "name": "edit_file", "args": {"b": 2, "a": 1}}]
+        a = self._run(metrics, tmp_path, monkeypatch, ev)
+        assert a["per_call"]["duplicate_calls"] == 1
+
+    def test_third_identical_call_counts_again(self, tmp_path, monkeypatch, metrics):
+        ev = self._call("bash", cmd="x") * 3
+        a = self._run(metrics, tmp_path, monkeypatch, ev)
+        assert a["per_call"]["duplicate_calls"] == 2
+        assert a["repeat_timing"]["first_duplicate_iter_median"] == 2
+
+    def test_gap_is_measured_in_iterations(self, tmp_path, monkeypatch, metrics):
+        ev = (self._call("bash", cmd="x")          # iter 1
+              + self._call("bash", cmd="x")        # iter 2 — first duplicate
+              + self._call("bash", cmd="y")        # iter 3
+              + [{"phase": "nudge", "reason": "repeated call"}])
+        t = self._run(metrics, tmp_path, monkeypatch, ev)["repeat_timing"]
+        assert t["first_duplicate_iter_median"] == 2
+        assert t["first_repeat_nudge_iter_median"] == 3
+        assert t["gap_median"] == 1
+        assert t["runs_with_both"] == 1
+
+    def test_other_nudges_do_not_count_as_the_repeat_detector(self, tmp_path,
+                                                              monkeypatch, metrics):
+        ev = (self._call("bash", cmd="x") * 2
+              + [{"phase": "nudge", "reason": "unverified edits"}])
+        t = self._run(metrics, tmp_path, monkeypatch, ev)["repeat_timing"]
+        assert t["first_repeat_nudge_iter_median"] is None
+        assert t["runs_with_both"] == 0
+        assert t["gap_median"] is None
+
+    def test_duplicate_without_nudge_is_excluded_from_the_gap(self, tmp_path,
+                                                              monkeypatch, metrics):
+        t = self._run(metrics, tmp_path, monkeypatch,
+                      self._call("bash", cmd="x") * 2)["repeat_timing"]
+        assert t["runs_with_duplicate"] == 1
+        assert t["runs_with_repeat_nudge"] == 0
+        assert t["runs_with_both"] == 0
+        assert t["gap_median"] is None
+
+    def test_duplicates_do_not_carry_across_runs(self, tmp_path, monkeypatch,
+                                                 metrics):
+        # `seen` is per run; the same call in two runs is not a repeat.
+        root = tmp_path / "s"
+        (root / "events").mkdir(parents=True)
+        monkeypatch.setattr(metrics, "RESULTS", str(tmp_path))
+        (root / "ab.json").write_text(json.dumps({"base_ref": "abc1234", "runs": [
+            {"case": "c", "arm": "base", "model": "m", "repeat": i,
+             "checks": {"fully_fixed": False}} for i in (1, 2)]}))
+        for i in (1, 2):
+            (root / "events" / f"c__m__r{i}__base.jsonl").write_text(
+                "".join(json.dumps(e) + "\n"
+                        for e in self._call("bash", cmd="same")))
+        a = metrics.derive("s")["cases"]["c"]["base"]
+        assert a["per_call"]["duplicate_calls"] == 0
+        assert a["per_run"]["runs_with_duplicate_call"] == 0
+
+    def test_duplicate_rate_denominator_is_all_tool_calls(self, tmp_path,
+                                                          monkeypatch, metrics):
+        ev = self._call("bash", cmd="x") * 2 + self._call("read_file", path="a")
+        metrics_out = self._run(metrics, tmp_path, monkeypatch, ev)
+        assert metrics_out["per_call"]["total_tool_calls"] == 3
+        # and the comparison block uses that denominator, not edit_file_calls
+        cmp_ = metrics.derive("s")["cases"]["c"]["comparisons"]["duplicate_calls"]
+        assert cmp_["base"] == [1, 3]
+        assert cmp_["base_pct"] == 33.3

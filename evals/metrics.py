@@ -33,6 +33,13 @@ Metrics are split into `per_run` and `per_call`, and each carries an explicit
     preferred within-sweep, but robust enough to describe across sweeps when the
     quantity is an on/off (e.g. replace_lines 121 -> 0 after a description edit).
 
+`repeat_timing` is a third block, in ABSOLUTE ITERATIONS (rule 56: a fraction of
+the run is retrospective and cannot drive a runtime decision). It carries lever
+0e's quantity — how long after the first duplicate call the `repeated call`
+nudge actually fires. `gap_median` is the median of per-run paired differences
+over runs showing BOTH; the difference of the two medians is meaningless because
+they are computed over different run populations.
+
 `fisher_p` is emitted for per-run scores as CONTEXT ONLY. It assumes independent
 runs, which 5.92 showed is false across sweeps and questionable within them.
 Do not gate on it.
@@ -55,6 +62,11 @@ RESULTS = os.path.join(HERE, "results")
 # silently, so `errors_matched` in the output lets you notice.
 NOT_FOUND = "not found in"            # fs.py:704  — `old` not found
 AMBIG = "so it is not clear which"    # fs.py:1406 — ambiguous match
+REPEAT_NUDGE = "repeated call"        # loop.py:1657 — the late detector (5.85)
+
+
+def _median(v: list[int]) -> int | None:
+    return sorted(v)[len(v) // 2] if v else None
 
 
 def fisher(a: int, b: int, c: int, d: int) -> float:
@@ -96,8 +108,13 @@ def _events(root: str, run: dict, arm: str) -> list[dict]:
 def _arm(root: str, runs: list[dict], case: str, arm: str) -> dict:
     tools, nudges, stops = Counter(), Counter(), Counter()
     n = fixed = false_done = edits = occ = repl_all = nf = amb = 0
-    rl_runs = errors_matched = 0
+    rl_runs = errors_matched = dup_calls = dup_runs = 0
     iters: list[int] = []
+    # Lever 0e (5.85): the detector is late, not wrong. Collected per run so the
+    # gap is a median of paired differences, not a difference of medians.
+    dup_at: list[int] = []
+    nudge_at: list[int] = []
+    gaps: list[int] = []
     missing = 0
 
     for r in runs:
@@ -115,15 +132,31 @@ def _arm(root: str, runs: list[dict], case: str, arm: str) -> dict:
         iters.append(sum(1 for e in ev if e.get("phase") == "iteration"))
 
         rl_here = 0
+        it = 0                      # iteration index; `iteration` events order the run
+        seen: set[str] = set()      # (name, args) already issued in THIS run
+        first_dup = first_nudge = None
         for i, e in enumerate(ev):
             ph = e.get("phase")
-            if ph == "nudge":
-                nudges[str(e.get("reason", "?"))[:60]] += 1
+            if ph == "iteration":
+                it += 1
+            elif ph == "nudge":
+                reason = str(e.get("reason", "?"))
+                nudges[reason[:60]] += 1
+                if reason.startswith(REPEAT_NUDGE) and first_nudge is None:
+                    first_nudge = it
             elif ph == "stopped":
                 stops[str(e.get("reason", "?"))[:60]] += 1
             elif ph == "run":
                 name = e.get("name", "?")
                 tools[name] += 1
+                # 5.85's definition: name AND args identical to an earlier call.
+                key = name + "\0" + json.dumps(e.get("args") or {}, sort_keys=True)
+                if key in seen:
+                    dup_calls += 1
+                    if first_dup is None:
+                        first_dup = it
+                else:
+                    seen.add(key)
                 rl_here += name == "replace_lines"
                 if name != "edit_file":
                     continue
@@ -139,6 +172,13 @@ def _arm(root: str, runs: list[dict], case: str, arm: str) -> dict:
                 amb += hit_amb
                 errors_matched += hit_nf or hit_amb
         rl_runs += bool(rl_here)
+        dup_runs += first_dup is not None
+        if first_dup is not None:
+            dup_at.append(first_dup)
+        if first_nudge is not None:
+            nudge_at.append(first_nudge)
+        if first_dup is not None and first_nudge is not None:
+            gaps.append(first_nudge - first_dup)
 
     med = sorted(iters)[len(iters) // 2] if iters else 0
     return {
@@ -148,16 +188,30 @@ def _arm(root: str, runs: list[dict], case: str, arm: str) -> dict:
             "fully_fixed": fixed,
             "false_completions": false_done,
             "runs_touching_replace_lines": rl_runs,
+            "runs_with_duplicate_call": dup_runs,
         },
         "per_call": {
             "edit_file_calls": edits,
+            "duplicate_calls": dup_calls,
             "edits_with_occurrence": occ,
             "edits_with_replace_all": repl_all,
             "edits_old_not_found": nf,
             "edits_hit_ambiguity": amb,
+            "total_tool_calls": sum(tools.values()),
             "tool_calls": dict(tools.most_common()),
         },
         "iterations": {"median": med, "total": sum(iters)},
+        # Lever 0e. `gap_median` is the median of per-run (nudge - duplicate)
+        # differences over runs exhibiting BOTH, which is the quantity a redesign
+        # would shrink; the difference of the two medians is not (different runs).
+        "repeat_timing": {
+            "first_duplicate_iter_median": _median(dup_at),
+            "first_repeat_nudge_iter_median": _median(nudge_at),
+            "gap_median": _median(gaps),
+            "runs_with_both": len(gaps),
+            "runs_with_duplicate": len(dup_at),
+            "runs_with_repeat_nudge": len(nudge_at),
+        },
         "nudges": dict(nudges.most_common()),
         "stops": dict(stops.most_common()),
         "errors_matched": errors_matched,
@@ -200,6 +254,15 @@ def derive(label: str) -> dict | None:
                 "readable": "per-call, n in the hundreds — the channel that "
                             "can resolve a wording change (5.86b)",
             }
+        bt, ct = (b["per_call"]["total_tool_calls"], c["per_call"]["total_tool_calls"])
+        pack["comparisons"]["duplicate_calls"] = {
+            "base": [b["per_call"]["duplicate_calls"], bt],
+            "cand": [c["per_call"]["duplicate_calls"], ct],
+            "base_pct": round(100 * b["per_call"]["duplicate_calls"] / bt, 1) if bt else None,
+            "cand_pct": round(100 * c["per_call"]["duplicate_calls"] / ct, 1) if ct else None,
+            "readable": "per-call, denominator is ALL tool calls (not just "
+                        "edit_file) — the lever 0e channel (5.85)",
+        }
         cases[case] = pack
 
     # Server identity is a first-class experimental variable (5.94). A restart
