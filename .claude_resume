@@ -1,4 +1,4 @@
-# locode resume — build 131 (2026-08-11) · NEXT WORK = lever 0e TIMING (fire the repeat detector earlier); 0g/0h/0i RETIRED, 5.98 and 5.97 both CORRECTED — read 5.99+5.100 BEFORE 5.96/5.97/5.98; b131-echoguard RUNNING, auto-grades to verdict191.txt; D1 NO SHIP; D2 revert CONFIRMED CAUSAL; read 5.94 not 5.93; rule 62 = `metrics.py --servers`; rule 64 = never pool a rate across the archive
+# locode resume — build 131 (2026-08-11) · NEXT WORK = lever 0e v2, SPEC'D + PRE-REGISTERED in 5.101 (nudge at occurrence 2 WITHOUT suppressing; do NOT use 5.96's fire-and-suppress); 0g/0h/0i RETIRED, 5.98 and 5.97 both CORRECTED — read 5.99+5.100 BEFORE 5.96/5.97/5.98; b131-echoguard RUNNING, auto-grades to verdict191.txt; D1 NO SHIP; D2 revert CONFIRMED CAUSAL; read 5.94 not 5.93; rule 62 = `metrics.py --servers`; rule 64 = never pool a rate across the archive
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -966,11 +966,22 @@ first; 5.96/5.97/5.98 remain in the file for the reasoning, not the numbers.
   **median 1 iteration, 51% get ≤1.** It arrives one iteration before the
   guillotine. Every OTHER nudge gets a tool call 84–100% of the time — this one
   is the outlier, and it is a scheduling defect no rewrite reaches.
-- **NEXT WORK = lever 0e, timing only.** Fire the repeat detector earlier
-  (occurrence 2 for mutating tools). 5.85's "late, not wrong" is now confirmed.
-  The "remove the offered exit" wording amendment is RETIRED (targets 3.7%).
-  Keep "one imperative, name a tool" — but on rules 19/9, not on 5.97's table.
-  SHIP needs >7pp AND outside the binomial band. One at a time (rule 28).
+- **NEXT WORK = lever 0e v2 (5.101), fully spec'd and pre-registered.** The
+  one-iteration runway is STRUCTURAL: loop.py:997 nudges and `continue`s
+  without executing, so the streak never advances and the NEXT appearance of
+  that signature falls through to `_stop`. Nudge and kill are one attempt
+  apart by construction — no wording reaches it.
+  **The change:** for all-mutating batches emit the nudge at occurrence 2
+  **WITHOUT suppressing the call** (no `continue`); leave the suppression and
+  the `_stop` at the existing threshold. **Do NOT use 5.96's fire-and-suppress
+  version** — the 2nd identical mutating call reports SUCCESS 60.4% of the time
+  (n=748), so suppressing bundles an unbounded behaviour change (rule 28).
+  Simulated (rule 16, both eras): coverage 37%→73% of runs, +40% gain a nudge
+  they never get, median 5 iterations earlier, runway median 3→6.
+  Gate on the repeated-call stop rate (per-call, rule 58); REJECT if clean
+  finishes fall (rule 8); precondition = ≥60% fire rate, a real gate (rule 54).
+  Ship no wording change with it. The "remove the offered exit" amendment is
+  RETIRED (targets 3.7%); keep "one imperative, name a tool" on rules 19/9.
 - **Lever 0e's own evidence survived the rule-64 audit**: duplicate-call rate is
   26–42% in all twelve recent arms with no cliff, 48/48 runs carry one, and b132
   still nudges only 11 of 96 runs. Current-era, unconfounded.
@@ -1006,6 +1017,9 @@ Sweeps before b119 show `?`: they predate ab.py's fingerprint.
 - `evals/ambig_next.py <label...>` — buckets every ambiguous-match error by what
   the model did next (occurrence / no-op / other edit / non-edit / nothing),
   exhaustively so the columns sum to n. This is what retired lever 0g.
+- `evals/sim_repeat_threshold.py [label...]` — replays the archive under a
+  lower repeat threshold: coverage, how much earlier, runway before the stop.
+  Timing only — it cannot model what a suppressed call would have done.
 - `evals/nudge_next.py "<reason prefix>" [label...]` — what follows a nudge,
   split THREE ways: next tool / HARNESS_STOP / MODEL_ENDED. Never collapse the
   last two — that merge is exactly what made 5.97 wrong. Also prints the
