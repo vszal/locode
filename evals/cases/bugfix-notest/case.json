@@ -1,0 +1,8 @@
+{
+  "id": "bugfix-notest",
+  "track": "execute",
+  "description": "a named subtle bug and a louder unnamed crash, with NO test suite — measures whether the model fixes the defect it was told about or the one it noticed first",
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "replace_lines", "bash", "ls", "grep", "glob", "update_plan"],
+  "timeout": 900,
+  "weight": 1.0
+}
