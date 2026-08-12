@@ -8240,6 +8240,14 @@ surrenders" is ruled out — build 131 as cand also landed ~0 and still never ga
 up. The only cell that moves is the one with the lever in it. The extra nudge
 appears to read as permission to stop.
 
+> **Restated after 5.105.** Gave-up is one of the metrics the arm-slot leak
+> biased (3/16 vs 12/16 on byte-identical arms), so the cross-slot columns above
+> are not comparable and the table is kept only for the record. The finding
+> survives on its **within-slot** form, which the leak cannot touch: holding the
+> slot fixed at *cand*, build 131 gave up **0/16** and build 132 gave up
+> **11/16**, replicated at **12/16**. Same slot, same server, lever the only
+> difference.
+
 This does not trip the rule 8 veto (`done` is 0→0, a floor, not a fall), so the
 NO SHIP above rests on the gating metric alone, as pre-registered. But it points
 the same way, and it is a caution about nudge volume in general: build 132's
@@ -8303,6 +8311,11 @@ per-run mean over 16 hides a coin flip. What is *not* explained is why the flip
 is so lopsided by slot: **18/32 base runs land ≥1 edit against 2/32 cand runs**,
 far past what one branch at fair odds would give.
 
+> **Answered in 5.105.** It was the rig. The arm name reached the model in its
+> own system prompt, and on byte-identical arms it reproduces this exact gap
+> (12/16 vs 1/16, p=0.0002). Pool those 32-run counts no further — they cross
+> the slot, which rule 64 already forbids for a different reason.
+
 ### Rule 67, and the pre-registered A/A that tests this
 
 I initially dismissed the slot hypothesis using `aa14-calib`, whose
@@ -8335,3 +8348,101 @@ Power is honest here rather than assumed: the observed 18/32-vs-2/32 gap is
 ~56% vs ~6%, which 16 v 16 detects at p≈0.005. A null therefore rules out an
 effect *of that size*, which is the one at issue — it does not rule out a small
 one.
+
+## 5.105 — aa16-slot: the subject could read its own arm label
+
+`grade_slot.py` (1024c8b) was committed before the sweep produced a number, and
+it returned the branch it was written to dread.
+
+### The result
+
+`aa16-slot`, 16 pairs of `exec-bugfix` on `qwencoder14`, base = a worktree at
+`3f18341`, cand = the live tree, same server (pid 85569) as b131 and b132. The
+gate held: `git diff 3f18341 -- locode/` is empty, so the two arms ran
+**byte-identical code**.
+
+| | base | cand |
+|---|---|---|
+| runs landing ≥1 edit **[pre-registered metric]** | **12/16** | **1/16** |
+| mean landed edits | 1.62 | 0.06 |
+| gave up | 3 | 12 |
+| stopped by a guard | 13 | 4 |
+| clean finishes (`done`) | 0 | 0 |
+
+**+68.8pp, Fisher two-sided p = 0.0002.** Nothing differed but the slot.
+
+That is not a noise floor, it is a signal — and it is the same shape and roughly
+the same size as the b131/b132 split 5.104 could not explain (~56% vs ~6%). The
+slot hypothesis is confirmed, and 5.103's original attribution to the *code* is
+now doubly withdrawn: it was never the build, and it was never one unlucky
+branch at call 4 either.
+
+### The mechanism: the arm name was in the model's system prompt
+
+Not the worktree-vs-live-tree difference I had assumed. Three lines, in three
+different files, compose into a leak:
+
+1. `harness.py` names each run's scratch directory with the arm —
+   `locode-eval-exec-bugfix__qwencoder14__r3__cand-8a4f`.
+2. That directory becomes the agent's **cwd**.
+3. `agent/messages.py:29` — `build_system_prompt` writes
+   `Working directory: {cwd}` into the system prompt.
+
+So every candidate run opened with the string `__cand` in its own instructions,
+and every baseline run with `__base`, before the first token of work. Whatever a
+14B coder model does with that, it does it consistently, and it is worth about
+69 percentage points of edit-landing.
+
+This is a **blinding failure**, the plain kind: the treatment label reached the
+subject. It has been in the rig since the harness was written, which means every
+paired A/B in the archive ran unblinded.
+
+> **Rule 68.** The treatment label must never reach the subject. No arm name,
+> build number, or condition tag may appear in anything the model can read — the
+> prompt, the cwd, filenames, or tool output — and a rig change that touches any
+> of those channels is not done until an A/A says the arms are indistinguishable.
+
+### The fix
+
+`harness.run_names(case, model, repeat, arm)` returns **two** names that differ
+in exactly one way, and it is load-bearing in both directions:
+
+- `run_id` **is** arm-tagged. It names the event log and the stdout file. This
+  is not optional: dropping the tag here would silently write both arms of a
+  pair into one file, which is a worse bug than the one being fixed, and I
+  nearly shipped it — `grep -n stamp` caught it before the sweep ran.
+- `stamp` is **not** arm-tagged. It names the tempdir, i.e. the cwd, i.e. the
+  channel that reaches the model.
+
+Both arms still draw *different random suffixes*. That is correct and was never
+the problem: a random suffix is unsystematic noise, where the arm name was a
+constant signal perfectly correlated with the treatment. Five regression tests
+in `tests/test_harness.py`, one parametrised over arm names, assert the tag is
+absent from `stamp` and present in `run_id`. Build 133.
+
+### What this invalidates, and what survives
+
+The damage is bounded by which metrics the leak moves. `aa16-slot` measures that
+directly, since its arms were identical, so every gap it shows is pure bias:
+
+| metric | A/A gap | status |
+|---|---|---|
+| runs landing ≥1 edit | 12/16 vs 1/16 | **biased — unusable across arms** |
+| gave up | 3 vs 12 | **biased** |
+| stopped by a guard | 13 vs 4 | **biased** |
+| repeat-stop share | 2/16 vs 2/16 | clean |
+| clean finishes (`done`) | 0 vs 0 | uninformative here (floor) |
+
+- **Lever 0e's NO SHIP (5.104) stands.** Its gating metric was the repeat-stop
+  share, which the A/A shows unbiased, and it tied at 3/16 vs 3/16.
+- **Anything the archive concluded from a per-run `landed`, `gaveup`, or
+  `stopped` comparison across arms is suspect** and must be re-read. The 5.59
+  "arm-slot bias" note, filed as an oddity, was this.
+- **Within-slot comparisons survive**, because the leak is a constant inside a
+  slot. That is why 5.104's surrender finding holds in its restated form.
+
+### Open
+
+`aa17-slotfix` is the validation: the same A/A on the same server, post-fix. It
+has to come back null. If a gap survives a blinded A/A, the leak was not the
+only channel and the worktree-vs-live-tree difference is back on the table.
