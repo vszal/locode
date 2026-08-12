@@ -406,3 +406,52 @@ class TestOutputSchema:
         assert result is not None
         assert isinstance(result["READ_FIRST"], list)
         assert len(result["READ_FIRST"]) > 0
+
+
+class TestServerIdentity:
+    """Server identity is a first-class experimental variable (ROADMAP 5.94).
+
+    A restart alone once moved VERIFIED from 0-7/14 to 4-11/14 with the code
+    held constant (5.47), so rule 62 requires checking the pid/started pair
+    before any cross-sweep comparison. If this field silently stopped being
+    carried through, that check would pass vacuously.
+    """
+
+    @staticmethod
+    def _sweep(tmp_path, monkeypatch, metrics, ab_extra):
+        root = tmp_path / "s"
+        (root / "events").mkdir(parents=True)
+        monkeypatch.setattr(metrics, "RESULTS", str(tmp_path))
+        ab = {"base_ref": "deadbee", "runs": [
+            {"case": "c", "arm": "base", "model": "m", "repeat": 1,
+             "checks": {"fully_fixed": True}},
+            {"case": "c", "arm": "cand", "model": "m", "repeat": 1,
+             "checks": {"fully_fixed": False}},
+        ]}
+        ab.update(ab_extra)
+        (root / "ab.json").write_text(json.dumps(ab))
+        return metrics.derive("s")
+
+    def test_server_fields_are_carried_through(self, tmp_path, monkeypatch, metrics):
+        out = self._sweep(tmp_path, monkeypatch, metrics, {"server": {
+            "pid": "69851", "started": "Sat Aug 8 16:18:10 2026",
+            "model": "some-model", "argv": ["ignored"]}})
+        assert out["server"]["pid"] == "69851"
+        assert out["server"]["started"] == "Sat Aug 8 16:18:10 2026"
+        assert out["server"]["model"] == "some-model"
+        # argv is deliberately dropped — it is long and not part of identity
+        assert "argv" not in out["server"]
+
+    def test_missing_server_block_does_not_crash(self, tmp_path, monkeypatch, metrics):
+        out = self._sweep(tmp_path, monkeypatch, metrics, {})
+        assert out["server"] == {"pid": None, "started": None, "model": None}
+
+    def test_created_timestamp_is_carried_through(self, tmp_path, monkeypatch, metrics):
+        out = self._sweep(tmp_path, monkeypatch, metrics,
+                          {"created": "2026-08-11 21:06:49"})
+        assert out["created"] == "2026-08-11 21:06:49"
+
+    def test_read_first_warns_about_cross_sweep_server_check(self, tmp_path,
+                                                             monkeypatch, metrics):
+        out = self._sweep(tmp_path, monkeypatch, metrics, {})
+        assert any("server pid" in n for n in out["READ_FIRST"])

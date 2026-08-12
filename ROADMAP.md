@@ -7323,4 +7323,90 @@ plus an overwhelming per-call signal (121 → 0). One paired sweep would settle 
 outright. Not blocking — the tool-choice evidence is strong — but it is the
 cheapest way to retire the last caveat on the most consequential rule in the log.
 
+## 5.94 — 5.93 overreached too. The real rule is the server process, not the code diff.
+
+A full extraction of every verdict in this file (all 7300 lines, delegated) was
+run to find decisions resting on cross-sweep reasoning. It found something
+better: **two counter-examples to 5.93, both of which I had written myself.**
+
+5.93 concluded that between-sweep variance with code held constant was "not
+obviously larger than binomial." That is false, and the evidence was already in
+this document:
+
+1. **§4.4, build 38 (2026-07-25).** "Two *build-identical* sweeps (r18/r19)
+   differ at p=0.030 on the exact exec-stall-trap qwencoder row." Recorded at the
+   time as a *proven finding* about non-stationarity, and the gate was rebuilt
+   around it.
+2. **§5.47 (2026-08-09).** The strongest case in the log. Between b108 and b110
+   the only product change was `locode/__init__.py` — the build number; every
+   other commit was docs. A **server restart** fell between them. What moved:
+   distinct plans at call 1 went 3 → 1, third call is `read_file` went 100% →
+   24%, and `VERIFIED` per arm went 0–7/14 → **4–11/14**. I retracted a headline
+   over it and coined "pre-restart era" / "post-restart era" language that
+   appears throughout §5.43–5.52.
+
+So the chain reads: 5.92 had the **right instinct and an invalid proof**; 5.93
+correctly killed the proof and then **overreached in the other direction**,
+declaring an effect absent that this log had already measured twice. Searching
+for four code-constant `base_ref` groups while ignoring the section titled
+*"The 25%→71% was a server restart"* is not a small miss.
+
+### What actually distinguishes a readable cross-sweep comparison
+Not the code diff alone — **the server process**. Every sweep from b119 through
+b132 ran inside one continuous process (pid 69851, up Aug 8 16:18 until it died
+Aug 11):
+
+| sweep | ran | process |
+|---|---|---|
+| b119-readguard | Aug 09 07:41 | 69851 |
+| b120, b121-confirm, b121-aa | Aug 10 00:09–04:56 | 69851 |
+| b127-transfer | Aug 10 19:49 | 69851 |
+| b128-uniquefirst | Aug 11 00:02 | 69851 |
+| b130-d1-occurrence-early | Aug 11 05:03 | 69851 |
+| b132-d1-clean | Aug 11 21:06 | 69851 |
+
+**Both claims 5.92 struck therefore survive — on this argument, not 5.93's.**
+Lever 0f (b130 base → b132 base) and the exec-bugfix decline (b127 → b132) are
+each a single-variable code delta measured inside one server process. 5.59's
+credit of build 119 (12/24 vs build 118's 0/38) sits in the same era and is
+likewise protected.
+
+### Rule 62, final form
+> Before attributing any cross-sweep difference, BOTH must hold: (1) diff the two
+> arms' code and state the delta; (2) confirm the same server process ran both.
+> Fail either and the comparison is worthless. Satisfy both and it is a usable
+> before/after — still weaker than a paired A/B. Never test a shared-rate null
+> against arms that ran different builds.
+
+Server identity is now a first-class experimental variable. `ab.py` already logs
+the server pid and start time at launch; **that line is evidence and belongs in
+`metrics.json`** — queued, so this check stops depending on my memory of which
+process was up.
+
+### Immediate consequence for the sweep now running (5.91)
+The server died and respawned today (pid 85569), so `fa12194`'s arm **can no
+longer be read against its own historical 8/24 from b128** — a restart falls
+between them, which is precisely the confound §5.47 documents. The drift-probe
+half of the 5.91 design is dead.
+
+The paired within-sweep comparison is untouched and still answers the question.
+Branch 2's **action** is unchanged (both arms low ⇒ the code is exonerated); only
+its **wording** must change — "drift" can no longer be distinguished from "the
+restart," and the write-up must say so. Recorded before the verdict, so this is
+a pre-registration amendment and not a post-hoc reinterpretation.
+
+### On the pattern
+Four corrections in one session (5.86, 5.92, 5.93, 5.94), each found by a
+deliberate check rather than by luck, and each check cheaper than the last —
+this one cost a delegated read. That is the process working, but the honest
+summary is that my *first* answer on a statistical question has now been wrong
+four times running, and my second answer was wrong once. The durable fix is
+mechanical, not attitudinal: **the server-identity check is going into
+`metrics.json` so it cannot be forgotten**, which is worth more than resolving
+to be careful.
+
+What has still never moved: every ship/revert decision came from a within-sweep
+paired comparison under a rule fixed in advance, and none of them changed across
+any of the four corrections.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*

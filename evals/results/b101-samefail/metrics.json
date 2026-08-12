@@ -2,7 +2,13 @@
   "schema": 1,
   "label": "b101-samefail",
   "base_ref": "e160435",
-  "generated": "2026-08-11T22:32:41",
+  "created": "2026-08-07 23:27:06",
+  "server": {
+    "pid": null,
+    "started": null,
+    "model": null
+  },
+  "generated": "2026-08-11T23:06:36",
   "total_runs": 16,
   "invalid_runs": 0,
   "models": [
@@ -155,6 +161,7 @@
   "READ_FIRST": [
     "per_run metrics compare base vs cand of THIS sweep ONLY. Both eval cases run at 4-8x binomial overdispersion across sweeps (5.92), so a per-run score from another sweep is not a valid comparator.",
     "per_call metrics (n in the hundreds) are the channel that can actually resolve a wording change (5.86b).",
-    "fisher_p is context only; it assumes independent runs. Do not gate on it."
+    "fisher_p is context only; it assumes independent runs. Do not gate on it.",
+    "Before ANY cross-sweep comparison (rule 62): the two sweeps must share a code delta you have diffed AND the same server pid/started pair. A restart alone once moved VERIFIED from 0-7/14 to 4-11/14 with code held constant (5.47). `metrics.py --servers` lists them."
   ]
 }

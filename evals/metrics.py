@@ -202,10 +202,19 @@ def derive(label: str) -> dict | None:
             }
         cases[case] = pack
 
+    # Server identity is a first-class experimental variable (5.94). A restart
+    # between two sweeps moved `VERIFIED` from 0-7/14 to 4-11/14 with the code
+    # held constant except the build number, so a cross-sweep comparison needs
+    # BOTH a known code delta AND a matching pid/started pair. Carried into the
+    # derived layer so the check does not depend on anyone remembering it.
+    srv = d.get("server") or {}
     return {
         "schema": SCHEMA,
         "label": label,
         "base_ref": d.get("base_ref"),
+        "created": d.get("created"),
+        "server": {"pid": srv.get("pid"), "started": srv.get("started"),
+                   "model": srv.get("model")},
         "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "total_runs": len(runs),
         "invalid_runs": sum(1 for r in runs if r.get("invalid")),
@@ -219,11 +228,50 @@ def derive(label: str) -> dict | None:
             "actually resolve a wording change (5.86b).",
             "fisher_p is context only; it assumes independent runs. Do not gate "
             "on it.",
+            "Before ANY cross-sweep comparison (rule 62): the two sweeps must "
+            "share a code delta you have diffed AND the same server pid/started "
+            "pair. A restart alone once moved VERIFIED from 0-7/14 to 4-11/14 "
+            "with code held constant (5.47). `metrics.py --servers` lists them.",
         ],
     }
 
 
+def servers() -> int:
+    """List every sweep's server process, newest last. The rule-62 check (5.94).
+
+    Sweeps sharing a pid+started pair are cross-sweep comparable on the server
+    axis; a change of either is a restart, and a restart alone has moved results
+    as far as a real code change (5.47).
+    """
+    rows = []
+    for lab in sorted(os.listdir(RESULTS)):
+        p = os.path.join(RESULTS, lab, "ab.json")
+        if not os.path.exists(p):
+            continue
+        try:
+            with open(p) as fh:
+                d = json.load(fh)
+        except (json.JSONDecodeError, OSError):
+            continue
+        s = d.get("server") or {}
+        rows.append((d.get("created", "?"), lab,
+                     str(s.get("pid", "?")), str(s.get("started", "?"))))
+    rows.sort()
+    print(f"{'created':20s}{'sweep':32s}{'pid':>8s}  server started")
+    prev = None
+    for created, lab, pid, started in rows:
+        key = (pid, started)
+        if prev is not None and key != prev:
+            print(" " * 20 + "-- SERVER RESTART — comparisons across this "
+                             "line are not readable --")
+        print(f"{created:20s}{lab:32s}{pid:>8s}  {started}")
+        prev = key
+    return 0
+
+
 def main(argv: list[str]) -> int:
+    if "--servers" in argv:
+        return servers()
     show = "--print" in argv
     args = [a for a in argv if not a.startswith("--")]
     if "--all" in argv:
