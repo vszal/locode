@@ -88,7 +88,11 @@ def fisher(a: int, b: int, c: int, d: int) -> float:
 
 
 def _events(root: str, run: dict, arm: str) -> list[dict]:
-    """Rule 43: the run key is `repeat`, not `rep`."""
+    """The run key is `repeat`, not `rep` — a recurring typo, not a rule.
+
+    (Every grader since grade126 headed this warning "Rule 43", which is a
+    mislabel: rule 43 is the grader/closed-sweep rule at ROADMAP:3571.)
+    """
     p = os.path.join(root, "events",
                      f"{run['case']}__{run['model']}__r{run['repeat']}__{arm}.jsonl")
     if not os.path.exists(p):

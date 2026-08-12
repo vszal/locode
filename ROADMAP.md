@@ -5,6 +5,10 @@ priorities in place** rather than deferring them to the end. Every code item
 lands with tests + a `__build__` bump; every quality claim is backed by a graded
 sweep logged in `evals/LOG.md`.
 
+Numbered methodology rules are cited throughout this file; **`RULES.md`
+indexes them** (statement, section, and which are superseded). Coin a new
+one there as well as here, stated in full in its own sentence.
+
 Status: `[ ]` todo · `[~] in progress` · `[x] done` · `[!] needs a decision`
 
 ---
@@ -7450,5 +7454,109 @@ another session mining the back-catalogue for it.
 Deliberately not done: back-filling pids from process history or file mtimes.
 An inferred fingerprint would be indistinguishable in the schema from a recorded
 one, and rule 62 is only worth anything if its inputs are observations.
+
+## 5.96 — LEVER 0e, re-diagnosed: the detector is not late, it is asking for a third attempt that never comes
+
+5.85 said "the repeat detector fires nine iterations after the signal" and called
+the detector *late*. With the quantity now derived for every sweep (5.95) and the
+loop's actual trigger read rather than assumed, that framing is wrong in a way
+that changes the fix.
+
+### The scale of the waste, measured
+Across every b12x/b13x sweep — 752 runs, **13,695 tool calls**:
+
+| | count | share |
+|---|---|---|
+| exact duplicate calls (name+args identical, same run) | **4,798** | **35%** |
+| …of which the result was IDENTICAL to last time | 2,112 | 44% of dups |
+| …of which the result DIFFERED | 2,686 | 56% of dups |
+
+Split by tool, the 56% resolves cleanly and mostly exonerates the loop:
+
+| tool | duplicates | result differed |
+|---|---|---|
+| bash | 2,541 | 70% |
+| read_file | 964 | 56% |
+| **edit_file** | **819** | **20%** |
+| update_plan | 375 | 47% |
+| replace_lines | 99 | 38% |
+
+A repeated `bash` whose output changed is a re-test after an edit — working as
+intended, and the loop's `same_result` gate is right to ignore it. The waste is
+concentrated in the mutating tools, where 80% of repeats return byte-identical
+text.
+
+### What those repeated edits actually get back
+719 same-result duplicate mutating calls, in **421 of 752 runs (56%)**:
+
+| the harness said, verbatim, twice | count | share |
+|---|---|---|
+| ambiguous match (`so it is not clear which`) | 287 | 40% |
+| ALREADY DONE / ALREADY IN PLACE (`old` == `new`) | ~256 | 36% |
+| reported SUCCESS (`edited …`) | 102 | 14% |
+| refused — would introduce a SyntaxError | ~44 | 6% |
+| `old` not found | 23 | 3% |
+
+82% of them are the model **re-sending an edit the harness already rejected, and
+receiving the identical rejection.** That is the failure the user reported
+directly ("at least 4 of these in a session: this edit does NOTHING"). The 14%
+that *succeeded* are worse in kind: re-applying a landed edit is the
+content-duplication hazard `_nudge_repeat_edit` exists to prevent.
+
+### Why the machinery misses them
+`loop.py:997` fires at `seen_streak >= max_repeat_calls - 1`, i.e. **2**, and the
+streak is checked *before* running. Occurrence 1 sets the streak to 1; occurrence
+2 sets it to 2; the nudge therefore fires only when the model reaches for the
+identical call a **third** time. On this corpus it almost never does — 719 second
+occurrences produced roughly 50 nearby repeat-family nudges (7%), against 407
+`repeated call` + `repeated edit` nudges in these sweeps in total.
+
+So the second pointless edit is never addressed by the repeat machinery at all.
+Something else usually speaks: of those 719, 72% draw *some other* nudge
+(`unverified edits`, `error unchanged across edits`, `same failure`) and 21% draw
+nothing. The nine-iteration "gap" of 5.85 is the distance to a threshold the
+model mostly never trips, not a slow detector.
+
+### Two mid-analysis corrections, kept
+1. **A first pass reported "0% of same-result mutating duplicates ever reach a
+   third occurrence" as a finding.** It was an artifact twice over: the script
+   failed to record the previous result for mutating calls (so nothing could
+   ever match), and, once fixed, a third occurrence is *suppressed pre-execution*
+   by the nudge path's `continue` — absence from the event log is expected, not
+   evidence. Conclusions were re-derived from the nudge stream instead.
+2. **"The detector is keyed on batch signature, so a repeat inside a
+   differently-shaped batch never matches" — refuted, not assumed.** Counting
+   `run` events per iteration: **13,695 of 13,695 batches contain exactly one
+   call.** `batch_sig` is identical to the call signature for this model, and the
+   hypothesis was dropped before it reached a recommendation.
+
+### Pre-registration — lever 0e (written before the change exists)
+**Change under test.** For mutating tools only (`_MUTATING_EDIT_TOOLS`), fire at
+the *second* identical call whose result is byte-identical, instead of the third.
+Per 5.85's constraint 1, not the existing text: the terminal
+"give your final answer now" wording is wrong at occurrence 2. Per constraint 2,
+escalate — early duplicate steers, late duplicate keeps today's behaviour.
+
+**Primary metric (per-call channel, 5.86b).** Same-result duplicate mutating
+calls per 100 mutating calls, base vs cand, within one sweep.
+
+**Threshold.** The A/A floor for a per-call duplicate rate is now measured, over
+six A/A and calibration sweeps: diffs of +4.0, +1.7, +3.7, 0.0, −6.4, +4.3 pp,
+**every one inside its own binomial 95% band** — this channel behaves, unlike the
+per-run score. SHIP requires the drop to clear BOTH the binomial 95% band for the
+realised n AND 7 pp (the largest A/A excursion, rounded up).
+
+**REJECT line (5.76/5.81 — this touches the loop).** Reject if `not found`
+rate rises at all, if aim depth worsens (lever 0d), or if false completions
+appear in cand and not base — b126 is the cautionary case, an intervention the
+model obeyed into a worse place. A duplicate is partly a *symptom* of a hard run
+(5.85), so a fall in duplicates that does not clear the REJECT line is not a win.
+
+**Explicitly not claimed.** That suppressing duplicates converts failures into
+successes. 5.85's correction 2 stands: "zero duplicates" is very nearly a synonym
+for "short run". `fully_fixed` is reported, not gated on.
+
+**Queued.** Behind b131-echoguard — one experiment at a time, and no source edits
+while a sweep runs.
 
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*

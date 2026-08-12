@@ -945,6 +945,12 @@ completion. **The repeat death is still the dominant ending.**
 9. 5.19 option 3 (low): name the similarity in a fuzzy success message.
 
 ## Instruments
+`RULES.md` — the numbered methodology rules, indexed (27 of ~50; the rest are
+listed as unindexed, not absent). Six are marked reconstructed: cited by number
+but never actually stated, so do not quote them as canon. "The run key is
+`repeat`, not `rep`" is a TYPO, not rule 43 — graders 126-191 all mislabelled it;
+rule 43 is the grader/closed-sweep rule.
+
 `evals/metrics.py <label> | --all [--print]` — derives `metrics.json` per sweep
 from ab.json + events/. Standalone and post-hoc: safe to run mid-sweep, and it
 backfills history. 49 sweeps backfilled and TRACKED in git, which matters

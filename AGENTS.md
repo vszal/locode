@@ -90,6 +90,9 @@ Keep on Opus **only** what truly needs it:
   resolution, alias/config resolution, the fs tools (`edit_file` exact-match,
   path scoping), and the model client's message assembly + tool-call parsing
   (HTTP mocked — **tests never hit the network or `:8081`**).
+- Eval work is governed by numbered methodology rules indexed in **`RULES.md`**
+  (`ROADMAP.md` holds the reasoning). Read it before designing or grading a
+  sweep, and coin any new rule there, stated in full.
 - Run `pytest -q` before declaring a task complete; state real results (don't
   claim green without running).
 
