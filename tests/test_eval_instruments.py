@@ -275,3 +275,48 @@ class TestScanGaps:
             str(tmp_path), [run_dict(repeat=1)], "repeated call")
         # two "iteration" phase events occur between the nudge and the stop
         assert gaps == [2]
+
+
+class TestRunsForDedup:
+    """evals/ambig_next.py: runs_for() — the rule-66 double-count guard.
+
+    ab.json holds ONE run entry per arm, but events() takes the arm as a
+    parameter and ignores run['arm']. Iterating the unfiltered list therefore
+    reads every event file twice. This inflated every absolute n in ROADMAP
+    5.99-5.101 by exactly 2x. See 5.103.
+    """
+
+    def test_arm_entries_are_filtered_not_counted_twice(self, ambig_next,
+                                                        tmp_path):
+        write_run(tmp_path, "c", "m", 1, "base", [
+            {"phase": "run", "name": "edit_file", "args": {}},
+            {"phase": "result", "content": ambig_next.AMBIG},
+            {"phase": "run", "name": "edit_file", "args": {"occurrence": 2}},
+            {"phase": "result", "content": "ok"},
+        ])
+        # the shape ab.py actually writes: one entry per arm, same repeat
+        runs = [dict(run_dict(repeat=1), arm="base"),
+                dict(run_dict(repeat=1), arm="cand")]
+        n, b = ambig_next.arm_rates(str(tmp_path), runs, "base")
+        assert n == 1, "the base event file was counted once per arm entry"
+        assert b["occurrence"] == 1
+
+    def test_untagged_runs_still_work(self, ambig_next, tmp_path):
+        """Sweeps predating the `arm` key must keep grading — that older shape
+        is the one the unfiltered loop was correct for."""
+        write_run(tmp_path, "c", "m", 1, "base", [
+            {"phase": "run", "name": "edit_file", "args": {}},
+            {"phase": "result", "content": ambig_next.AMBIG},
+            {"phase": "run", "name": "edit_file", "args": {"occurrence": 2}},
+            {"phase": "result", "content": "ok"},
+        ])
+        n, _ = ambig_next.arm_rates(str(tmp_path), [run_dict(repeat=1)], "base")
+        assert n == 1
+
+    def test_runs_for_selects_only_the_named_arm(self, ambig_next):
+        runs = [dict(run_dict(repeat=1), arm="base"),
+                dict(run_dict(repeat=1), arm="cand"),
+                dict(run_dict(repeat=2), arm="base")]
+        assert len(ambig_next.runs_for(runs, "base")) == 2
+        assert len(ambig_next.runs_for(runs, "cand")) == 1
+        assert ambig_next.runs_for([run_dict()], "base") == [run_dict()]

@@ -41,6 +41,24 @@ def events(root, run, arm):
     return out
 
 
+def runs_for(runs, arm):
+    """The run entries belonging to one arm.
+
+    ab.json holds ONE entry per arm per repeat (32 entries for a 16-pair
+    sweep), and `events()` above takes the arm as a PARAMETER rather than
+    reading `run['arm']`. So the natural-looking `for run in runs` with a fixed
+    arm opens every event file twice, and `for run in runs: for arm in (...)`
+    opens it twice per arm. Verified across the archive: 47 of 49 sweeps have
+    exactly one run entry per event file, so the inflation is a uniform 2x --
+    every rate stayed correct and every absolute n was double. Caught when a
+    per-run count came back 32/16. See ROADMAP 5.103, rule 66.
+
+    Falls back to the whole list for any sweep whose entries predate the `arm`
+    key, which is the shape this would have been correct for."""
+    tagged = [r for r in runs if r.get("arm")]
+    return [r for r in tagged if r["arm"] == arm] if tagged else runs
+
+
 BUCKETS = ("occurrence", "noop", "otheredit", "nonedit", "noneext")
 
 
@@ -52,7 +70,7 @@ def arm_rates(root, runs, arm):
     """
     n_ambig = 0
     b = dict.fromkeys(BUCKETS, 0)
-    for run in runs:
+    for run in runs_for(runs, arm):
         ev = events(root, run, arm)
         # flatten to the (run, result) call sequence; every batch is one call
         calls = []

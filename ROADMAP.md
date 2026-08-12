@@ -7721,19 +7721,20 @@ it. The no-op is the mirror image: present in every arm from b99 to b125-base,
 b132-d1-clean, the most recent completed sweep, is the cleanest read:
 
 ```
-base   54 ambiguity errors → 54 occurrence (100%),  0 no-op,  0 other edit
-cand  244 ambiguity errors → 202 occurrence (82.8%), 0 no-op,  0 other edit
-                             42 switched to a non-edit tool
+base   27 ambiguity errors → 27 occurrence (100%),  0 no-op,  0 other edit
+cand  122 ambiguity errors → 101 occurrence (82.8%), 0 no-op,  0 other edit
+                             21 switched to a non-edit tool
 ```
 
-Those 42, plus the equivalents in b126/b128/b130, are 78 `bash` and 18
-`read_file` — re-run the tests, re-read the file. Both are sane recoveries,
-not pathologies.
+(Counts halved 2026-08-12 — rule 66, see 5.103. Every share is unchanged.)
+
+Those 21, plus the equivalents in b126/b128/b130, are `bash` and `read_file` —
+re-run the tests, re-read the file. Both are sane recoveries, not pathologies.
 
 ### What this means
 
 1. **Lever 0g is retired.** The behaviour it was designed to unlock — "rewrite
-   the edit instead of reaching for `occurrence`" — occurs **0 times in 244**
+   the edit instead of reaching for `occurrence`" — occurs **0 times in 122**
    in the current code. There is nothing left to convert.
 2. **0h and 0i go with it.** Both propose rewriting the same message
    (shorten the match listing; escalate to a user-role nudge). That message is
@@ -7807,19 +7808,26 @@ tools* versus *the harness killed the run*:
 
 | outcome after a `repeated call` nudge | n | share |
 |---|---|---|
-| **harness stop** (`stopped` event) | 855 | **55.1%** |
-| next tool call | 637 | 41.1% |
-| **model actually ended its turn** | **59** | **3.8%** |
+| **harness stop** (`stopped` event) | 444 | **56.1%** |
+| next tool call | 319 | 40.3% |
+| **model actually ended its turn** | **29** | **3.7%** |
 
-n = 1,551 across the archive. (5.97's 383 is a different, unreconstructed
+n = 792 across the archive. (5.97's 383 is a different, unreconstructed
 count; the ratio matters more than the base here, and every sweep is included
 above.)
 
-**The model takes the offered exit 3.8% of the time, not 61%.** The 61% was
-overwhelmingly the harness's own guard firing. Of the 855 stops, **479 are
+> **Counts corrected 2026-08-12 (rule 66).** Every absolute `n` first published
+> in 5.99–5.101 was exactly **2× too large**: `ab.json` holds one run entry per
+> *arm*, and the instruments looped `for run in runs` while passing the arm
+> separately, so each event file was read twice. The inflation is uniform, so
+> **every share in these sections was and remains correct** — only the
+> denominators moved. Corrected here and in the table below; see 5.103.
+
+**The model takes the offered exit 3.7% of the time, not 61%.** The 61% was
+overwhelmingly the harness's own guard firing. Of the 444 stops, **240 are
 "the model repeated the same tool call without making progress"** — the repeat
-cap — and 330 are the stall cap. So the actual sequence is: nudge fires → the
-model repeats anyway → the cap executes the run.
+cap — and the rest are the stall caps. So the actual sequence is: nudge fires →
+the model repeats anyway → the cap executes the run.
 
 ### The nudge arrives one iteration before the guillotine
 
@@ -7827,8 +7835,8 @@ Iterations from the first `repeated call` nudge to the `stopped` event:
 
 | population | n | median | mean | ≤1 iteration |
 |---|---|---|---|---|
-| whole archive | 1,166 | **1** | 3.2 | **51%** |
-| five most recent sweeps | 206 | 2 | 4.5 | 24% |
+| whole archive | 590 | **1** | 3.2 | **50%** |
+| five most recent sweeps | 103 | 2 | 4.5 | 24% |
 
 Half the time the nudge gets a single iteration to work before the run is
 killed. It is not being ignored and it is not being taken as an exit — it is
@@ -7867,12 +7875,12 @@ Running the same three-way split across every other nudge in 5.97:
 
 | nudge | fires | next tool | harness stop | model ended |
 |---|---|---|---|---|
-| `stall on a stale reading` | 160 | **100.0%** | 0.0% | 0.0% |
-| `every tool call failing` | 348 | 97.1% | 0.6% | 2.3% |
-| `unverified edits` | 2,196 | 96.3% | 3.6% | 0.1% |
-| `same failure (2 in a row)` | 3,396 | 88.3% | 10.7% | 1.1% |
-| `repeated edit` | 166 | 84.3% | 15.7% | 0.0% |
-| **`repeated call`** | **1,556** | **41.0%** | **55.3%** | **3.7%** |
+| `stall on a stale reading` | 80 | **100.0%** | 0.0% | 0.0% |
+| `every tool call failing` | 181 | 97.2% | 0.6% | 2.2% |
+| `unverified edits` | 1,112 | 95.7% | 4.2% | 0.1% |
+| `same failure (2 in a row)` | 1,724 | 88.3% | 10.7% | 1.0% |
+| `repeated edit` | 83 | 84.3% | 15.7% | 0.0% |
+| **`repeated call`** | **792** | **40.3%** | **56.1%** | **3.7%** |
 
 Model-ended is 0–2.3% for all of them, so no other row was distorted by the
 merged bucket and 5.97's other conclusions stand. But the contrast is the
@@ -8007,13 +8015,12 @@ the weaker of the two messages, by a wide margin:
 
 | nudge | fires (archive) | next event is a tool call | runway ≤1 iteration |
 |---|---|---|---|
-| `repeated call` (`_nudge_repeat`) | 1,056 | 41.0% | 51% |
+| `repeated call` (`_nudge_repeat`) | 792 | 40.3% | 50% |
 | `repeated edit` (`_nudge_repeat_edit`) | 83 | **84.3%** | 17% |
 
-And the compliance is specific, not diffuse: of the 166 `repeated edit` fires
-scanned per-arm, the next tool is `read_file` in 81.9% — exactly what the text
-asks for ("STOP editing, RE-READ the file"). So the patch calls
-`_nudge_repeat_edit`.
+And the compliance is specific, not diffuse: of the 83 `repeated edit` fires,
+the next tool is `read_file` in 81.9% — exactly what the text asks for ("STOP
+editing, RE-READ the file"). So the patch calls `_nudge_repeat_edit`.
 
 **That makes this a bundled intervention, and it is declared as one.** Versus
 base, two things move for a mutating repeat: *when* the warning arrives
@@ -8093,3 +8100,93 @@ the one I hit: it is concluding that a mutation *was not* caught, and weakening
 a grader to "fix" a test that was never broken.
 
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
+
+## 5.103 — b131-echoguard: the code is exonerated, and the instruments were counting double
+
+### The pre-registered verdict
+
+The sweep ran 16 pairs on `exec-bugfix` (base = `fa12194`, build 125, no echo
+guard; cand = build 131). `grade191.py`, written before any number existed,
+returns **branch 2**:
+
+- **Gate 1 passed.** Base shows zero echo nudges and zero echo stops, so the
+  worktree really is pre-guard and the comparison is valid.
+- **fully_fixed: 0/16 base, 0/16 cand.** Fisher p = 1.
+
+**The echo guard is exonerated.** fa12194 no longer reproduces its own b128
+score of 8/24 on this case — it now scores 0/16 — so the collapse cannot be
+attributed to any code change made after it.
+
+Per the 5.94 amendment, the *action* stands and only the *wording* changes:
+**this is not evidence of "drift."** The model server has been up since Aug 8
+and a restart sits between b128 and now; drift and the restart are confounded
+and this sweep cannot separate them. All it establishes is that nothing
+measured on `exec-bugfix` since b128 can be attributed to a code change.
+
+`ab.py` itself called the sweep 🚫 UNDERPOWERED — 16/16 pairs tied, 0
+informative. That verdict is correct on its own terms and is exactly why the
+per-run channel is read with `armstats.py` instead (the standing rule that
+score deltas cannot see turn endings).
+
+### The unregistered finding: the arms fail in opposite ways
+
+Not pre-registered, therefore a hypothesis and **not** a result (rule 43):
+
+| | base (b125) | cand (b131) |
+|---|---|---|
+| runs landing ≥1 edit | 8/16 | **0/16** |
+| `edit_file` succeeding | 24/45 | **0/46** |
+| `replace_lines` succeeding | 0/24 | 0/60 |
+| median `old` size | **1 line** | **19 lines** |
+| single-line edits | 53% | **0%** |
+
+Fisher on the per-run column is p = 0.0025, but the mechanism matters more than
+the p-value, and reading the trajectories supplies it. Base attempts surgical
+one-line edits that *land* and are *wrong* — it flip-flops
+`current_len += 1 + len(word)` against `current_len += len(word)` three times,
+each edit succeeding, and dies on "edits kept hitting the same error."
+Candidate attempts whole-function rewrites: every `old` is a 19-line block that
+no longer matches, and its `replace_lines` fallbacks are all refused by the
+syntax guard as corruption. Zero edits land, and it dies on the test-still-fails
+stop.
+
+So "cand landed zero edits" is **not** an edit-tool regression. Both arms fix
+nothing; they merely fail in different shapes. The syntax guard refuses 100% of
+`replace_lines` in *both* arms, so it is not the differentiator either. What
+changed is the granularity the model attempts, which is a prompt-level effect,
+and identifying its cause needs its own sweep.
+
+### Rule 66 — the instruments were reading every file twice
+
+Chasing the per-run number above produced `read_runs = 32/16`, an impossible
+denominator. Cause: `ab.json` holds **one run entry per arm** (32 entries for a
+16-pair sweep), while `events(root, run, arm)` builds its path from the arm
+passed *as a parameter* and ignores `run['arm']`. So the natural
+`for run in runs` with a fixed arm opens each file twice, and
+`for run in runs: for arm in (...)` does it once per arm.
+
+Exposure, measured rather than assumed: **47 of 49 sweeps have exactly one run
+entry per event file**, so the inflation is a uniform 2×. That is the saving
+grace — *every share published in 5.99, 5.100 and 5.101 was and remains
+correct*; only the absolute counts were wrong, and all of them by the same
+factor. Confirmed independently: a raw grep of the event files counts 83
+`repeated edit` nudges where the instrument reported 166.
+
+Corrected and re-run: `repeated call` fires **792** times (was 1,556) at
+40.3% / 56.1% / 3.7%, and the runway population is **590** (was 1,166), still
+median 1 with 50% at ≤1 iteration. The 5.99 and 5.100 tables are corrected in
+place with a note. **No conclusion in any of those sections changes** — the
+`repeated call` nudge is still the lone outlier against 84–100% compliance
+everywhere else, and lever 0e v2 is unaffected.
+
+Fixed in `evals/ambig_next.py` as `runs_for(runs, arm)`, used by both
+instruments, with a regression test that fails on the old loop.
+
+> **Rule 66.** Before reporting any absolute `n` from an event-log instrument,
+> check the denominator against the file count. Shares survive a uniform
+> miscount; counts do not.
+
+The near-miss is worth naming: two sections of quantitative argument were built
+on doubled counts and *none of the conclusions moved*, because every claim in
+them was a ratio. That is luck, not method — the same bug under a non-uniform
+sweep shape would have silently re-weighted the pool and moved the shares too.

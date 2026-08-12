@@ -25,7 +25,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ambig_next import events  # noqa: E402
+from ambig_next import events, runs_for  # noqa: E402
 
 RESULTS = "evals/results"
 
@@ -35,8 +35,10 @@ def scan(root, runs, prefix):
     out = collections.Counter()
     reasons = collections.Counter()
     gaps = []
-    for run in runs:
-        for arm in ("base", "cand"):
+    for arm in ("base", "cand"):
+        # runs_for, not `for run in runs` -- ab.json carries one entry per arm,
+        # so the unfiltered loop reads every file twice (rule 66).
+        for run in runs_for(runs, arm):
             ev = events(root, run, arm)
             # iteration index per event, so the gap is in iterations not events
             it = 0

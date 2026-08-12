@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–65.** All 52 numbers actually in use are below. Thirteen numbers
+**Complete for 1–66.** All 53 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -71,6 +71,7 @@ anchor is authoritative if one ever drifts.
 | 63 | A "did the model comply" classifier must be derived from what the instruction asked for, not from generic novelty — for any nudge that says "go back and look again", the two are opposites. | L7599 · §5.97 |
 | 64 | The archive spans your own fixes — never rank a lever on a rate pooled across it. Split the rate by sweep and look for the cliff before the number reaches a recommendation. | L7776 · §5.99 |
 | 65 | Mutation-testing a grader must clear `__pycache__` between mutations. A same-size edit restored within the same mtime second leaves stale bytecode that importlib accepts, so the mutated code keeps running against the restored source. | L8024 · §5.102 |
+| 66 | Before reporting any absolute `n` from an event-log instrument, check the denominator against the file count. `ab.json` carries one run entry per *arm*, so `for run in runs` with the arm passed separately reads every event file twice. Shares survive a uniform miscount; counts do not. | §5.103 |
 
 ⚠ = **reconstructed.** The number is cited but never stated outright anywhere in
 `ROADMAP.md`; the wording is inferred from its use sites and is **not** a
@@ -121,4 +122,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **66**.
+graders. Next free number: **67**.

@@ -1,0 +1,185 @@
+{
+  "kind": "paired-ab",
+  "label": "b131-echoguard",
+  "created": "2026-08-11 21:18:17",
+  "base_ref": "fa12194",
+  "base_sha": "fa12194",
+  "cand_desc": "/Users/vszalvay/Code/locode",
+  "server": {
+    "pid": "69851",
+    "started": "Sat Aug 8 16:18:10 2026",
+    "model": "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit",
+    "argv": "/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model mlx-community/Qwen2.5-Coder-14B-Instruct-4bit --host 127.0.0.1 --port 8081 --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 1610612736"
+  },
+  "pairs": [],
+  "dropped": [
+    {
+      "case": "exec-bugfix",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "why": "ungraded \u2014 cand: infrastructure: infrastructure: All connection attempts failed"
+    }
+  ],
+  "case_table": {},
+  "analysis": {
+    "n_pairs": 0,
+    "n_effective": 0,
+    "n_dropped": 1,
+    "min_pairs": 6,
+    "mean_delta": null,
+    "wins": 0,
+    "losses": 0,
+    "ties": 0,
+    "p": null,
+    "status": "inconclusive",
+    "why": "no pair had a verdict on both arms",
+    "calibrated": false
+  },
+  "runs": [
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 17,
+        "tool_calls": 17,
+        "tool_calls_by_name": {
+          "bash": 6,
+          "read_file": 4,
+          "edit_file": 7
+        },
+        "tool_errors": 6,
+        "tool_error_rate": 0.353,
+        "nudges": 5,
+        "nudges_by_reason": {
+          "same failure": 4,
+          "unchanged": 1
+        },
+        "stop_reason": "edits kept hitting the same error without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 124.9,
+        "model_seconds": 122.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 122.3,
+        "gen_chars": 3347,
+        "gen_chars_per_sec": 27.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 125.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r1__base-2pmullez",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwencoder14",
+      "repeat": 1,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 24,
+        "tool_calls": 22,
+        "tool_calls_by_name": {
+          "bash": 4,
+          "update_plan": 7,
+          "read_file": 2,
+          "edit_file": 9
+        },
+        "tool_errors": 6,
+        "tool_error_rate": 0.273,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "unverified edits": 2,
+          "same failure": 1,
+          "truncated": 1
+        },
+        "stop_reason": "infrastructure: All connection attempts failed",
+        "clean_finish": false,
+        "infra_error": "infrastructure: All connection attempts failed",
+        "wallclock": 144.5,
+        "model_seconds": 142.8,
+        "plan_updates": 7,
+        "truncations": 0,
+        "gen_seconds": 142.7,
+        "gen_chars": 4927,
+        "gen_chars_per_sec": 34.5,
+        "harness_timeout": false
+      },
+      "returncode": 1,
+      "timed_out": false,
+      "seconds": 144.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwencoder14__r1__cand-gj78y7fk",
+      "error": "",
+      "invalid": "infrastructure: infrastructure: All connection attempts failed",
+      "arm": "cand"
+    }
+  ],
+  "summary": {
+    "overall_score": 0.5,
+    "clean_finish_rate": 0.0,
+    "total_nudges": 5,
+    "total_iterations": 17,
+    "nudge_histogram": {
+      "same failure": 4,
+      "unchanged": 1
+    },
+    "n_runs": 2,
+    "n_valid": 1,
+    "invalid_runs": 1,
+    "invalid_rate": 0.5,
+    "invalid_reasons": {
+      "infrastructure": 1
+    },
+    "gen_rate": 31.2,
+    "gen_chars": 8274,
+    "rows": {
+      "exec-bugfix::qwencoder14": {
+        "case": "exec-bugfix",
+        "track": "execute",
+        "model": "qwencoder14",
+        "n": 1,
+        "n_invalid": 1,
+        "invalid_reasons": {
+          "infrastructure": 1
+        },
+        "score_mean": 0.5,
+        "score_min": 0.5,
+        "scores": [
+          0.5
+        ],
+        "iterations_mean": 17,
+        "nudges_mean": 5,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 125.0,
+        "gen_rate_mean": 27.4,
+        "stop_reasons": [
+          "edits kept hitting the same error without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "exec-bugfix": 1.0
+    }
+  },
+  "floor_key": "exec-bugfix|qwencoder14|r16",
+  "is_calibration": false
+}
