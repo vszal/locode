@@ -8038,7 +8038,13 @@ what makes the ≥60% precondition gradable at all; the model never sees it.
 (2) `nudged_repeat_early` deliberately does **not** get added to
 `_forgive_rereads` / `_forgive_nudged_verifies`. Both are scoped to re-readable
 tools and never forgive a mutating edit; the early set contains nothing but
-mutating batches, so the two never intersect.
+mutating batches, so the two never intersect. (3) The trigger is
+`seen_streak == max_repeat_calls - 2` — *one occurrence before the threshold* —
+not a hard-coded 2. Raising `max_repeat_calls` is how the repeat guard gets
+disabled (nine tests set it to 99/999/1000 to isolate other paths), and an
+absolute trigger would have quietly re-armed a nudge inside exactly those
+tests. Under the default of 3 the two readings coincide, which is why the
+simulation still applies.
 
 ## 5.102 — the instruments have tests, and a mutation-testing trap worth a number
 
