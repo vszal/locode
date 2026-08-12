@@ -4089,3 +4089,235 @@ async def test_marker_plus_real_prose_is_still_a_valid_answer(tmp_path):
     loop = make_loop(tmp_path, [{"role": "assistant", "content": reply}])
     out = await loop.run_turn("fix textkit.py")
     assert out == reply
+
+
+# --- run-before-edit advisory (5.112) ----------------------------------------
+# The softer sibling of require_read_before_edit. A read is always possible so
+# that one is a hard reject; a run is not, so this one is an advisory: one shot
+# per turn, it does not suppress the edit, and it accepts "nothing to run here".
+# Off by default — every test below turns it on explicitly.
+
+ADVICE = "before you edit anything else"
+
+
+def _advisory_cfg():
+    cfg = Config()
+    cfg.agent.require_run_before_edit = True
+    # Isolate the lever under test: the read gate would refuse these edits for
+    # a completely unrelated reason and every assertion below would pass for
+    # the wrong cause.
+    cfg.agent.require_read_before_edit = False
+    cfg.permissions.tools["edit_file"] = "auto"
+    cfg.permissions.tools["write_file"] = "auto"
+    return cfg
+
+
+def _advised(loop):
+    return sum(ADVICE in m.get("content", "") for m in loop.history)
+
+
+async def test_editing_before_running_anything_is_advised(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=_advisory_cfg())
+    await loop.run_turn("the totals a.py prints are wrong")
+    assert _advised(loop) == 1
+
+
+async def test_the_advisory_does_not_suppress_the_edit(tmp_path):
+    # The whole difference from require_read_before_edit. The edit lands; the
+    # advice steers the NEXT iteration.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=_advisory_cfg())
+    await loop.run_turn("a.py is broken")
+    assert (tmp_path / "a.py").read_text() == "x = 2\n"
+    assert _advised(loop) == 1
+
+
+async def test_the_advisory_is_off_by_default(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.agent.require_read_before_edit = False
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("the totals a.py prints are wrong")
+    assert _advised(loop) == 0
+
+
+async def test_a_successful_run_first_silences_the_advisory(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="python a.py"),
+         native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        FakeBash("total: 3\n"),
+        cfg=_advisory_cfg())
+    await loop.run_turn("the totals a.py prints are wrong")
+    assert _advised(loop) == 0
+
+
+async def test_a_run_that_is_not_verify_shaped_still_counts(tmp_path):
+    # Deliberately broader than _saw_verify_ok: a script that runs to completion
+    # and prints the wrong numbers exits 0 and is not verify-shaped, yet it is
+    # exactly the reproduction this advisory asks for.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="./tally.sh --report"),
+         native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        FakeBash("Produce   $10.00\n"),
+        cfg=_advisory_cfg())
+    await loop.run_turn("the totals are wrong")
+    assert _advised(loop) == 0
+
+
+async def test_a_failing_run_does_not_count_as_having_run(tmp_path):
+    # A command that could not execute showed the model nothing about the fault.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_call("bash", cmd="python missing.py"),
+         native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        FakeBash("no such file: missing.py", is_error=True),
+        cfg=_advisory_cfg())
+    await loop.run_turn("the totals a.py prints are wrong")
+    assert _advised(loop) == 1
+
+
+async def test_a_run_in_the_same_batch_does_not_silence_its_own_advisory(tmp_path):
+    # The reason the condition is snapshotted before the batch executes. When
+    # the model emits the run and the edit together it has still decided to edit
+    # without having seen any output.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop_with_bash(
+        tmp_path,
+        [native_multi(("bash", {"cmd": "python a.py"}),
+                      ("edit_file", {"path": "./a.py",
+                                     "old": "x = 1", "new": "x = 2"})),
+         {"role": "assistant", "content": "done"}],
+        FakeBash("total: 3\n"),
+        cfg=_advisory_cfg())
+    await loop.run_turn("the totals a.py prints are wrong")
+    assert _advised(loop) == 1
+
+
+async def test_a_request_with_no_symptom_is_not_advised(tmp_path):
+    # Nothing to reproduce: the code does not do this yet, so there is no
+    # output that could point at a defect.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=_advisory_cfg())
+    await loop.run_turn("add a --json flag to a.py")
+    assert _advised(loop) == 0
+
+
+async def test_creating_a_new_file_is_not_a_blind_edit(tmp_path):
+    # Writing a fresh probe script is very often the first half of the
+    # reproduction the advisory wants, not editing in the dark.
+    loop = make_loop(
+        tmp_path,
+        [native_call("write_file", path="./repro.py", content="print(1)\n"),
+         {"role": "assistant", "content": "done"}],
+        cfg=_advisory_cfg())
+    await loop.run_turn("the totals are wrong, reproduce it")
+    assert _advised(loop) == 0
+
+
+async def test_overwriting_an_existing_file_is_a_blind_edit(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop(
+        tmp_path,
+        [native_call("write_file", path="./a.py", content="x = 2\n"),
+         {"role": "assistant", "content": "done"}],
+        cfg=_advisory_cfg())
+    await loop.run_turn("a.py crashes")
+    assert _advised(loop) == 1
+
+
+async def test_the_advisory_fires_at_most_once_per_turn(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         native_call("edit_file", path="./a.py", old="x = 2", new="x = 3"),
+         native_call("edit_file", path="./a.py", old="x = 3", new="x = 4"),
+         {"role": "assistant", "content": "done"}],
+        cfg=_advisory_cfg())
+    await loop.run_turn("a.py gives the wrong answer")
+    assert _advised(loop) == 1
+
+
+async def test_the_advisory_re_arms_on_the_next_turn(tmp_path):
+    # Per-turn, like every other one-shot in the loop: a new request is a new
+    # chance to reproduce before editing.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"},
+         native_call("edit_file", path="./a.py", old="x = 2", new="x = 3"),
+         {"role": "assistant", "content": "done again"}],
+        cfg=_advisory_cfg())
+    await loop.run_turn("a.py gives the wrong answer")
+    await loop.run_turn("still wrong")
+    assert _advised(loop) == 2
+
+
+def test_names_a_symptom_recognises_defect_reports():
+    from locode.agent.loop import _names_a_symptom
+    for text in ("the totals come out wrong",
+                 "fix the bug comparing directories in syncdirs.py",
+                 "it crashes on startup",
+                 "the parser fails on empty input",
+                 "this doesn't handle unicode",
+                 "sync is broken",
+                 "throws an exception when the list is empty",
+                 "the output is incorrect"):
+        assert _names_a_symptom(text), text
+
+
+def test_names_a_symptom_stays_quiet_on_feature_requests():
+    from locode.agent.loop import _names_a_symptom
+    for text in ("add a --json flag to a.py",
+                 "write a short summary of what this module does",
+                 "refactor tally.py to use pathlib",
+                 "implement the glob tool",
+                 "rename compute_totals to compute_category_totals"):
+        assert not _names_a_symptom(text), text
+
+
+def test_mutates_existing_only_counts_content_already_on_disk(tmp_path):
+    from locode.agent.loop import _mutates_existing
+
+    class Call:
+        def __init__(self, name, **args):
+            self.name, self.args = name, args
+
+    (tmp_path / "there.py").write_text("x = 1\n")
+    cwd = str(tmp_path)
+    # edit_file/replace_lines cannot target a missing file, so they always count
+    # and need no stat.
+    assert _mutates_existing(Call("edit_file", path="./there.py"), cwd)
+    assert _mutates_existing(Call("replace_lines", path="./anything.py"), cwd)
+    assert _mutates_existing(Call("write_file", path="./there.py"), cwd)
+    assert not _mutates_existing(Call("write_file", path="./new.py"), cwd)
+    assert not _mutates_existing(Call("append_file", path="./new.py"), cwd)
+    assert not _mutates_existing(Call("bash", cmd="ls"), cwd)
+    assert not _mutates_existing(Call("write_file"), cwd)

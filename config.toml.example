@@ -94,6 +94,16 @@ repeat_resets_on_landed_edit = true
 # iterations guessing before giving up. One read costs one iteration. Set false
 # to restore the pre-build-93 behaviour or to A/B it.
 require_read_before_edit = true
+# The same idea one level up, and much softer: advise the model to RUN the code
+# before editing, when the request named a symptom (wrong, fails, crashes, bug)
+# and nothing has been executed yet this turn. On the live sync-script sweep the
+# model landed an edit in 6 runs of 6 and fixed the bug the user named in 0 of
+# 6 — it was never looking for the defect, because nothing showed it the symptom.
+# An ADVISORY, not a gate, because a read is always possible and a run is not:
+# it fires at most once per turn, does not suppress the edit, and accepts "there
+# is nothing to run here" as an answer.
+# DEFAULT OFF — ships dark. Decision rule pre-registered in ROADMAP 5.112.
+require_run_before_edit = false
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 # Warn one occurrence early on repeated mutating edits (at the 2nd identical
 # call, not the 3rd) without suppressing the call. The late nudge fires a median

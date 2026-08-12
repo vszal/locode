@@ -166,6 +166,26 @@ class AgentConfig:
     # to seven and ended in surrender. Off restores the pre-build-93 behaviour
     # for an A/B.
     require_read_before_edit: bool = True
+    # The same idea one level up, and deliberately much softer: advise the model
+    # to RUN the code before it edits, when the request named a symptom and
+    # nothing has been executed yet this turn. 5.111 relocated the problem it
+    # targets — on the live sync-script sweep the model landed an edit in 6 runs
+    # of 6 and fixed the bug the user actually named in 0 of 6. It was not
+    # failing to find the defect; it was never looking for it, because nothing
+    # ever showed it the symptom.
+    #
+    # Unlike require_read_before_edit this is an ADVISORY, not a gate, and the
+    # asymmetry is the point: a read is always possible, a run is not. Some
+    # tasks have nothing to execute. So it fires at most once per turn, does not
+    # suppress the edit, and says out loud that "there is nothing to run here"
+    # is an acceptable answer.
+    #
+    # DEFAULT OFF: ships dark, turned on only by an A/B arm. The decision rule
+    # is pre-registered in ROADMAP 5.112 and the case it must be measured on is
+    # `bugfix-notest` — NOT plan-hijack, whose prompt names a test file, so the
+    # nudge would almost never fire there and the arms would come out flat for a
+    # reason unrelated to whether the steer works.
+    require_run_before_edit: bool = False
     # [lever 0e] Emit the repeat nudge one occurrence EARLY for batches that
     # are all mutating edits — at the second identical call rather than the
     # third — WITHOUT suppressing the call. The nudge and the repeat-kill are

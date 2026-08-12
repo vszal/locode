@@ -228,6 +228,11 @@ class AgentLoop:
         # green pytest tally, so a "the tests pass" final answer can be gated on
         # the model having actually SEEN green rather than asserting it blind.
         self._saw_green_test = False
+        # Per-turn: has ANY bash call exited cleanly yet? Gates the
+        # run-before-edit advisory, which must not fire once the model has
+        # actually executed something. One shot per turn, tracked alongside.
+        self._ran_bash_ok = False
+        nudged_run_before_edit = False
         # Sibling flag for the non-test verify class (compile/run/import): set
         # True the moment a code-CHECKING bash command (py_compile, python, ruff,
         # ...) exits cleanly, so a "the file compiles / runs fine" final answer
@@ -1116,8 +1121,25 @@ class AgentLoop:
                         if base:
                             unverified_edits[base] = unverified_edits.get(base, 0) + 1
                             edit_tally[base] = edit_tally.get(base, 0) + 1
+                # Run-before-edit advisory (ROADMAP 5.112). DECIDED here, before
+                # the batch runs, and FIRED below, after it: both halves of the
+                # timing matter. Deciding early is required because a batch that
+                # pairs a bash call with an edit would otherwise set the
+                # executed-something flag and silence its own advisory, and
+                # because write_file makes its own target exist. Firing late is
+                # required because this is an advisory, not a gate — it must not
+                # suppress the edit, only steer the next iteration.
+                blind_edit = (self._cfg.agent.require_run_before_edit
+                              and not nudged_run_before_edit
+                              and not self._ran_bash_ok
+                              and any(_mutates_existing(c, self._cwd)
+                                      for c in calls)
+                              and _names_a_symptom(user_text))
                 error_sig, result_sig, no_change, all_errored, all_noinfo = \
                     await self._run_calls(calls)
+                if blind_edit:
+                    nudged_run_before_edit = True
+                    self._nudge_run_before_edit()
                 # Lift a call that changed nothing back out of the history it was
                 # just written into, before the model can read it as an example of
                 # what to emit next. The assistant message is the one appended
@@ -1403,6 +1425,16 @@ class AgentLoop:
                 # that happens to contain "5 passed" can't spoof it. Gates the
                 # unverified-tests finish nudge in run_turn.
                 self._saw_green_test = True
+            if call.name == "bash" and not res.is_error:
+                # Broader than _saw_verify_ok below on purpose: this one answers
+                # "has anything been EXECUTED this turn?", which gates the
+                # run-before-edit advisory. A script that runs to completion and
+                # prints the wrong numbers exits 0 and is not verify-shaped, yet
+                # it is exactly the reproduction that advisory exists to ask for.
+                # The cost is that an `ls` through bash also silences it — a
+                # false negative, which is the direction this codebase errs in
+                # (see _asks_for_a_change).
+                self._ran_bash_ok = True
             if (call.name == "bash" and not res.is_error
                     and _is_verify_bash(call.args.get("cmd", ""))):
                 # A code-CHECKING command (py_compile / python / ruff / ...) ran
@@ -1970,6 +2002,30 @@ class AgentLoop:
         self._on_event({"phase": "nudge",
                         "reason": "compile/run claimed ok but never verified"})
 
+    def _nudge_run_before_edit(self) -> None:
+        """[5.112] One shot per turn, on the first blind edit of a defect report.
+
+        Wording follows the 5.32/5.36 recipe that converted twice: name the call
+        first, forbid answering in prose, demote the reasoning to the tail. The
+        last sentence is what makes this an advisory rather than a gate — a task
+        with nothing runnable must have a way out that is not a stall.
+        """
+        self.history.append({
+            "role": "user",
+            "content": ("Run the code with a bash tool call now, before you "
+                        "edit anything else. Do not describe what you would "
+                        "run — make the call. Nothing has been executed this "
+                        "turn, so no output has shown you the fault the request "
+                        "describes, and the edit you just made is a guess at "
+                        "which line is wrong. Reproduce the symptom first and "
+                        "let the actual output point at the defect. If there is "
+                        "genuinely nothing to run here, say so in one line and "
+                        "carry on."),
+            "kind": "nudge",
+        })
+        self._on_event({"phase": "nudge",
+                        "reason": "edited before running anything"})
+
     def _nudge_zero_change(self) -> None:
         self.history.append({
             "role": "user",
@@ -2072,6 +2128,55 @@ _WRITE_VERB_RE = re.compile(
     r"|updat(?:e|es|ing))\b",
     re.IGNORECASE,
 )
+
+
+# Words that report a SYMPTOM — the request is about something the code already
+# does wrong, as opposed to something it does not do yet. Gates the
+# run-before-edit advisory (ROADMAP 5.112), whose whole premise is that a
+# reproduction exists to be observed: "add a --json flag" has no symptom to
+# reproduce, "the totals come out too low" does.
+#
+# No windowing, unlike _asks_for_a_change. A symptom word anywhere in the
+# request is enough, because this predicate is ANDed with two far stronger
+# conditions (nothing executed yet, and a mutating edit to an existing file) and
+# is not the one carrying the specificity.
+_SYMPTOM_RE = re.compile(
+    r"\b(?:bugs?|buggy|broke(?:n|s)?|breaks?|breaking"
+    r"|fail(?:s|ed|ing|ure|ures)?|crash(?:es|ed|ing)?|errors?|erroring"
+    r"|wrong(?:ly)?|incorrect(?:ly)?|invalid|mistake[ns]?"
+    r"|do(?:es)?n't|do(?:es)? not|isn't|is not|aren't|are not"
+    r"|won't|will not|can't|cannot|never (?:works?|fires?|runs?|returns?)"
+    r"|misbehav\w*|regress(?:es|ed|ion|ions)?|traceback|exception)\b",
+    re.IGNORECASE,
+)
+
+
+def _names_a_symptom(user_text: str) -> bool:
+    """Whether the request describes something the code currently does WRONG."""
+    return bool(_SYMPTOM_RE.search(user_text))
+
+
+def _mutates_existing(call, cwd) -> bool:
+    """Whether a call edits content that was already on disk.
+
+    `edit_file` and `replace_lines` always qualify — they cannot target a file
+    that does not exist. `write_file` and `append_file` only qualify when the
+    path is already there: creating a file from scratch is not editing in the
+    dark, and a brand-new script is very often the first half of exactly the
+    reproduction the advisory is about to ask for. Must be called BEFORE the
+    batch runs, or the write has already made its own target exist.
+    """
+    if call.name in ("edit_file", "replace_lines"):
+        return True
+    if call.name not in ("write_file", "append_file"):
+        return False
+    path = call.args.get("path")
+    if not path:
+        return False
+    try:
+        return os.path.exists(os.path.join(str(cwd), str(path)))
+    except (OSError, ValueError):
+        return False
 
 
 # Verbs that ask for the WORKSPACE to end up different — a superset of
