@@ -7986,4 +7986,50 @@ below 60% the lever did not fire and the sweep grades nothing (rule 17).
 byte-identical so the sweep tests timing alone (rule 28). The wording question
 is now moot anyway — 5.100 retired the "remove the offered exit" amendment.
 
+## 5.102 — the instruments have tests, and a mutation-testing trap worth a number
+
+`evals/ambig_next.py` and `evals/nudge_next.py` retired three levers and
+corrected two headline findings between them, so they now ship with
+`tests/test_eval_instruments.py` — 16 hermetic tests, no network, no reads of
+`evals/results`. Full suite: **1,254 passed**.
+
+The tests were drafted by a Sonnet subagent against a prose spec and verified
+here. Four mutations, all caught:
+
+| mutation | tests that failed |
+|---|---|
+| collapse `HARNESS_STOP` into `MODEL_ENDED` | 2 |
+| narrow the gap to stops immediately after the nudge | 1 |
+| fold `nonedit` into `otheredit` | 4 |
+| drop the `noneext` bucket | 3 |
+
+The first is the important one: it is exactly the §5.100 defect, and it now
+fails a test that says so in its docstring.
+
+### Rule 65
+
+Verifying those mutations cost an hour to a trap worth recording. After
+restoring the module, one test kept failing — and the source file was
+byte-identical to `HEAD`, confirmed by `git diff --quiet`. The same code passed
+under a plain script and failed under pytest.
+
+The cause: the mutation swapped `>=` for `==`, **the same number of bytes**,
+and the restoring `cp` landed in the same mtime second as the mutated version.
+CPython validates cached bytecode on (mtime, size), both of which matched, so
+`evals/__pycache__/nudge_next.cpython-311.pyc` was accepted and **the mutated
+bytecode kept running against a correct source file**. `rm -rf
+evals/__pycache__` fixed it instantly. The script disagreed with pytest only
+because it loaded the module by a different name and missed the cache.
+
+**Rule 65: mutation-testing a grader must clear `__pycache__` between
+mutations.** A same-size edit restored within the same mtime second leaves
+stale bytecode that importlib accepts, so the mutated code keeps running
+against the restored source.
+
+This is rule 51 one layer down — 51 says verify code identity from the runtime
+strings rather than the source file, and here the source file was provably
+correct while the runtime was not. The dangerous version of this failure is not
+the one I hit: it is concluding that a mutation *was not* caught, and weakening
+a grader to "fix" a test that was never broken.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*

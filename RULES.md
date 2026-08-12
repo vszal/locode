@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–64.** All 51 numbers actually in use are below. Thirteen numbers
+**Complete for 1–65.** All 52 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -70,10 +70,11 @@ anchor is authoritative if one ever drifts.
 | 62 | Before attributing any cross-sweep difference, BOTH must hold: (1) diff the two arms' code and state the delta; (2) confirm the same server process ran both. Check (2) with `python evals/metrics.py --servers`. | L7378 · §5.94 |
 | 63 | A "did the model comply" classifier must be derived from what the instruction asked for, not from generic novelty — for any nudge that says "go back and look again", the two are opposites. | L7599 · §5.97 |
 | 64 | The archive spans your own fixes — never rank a lever on a rate pooled across it. Split the rate by sweep and look for the cliff before the number reaches a recommendation. | L7776 · §5.99 |
+| 65 | Mutation-testing a grader must clear `__pycache__` between mutations. A same-size edit restored within the same mtime second leaves stale bytecode that importlib accepts, so the mutated code keeps running against the restored source. | L8024 · §5.102 |
 
 ⚠ = **reconstructed.** The number is cited but never stated outright anywhere in
 `ROADMAP.md`; the wording is inferred from its use sites and is **not** a
-quotation. Rules 3, 7, 8, 9, 12, 14, 20, 24, 31, 37, 51, 52 — twelve of fifty-one.
+quotation. Rules 3, 7, 8, 9, 12, 14, 20, 24, 31, 37, 51, 52 — twelve of fifty-two.
 Do not quote them as canon. Two need care beyond that: rule 31 is cited at L4424
 as "Rule 31, **sharper**", implying an earlier formulation that is not in the
 file; rule 52 is cited "as amended" (L6588) with no pre-amendment text on record.
@@ -100,6 +101,9 @@ L5864). Same rule, refined in place, no amendment.
   that names the server process.
 - **Rules 31 and 38 are near-duplicates** ("grade by what it converts to").
   38 is the quotable one.
+- **Rule 65 is rule 51 one layer down.** 51 says verify code identity from the
+  runtime strings, not the source file. 65 is the same trap in CPython's import
+  cache: the source file can be correct and the running bytecode still not be.
 - **Rule 64 is the one 24/26/35/58/62 do not cover.** They all govern *comparing*
   sweeps; 64 governs *pooling* them, which hides the comparison rather than
   making a bad one. That is how §5.98 got through with no comparison in it.
@@ -115,6 +119,6 @@ L5864). Same rule, refined in place, no amendment.
 
 State it in full at the point of coining, in its own sentence, with the number —
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
-parenthetical is how twelve of the fifty-one entries above ended up reconstructed
+parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **65**.
+graders. Next free number: **66**.
