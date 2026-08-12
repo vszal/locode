@@ -6677,4 +6677,162 @@ the same population until proven otherwise.
 
 Queued behind b130 — one experiment at a time.
 
+## 5.86 — b130 has NO VERDICT; D2 reverted; the A/A noise floor invalidates the gate
+
+Three findings, in ascending order of how much they cost me.
+
+### 1. b130 is unreadable. That is the outcome — not REJECT.
+
+5.81 fixed two rules in advance, and they fired together:
+
+> "Base exec-ambig fully_fixed should land near 17/24; **if it does not, the
+> sweep is unreadable and nothing below grades**."
+> "**exec-ambig fully_fixed < 13/24 → REJECT**, whatever else moves."
+
+Base came in at **8/24**. Cand came in at **12/24**. The precondition failed,
+and it *textually precedes and voids* the REJECT line. `grade130.py` printed
+"=> REJECT. Revert D1." anyway, because I coded the precondition as a `print()`
+and the REJECT as an `if`. That is a grader bug, and it is precisely the failure
+rule 54 exists to prevent: mechanically executing a pre-registered rule whose
+precondition was void. The grader is fixed to `sys.exit` on a failed
+precondition.
+
+**D1 is unjudged.** Not shipped, not rejected. It is not reverted either — it
+goes back under test against a clean baseline (5.87). I am explicitly declining
+to re-grade it on the paired numbers, which are favourable (exec-bugfix 0/24 →
+15/24, p=2.4e-06; sign-flip p=0.0005; not-found 47% → 0%), because 5.81 forbids
+rescuing a voided sweep after the fact. Favourable evidence gets the same
+treatment as unfavourable evidence or the pre-registration is worthless.
+
+### 2. Why the baseline collapsed: D2, shipped without an A/B (lever 0f)
+
+The b130 base is build 129; the b128 base is build 125. The only functional
+difference is D2 plus the echo guard, and the echo guard never fired.
+
+D2 replaced a permissive clause in `replace_lines`' description ("or a snippet
+that isn't unique") with a prohibition ("A snippet that simply appears MORE THAN
+ONCE is NOT a reason to come here — stay in edit_file"). Effect on exec-ambig,
+base arm, 24 runs each:
+
+| | permissive (b128) | prohibition (b130) |
+|---|---|---|
+| `replace_lines` calls | **0** | **121** — most-used tool in the run |
+| runs that touched it | 0/24 | 16/24 |
+
+and within the b130 base arm:
+
+| | n | fully_fixed |
+|---|---|---|
+| stayed in `edit_file` | 8 | **8/8 (100%)** |
+| touched `replace_lines` | 16 | **0/16 (0%)** |
+
+This is not the survivor-marker trap of 5.84 (rule 56): opportunity is uniform —
+every exec-ambig run has duplicate snippets by construction, so all 24 runs had
+the same chance to take the bait. And the first `replace_lines` call followed an
+ambiguity error in **0 of 16** runs, so it is not error-driven fallback. The
+model retrieved the tool from the list because the description now names its
+situation.
+
+> **Lever 0f — a prohibition raises salience for the case it prohibits.** These
+> models match a tool description against the situation, not against the
+> description's polarity. Naming a case in order to forbid it is
+> indistinguishable, in retrieval, from advertising it. The permissive wording
+> that *allowed* this use got 0 uses; the wording that *banned* it got 121.
+> Describe only what a tool IS for. Every "do NOT" in a tool description is now
+> suspect and needs an audit pass.
+
+Reverted in build 131, byte-identical to `fa12194` — deviating would add a
+second unmeasured change.
+
+### 3. The part I cannot explain, stated plainly
+
+exec-bugfix base also collapsed, 8/24 → 0/24, and **22 of those 24 runs never
+touched `replace_lines`**. Lever 0f does not explain it. Candidates: a
+second-order effect of D2 on the tool list as a whole; drift in a model server
+that has been up 3 days across every sweep from b125 to b130; or noise (see
+below). I am not picking one. The 5.87 base arm re-measures the D2-reverted
+state and settles it: if exec-bugfix base returns to ~8/24, D2 did it; if it
+stays near 0, something is drifting and a lot of banked numbers are soft.
+
+### 4. The expensive one: there was a finished A/A on disk the whole time
+
+`evals/results/b121-aa` — **identical code in both arms** — scored exec-ambig
+**base 12/24, cand 6/24**. A 6/24 spread, 25 points, from nothing at all.
+
+`ab.py` has printed "UNCALIBRATED — run an A/A" on every sweep for weeks. I
+treated that as a chore to schedule. The calibration run already existed, I had
+run it myself, and I never read it against the decision rules I was writing.
+
+Consequences, in order:
+
+- **5.81's sanity gate was unsound when written.** "Base should reproduce 17/24"
+  demanded a *cross-sweep, unpaired* reproduction of a per-run metric whose A/A
+  spread is ±6 — the exact comparison `ab.py`'s paired design exists to avoid.
+  It was likely to misfire regardless of D1's merit, and it did.
+- **The REJECT line was never statistically viable.** A threshold at 13/24 on a
+  metric with a ±6 noise floor is a coin flip dressed as a rule.
+- **Per-run `fully_fixed` at r24 is too blunt to be a primary decision
+  variable**, and it has been the primary decision variable since 5.76.
+
+What survives is the per-call mechanism metrics. `old`-not-found rate, first-aim
+depth, and tool choice are measured over 90–276 calls, not 24 runs, and their
+effects have been an order of magnitude larger than their sampling error
+(0→121 calls; 0/134 → 74/119 not-found). Every conclusion drawn from those
+holds. The b126 rejection (5.78) stands on exactly that footing — its per-run
+delta was 17→8, inside the noise band, but its mechanism evidence (aim 16/24 →
+0/24, not-found 0% → 62%) is not.
+
+> **Rule 57 — calibrate before you threshold.** A decision rule on a metric
+> whose A/A spread you have not measured is not pre-registration, it is
+> numerology. Read the noise floor first, then set the line outside it.
+
+> **Rule 58 — never gate on cross-sweep reproduction of a per-run metric.**
+> Sweeps are paired *within* themselves for a reason. A sanity check must be
+> either a within-sweep quantity or a per-call rate with n in the hundreds.
+
+> **Rule 59 — an unread result is worse than no result.** b121-aa cost a full
+> sweep and sat unexamined while five later sweeps were graded against rules it
+> would have invalidated. When a run finishes, read it against the *open*
+> questions, not just the one it was launched for.
+
+### Falls out of this
+- **Audit every prohibition in model-facing tool text** (lever 0f). Queued as
+  D12, ahead of the remaining 5.77 items.
+- **Re-base decision rules on per-call metrics** (rule 57/58). Applied in 5.87.
+- The 5.85 lever-0e work stays queued behind 5.87 — one experiment at a time.
+
+## 5.87 — pre-registration: D1 against a clean baseline
+
+Written and committed BEFORE the sweep runs. Base `b6853bd` (build 131 = echo
+guard + D2 reverted, descriptions byte-identical to the banked-good `fa12194`);
+cand = build 132 = base + D1 only. qwencoder14, exec-ambig + exec-bugfix, r24.
+
+D1 moves `occurrence` from 56% to 25% of `edit_file`'s description and corrects
+a falsehood that has been live since build 123 ("must match once unless
+replace_all is true" — untrue, `occurrence` also resolves it).
+
+**The decision runs on per-call mechanism metrics, not on `fully_fixed`** (rules
+57/58). All are per-call with n in the hundreds:
+
+- **SHIP** if `old`-not-found on exec-ambig is ≤10% in cand, AND cand edits
+  carrying `occurrence` exceed base by ≥15 points, AND `replace_lines` calls
+  stay ≤10 in both arms, AND cand false completions = 0.
+- **REJECT** if cand not-found exceeds base by ≥10 points (the b126 failure
+  mode — obeyed into a worse place, lever 0d), or cand false completions > 0.
+- Otherwise **NO SHIP, stop editing this string.**
+
+`fully_fixed` is **reported, not gated** — its ±6 A/A floor cannot carry a
+threshold at n=24. The paired sign-flip p across both cases is reported as
+supporting evidence only.
+
+**Base-arm sanity is now a within-sweep, per-call check, not a cross-sweep
+score:** base `replace_lines` calls on exec-ambig must be ≤10. If the D2 revert
+worked, that number is ~0 (it was 0 in b128, 121 in b130). If it comes back
+high, the revert did not take and the sweep is void — and that is checkable
+without reference to any earlier sweep's score.
+
+Also recorded, ungated, to settle 5.86 item 3: base exec-bugfix `fully_fixed`.
+~8/24 implicates D2; ~0/24 implicates drift and forces a full recalibration
+before any further wording work.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
