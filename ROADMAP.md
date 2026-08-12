@@ -8865,3 +8865,50 @@ pins the real behaviour), which is why the case was built with tests rather than
 against the live file. Next: run `plan-hijack` as a proper case and find out
 whether "fixes the bug that was named, not the first bug it trips over" moves at
 all under any lever, or whether it is a capability ceiling on a 9B model.
+
+## 5.110 — Premature `[x]`: a hole that is real in the code and absent from the data
+
+Reading the first `plan-hijack` baseline run turned up a plan whose very first
+revision already read `[x] Fix compare_dirs` and `[x] Run tests again` — both
+marked finished before either had happened. The code permits worse than that:
+`Plan.replace` accepts a wholly-`[x]` list, `Plan.complete` goes True on it, and
+`UpdatePlan.run` then answers **"All tasks are done. Give your final answer
+now."** On paper that is a false-completion route straight through the one gate
+whose job is to prevent premature finishing, reachable on a model's first call.
+
+Rule 69 says find the runs that already went through it before crediting it.
+
+**Frequency, across all 1,328 archived runs that made a plan:** 198 (14.9%)
+opened with at least one `[x]`; **25 (1.9%) opened with a plan that was entirely
+`[x]`.** So the hole is not hypothetical — it is taken every fiftieth run.
+
+**And it costs nothing.** All 25 were opened individually:
+
+- 17 are `plan-doc` / `design-doc`, and in every one the model had *already done
+  the work* — 3 tool calls before the plan, 4 total. The all-done plan is a
+  receipt written at the end of the turn, not a claim made at the start.
+- 8 are `exec-bugfix`, where the plan lands after 2 calls and the run then
+  continues for **10 to 14 more**. The "give your final answer now" line did not
+  end a single one of them.
+
+Zero of 25 produced a false completion. The reachable version of the bug — an
+all-done plan on the *first* call of the turn, before any work — does not occur
+in the archive at all.
+
+The partial case is likewise unsupported. Comparing runs whose first plan
+carried an `[x]` against runs whose first plan was all-open, **paired inside each
+(sweep, case, model) cell** so build and case difficulty cannot drive the split:
+clean finish 5/20 vs 10/26, **p=0.3648**. Landing is 20/20 vs 26/26 — a ceiling,
+which per 5.108 is not evidence of anything in either direction. Eight cells
+contained both kinds, so this is underpowered and stays a null, not a finding.
+
+**Decision: do not fix.** Adding a first-revision guard would be a change to the
+plan semantics — the thing every ending metric is measured against — bought with
+no evidence of harm. It is recorded here so the next reader who spots the hole in
+`plan.py` finds the measurement instead of re-deriving the alarm. If a future
+sweep shows a turn ending on an unearned all-done plan, this is the section to
+reopen, and the fix is one condition in `Plan.replace`.
+
+The general form is worth keeping: **a hole in the code and a hole in the
+behaviour are different claims, and the archive can usually settle the second
+for free.** 1,328 runs were already sitting on disk; the check cost one script.
