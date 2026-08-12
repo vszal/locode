@@ -1,4 +1,4 @@
-# locode resume — build 131 (2026-08-11) · NEXT WORK = lever 0g, the ambiguity-message prohibition (5.98, 397 no-op edits sourced); b131-echoguard RUNNING, auto-grades to verdict191.txt; D1 NO SHIP; D2 revert CONFIRMED CAUSAL; read 5.94 not 5.93; SERVER RESTARTED; rule 62 checked by `metrics.py --servers`
+# locode resume — build 131 (2026-08-11) · NEXT WORK = lever 0e TIMING (fire the repeat detector earlier); 0g/0h/0i RETIRED, 5.98 and 5.97 both CORRECTED — read 5.99+5.100 BEFORE 5.96/5.97/5.98; b131-echoguard RUNNING, auto-grades to verdict191.txt; D1 NO SHIP; D2 revert CONFIRMED CAUSAL; read 5.94 not 5.93; rule 62 = `metrics.py --servers`; rule 64 = never pool a rate across the archive
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -944,37 +944,45 @@ completion. **The repeat death is still the dominant ending.**
    its own malformed shape.
 9. 5.19 option 3 (low): name the similarity in a fuzzy success message.
 
-## THE EDIT FINDING (5.96–5.98) — the next code work, all measured, none started
-Four analyses off the archive (752 runs, 13,695 calls), no source touched:
-- **397 no-op edits found and sourced (5.98).** 1,445 edits hit the ambiguous-
-  match error. Its message says "Do NOT rewrite your edit … ADD one field:
-  `occurrence`". 41.7% rewrite anyway — the prohibited thing — and 66% of those
-  send `old`==`new`. That IS the user's "this edit does NOTHING" report.
-  `occurrence` succeeds **349/349** and is used 1,123x overall (67% unprompted),
-  so this is compliance failure, not ignorance.
-- **Lever 0g is the next experiment**: delete "Do NOT rewrite your edit — it is
-  fine as it is." Tests confirmed-causal lever 0f on this message. One clause;
-  primary metric = `occurrence` uptake among the 1,445 (per-call, good power).
-  0h (shorten the match listing) and 0i (deliver as a user-role nudge) behind it.
-  **One at a time (rule 28).** Mechanism for the copying is UNDETERMINED — two
-  discriminating tests already failed, both recorded in 5.98; do not re-run them.
-- **Nudge compliance measured (5.97).** Every nudge naming ONE action is obeyed
-  ~100% (`repeated edit`→read_file 28/28, `stall on a stale reading`→bash 80/80,
-  `unverified edits`→bash-or-read 93%). `repeated call` offers a menu with an
-  exit and 61% of its 383 fires END THE TURN. Wording rule for anything new:
-  one imperative, no menu, no offered exit.
-- **Lever 0e re-diagnosed (5.96).** The repeat guard is not late — it wants a
-  THIRD identical call and the model rarely tries one. 719 same-result duplicate
-  mutating calls across 56% of runs; `repeated edit` (the most-obeyed nudge in
-  the system) reaches only 28 of them. Pre-registered: fire at occurrence 2 for
-  mutating tools, new wording, SHIP needs >7pp AND outside the binomial band.
+## THE EDIT FINDING — 5.98 and 5.97 were BOTH WRONG (corrected in 5.99, 5.100)
+Two headline numbers were pooled across the whole archive, which averages over
+my own shipped fixes. **Rule 64.** Both are withdrawn. Read 5.99 and 5.100
+first; 5.96/5.97/5.98 remain in the file for the reasoning, not the numbers.
+
+- **RETIRED: lever 0g, and 0h/0i with it (5.99).** The "397 no-op edits, only
+  24.2% use `occurrence`" figure spans builds 83–132. `occurrence` landed at
+  build 123 and the message announcing it as the b125 candidate. Uptake is
+  **0.0% in all 40 arms before that message and 72.7–100% in every arm after**;
+  the no-op is the mirror image, gone from every arm since. b132-d1-clean:
+  **244 ambiguity errors → 202 occurrence, 0 no-ops, 0 blind re-edits.** The
+  behaviour 0g meant to unlock occurs 0/244. All three levers rewrite the most
+  effective message this project has shipped — rule 60 says don't.
+  **The user's "new is identical to old" complaint is CLOSED on this path.**
+- **CORRECTED: the repeat nudge is overrun, not obeyed-with-an-exit (5.100).**
+  5.97's "61% of `repeated call` fires end the turn" merged the model stopping
+  with the HARNESS killing the run. Split three ways over 1,556 fires:
+  **55.3% harness stop, 41.0% next tool call, 3.7% the model actually ended.**
+  480 of the stops are the repeat cap itself. Gap from first nudge to stop:
+  **median 1 iteration, 51% get ≤1.** It arrives one iteration before the
+  guillotine. Every OTHER nudge gets a tool call 84–100% of the time — this one
+  is the outlier, and it is a scheduling defect no rewrite reaches.
+- **NEXT WORK = lever 0e, timing only.** Fire the repeat detector earlier
+  (occurrence 2 for mutating tools). 5.85's "late, not wrong" is now confirmed.
+  The "remove the offered exit" wording amendment is RETIRED (targets 3.7%).
+  Keep "one imperative, name a tool" — but on rules 19/9, not on 5.97's table.
+  SHIP needs >7pp AND outside the binomial band. One at a time (rule 28).
+- **Lever 0e's own evidence survived the rule-64 audit**: duplicate-call rate is
+  26–42% in all twelve recent arms with no cliff, 48/48 runs carry one, and b132
+  still nudges only 11 of 96 runs. Current-era, unconfounded.
 - Duplicate-rate A/A floor is MEASURED: +4.0/+1.7/+3.7/0.0/−6.4/+4.3 pp over six
   A/A sweeps, every one inside its binomial band. Per-call behaves; per-run does not.
+- **Do not re-run** the two failed copy-mechanism tests recorded in 5.98.
 
 ## Instruments
-`RULES.md` — the numbered methodology rules, indexed (27 of ~50; the rest are
-listed as unindexed, not absent). Six are marked reconstructed: cited by number
-but never actually stated, so do not quote them as canon. "The run key is
+`RULES.md` — the numbered methodology rules, **now COMPLETE for 1–64**: all 51
+in use, and 13 numbers (1, 4, 5, 6, 10, 11, 18, 32–34, 39, 44, 45) verified
+never coined at all. Twelve are marked reconstructed: cited by number but never
+actually stated, so do not quote them as canon. "The run key is
 `repeat`, not `rep`" is a TYPO, not rule 43 — graders 126-191 all mislabelled it;
 rule 43 is the grader/closed-sweep rule.
 
@@ -984,7 +992,7 @@ backfills history. 49 sweeps backfilled and TRACKED in git, which matters
 because `events/` is gitignored — metrics.json is the ONLY durable record of the
 per-call channel. Schema splits per_run vs per_call and marks each `readable`.
 Write new graders against it instead of re-implementing collect() a fourth time;
-32 hermetic tests in `tests/test_eval_metrics.py`, mutation-checked.
+41 hermetic tests in `tests/test_eval_metrics.py`, mutation-checked.
 `metrics.py --servers` prints every sweep in creation order and draws an
 explicit restart line wherever the server pid/started pair changes — that is
 the rule-62 check, mechanized so it stops depending on memory. Each
@@ -995,6 +1003,13 @@ Sweeps before b119 show `?`: they predate ab.py's fingerprint.
   worktree baseline vs the **LIVE WORKING TREE** candidate. **Source edits are
   forbidden while a sweep runs.** Docs, ROADMAP.md and gitignored files are safe.
 - `evals/armstats.py <label>` — turn ENDINGS per arm. The primary channel.
+- `evals/ambig_next.py <label...>` — buckets every ambiguous-match error by what
+  the model did next (occurrence / no-op / other edit / non-edit / nothing),
+  exhaustively so the columns sum to n. This is what retired lever 0g.
+- `evals/nudge_next.py "<reason prefix>" [label...]` — what follows a nudge,
+  split THREE ways: next tool / HARNESS_STOP / MODEL_ENDED. Never collapse the
+  last two — that merge is exactly what made 5.97 wrong. Also prints the
+  nudge→stop iteration gap.
 - `$CLAUDE_JOB_DIR/tmp/grade101.py <label>` — arm-split mechanism grader:
   repeat rate, repeat depth, stuck→next-action mix, annotation fires.
 - `$CLAUDE_JOB_DIR/tmp/power.py` — the 5.27 census; re-run it after new sweeps.
