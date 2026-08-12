@@ -1,0 +1,1000 @@
+{
+  "schema": 1,
+  "label": "b83-regression",
+  "base_ref": "68bb85a",
+  "generated": "2026-08-11T22:32:41",
+  "total_runs": 48,
+  "invalid_runs": 0,
+  "models": [
+    "gemmacoder12_4bit"
+  ],
+  "cases": {
+    "design-doc": {
+      "base": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 0,
+          "false_completions": 3,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 0,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 0,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "read_file": 3,
+            "write_file": 3
+          }
+        },
+        "iterations": {
+          "median": 3,
+          "total": 9
+        },
+        "nudges": {},
+        "stops": {},
+        "errors_matched": 0
+      },
+      "cand": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 0,
+          "false_completions": 3,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 0,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 0,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "read_file": 3,
+            "write_file": 3
+          }
+        },
+        "iterations": {
+          "median": 3,
+          "total": 9
+        },
+        "nudges": {},
+        "stops": {},
+        "errors_matched": 0
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            0,
+            3
+          ],
+          "cand": [
+            0,
+            3
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            0
+          ],
+          "cand": [
+            0,
+            0
+          ],
+          "base_pct": null,
+          "cand_pct": null,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            0,
+            0
+          ],
+          "cand": [
+            0,
+            0
+          ],
+          "base_pct": null,
+          "cand_pct": null,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            0,
+            0
+          ],
+          "cand": [
+            0,
+            0
+          ],
+          "base_pct": null,
+          "cand_pct": null,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    },
+    "diff-report": {
+      "base": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 3,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 1
+        },
+        "per_call": {
+          "edit_file_calls": 5,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 5,
+          "edits_old_not_found": 1,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "edit_file": 5,
+            "read_file": 3,
+            "replace_lines": 2,
+            "bash": 2
+          }
+        },
+        "iterations": {
+          "median": 6,
+          "total": 17
+        },
+        "nudges": {
+          "repeated edit": 2
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 2
+        },
+        "errors_matched": 1
+      },
+      "cand": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 3,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 2
+        },
+        "per_call": {
+          "edit_file_calls": 4,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 4,
+          "edits_old_not_found": 2,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "edit_file": 4,
+            "read_file": 3,
+            "replace_lines": 3,
+            "bash": 1
+          }
+        },
+        "iterations": {
+          "median": 5,
+          "total": 15
+        },
+        "nudges": {
+          "repeated edit": 1
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 1
+        },
+        "errors_matched": 2
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            3,
+            3
+          ],
+          "cand": [
+            3,
+            3
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            5
+          ],
+          "cand": [
+            0,
+            4
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            1,
+            5
+          ],
+          "cand": [
+            2,
+            4
+          ],
+          "base_pct": 20.0,
+          "cand_pct": 50.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            0,
+            5
+          ],
+          "cand": [
+            0,
+            4
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    },
+    "e2e-spec-to-code": {
+      "base": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 0,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 12,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 12,
+          "edits_old_not_found": 4,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "update_plan": 17,
+            "write_file": 12,
+            "edit_file": 12,
+            "read_file": 3,
+            "bash": 2
+          }
+        },
+        "iterations": {
+          "median": 19,
+          "total": 56
+        },
+        "nudges": {
+          "repetition loop": 5,
+          "edit changed nothing": 2,
+          "repeated call": 2,
+          "unverified edits": 1,
+          "error unchanged across edits": 1,
+          "repeated edit": 1
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 2,
+          "edits kept hitting the same error without making progress": 1
+        },
+        "errors_matched": 4
+      },
+      "cand": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 0,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 2
+        },
+        "per_call": {
+          "edit_file_calls": 9,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 6,
+          "edits_old_not_found": 2,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "update_plan": 15,
+            "write_file": 13,
+            "edit_file": 9,
+            "read_file": 4,
+            "bash": 4,
+            "replace_lines": 4
+          }
+        },
+        "iterations": {
+          "median": 19,
+          "total": 57
+        },
+        "nudges": {
+          "repeated call": 3,
+          "repetition loop": 2,
+          "error unchanged across edits": 2,
+          "unverified edits": 2,
+          "edit changed nothing": 1
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 3
+        },
+        "errors_matched": 2
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            0,
+            3
+          ],
+          "cand": [
+            0,
+            3
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            12
+          ],
+          "cand": [
+            0,
+            9
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            4,
+            12
+          ],
+          "cand": [
+            2,
+            9
+          ],
+          "base_pct": 33.3,
+          "cand_pct": 22.2,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            0,
+            12
+          ],
+          "cand": [
+            0,
+            9
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    },
+    "exec-bugfix": {
+      "base": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 3,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 1
+        },
+        "per_call": {
+          "edit_file_calls": 12,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 12,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "update_plan": 12,
+            "edit_file": 12,
+            "bash": 7,
+            "read_file": 4,
+            "replace_lines": 2
+          }
+        },
+        "iterations": {
+          "median": 13,
+          "total": 42
+        },
+        "nudges": {
+          "unverified edits": 3,
+          "repeated call": 1,
+          "repeated edit": 1
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 2
+        },
+        "errors_matched": 0
+      },
+      "cand": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 3,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 1
+        },
+        "per_call": {
+          "edit_file_calls": 11,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 11,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "update_plan": 12,
+            "edit_file": 11,
+            "bash": 9,
+            "read_file": 4,
+            "replace_lines": 1
+          }
+        },
+        "iterations": {
+          "median": 15,
+          "total": 42
+        },
+        "nudges": {
+          "unverified edits": 3,
+          "repeated call": 2
+        },
+        "stops": {},
+        "errors_matched": 0
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            3,
+            3
+          ],
+          "cand": [
+            3,
+            3
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            12
+          ],
+          "cand": [
+            0,
+            11
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            0,
+            12
+          ],
+          "cand": [
+            0,
+            11
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            0,
+            12
+          ],
+          "cand": [
+            0,
+            11
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    },
+    "exec-from-plan": {
+      "base": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 2,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 1
+        },
+        "per_call": {
+          "edit_file_calls": 15,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 14,
+          "edits_old_not_found": 1,
+          "edits_hit_ambiguity": 1,
+          "tool_calls": {
+            "update_plan": 17,
+            "edit_file": 15,
+            "read_file": 10,
+            "replace_lines": 3,
+            "bash": 2
+          }
+        },
+        "iterations": {
+          "median": 19,
+          "total": 55
+        },
+        "nudges": {
+          "unverified edits": 4,
+          "repetition loop": 2,
+          "open plan tasks": 1,
+          "tests claimed passing but never seen green": 1,
+          "repeated call": 1
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 1
+        },
+        "errors_matched": 2
+      },
+      "cand": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 2,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 1
+        },
+        "per_call": {
+          "edit_file_calls": 26,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 14,
+          "edits_old_not_found": 1,
+          "edits_hit_ambiguity": 4,
+          "tool_calls": {
+            "edit_file": 26,
+            "read_file": 7,
+            "update_plan": 5,
+            "replace_lines": 3,
+            "bash": 3,
+            "append_file": 1
+          }
+        },
+        "iterations": {
+          "median": 16,
+          "total": 53
+        },
+        "nudges": {
+          "repetition loop": 4,
+          "unverified edits": 4,
+          "edit changed nothing": 1,
+          "repeated call": 1
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 1
+        },
+        "errors_matched": 5
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            2,
+            3
+          ],
+          "cand": [
+            2,
+            3
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            15
+          ],
+          "cand": [
+            0,
+            26
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            1,
+            15
+          ],
+          "cand": [
+            1,
+            26
+          ],
+          "base_pct": 6.7,
+          "cand_pct": 3.8,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            1,
+            15
+          ],
+          "cand": [
+            4,
+            26
+          ],
+          "base_pct": 6.7,
+          "cand_pct": 15.4,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    },
+    "exec-stall-trap": {
+      "base": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 1,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 3
+        },
+        "per_call": {
+          "edit_file_calls": 4,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 4,
+          "edits_old_not_found": 2,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "replace_lines": 9,
+            "update_plan": 8,
+            "bash": 7,
+            "read_file": 4,
+            "edit_file": 4
+          }
+        },
+        "iterations": {
+          "median": 12,
+          "total": 39
+        },
+        "nudges": {
+          "repeated edit": 2,
+          "open plan tasks": 1,
+          "every tool call failing": 1,
+          "repeated call": 1,
+          "unverified edits": 1
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 3
+        },
+        "errors_matched": 2
+      },
+      "cand": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 1,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 2
+        },
+        "per_call": {
+          "edit_file_calls": 10,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 10,
+          "edits_old_not_found": 3,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "edit_file": 10,
+            "update_plan": 7,
+            "bash": 6,
+            "read_file": 5,
+            "replace_lines": 5
+          }
+        },
+        "iterations": {
+          "median": 12,
+          "total": 39
+        },
+        "nudges": {
+          "unverified edits": 4,
+          "repeated edit": 2,
+          "open plan tasks": 1
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 2
+        },
+        "errors_matched": 3
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            1,
+            3
+          ],
+          "cand": [
+            1,
+            3
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            4
+          ],
+          "cand": [
+            0,
+            10
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            2,
+            4
+          ],
+          "cand": [
+            3,
+            10
+          ],
+          "base_pct": 50.0,
+          "cand_pct": 30.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            0,
+            4
+          ],
+          "cand": [
+            0,
+            10
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    },
+    "plan-doc": {
+      "base": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 0,
+          "false_completions": 3,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 0,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 0,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "read_file": 6,
+            "write_file": 3
+          }
+        },
+        "iterations": {
+          "median": 4,
+          "total": 12
+        },
+        "nudges": {},
+        "stops": {},
+        "errors_matched": 0
+      },
+      "cand": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 0,
+          "false_completions": 3,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 0,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 0,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "read_file": 6,
+            "write_file": 3
+          }
+        },
+        "iterations": {
+          "median": 4,
+          "total": 12
+        },
+        "nudges": {},
+        "stops": {},
+        "errors_matched": 0
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            0,
+            3
+          ],
+          "cand": [
+            0,
+            3
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            0
+          ],
+          "cand": [
+            0,
+            0
+          ],
+          "base_pct": null,
+          "cand_pct": null,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            0,
+            0
+          ],
+          "cand": [
+            0,
+            0
+          ],
+          "base_pct": null,
+          "cand_pct": null,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            0,
+            0
+          ],
+          "cand": [
+            0,
+            0
+          ],
+          "base_pct": null,
+          "cand_pct": null,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    },
+    "syntax-fix": {
+      "base": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 3,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 3,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 3,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "bash": 9,
+            "read_file": 3,
+            "edit_file": 3
+          }
+        },
+        "iterations": {
+          "median": 7,
+          "total": 21
+        },
+        "nudges": {
+          "repeated call": 3
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 3
+        },
+        "errors_matched": 0
+      },
+      "cand": {
+        "runs": 3,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 3,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 3,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 3,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "bash": 9,
+            "read_file": 3,
+            "edit_file": 3
+          }
+        },
+        "iterations": {
+          "median": 7,
+          "total": 21
+        },
+        "nudges": {
+          "repeated call": 3
+        },
+        "stops": {},
+        "errors_matched": 0
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            3,
+            3
+          ],
+          "cand": [
+            3,
+            3
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            3
+          ],
+          "cand": [
+            0,
+            3
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            0,
+            3
+          ],
+          "cand": [
+            0,
+            3
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            0,
+            3
+          ],
+          "cand": [
+            0,
+            3
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    }
+  },
+  "READ_FIRST": [
+    "per_run metrics compare base vs cand of THIS sweep ONLY. Both eval cases run at 4-8x binomial overdispersion across sweeps (5.92), so a per-run score from another sweep is not a valid comparator.",
+    "per_call metrics (n in the hundreds) are the channel that can actually resolve a wording change (5.86b).",
+    "fisher_p is context only; it assumes independent runs. Do not gate on it."
+  ]
+}

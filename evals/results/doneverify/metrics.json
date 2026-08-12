@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "label": "doneverify",
+  "base_ref": "68bb85a",
+  "generated": "2026-08-11T22:32:42",
+  "total_runs": 20,
+  "invalid_runs": 0,
+  "models": [
+    "gemmacoder12_4bit"
+  ],
+  "cases": {
+    "syntax-fix": {
+      "base": {
+        "runs": 10,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 10,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 10,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 10,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "bash": 30,
+            "read_file": 10,
+            "edit_file": 10
+          }
+        },
+        "iterations": {
+          "median": 7,
+          "total": 70
+        },
+        "nudges": {
+          "repeated call": 10
+        },
+        "stops": {
+          "the model repeated the same tool call without making progres": 10
+        },
+        "errors_matched": 0
+      },
+      "cand": {
+        "runs": 10,
+        "runs_missing_events": 0,
+        "per_run": {
+          "fully_fixed": 10,
+          "false_completions": 0,
+          "runs_touching_replace_lines": 0
+        },
+        "per_call": {
+          "edit_file_calls": 10,
+          "edits_with_occurrence": 0,
+          "edits_with_replace_all": 10,
+          "edits_old_not_found": 0,
+          "edits_hit_ambiguity": 0,
+          "tool_calls": {
+            "bash": 30,
+            "read_file": 10,
+            "edit_file": 10
+          }
+        },
+        "iterations": {
+          "median": 7,
+          "total": 70
+        },
+        "nudges": {
+          "repeated call": 10
+        },
+        "stops": {},
+        "errors_matched": 0
+      },
+      "comparisons": {
+        "fully_fixed": {
+          "base": [
+            10,
+            10
+          ],
+          "cand": [
+            10,
+            10
+          ],
+          "delta_runs": 0,
+          "fisher_p": 1.0,
+          "readable": "WITHIN-SWEEP ONLY \u2014 never compare to another sweep (5.92); A/A floor is +/-6 runs at n=24"
+        },
+        "edits_with_occurrence": {
+          "base": [
+            0,
+            10
+          ],
+          "cand": [
+            0,
+            10
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_old_not_found": {
+          "base": [
+            0,
+            10
+          ],
+          "cand": [
+            0,
+            10
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        },
+        "edits_hit_ambiguity": {
+          "base": [
+            0,
+            10
+          ],
+          "cand": [
+            0,
+            10
+          ],
+          "base_pct": 0.0,
+          "cand_pct": 0.0,
+          "readable": "per-call, n in the hundreds \u2014 the channel that can resolve a wording change (5.86b)"
+        }
+      }
+    }
+  },
+  "READ_FIRST": [
+    "per_run metrics compare base vs cand of THIS sweep ONLY. Both eval cases run at 4-8x binomial overdispersion across sweeps (5.92), so a per-run score from another sweep is not a valid comparator.",
+    "per_call metrics (n in the hundreds) are the channel that can actually resolve a wording change (5.86b).",
+    "fisher_p is context only; it assumes independent runs. Do not gate on it."
+  ]
+}

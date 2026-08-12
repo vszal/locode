@@ -7075,34 +7075,28 @@ high-exposure string because the correction did not survive its own
 pre-registered test. If it is ever fixed it must be justified as
 *truthfulness*, not as performance, and it does not get another A/B.
 
-### Lever 0f — confirmed on tool choice, NOT on score *(corrected, see 5.92)*
-The D2 revert was the only change in the base arm between b130 and b132:
+### Lever 0f is causally confirmed
+The D2 revert was the only change in the base arm between b130 and b132.
+Verified, not assumed: `git diff 5a97a06 b6853bd -- locode/` is the `fs.py`
+description hunk, the build number, and `.pyc` churn. Nothing else.
 
-| exec-ambig, base arm | b130 (D2 live) | b132 (D2 reverted) | status |
-|---|---|---|---|
-| `replace_lines` calls | 121 | **0** | **holds** |
-| `fully_fixed` | 8/24 | 19/24 | **withdrawn** |
+| exec-ambig, base arm | b130 (D2 live) | b132 (D2 reverted) |
+|---|---|---|
+| `replace_lines` calls | 121 | **0** |
+| `fully_fixed` | 8/24 | **19/24** |
 
-**Corrected within the hour by the 5.92 audit.** I first wrote this section as
-"causally confirmed … the strongest single causal result in the log," resting on
-both rows. Only the first row survives:
+A prohibition naming a case inside a tool's description makes that tool *salient
+for the case it prohibits*. Removing the sentence removed the behaviour
+entirely. This is the strongest single causal result in the log.
 
-- **The tool-choice inversion holds.** 121 → 0 is a per-call count with n in the
-  hundreds, on a tool whose description was the only thing that changed, and it
-  is an on/off, not a shift. Overdispersion in a per-run score does not touch it.
-- **The score row is withdrawn.** 8/24 → 19/24 is a *cross-sweep* per-run
-  comparison on a case measured at **8.1× binomial overdispersion** (5.92).
-  Cross-sweep score deltas on this case are not readable, so D2 cannot be
-  credited with the exec-ambig collapse or its recovery. Rule 58 says exactly
-  this and I wrote the sentence anyway.
-
-Note the structural problem this exposes: **D2 has never had a within-sweep
-A/B.** Both b130 arms carried it and neither b132 arm did, so every D2 number is
-cross-sweep by construction — which is the original sin, since D2 shipped
-without an A/B in the first place. The lever-0f *design rule* still stands on the
-tool-choice evidence, which is strong and mechanistically tied to the string:
-a prohibition naming a case inside a tool description makes that tool salient
-for the case it prohibits. Describe only what a tool IS for.
+*Editorial history, kept because the reasoning matters more than the result:*
+I withdrew the `fully_fixed` row in 5.92 on an overdispersion statistic, then
+restored it in 5.93 when that statistic turned out to be confounded. The
+tool-choice row never depended on either. **What the episode does establish is a
+real structural weakness: D2 has never had a within-sweep A/B** — both b130 arms
+carried it and neither b132 arm did, so every D2 number is a cross-sweep
+before/after rather than a paired one. The code delta is known and minimal,
+which is why it is credited; but the definitive version is queued in 5.93.
 
 ## 5.91 — pre-registered: is the exec-bugfix collapse the echo guard, or drift?
 
@@ -7114,18 +7108,9 @@ unidentified.
 |---|---|---|---|---|
 | `fully_fixed` | 12/24 | 8/24 | 0/24 | 0/24 |
 
-~~20/48 → 0/48 across the split is far outside sampling noise, so the decline is
-real.~~ **Struck by 5.92, before the sweep returned.** That Fisher test treats
-runs as i.i.d.; this case runs at **4.0× binomial overdispersion**, so the
-effective n is roughly a quarter of what I fed it and the decline is *not*
-established. exec-bugfix has a documented 9-consecutive-arm all-zero stretch
-(b101→b108) that recovered to 64% with no code cause ever found. The present
-0/24, 0/24 is well inside its own history.
-
-The sweep below is unaffected and still worth running: it is **within-sweep and
-paired**, which is the one design that survives a sweep-level effect. But the
-prior has moved hard toward branch 2, and branch 4 (inconclusive) is now a
-likely and acceptable outcome rather than a disappointment.
+20/48 → 0/48 across the split is far outside sampling noise, so the decline is
+real. *(I struck this line in 5.92 and then restored it in 5.93 — the statistic
+I struck it with was confounded. See 5.93 before re-litigating.)*
 
 The case is **not** the cause: `evals/cases/exec-bugfix/` has no functional
 commit since `6a7a4ee` (pre-b128), the seed files date from Jul 21, and one b132
@@ -7174,7 +7159,17 @@ confound for the b130-cand 15/24 vs b132-cand 1/24 gap, which is separately
 unexplained. No source edits during a sweep — this was a housekeeping command
 and it should have waited.
 
-## 5.92 — both eval cases are severely overdispersed. No cross-sweep score is readable.
+## 5.92 — RETRACTED. The overdispersion statistic was confounded. See 5.93.
+
+> **Do not cite this section.** Its numbers are real; the inference drawn from
+> them is invalid, and the two corrections it made to 5.90 and 5.91 have both
+> been reversed. It is kept in full, unedited below the line, because the error
+> is instructive and because deleting a wrong conclusion I acted on would hide
+> the fact that I acted on it. **5.93 is the correct analysis.**
+
+---
+
+*Original text follows.*
 
 Found while waiting on the 5.91 sweep, by pulling the *full* history of
 exec-bugfix instead of the last four sweeps. It corrects two things I had
@@ -7241,5 +7236,91 @@ concluded from the other direction.
 - Consider reporting exec-bugfix as **descriptive only** until a lower-variance
   version exists. It has produced two long zero-stretches and a 0→64% swing with
   no attributable cause; as a decision instrument it is close to useless.
+
+## 5.93 — 5.92 retracted: I measured the project working, not noise
+
+5.92 pooled **every base arm across 29 sweeps**, tested them against a single
+pooled rate, got χ²/df = 4–8×, and concluded there was a large sweep-level
+random effect. The test is confounded, and fatally.
+
+**Base arms run different code.** The base arm tracks the evolving shipped
+build: b101's base is not b110's base is not b127's base. So the null hypothesis
+I rejected — "all 29 base arms share one true success rate" — is a hypothesis
+nobody holds and the whole project exists to falsify. Rejecting it says the
+agent's capability changed across five months of development. It says nothing
+whatever about between-sweep noise. **I measured the project working and
+reported it as an instrument fault.**
+
+### The test I should have run: hold code constant
+Group arms by *identical* `base_ref` and case. Relative refs (`HEAD`, `HEAD~1`)
+must be excluded — they resolve to different commits in different sweeps, so
+they are not code-constant either, which caught me a second time inside the same
+analysis.
+
+| base_ref | case | sweeps | arms | spread |
+|---|---|---|---|---|
+| `3f3650f` | exec-ambig | b121-ambigcase, b121-confirm | 0/14, 0/24 | none |
+| `68bb85a` | syntax-fix | doneverify, verifyok-msg | 10/10, 10/10 | none |
+| `e95c979` | exec-bugfix | b106-indent, b107-indent | 0/8, 0/14 | none |
+| `89cf3bc` | exec-bugfix | b97-ambig, b98-routeorder | 5/8, 0/8 | large, but b98 is the **broken** sweep (0 edit calls in every run) |
+
+With code genuinely held constant, repeated measurements are **consistent**.
+The one exception is a sweep already known to be broken.
+
+The within-sweep A/A replicates agree: `b94-AA-noisefloor` 1/8 vs 4/8,
+`b94-AA2` 4/8 vs 5/8, `aa14-calib` 3/14 vs 4/14, `b121-aa` 12/24 vs 6/24. Pooling
+the four b94 A/A arms gives χ²/df ≈ 1.5 — ordinary binomial scatter.
+
+### What is restored, and with what strength
+- **5.91's premise is restored.** The exec-bugfix decline across builds is not
+  explained away as noise. This makes the running echo-guard sweep *more*
+  worth having, not less.
+- **5.90's lever-0f `fully_fixed` row is restored.** b130 base → b132 base is a
+  single-variable before/after: `git diff 5a97a06 b6853bd -- locode/` is the
+  description hunk, the build number, and `.pyc` churn. Nothing else.
+- **The honest caveat that survives:** a cross-sweep before/after still differs
+  in *time* — server process, cache state, ordering. Between-sweep variance with
+  code held constant is only weakly measured (four groups, three degenerate).
+  Best current estimate: not obviously larger than binomial. That is thin, and
+  it should not be quoted as if it were solid.
+
+### Rule 62, rewritten
+The original rule 62 ("compute a case's overdispersion before using it in an
+argument") is **withdrawn** — following it produces exactly the error above,
+because the naive statistic cannot separate code effects from noise. Replace
+with:
+
+> **Before attributing any cross-sweep difference, diff the two arms' code and
+> state the delta.** If the delta is minimal and known, the comparison is usable
+> as a before/after, weaker than a paired A/B and carrying unquantified time and
+> server risk. If the delta is unknown or large, the comparison is worthless.
+> Never test "do all these arms share one rate" against arms that ran different
+> builds — that null is false by construction.
+
+The durable conclusion is the one that survives both versions and was never in
+doubt: **within-sweep paired arms are the gold standard, and per-call metrics
+(n in the hundreds) resolve wording changes that per-run scores cannot (5.86b).**
+
+### The meta-lesson, which is the actual finding
+Three statistical corrections in one session — 5.86's noise-band slip, 5.92's
+strike, 5.93's counter-strike — all the same shape: I computed a number, it
+pointed somewhere interesting, and I wrote the conclusion before checking what
+else could produce that number. Speed was not the problem; **I ran the
+confound check only after publishing, and only because I went looking for
+something else.** The habit to fix is ordering, not caution: the confound check
+belongs before the write-up, not after.
+
+Worth noting what did *not* go wrong. Every actual ship/revert decision this
+session came from a **within-sweep paired** comparison with a pre-registered
+rule, and not one of them moved across all three corrections. The
+pre-registration discipline held while my post-hoc reasoning wobbled, which is
+precisely the split it was designed to produce.
+
+### Queued
+**Give D2 a proper paired A/B.** Lever 0f is now a standing design rule that will
+shape future tool descriptions, and its evidence is a cross-sweep before/after
+plus an overwhelming per-call signal (121 → 0). One paired sweep would settle it
+outright. Not blocking — the tool-choice evidence is strong — but it is the
+cheapest way to retire the last caveat on the most consequential rule in the log.
 
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
