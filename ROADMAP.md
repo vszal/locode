@@ -6985,4 +6985,61 @@ Down roughly 30×. This is a cross-sweep comparison, but of the class rule 58
 error. The reported defect is substantially fixed; the `occurrence` work
 (build 125) is where most of it went.
 
+## 5.89 — D6/D7 closed with no change; the weak nudge is `repeated call`
+
+The last open 5.77 items. Both measured before designing anything (rule 61),
+across 240 runs / 931 nudges from b125, b128 and b130.
+
+### The stacking is real; the harm is not
+102 turns emitted ≥2 nudges at once. The dominant pair is genuinely redundant —
+**88×** "error unchanged across edits" + "same failure (3 runs in a row)", which
+say close to the same thing — and **51×** "unverified edits" fired twice in
+consecutive turns.
+
+So I measured whether it costs anything. Efficacy = does the model's next tool
+call differ from the one before the nudge:
+
+| | n | changed behaviour |
+|---|---|---|
+| nudge alone | 593 | **96%** |
+| nudge STACKED | 206 | **93%** |
+
+Difference **−3.3 points against a ±3.7-point band — inside noise.** n≈800, so
+this is not an underpowered null; stacking does not measurably freeze the model.
+
+**D6 and D7 are closed with no change** (rule 60). Redundant text is
+inelegant, but I have no evidence it costs behaviour, and rewriting nudge text
+on aesthetics is what D2 was.
+
+### The finding that matters: one nudge is much weaker than the rest
+
+| nudge reason | n | changed behaviour |
+|---|---|---|
+| unverified edits | 231 | 100% |
+| same failure (2 in a row) | 161 | 100% |
+| error unchanged across edits | 130 | 100% |
+| same failure (3 in a row) | 107 | 100% |
+| stall on a stale reading | 32 | 100% |
+| open plan tasks | 49 | 84% |
+| **repeated call** | **44** | **77%** |
+
+**After being told it repeated a call, the model repeats it again 23% of the
+time** (77% ± 12 at n=44). Every other nudge is saturated at 100%. This is the
+one nudge in the system with a measurable failure rate, and it is precisely the
+nudge lever 0e is about — 5.85 already established it fires nine iterations
+after the first duplicate. So it arrives far too late *and* it is the least
+likely to be obeyed when it does.
+
+That is the target: not the stacking, and not moving the existing text earlier
+(5.85 design constraint 1 already forbade that).
+
+### Honest limit on this metric
+"Next call differs from previous call" is a **saturated** bar — 100% for six of
+seven reasons means it mostly measures "the model is not frozen," not "the nudge
+worked." It cannot discriminate among the good nudges and a larger sweep will
+not help (cf. `syntax-fix`, dropped from rotation for the same reason). It is
+only informative where it *fails*, which is why the `repeated call` row is the
+only row worth acting on. A sharper metric — did the model do what the nudge
+asked — needs a per-reason definition and does not exist yet.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
