@@ -4141,9 +4141,26 @@ async def test_the_advisory_does_not_suppress_the_edit(tmp_path):
     assert _advised(loop) == 1
 
 
-async def test_the_advisory_is_off_by_default(tmp_path):
+async def test_the_advisory_is_on_by_default(tmp_path):
+    """Build 136 flipped this default on — see ROADMAP 5.116."""
     (tmp_path / "a.py").write_text("x = 1\n")
     cfg = Config()
+    assert cfg.agent.require_run_before_edit is True
+    cfg.agent.require_read_before_edit = False
+    cfg.permissions.tools["edit_file"] = "auto"
+    loop = make_loop(
+        tmp_path,
+        [native_call("edit_file", path="./a.py", old="x = 1", new="x = 2"),
+         {"role": "assistant", "content": "done"}],
+        cfg=cfg)
+    await loop.run_turn("the totals a.py prints are wrong")
+    assert _advised(loop) == 1
+
+
+async def test_the_advisory_can_be_turned_off(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    cfg = Config()
+    cfg.agent.require_run_before_edit = False
     cfg.agent.require_read_before_edit = False
     cfg.permissions.tools["edit_file"] = "auto"
     loop = make_loop(

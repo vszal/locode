@@ -1,0 +1,1343 @@
+{
+  "kind": "paired-ab",
+  "label": "b136-runedit",
+  "created": "2026-08-12 10:51:29",
+  "base_ref": "HEAD",
+  "base_sha": "535b094",
+  "cand_desc": "/Users/vszalvay/.claude/jobs/1652a884/tmp/arm_runedit",
+  "server": {
+    "pid": "10672",
+    "started": "Wed Aug 12 06:27:25 2026",
+    "model": "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx",
+    "argv": "/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx --host 127.0.0.1 --port 8081 --chat-template-args {\"enable_thinking\": false} --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 1610612736"
+  },
+  "pairs": [
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 1,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 2,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 3,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 4,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 5,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 6,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 7,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 8,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 9,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 10,
+      "base": 0.286,
+      "cand": 0.143,
+      "delta": -0.143
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 11,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    },
+    {
+      "case": "bugfix-notest",
+      "model": "qythos9",
+      "repeat": 12,
+      "base": 0.286,
+      "cand": 1.0,
+      "delta": 0.714
+    }
+  ],
+  "dropped": [],
+  "case_table": {
+    "bugfix-notest": {
+      "n": 12,
+      "mean_delta": 0.6426,
+      "base": 0.286,
+      "cand": 0.9286
+    }
+  },
+  "analysis": {
+    "n_pairs": 12,
+    "n_effective": 12,
+    "n_dropped": 0,
+    "min_pairs": 6,
+    "mean_delta": 0.6426,
+    "wins": 11,
+    "losses": 1,
+    "ties": 0,
+    "p": 0.001,
+    "status": "inconclusive",
+    "why": "UNCALIBRATED \u2014 no A/A run has measured this setup's noise floor, so nothing here says the delta is bigger than what IDENTICAL code produces. That is not a technicality: the sweep this gate was written for read +0.375 at p=0.031 and an A/A of the same setup returned +0.281. Run `--base HEAD --allow-identical` with the same -c/-m/-r, then re-read this sweep.",
+    "calibrated": false
+  },
+  "runs": [
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.7,
+        "model_seconds": 34.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.7,
+        "gen_chars": 1649,
+        "gen_chars_per_sec": 47.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r1-4ov_w84y",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 49.1,
+        "model_seconds": 49.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 49.0,
+        "gen_chars": 2169,
+        "gen_chars_per_sec": 44.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 49.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r1-318h6to_",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 49.3,
+        "model_seconds": 49.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 49.2,
+        "gen_chars": 2426,
+        "gen_chars_per_sec": 49.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 49.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r2-2ugrbgz1",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.1,
+        "model_seconds": 33.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.0,
+        "gen_chars": 1649,
+        "gen_chars_per_sec": 50.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r2-cjynnf1q",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.1,
+        "model_seconds": 33.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.1,
+        "gen_chars": 1649,
+        "gen_chars_per_sec": 49.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r3-5_i_4k_s",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 46.9,
+        "model_seconds": 46.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 46.8,
+        "gen_chars": 2169,
+        "gen_chars_per_sec": 46.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 47.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r3-llhwh49v",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 48.9,
+        "model_seconds": 48.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 48.8,
+        "gen_chars": 2426,
+        "gen_chars_per_sec": 49.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 49.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r4-xapscs1d",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 4,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.1,
+        "model_seconds": 33.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.0,
+        "gen_chars": 1649,
+        "gen_chars_per_sec": 49.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r4-00vctcav",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 5,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.0,
+        "model_seconds": 33.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 32.9,
+        "gen_chars": 1649,
+        "gen_chars_per_sec": 50.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r5-nsmps6v4",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 46.9,
+        "model_seconds": 46.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 46.8,
+        "gen_chars": 2228,
+        "gen_chars_per_sec": 47.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 47.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r5-twlveupw",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 50.7,
+        "model_seconds": 50.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 50.5,
+        "gen_chars": 2430,
+        "gen_chars_per_sec": 48.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 50.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r6-eggcr80i",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 6,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.0,
+        "model_seconds": 34.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.9,
+        "gen_chars": 1649,
+        "gen_chars_per_sec": 48.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r6-a_tbeihh",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 7,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.2,
+        "model_seconds": 33.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.2,
+        "gen_chars": 1649,
+        "gen_chars_per_sec": 49.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r7-bkvr94wj",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 48.6,
+        "model_seconds": 48.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 48.5,
+        "gen_chars": 2243,
+        "gen_chars_per_sec": 46.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 48.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r7-rmfolonk",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 50.5,
+        "model_seconds": 50.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 50.4,
+        "gen_chars": 2426,
+        "gen_chars_per_sec": 48.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 50.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r8-poe_0kzu",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 8,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.0,
+        "model_seconds": 34.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.9,
+        "gen_chars": 1656,
+        "gen_chars_per_sec": 48.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r8-zw5ioc_v",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 9,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.0,
+        "model_seconds": 34.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.0,
+        "gen_chars": 1649,
+        "gen_chars_per_sec": 48.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r9-w62ipjdw",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 9,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 14,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "read_file": 5,
+          "edit_file": 4,
+          "bash": 4
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.077,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 99.9,
+        "model_seconds": 99.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 99.7,
+        "gen_chars": 5427,
+        "gen_chars_per_sec": 54.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 100.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r9-xt80fc8y",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 10,
+      "score": 0.143,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": false,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 3
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 29.9,
+        "model_seconds": 29.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 29.8,
+        "gen_chars": 949,
+        "gen_chars_per_sec": 31.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 30.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r10-k6_x5s2m",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 10,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.6,
+        "model_seconds": 34.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.6,
+        "gen_chars": 1652,
+        "gen_chars_per_sec": 47.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r10-yjowgjw3",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 11,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.7,
+        "model_seconds": 34.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.6,
+        "gen_chars": 1652,
+        "gen_chars_per_sec": 47.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r11-2mfcowsx",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 11,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 49.5,
+        "model_seconds": 49.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 49.4,
+        "gen_chars": 2432,
+        "gen_chars_per_sec": 49.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 49.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r11-xrs6pe2t",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 12,
+      "score": 1.0,
+      "checks": {
+        "fixed_decoy": true,
+        "runs_clean": true,
+        "fixed_named": true,
+        "grand_total_right": true,
+        "did_not_edit_data": true,
+        "still_reads_csv": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 49.7,
+        "model_seconds": 49.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 49.6,
+        "gen_chars": 2234,
+        "gen_chars_per_sec": 45.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 49.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r12-uuc4gkrr",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "bugfix-notest",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 12,
+      "score": 0.286,
+      "checks": {
+        "fixed_decoy": false,
+        "runs_clean": false,
+        "fixed_named": true,
+        "grand_total_right": false,
+        "did_not_edit_data": true,
+        "still_reads_csv": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.2,
+        "model_seconds": 34.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.1,
+        "gen_chars": 1652,
+        "gen_chars_per_sec": 48.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-bugfix-notest__qythos9__r12-mju2d2b1",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    }
+  ],
+  "summary": {
+    "overall_score": 0.607,
+    "clean_finish_rate": 0.958,
+    "total_nudges": 12,
+    "total_iterations": 137,
+    "nudge_histogram": {
+      "edited before running": 11,
+      "repeated call": 1
+    },
+    "n_runs": 24,
+    "n_valid": 24,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 48.2,
+    "gen_chars": 49363,
+    "rows": {
+      "bugfix-notest::qythos9": {
+        "case": "bugfix-notest",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 24,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.607,
+        "score_min": 0.143,
+        "scores": [
+          0.286,
+          1.0,
+          1.0,
+          0.286,
+          0.286,
+          1.0,
+          1.0,
+          0.286,
+          0.286,
+          1.0,
+          1.0,
+          0.286,
+          0.286,
+          1.0,
+          1.0,
+          0.286,
+          0.286,
+          1.0,
+          0.143,
+          0.286,
+          0.286,
+          1.0,
+          1.0,
+          0.286
+        ],
+        "iterations_mean": 5.7,
+        "nudges_mean": 0.5,
+        "clean_finish_rate": 0.958,
+        "seconds_mean": 42.9,
+        "gen_rate_mean": 48.2,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "bugfix-notest": 1.0
+    }
+  },
+  "floor_key": "bugfix-notest|qythos9|r12",
+  "is_calibration": false
+}

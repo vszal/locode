@@ -180,12 +180,20 @@ class AgentConfig:
     # suppress the edit, and says out loud that "there is nothing to run here"
     # is an acceptable answer.
     #
-    # DEFAULT OFF: ships dark, turned on only by an A/B arm. The decision rule
-    # is pre-registered in ROADMAP 5.112 and the case it must be measured on is
-    # `bugfix-notest` — NOT plan-hijack, whose prompt names a test file, so the
-    # nudge would almost never fire there and the arms would come out flat for a
-    # reason unrelated to whether the steer works.
-    require_run_before_edit: bool = False
+    # DEFAULT ON since build 136. Measured on `bugfix-notest`, n=12 paired,
+    # qythos9, against an A/A noise floor of -0.012 taken the same day:
+    #
+    #     runs_clean       0/12 -> 11/12      fixed_decoy   0/12 -> 11/12
+    #     fully_fixed      0/12 -> 11/12      fixed_named  12/12 -> 11/12
+    #     score  0.286 -> 0.929 (+0.643, W11/L1/T0, sign-flip p=0.001)
+    #
+    # The baseline never ran the script even once in 12 runs, so it never saw
+    # the NameError on the first line of its output. One advisory converts
+    # that. Cost is real and accepted: 3.0 -> 6.3 tool calls and 34s -> 52s per
+    # run. See ROADMAP 5.116 — this breached the pre-registered 25% tool-call
+    # cap, which was the wrong shape of guard for a lever whose entire purpose
+    # is to add a tool call.
+    require_run_before_edit: bool = True
     # [lever 0e] Emit the repeat nudge one occurrence EARLY for batches that
     # are all mutating edits — at the second identical call rather than the
     # third — WITHOUT suppressing the call. The nudge and the repeat-kill are

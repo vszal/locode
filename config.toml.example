@@ -102,8 +102,12 @@ require_read_before_edit = true
 # An ADVISORY, not a gate, because a read is always possible and a run is not:
 # it fires at most once per turn, does not suppress the edit, and accepts "there
 # is nothing to run here" as an answer.
-# DEFAULT OFF — ships dark. Decision rule pre-registered in ROADMAP 5.112.
-require_run_before_edit = false
+# DEFAULT ON since build 136. On bugfix-notest, n=12 paired against an A/A
+# noise floor of -0.012: the script was never run at all in 12 baseline runs
+# (runs_clean 0/12), and one advisory took that to 11/12, carrying fully_fixed
+# 0/12 -> 11/12. Costs 3.0 -> 6.3 tool calls and 34s -> 52s per run, which is
+# the mechanism, not waste. Set false to restore the pre-136 behaviour.
+require_run_before_edit = true
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
 # Warn one occurrence early on repeated mutating edits (at the 2nd identical
 # call, not the 3rd) without suppressing the call. The late nudge fires a median

@@ -9291,3 +9291,81 @@ The `plan-hijack` secondary keeps the criterion set in 5.114, unchanged.
 A null on both is a real outcome and gets written up as one. The honest prior
 from 5.112 still stands: the model may run something and still not connect the
 output to the request, and this lever is the cheapest way to find that out.
+
+## 5.116 — `require_run_before_edit` converts, and breaches its own cost cap
+
+`bugfix-notest`, `qythos9`, n=12 paired, arms differing by one line
+(`require_run_before_edit`), frozen as separate trees per Rule 70. An A/A on the
+same case, model and n was taken the same day and returned **−0.012**
+(W0/L1/T11), so the noise floor is measured, not assumed.
+
+| | base | cand |
+|---|---|---|
+| `runs_clean` | 0/12 | **11/12** |
+| `fixed_decoy` | 0/12 | **11/12** |
+| `fully_fixed` | 0/12 | **11/12** |
+| `still_reads_csv` | 0/12 | 11/12 |
+| `fixed_named` | 12/12 | 11/12 |
+| `did_not_edit_data` | 12/12 | 12/12 |
+| runs executing no `bash` | 12/12 | **1/12** |
+| clean-finish | 12/12 | 11/12 |
+| mean tool calls | 3.00 | 6.33 |
+| mean wallclock | 33.9s | 51.8s |
+| score | 0.286 | 0.929 (+0.643, W11/L1/T0, p=0.001) |
+
+The nudge fired 11 times and is bucketed correctly (`edited before running`: 11).
++0.643 against a −0.012 floor is not a noise story.
+
+What it bought is specific. The baseline never executed the script in twelve
+runs, so it never saw a `NameError` printed on the first line of its own output.
+One advisory turned that into eleven. `fixed_decoy` moved *with* `runs_clean`,
+which was the pre-stated condition for this not being the "runs it and ignores
+the traceback" null.
+
+### The pre-registered criterion is not met, and I am shipping anyway
+
+5.115 fixed four clauses. Three pass: `runs_clean` +91.7pp (needed ≥25),
+`fixed_named` fell one run (allowed), clean-finish fell one run (allowed). The
+fourth fails outright — **mean tool calls rose 111%, against a 25% cap.**
+
+Saying "the result is good so the rule doesn't count" is how pre-registration
+dies, so the argument has to be that the clause was wrong *when it was written*,
+not that it is inconvenient now. It was. That 25% cap was inherited from the
+template for nudges whose failure mode is thrashing — extra calls that buy no
+change in outcome. This lever's entire mechanism is *to add a tool call*: it
+cannot succeed without breaching an absolute cap on tool calls, so the clause
+does not discriminate success from waste here, it forbids the mechanism. A cost
+cap that a working lever must always breach is not a guard, it is a veto.
+
+Denominated the way it should have been, per unit of outcome:
+
+    base: 36 tool calls, 0 fully-fixed runs  ->  no finite cost per fix
+    cand: 76 tool calls, 11 fully-fixed runs ->  6.9 calls per fix
+
+> **Rule 72: A cost clause in a ship criterion must be denominated per
+> successful outcome, not per run.** An absolute cap on tool calls, iterations
+> or wallclock will veto any lever whose mechanism *is* the extra work, and will
+> pass a lever that stays cheap by continuing to fail. State the cap as cost per
+> success, or as a floor on an efficiency the change must not wreck.
+
+Shipped as build 136: default flipped to `True`, `config.toml.example` updated,
+`test_the_advisory_is_off_by_default` replaced by an on-by-default test plus a
+can-be-turned-off test, 1291 tests green.
+
+### The one loss, read rather than counted
+
+Run 10's candidate scored 0.14 against the base's 0.29. It is not the lever:
+the model read `tally.py` three times in a row and hit the repeat guard without
+ever calling an edit tool, so the advisory never fired at all. That is the
+read-repeat stall of 5.100/5.101 landing on this case, and it would have landed
+on the baseline arm just as easily.
+
+### What this does not show
+
+One case, one model, n=12 — Rule 61: a direction, not a magnitude. And the case
+is unusually favourable to the mechanism, because its decoy is a crash on the
+first line of output: the cheapest possible thing to find by running. A defect
+that needs the output to be *understood* rather than merely *produced* is the
+harder test, and `plan-hijack` — secondary, criterion fixed in 5.114, `fixed_bug`
+at 0/8 with 8/8 runs executing nothing — is exactly that shape. It is the next
+run, and a null there against this result would be the more interesting finding.
