@@ -8605,3 +8605,55 @@ output that printed a path. It does not: grepping all 96 event logs of
 `aa16-slot`, `b132-early0e` and `b131-echoguard` for `locode-ab-base` or
 `Code/locode` returns **zero** model-visible events. The cwd was the only open
 channel. That is worth knowing before rebuilding the rig around the wrong one.
+
+## 5.108 — aa17-slotfix: the fix holds, on the rule fixed in advance
+
+`grade_slot.py aa17-slotfix`, gate passed (`is_calibration`, and
+`git diff 56635b7 -- locode/` empty, so the arms were byte-identical):
+
+| metric | aa16-slot (leaky) | aa17-slotfix (blinded) |
+|---|---|---|
+| runs landing ≥1 edit **[pre-registered]** | 12/16 vs 1/16, **p=0.0002** | **5/16 vs 8/16, p=0.4725** |
+| gave up | 3/16 vs 12/16, p=0.0038 | **0/16 vs 0/16, p=1.0** |
+| stopped by a guard | 13/16 vs 4/16, p=0.0038 | **16/16 vs 16/16, p=1.0** |
+
+Gap −18.8pp, inside the ±25pp band. That is **outcome row 1 of 5.107: fix
+validated.** Reading 1 of 5.105 is closed and lever grading resumes.
+
+### Why this is stronger than the p-value
+
+The pre-registered metric alone would be weak evidence — p=0.47 at 16 v 16 is
+mostly a statement about power. Three things make it more than that:
+
+1. **All three biased metrics went flat together**, and the two that were not
+   part of the rule went *perfectly* flat: 0/16 vs 0/16 and 16/16 vs 16/16. A
+   null on one underpowered metric is cheap; three-for-three, two of them exact
+   ties, is not what a residual bias looks like.
+2. **The arms converged rather than merely failing to separate.** 12/1 became
+   5/8 — base fell and cand rose, each toward the middle. Sampling noise that
+   happened to produce a 68.8pp gap once would be expected to give another
+   random draw, not a symmetric collapse toward a common rate.
+3. **The sign flipped.** The residual gap runs *cand*-favouring, the opposite of
+   the leak's direction, which is what a leftover of the same bias would not do.
+
+### What is still not claimed
+
+That the leak *caused* aa16-slot's gap remains the best-supported reading, not a
+demonstrated one — the two sweeps are separated by 40 minutes and one build, and
+rule 69's objection (six earlier A/As ran through the same channel and are flat)
+is not retired by this, only outweighed. The honest statement is: **an effect
+that was reproducibly present is now reproducibly absent, and the only thing
+changed between them was the blinding.** If it recurs on a future A/A, reading 2
+comes back and both arms become worktrees.
+
+Also unchanged: the −18.8pp residual is larger than any earlier A/A's landing
+gap, and this design does not detect 20pp. The floor on this metric at n=16 is
+wide, which is a fact about `exec-bugfix`'s bimodality (5.104) and not about the
+rig. Grade levers on endings, as 5.27 already requires.
+
+### Standing consequence
+
+Every future A/A is now also a **blinding check**, and gets read as one. Rule 68
+made the label a defect; rule 67 already made same-era calibration mandatory.
+Together they mean the rig re-proves itself every time the noise floor is
+measured, which is the only way a defect this old goes undetected for a week.
