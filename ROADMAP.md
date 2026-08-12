@@ -7042,4 +7042,107 @@ only informative where it *fails*, which is why the `repeated call` row is the
 only row worth acting on. A sharper metric — did the model do what the nudge
 asked — needs a per-reason definition and does not exist yet.
 
+## 5.90 — b132 verdict: D1 NO SHIP (pre-registered); lever 0f confirmed causal
+
+Sweep `b132-d1-clean`, base `b6853bd` (build 131, D2 reverted) vs cand build 132
+(D1: the `edit_file` "must match EXACTLY ONCE" rewrite). 96 runs, graded by
+`grade87.py`, which was written and committed **before** the candidate existed.
+
+The gate passed (base `replace_lines` = 0, cand = 9, both ≤ 10), so the decision
+line below it is readable.
+
+| exec-ambig | base (131) | cand (132) |
+|---|---|---|
+| `fully_fixed` *(reported, NOT gated)* | 19/24 (79%) | 22/24 (92%) |
+| edits carrying `occurrence` | 83/146 (57%) | 102/167 (39%) |
+| `` `old` not found `` (lever 0d) | 0/146 (0%) | 6/262 (2%) |
+| false completions | 0 | 0 |
+
+**NO SHIP.** SHIP required `occurrence` uptake at base+15pt; it moved the wrong
+way, 57% → 39%. Not a REJECT: not-found stayed at 2% and false completions at 0,
+so D1 is not *harmful* — it simply does not earn its place. D1 is reverted; the
+working tree is build 131. The patch is kept at `d1_fsonly.patch`.
+
+Per 5.81/5.87: **stop editing this string.** Four consecutive attempts (D1 twice,
+b126, b128) have failed to move `edit_file`'s description in a measurable
+direction, and the per-run channel cannot resolve what is left (5.86b).
+
+### Accepted cost, stated plainly
+Reverting D1 restores a clause that is **false**: the description still says the
+`old` text "must match once … unless `replace_all` is true", and since build 123
+`occurrence` is a second exception. I am leaving a known-untrue sentence in a
+high-exposure string because the correction did not survive its own
+pre-registered test. If it is ever fixed it must be justified as
+*truthfulness*, not as performance, and it does not get another A/B.
+
+### Lever 0f is now causally confirmed
+The D2 revert was the only change in the base arm between b130 and b132:
+
+| exec-ambig, base arm | b130 (D2 live) | b132 (D2 reverted) |
+|---|---|---|
+| `replace_lines` calls | 121 | **0** |
+| `fully_fixed` | 8/24 | **19/24** |
+
+A prohibition naming a case inside a tool's description makes that tool *salient
+for the case it prohibits*. Removing the sentence removed the behaviour
+entirely. This is the strongest single causal result in the log.
+
+## 5.91 — pre-registered: is the exec-bugfix collapse the echo guard, or drift?
+
+**Written before the sweep runs.** 5.86 item 3 fired on the "~0/24" branch:
+exec-bugfix base is 0/24 with D2 reverted, so D2 is excluded and the cause is
+unidentified.
+
+| exec-bugfix, base arm | b127 | b128 | b130 | b132 |
+|---|---|---|---|---|
+| `fully_fixed` | 12/24 | 8/24 | 0/24 | 0/24 |
+
+20/48 → 0/48 across the split is far outside sampling noise, so the decline is
+real. The case is **not** the cause: `evals/cases/exec-bugfix/` has no functional
+commit since `6a7a4ee` (pre-b128), the seed files date from Jul 21, and one b132
+cand run still passed — so the case is unchanged and remains solvable.
+
+### Why this is a clean single-variable test
+`fa12194` (build 125) vs `b6853bd` (build 131) differ by **the build-129 echo
+guard and nothing else**: all 9 tool descriptions are byte-identical under AST
+comparison, and every `fs.py` line change between them is a comment. The guard
+is the only source change spanning the 8/24 → 0/24 split, and it is observed
+firing on this case (2 runs in b132 base).
+
+`fa12194` is also the base arm of b128, where it scored 8/24 — so the base arm
+is simultaneously a **drift probe against its own history**.
+
+Design: `--base fa12194 -c exec-bugfix -r 16`, 32 runs, paired and interleaved
+in one session, which controls for drift within the sweep.
+
+**Power (rule 61, computed first):** if the guard is the cause, the base arm
+should land near its historical 33–50%. 5/16 vs 0/16 gives Fisher p = 0.037;
+6/16 vs 0/16 gives p = 0.017. 4/16 vs 0/16 gives p = 0.10 and does **not**
+clear. The test is adequately powered only for an effect of ≥5 runs, which is
+the effect actually claimed (8/24 → 0/24 ≈ 5/16).
+
+### Decision rule, fixed in advance
+1. Base ≥ 5/16 **and** cand ≤ 1/16 → **the echo guard caused the regression.**
+   Repair or revert it; the 5.82 item-3 interrupt patch does not land until the
+   existing guard is understood.
+2. Both arms ≤ 2/16 → **the code is exonerated; this is environmental drift.**
+   `fa12194` no longer reproduces its own 8/24. Restart the model server
+   (up since Aug 8) and recalibrate every case before any further wording work.
+3. Both arms ≥ 5/16 → the b130/b132 0/24 readings were themselves the anomaly.
+   Recalibrate; do not credit or blame any wording change on exec-bugfix.
+4. Anything else → **inconclusive**, and reported as inconclusive. No verdict
+   gets computed downstream of a branch that did not fire (rule 54).
+
+Recorded ungated for mechanism: echo-guard nudge and stop counts per arm, and
+the `edits kept hitting the same error` stop count (20/24 in b132 base vs 8/24
+in b128 base — the dominant failure, and the thing any explanation must cover).
+
+### Disclosed confound
+I deleted `__pycache__` repo-wide **mid-sweep** during b132 (~run 42, inside
+exec-ambig; all exec-bugfix runs 49–96 ran after). It cannot explain the b130
+exec-bugfix 0/24, which predates it and had no cleanup. It remains a possible
+confound for the b130-cand 15/24 vs b132-cand 1/24 gap, which is separately
+unexplained. No source edits during a sweep — this was a housekeeping command
+and it should have waited.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
