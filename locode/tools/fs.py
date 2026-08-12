@@ -1558,10 +1558,27 @@ class ReplaceLines:
         "Replace a RANGE OF LINES by their line numbers. This is the RIGHT tool "
         "for an indentation or whitespace fix (edit_file preserves the file's "
         "existing indentation and would no-op) and for text edit_file cannot "
-        "match exactly (a malformed line or odd bytes). A snippet that simply "
-        "appears MORE THAN ONCE is NOT a reason to come here — stay in "
-        "edit_file and set `occurrence` to the one you mean. To DELETE code, "
-        "PREFER edit_file with an empty `new` — deleting "
+        # [D2 REVERTED — build 131] Build 128 replaced "or a snippet that isn't
+        # unique" with an explicit prohibition: "A snippet that simply appears
+        # MORE THAN ONCE is NOT a reason to come here — stay in edit_file and
+        # set `occurrence` to the one you mean." It shipped WITHOUT an A/B, and
+        # it inverted tool choice on the exact case it was aimed at.
+        #
+        # exec-ambig, base arm, replace_lines calls: 0 under the permissive text
+        # (b128, 24 runs) -> 121 under the prohibition (b130, 24 runs). 16 of 24
+        # runs took the bait, and every one of them failed: fully_fixed was 8/8
+        # for runs that stayed in edit_file and 0/16 for runs that touched
+        # replace_lines. Opportunity is uniform here — every exec-ambig run has
+        # duplicates by construction — so this is not a survivor marker.
+        #
+        # The prohibition made the tool SALIENT for the case it prohibits: the
+        # model matches on the situation keywords, not on the polarity. The
+        # first replace_lines call followed an ambiguity error in 0 of 16 runs,
+        # so it is not error-driven fallback — it is retrieval from the tool
+        # list. Lever 0f: never name a case in a tool's description in order to
+        # forbid it; describe only what the tool IS for. ROADMAP 5.86.
+        "match exactly (a malformed line, odd bytes, or a snippet that isn't "
+        "unique). To DELETE code, PREFER edit_file with an empty `new` — deleting "
         "by line number is the classic trap: each delete renumbers every line "
         "below it, so removing several blocks by number lands on the wrong lines "
         "and over-deletes or duplicates content. `start` and `end` are 1-based "
