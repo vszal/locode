@@ -43,10 +43,10 @@ def row_revenue(row):
 
 
 def compute_category_totals(rows):
-    """Sum revenue for every row, grouped by category.
+    """Build the per-category figures used by the revenue summary.
 
-    Returns a dict mapping category name to total revenue for that
-    category across all of its rows in the input.
+    The report lists one line per category, in the order `print_report`
+    sorts them, so the mapping returned here is keyed by category name.
     """
     totals = {}
     for row in rows:

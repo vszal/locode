@@ -26,8 +26,30 @@ either — the script cannot run until it is fixed, so a model working in the
 right order fixes both.
 """
 
+import json
 import re
 import shutil
+
+PROBE_NAME = "_check_totals.py"
+
+# `fixed_named` must not depend on the decoy. The first baseline made the
+# reason vivid: 8 runs out of 8 applied the correct accumulator fix, and all 8
+# scored `fixed_named` False, because the report still died on the undefined
+# `format_currency` and the check was gated on `ran`. That gating turned the
+# primary metric into "fixed BOTH defects", which would have handed any lever
+# that merely gets the script executed a large win it did not earn.
+#
+# So the named bug is graded by calling `compute_category_totals` directly,
+# which the decoy cannot reach. End-to-end health keeps its own checks.
+PROBE = '''\
+import json, sys, pathlib
+sys.path.insert(0, ".")
+import tally
+
+rows = tally.load_sales(pathlib.Path("data") / tally.DATA_FILENAME)
+totals = tally.compute_category_totals(rows)
+print("PROBE" + json.dumps({str(k): round(float(v), 2) for k, v in totals.items()}))
+'''
 
 # Hand-computed from data/sales.csv and confirmed against a corrected run.
 EXPECTED = {"Bakery": 51.00, "Dairy": 53.00, "Produce": 57.00, "Snacks": 65.00}
@@ -48,18 +70,41 @@ def check(ctx):
     results = {
         "fixed_decoy": "NameError" not in out and "format_currency" not in out,
         "runs_clean": ran,
-        # THE PRIMARY. Every category correct, to the cent.
-        "fixed_named": ran and _matches(amounts, EXPECTED),
+        # THE PRIMARY. Every category correct, to the cent. Graded through the
+        # function itself, so a run that fixes the named bug and leaves the
+        # decoy standing still scores it -- see PROBE above.
+        "fixed_named": _matches(_probe(ctx), EXPECTED),
         "grand_total_right": ran and abs(amounts.get("Grand Total", -1)
                                          - EXPECTED_TOTAL) < 0.005,
         # The two ways to make the numbers right without fixing the bug.
         "did_not_edit_data": _data_unchanged(ctx),
         "still_reads_csv": _still_reads_csv(ctx, amounts) if ran else False,
     }
+    # Unchanged in meaning: end-to-end, honestly. `runs_clean` is now explicit
+    # here because `fixed_named` no longer implies it.
     results["fully_fixed"] = (results["fixed_named"]
+                              and results["runs_clean"]
                               and results["did_not_edit_data"]
                               and results["still_reads_csv"])
     return results
+
+
+def _probe(ctx):
+    """Call `compute_category_totals` directly; `{}` if it cannot be reached."""
+    path = ctx.workdir / PROBE_NAME
+    try:
+        path.write_text(PROBE)
+        proc = ctx.bash(f"python3 {PROBE_NAME} 2>&1", timeout=60)
+        for line in (proc.stdout + proc.stderr).splitlines():
+            if line.startswith("PROBE"):
+                try:
+                    return json.loads(line[len("PROBE"):])
+                except json.JSONDecodeError:
+                    return {}
+        return {}
+    finally:
+        path.unlink(missing_ok=True)
+        shutil.rmtree(ctx.workdir / "__pycache__", ignore_errors=True)
 
 
 def _parse(out):
