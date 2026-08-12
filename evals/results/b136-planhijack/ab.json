@@ -1,0 +1,359 @@
+{
+  "kind": "paired-ab",
+  "label": "b136-planhijack",
+  "created": "2026-08-12 11:18:10",
+  "base_ref": "HEAD~1",
+  "base_sha": "535b094",
+  "cand_desc": "/Users/vszalvay/Code/locode",
+  "server": {
+    "pid": "10672",
+    "started": "Wed Aug 12 06:27:25 2026",
+    "model": "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx",
+    "argv": "/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx --host 127.0.0.1 --port 8081 --chat-template-args {\"enable_thinking\": false} --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 1610612736"
+  },
+  "pairs": [
+    {
+      "case": "plan-hijack",
+      "model": "qythos9",
+      "repeat": 1,
+      "base": 0.375,
+      "cand": 0.375,
+      "delta": 0.0
+    },
+    {
+      "case": "plan-hijack",
+      "model": "qythos9",
+      "repeat": 2,
+      "base": 0.375,
+      "cand": 0.75,
+      "delta": 0.375
+    }
+  ],
+  "dropped": [
+    {
+      "case": "plan-hijack",
+      "model": "qythos9",
+      "repeat": 3,
+      "why": "incomplete pair: one arm never ran"
+    }
+  ],
+  "case_table": {
+    "plan-hijack": {
+      "n": 2,
+      "mean_delta": 0.1875,
+      "base": 0.375,
+      "cand": 0.5625
+    }
+  },
+  "analysis": {
+    "n_pairs": 2,
+    "n_effective": 1,
+    "n_dropped": 1,
+    "min_pairs": 6,
+    "mean_delta": 0.1875,
+    "wins": 1,
+    "losses": 0,
+    "ties": 1,
+    "p": 1.0,
+    "status": "underpowered",
+    "why": "only 1 informative pair(s) (2 ran, but 1 scored the same on both arms and a tie cannot move a sign-flip test); a sign-flip test needs 6 before any result can reach p<0.05 (its floor is 2/2^n = 1.000). At the observed rate (1/2 informative) this design needs ~12 runs per arm, not 2",
+    "runs_needed": 12,
+    "calibrated": false
+  },
+  "runs": [
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.375,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": true,
+        "no_plan_needed": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 3,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 48.3,
+        "model_seconds": 48.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 48.2,
+        "gen_chars": 1561,
+        "gen_chars_per_sec": 32.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 48.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r1-9in6kky8",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.375,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": true,
+        "no_plan_needed": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 3
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.5,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "repetition loop": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 171.9,
+        "model_seconds": 171.3,
+        "plan_updates": 0,
+        "truncations": 1,
+        "gen_seconds": 171.3,
+        "gen_chars": 9455,
+        "gen_chars_per_sec": 55.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 172.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r1-p3a_u6ui",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 0.75,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": true,
+        "detects_new": true,
+        "detects_modified": true,
+        "no_false_deletions": true,
+        "did_not_hijack": false,
+        "no_plan_needed": false,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 23,
+        "tool_calls": 21,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "update_plan": 7,
+          "edit_file": 2,
+          "bash": 8
+        },
+        "tool_errors": 5,
+        "tool_error_rate": 0.238,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 207.4,
+        "model_seconds": 206.2,
+        "plan_updates": 7,
+        "truncations": 0,
+        "gen_seconds": 206.1,
+        "gen_chars": 12798,
+        "gen_chars_per_sec": 62.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 207.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r2-75vsji17",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 0.375,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": true,
+        "no_plan_needed": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 3,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 32.6,
+        "model_seconds": 32.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 32.6,
+        "gen_chars": 1537,
+        "gen_chars_per_sec": 47.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 32.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r2-knwf82fn",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 0.375,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": true,
+        "no_plan_needed": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 3,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.5,
+        "model_seconds": 34.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.4,
+        "gen_chars": 1679,
+        "gen_chars_per_sec": 48.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r3-r5o57i_c",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    }
+  ],
+  "summary": {
+    "overall_score": 0.45,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 5,
+    "total_iterations": 40,
+    "nudge_histogram": {
+      "edited before running": 2,
+      "repetition loop": 1,
+      "slow progress": 1,
+      "open plan tasks": 1
+    },
+    "n_runs": 5,
+    "n_valid": 5,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 54.9,
+    "gen_chars": 27030,
+    "rows": {
+      "plan-hijack::qythos9": {
+        "case": "plan-hijack",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 5,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.45,
+        "score_min": 0.375,
+        "scores": [
+          0.375,
+          0.375,
+          0.75,
+          0.375,
+          0.375
+        ],
+        "iterations_mean": 8,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 99.1,
+        "gen_rate_mean": 54.9,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "plan-hijack": 1.0
+    }
+  },
+  "floor_key": "plan-hijack|qythos9|r12",
+  "is_calibration": false
+}

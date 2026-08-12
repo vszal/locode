@@ -1,0 +1,1319 @@
+{
+  "kind": "paired-ab",
+  "label": "b136-reproonly",
+  "created": "2026-08-12 11:37:34",
+  "base_ref": "535b094",
+  "base_sha": "535b094",
+  "cand_desc": "/Users/vszalvay/Code/locode",
+  "server": {
+    "pid": "10672",
+    "started": "Wed Aug 12 06:27:25 2026",
+    "model": "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx",
+    "argv": "/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx --host 127.0.0.1 --port 8081 --chat-template-args {\"enable_thinking\": false} --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 1610612736"
+  },
+  "pairs": [
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 1,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 2,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 3,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 4,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 5,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 6,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 7,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 8,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 9,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 10,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 11,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    },
+    {
+      "case": "repro-only",
+      "model": "qythos9",
+      "repeat": 12,
+      "base": 1.0,
+      "cand": 1.0,
+      "delta": 0.0
+    }
+  ],
+  "dropped": [],
+  "case_table": {
+    "repro-only": {
+      "n": 12,
+      "mean_delta": 0.0,
+      "base": 1.0,
+      "cand": 1.0
+    }
+  },
+  "analysis": {
+    "n_pairs": 12,
+    "n_effective": 0,
+    "n_dropped": 0,
+    "min_pairs": 6,
+    "mean_delta": 0.0,
+    "wins": 0,
+    "losses": 0,
+    "ties": 12,
+    "p": 1.0,
+    "status": "underpowered",
+    "why": "only 0 informative pair(s) (12 ran, but 12 scored the same on both arms and a tie cannot move a sign-flip test); a sign-flip test needs 6 before any result can reach p<0.05 (its floor is 2/2^n = 2.000). Every pair tied: this case may be SATURATED and carry no signal at any sample size \u2014 check whether both arms are scoring at the ceiling",
+    "runs_needed": null,
+    "calibrated": false
+  },
+  "runs": [
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 27.6,
+        "model_seconds": 27.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.5,
+        "gen_chars": 1276,
+        "gen_chars_per_sec": 46.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 27.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r1-wc3obwx5",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.9,
+        "model_seconds": 34.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.8,
+        "gen_chars": 1635,
+        "gen_chars_per_sec": 46.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r1-6z0l0iil",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 35.5,
+        "model_seconds": 35.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 35.4,
+        "gen_chars": 1635,
+        "gen_chars_per_sec": 46.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r2-5cwbo87p",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 28.2,
+        "model_seconds": 28.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 28.1,
+        "gen_chars": 1296,
+        "gen_chars_per_sec": 46.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 28.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r2-ivuio3k1",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 28.0,
+        "model_seconds": 28.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.9,
+        "gen_chars": 1276,
+        "gen_chars_per_sec": 45.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 28.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r3-lbntkpg8",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 35.2,
+        "model_seconds": 35.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 35.1,
+        "gen_chars": 1635,
+        "gen_chars_per_sec": 46.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r3-hzfyz721",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 35.9,
+        "model_seconds": 35.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 35.8,
+        "gen_chars": 1635,
+        "gen_chars_per_sec": 45.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 36.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r4-8qd07m1m",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 28.1,
+        "model_seconds": 28.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 28.1,
+        "gen_chars": 1276,
+        "gen_chars_per_sec": 45.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 28.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r4-sjyytma1",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 27.7,
+        "model_seconds": 27.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.7,
+        "gen_chars": 1276,
+        "gen_chars_per_sec": 46.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 27.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r5-mb1nsn48",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.4,
+        "model_seconds": 33.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.3,
+        "gen_chars": 1530,
+        "gen_chars_per_sec": 46.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r5-ia2nqpqp",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.3,
+        "model_seconds": 33.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.2,
+        "gen_chars": 1644,
+        "gen_chars_per_sec": 49.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r6-mvli7ze0",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 27.5,
+        "model_seconds": 27.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.4,
+        "gen_chars": 1276,
+        "gen_chars_per_sec": 46.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 27.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r6-wsij1jfe",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 27.9,
+        "model_seconds": 27.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.9,
+        "gen_chars": 1276,
+        "gen_chars_per_sec": 45.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 28.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r7-wq9m2bhe",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 35.2,
+        "model_seconds": 35.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 35.1,
+        "gen_chars": 1635,
+        "gen_chars_per_sec": 46.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r7-3m9u57sv",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.1,
+        "model_seconds": 34.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.0,
+        "gen_chars": 1590,
+        "gen_chars_per_sec": 46.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r8-i7fd_mga",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 27.8,
+        "model_seconds": 27.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.7,
+        "gen_chars": 1276,
+        "gen_chars_per_sec": 46.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 27.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r8-o46e1fgq",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 9,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 28.0,
+        "model_seconds": 28.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.9,
+        "gen_chars": 1276,
+        "gen_chars_per_sec": 45.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 28.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r9-hz2lw52a",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 9,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 35.0,
+        "model_seconds": 35.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.9,
+        "gen_chars": 1635,
+        "gen_chars_per_sec": 46.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r9-d70nln62",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 10,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.4,
+        "model_seconds": 33.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.3,
+        "gen_chars": 1636,
+        "gen_chars_per_sec": 49.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r10-pavibbu8",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 10,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 27.3,
+        "model_seconds": 27.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.2,
+        "gen_chars": 1299,
+        "gen_chars_per_sec": 47.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 27.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r10-8cabwdj_",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 11,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 27.4,
+        "model_seconds": 27.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.4,
+        "gen_chars": 1279,
+        "gen_chars_per_sec": 46.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 27.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r11-f_sz4my6",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 11,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 35.6,
+        "model_seconds": 35.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 35.5,
+        "gen_chars": 1639,
+        "gen_chars_per_sec": 46.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 35.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r11-83e6pvl4",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 12,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.7,
+        "model_seconds": 33.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 33.6,
+        "gen_chars": 1524,
+        "gen_chars_per_sec": 45.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r12-n9bxcy4x",
+      "error": "",
+      "invalid": "",
+      "arm": "cand"
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 12,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 27.7,
+        "model_seconds": 27.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 27.6,
+        "gen_chars": 1279,
+        "gen_chars_per_sec": 46.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 27.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qythos9__r12-wfb3pe0c",
+      "error": "",
+      "invalid": "",
+      "arm": "base"
+    }
+  ],
+  "summary": {
+    "overall_score": 1.0,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 12,
+    "total_iterations": 108,
+    "nudge_histogram": {
+      "edited before running": 12
+    },
+    "n_runs": 24,
+    "n_valid": 24,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 46.5,
+    "gen_chars": 34734,
+    "rows": {
+      "repro-only::qythos9": {
+        "case": "repro-only",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 24,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "iterations_mean": 4.5,
+        "nudges_mean": 0.5,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 31.3,
+        "gen_rate_mean": 46.5,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "repro-only": 1.0
+    }
+  },
+  "floor_key": "repro-only|qythos9|r12",
+  "is_calibration": false
+}

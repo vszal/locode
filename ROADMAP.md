@@ -9424,3 +9424,58 @@ needs a case built for reproduction, with all three properties at once:
 Property 2 is the hard one and is why both existing cases failed as vehicles.
 Until it exists, build 136 rests on one case, one model, n=12 — which is what
 5.116 says, and Rule 61 still governs it.
+
+## 5.118 — `repro-only` saturates, and the null is a no-harm result
+
+Built to 5.117's three properties, run as a paired A/B on the lever, n=12:
+
+    base 1.000   cand 1.000   delta +0.000   W0/L0/T12, 0 informative pairs
+    base: ran nothing 12/12, 3.00 tool calls
+    cand: ran something 12/12, 4.00 tool calls
+
+Property 2 — *invisible by reading* — is not met. The baseline fixed the
+ranking in **12 runs out of 12 without executing anything at all**. Reading
+`sorted(rows, key=lambda row: row["amount"])` and knowing the row came from a
+`csv.DictReader` is, for this model, enough. I judged that key "subtle" from the
+source and the model disagreed twelve times out of twelve.
+
+That is the third case in a row to fail as a vehicle for this lever, and the
+pattern across all three is now clear enough to state as design guidance rather
+than as another attempt:
+
+| case | why it cannot test the lever |
+|---|---|
+| `bugfix-notest` (named bug) | found by reading, 7/8 |
+| `plan-hijack` | the script cannot be run at all |
+| `repro-only` | found by reading, 12/12 |
+
+**qythos9 reads code well. What it does not do is run it.** So a defect that a
+*careful reader* could catch is not a test of reproduction, no matter how subtle
+it looks to the person writing the seed — and my estimate of "subtle" has now
+been wrong twice in the same direction. A defect that reading genuinely cannot
+reveal has to depend on **runtime state the source does not contain**: the
+actual bytes in the data file (a BOM, a stray space, a duplicate key), an
+environment or library difference, an ordering that only appears at scale. The
+code looks correct because it *is* correct, given assumptions the data breaks.
+`bugfix-notest`'s decoy has exactly this shape by accident — an undefined name is
+invisible until the interpreter reaches that line — which is why it is the only
+place the lever has shown an effect.
+
+### The null is still worth having
+
+The main risk in flipping a default on for every user is that it costs
+something on the many turns where it was not needed. Here the model was already
+going to fix the bug, the advisory fired anyway, and:
+
+    score        1.000 -> 1.000   (no regression, 12/12 both arms)
+    tool calls    3.00 -> 4.00    (+1 call: the run it was told to make)
+    wallclock      28s -> 35s
+
+So the lever's cost on a case it cannot help is one tool call and seven seconds,
+with no correctness or clean-finish penalty in 12 runs. That is the cheapest
+form this steer could take, and it is the evidence I did not have when 5.116
+accepted the 111% tool-call rise on `bugfix-notest`. Build 136 stands.
+
+Compliance is also worth recording: the advisory fired and the model ran
+something in **12 of 12** candidate runs. Whatever else is uncertain, the steer
+itself is not being ignored.
