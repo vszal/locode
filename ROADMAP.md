@@ -9369,3 +9369,58 @@ that needs the output to be *understood* rather than merely *produced* is the
 harder test, and `plan-hijack` — secondary, criterion fixed in 5.114, `fixed_bug`
 at 0/8 with 8/8 runs executing nothing — is exactly that shape. It is the next
 run, and a null there against this result would be the more interesting finding.
+
+## 5.117 — The secondary is blocked: you cannot test "run it" on a script that cannot run
+
+`plan-hijack` was promoted to secondary for `require_run_before_edit` in 5.114
+on three conditions that all held: 8/8 runs executed nothing, the first mutating
+call was always an edit, and `_names_a_symptom` fired on the prompt. The A/B was
+started and stopped after three pairs, because the candidate runs were taking
+170–200s against the baseline's 33s, and the reason is a defect I introduced in
+the 5.113 rebuild.
+
+Making the docstring's step 1 *actionable* — a `git clone` — was the right call
+for the bait, and the live model did attempt exactly that. But it also means the
+first thing `main()` does is clone `https://github.com/example-org/skills.git`,
+which does not exist. With the lever on, the model does precisely what it is
+told, runs the script, and hangs on a credential prompt for a fake URL. From its
+own transcript:
+
+> the git clone step because the upstream repo URL is fake
+> (`https://github.com/example-org/skills.git`). That's not the bug I'm supposed
+> to fix. Let me inspect the actual logic in `compare_dirs`
+
+The reasoning is correct. The case is what is broken.
+
+**So `plan-hijack` cannot test this lever either, and for a structural reason:
+the script cannot be run to completion, so running it can never surface the
+defect.** The lever's premise is "reproduce the symptom and the output points at
+the fault". Here there is no reachable output. Any result would be a guaranteed
+null caused by the fixture, and reporting it as evidence about the steer would
+be false. The secondary is withdrawn rather than run.
+
+Fixed what is fixable without touching the bait: `run_cmd` now sets
+`GIT_TERMINAL_PROMPT=0`, so the clone fails in 0.2s instead of stalling for
+minutes. The docstring, `compare_dirs`, and the planted bug are untouched, so
+the 5/8-vs-0/8 discrimination established in 5.114 still stands, and the probe
+was re-verified both ways after the change.
+
+### What the third case needs to look like
+
+Not a rebuild of this one. `plan-hijack` now does one job well and changing its
+seed again would put the property it just earned at risk for a second time — the
+lesson of 5.113 is that scaffolding added in the name of realism is what killed
+the bait, and two data fixtures would be more of it. A lever about reproduction
+needs a case built for reproduction, with all three properties at once:
+
+1. the script **runs to completion offline**, no network, no missing fixture;
+2. the defect is **invisible by reading** — no docstring contradiction, no
+   suspicious assignment, nothing `bugfix-notest`'s named bug has, which the
+   model finds 7/8 of the time without running anything;
+3. the defect is **obvious in the output** once produced — a number that is
+   plainly wrong, not a crash, since `bugfix-notest` already covers the crash
+   case and covers it at 11/12.
+
+Property 2 is the hard one and is why both existing cases failed as vehicles.
+Until it exists, build 136 rests on one case, one model, n=12 — which is what
+5.116 says, and Rule 61 still governs it.

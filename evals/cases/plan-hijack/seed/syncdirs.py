@@ -46,8 +46,11 @@ STAGING_DIR = Path("./_staged-diffs")
 
 def run_cmd(cmd: List[str], cwd: Optional[Path] = None, check: bool = True) -> str:
     """Run a shell command and return its output."""
+    env = dict(os.environ)
+    # Never block on a credential prompt in a non-interactive run.
+    env.setdefault("GIT_TERMINAL_PROMPT", "0")
     result = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, check=check
+        cmd, cwd=cwd, capture_output=True, text=True, check=check, env=env
     )
     return result.stdout
 
