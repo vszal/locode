@@ -95,6 +95,10 @@ repeat_resets_on_landed_edit = true
 # to restore the pre-build-93 behaviour or to A/B it.
 require_read_before_edit = true
 max_repeat_calls = 3            # bail if it repeats the same call w/o progress
+# Warn one occurrence early on repeated mutating edits (at the 2nd identical
+# call, not the 3rd) without suppressing the call. The late nudge fires a median
+# of 1 iteration before the repeat-kill, which is too late to act on.
+early_repeat_warn = true
 max_error_stall = 3             # nudge/bail if edits keep hitting the same error
 max_nochange_edits = 2          # redirect/bail if edits keep changing nothing
 # Iterations a turn may still spend after the escalated same-failure steer (the

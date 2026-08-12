@@ -166,6 +166,18 @@ class AgentConfig:
     # to seven and ended in surrender. Off restores the pre-build-93 behaviour
     # for an A/B.
     require_read_before_edit: bool = True
+    # [lever 0e] Emit the repeat nudge one occurrence EARLY for batches that
+    # are all mutating edits — at the second identical call rather than the
+    # third — WITHOUT suppressing the call. The nudge and the repeat-kill are
+    # one attempt apart by construction: the nudge `continue`s, so the streak
+    # never advances and the next appearance of that signature falls straight
+    # through to the stop. Measured runway is a median of 1 iteration, 51% get
+    # one or less (ROADMAP 5.100/5.101), which no wording can survive. Warning
+    # early lands ~5 iterations sooner in 40% more runs. It deliberately does
+    # NOT block: the second identical mutating call reports SUCCESS 60% of the
+    # time, so suppressing here would bundle an unbounded behaviour change into
+    # a timing fix. Off restores the pre-build-133 schedule for an A/B.
+    early_repeat_warn: bool = True
     max_repeat_calls: int = 3        # bail if it repeats the same call w/o progress
     max_error_stall: int = 3         # nudge/bail if edits keep hitting the same error
     max_nochange_edits: int = 2      # redirect/bail if edits keep changing nothing

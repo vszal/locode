@@ -217,6 +217,7 @@ class AgentLoop:
         repetition_aborts = 0
         self._denials = 0
         nudged_repeat: set = set()
+        nudged_repeat_early: set = set()  # [lever 0e] one-shot early warn
         nudged_stall: set = set()
         seen_prose: list = []
         nudged_slow = False
@@ -994,6 +995,32 @@ class AgentLoop:
                                 "(model re-stated its finished plan)",
                         "plan": self.plan.summary()})
                     return "All planned tasks are complete.\n\n" + self.plan.render()
+                # [lever 0e] Warn a full occurrence before the threshold
+                # below, for mutating edits only, and DO NOT suppress the call.
+                # The threshold block owns suppression and the stop; they are
+                # one attempt apart, so by the time it speaks the run is
+                # already ending. `_nudge_repeat_edit` is the message the late
+                # block routes to for this exact population and the most
+                # obeyed steer in the system — same text, just early enough to
+                # act on. One shot per signature.
+                # Expressed as "one occurrence before the threshold", not a
+                # hard-coded 2: raising max_repeat_calls is how the repeat
+                # guard gets disabled (several tests set it to 999), and an
+                # absolute trigger would quietly re-arm a nudge there. The
+                # `>= 1` floor keeps it off the very first call if someone
+                # sets max_repeat_calls to 2.
+                if (self._cfg.agent.early_repeat_warn
+                        and seen_streak >= 1
+                        and seen_streak == self._cfg.agent.max_repeat_calls - 2
+                        and batch_sig not in nudged_repeat_early
+                        and batch_sig not in nudged_repeat
+                        and all(c.name in _MUTATING_EDIT_TOOLS for c in calls)):
+                    nudged_repeat_early.add(batch_sig)
+                    self._nudge_repeat_edit(
+                        calls,
+                        _ledger_line(edit_tally, read_tally, run_count,
+                                     self._saw_green_test),
+                        early=True)
                 if seen_streak >= self._cfg.agent.max_repeat_calls - 1:
                     if batch_sig not in nudged_repeat:
                         nudged_repeat.add(batch_sig)
@@ -1656,7 +1683,8 @@ class AgentLoop:
         })
         self._on_event({"phase": "nudge", "reason": "repeated call"})
 
-    def _nudge_repeat_edit(self, calls, ledger: str = "") -> None:
+    def _nudge_repeat_edit(self, calls, ledger: str = "",
+                           early: bool = False) -> None:
         names = ", ".join(dict.fromkeys(c.name for c in calls))
         self.history.append({
             "role": "user",
@@ -1673,7 +1701,15 @@ class AgentLoop:
                         "final answer in plain text now — do not repeat the edit."),
             "kind": "nudge",
         })
-        self._on_event({"phase": "nudge", "reason": "repeated edit"})
+        ev = {"phase": "nudge", "reason": "repeated edit"}
+        if early:
+            # [lever 0e] The reason string stays byte-identical so every
+            # existing bucket (harness._NUDGE_BUCKETS matches by substring),
+            # test and archive query keeps working; the flag is what lets the
+            # sweep tell the occurrence-2 warning from the occurrence-3 one.
+            # The model never sees this — it goes to the event log only.
+            ev["early"] = True
+        self._on_event(ev)
 
     def _nudge_verify(self, filename: str, count: int, ledger: str = "") -> None:
         self.history.append({

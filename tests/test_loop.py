@@ -614,6 +614,128 @@ async def test_repeated_call_nudged_before_bailing(tmp_path):
     assert len(nudges) == 1
 
 
+# --- lever 0e v2: the early warning on mutating repeats ----------------------
+# Insert into tests/test_loop.py after test_repeated_call_nudged_before_bailing.
+#
+# The property under test is not "a nudge appears" — it is that the warning
+# arrives an occurrence EARLY *without* taking the call away. The late block
+# still owns suppression and the stop. See ROADMAP 5.101/5.101a.
+
+
+def _noop_edit_loop(tmp_path, cfg, n=4):
+    tmp_path.mkdir(parents=True, exist_ok=True)  # callers may pass a subdir
+    (tmp_path / "a.txt").write_text("hello")
+    return make_loop(tmp_path, [
+        native_call("edit_file", path="a.txt", old="hello", new="hello")
+    ] * n, cfg=cfg)
+
+
+def _early(events):
+    return [e for e in events
+            if e.get("phase") == "nudge" and e.get("early")]
+
+
+def _executed(loop):
+    """Batches that actually ran — a suppressed call leaves no tool result."""
+    return sum(1 for m in loop.history
+               if m["role"] == "user" and "Tool results" in m["content"])
+
+
+async def test_early_repeat_warn_fires_on_the_second_mutating_edit(tmp_path):
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    loop = _noop_edit_loop(tmp_path, cfg)
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("fix it")
+    early = _early(events)
+    assert len(early) == 1
+    # Byte-identical reason: harness._NUDGE_BUCKETS matches by substring, so a
+    # new string would have merged into the same bucket anyway. The flag is
+    # what makes the two distinguishable. 5.101a.
+    assert early[0]["reason"] == "repeated edit"
+    # ...and it is the edit-specific text, not the generic one.
+    assert any("STOP editing, RE-READ the file" in m["content"]
+               for m in loop.history if m["role"] == "user")
+
+
+async def test_early_repeat_warn_does_not_suppress_the_call(tmp_path):
+    # THE point of v2. 5.96 proposed fire-and-suppress; the 2nd identical
+    # mutating call reports SUCCESS 60.4% of the time, so suppressing it
+    # bundles an unbounded behaviour change into a timing fix (rule 28).
+    on, off = Config(), Config()
+    on.agent.max_repeat_calls = off.agent.max_repeat_calls = 3
+    on.agent.early_repeat_warn = True
+    off.agent.early_repeat_warn = False
+    a = _noop_edit_loop(tmp_path / "on", on)
+    b = _noop_edit_loop(tmp_path / "off", off)
+    await a.run_turn("fix it")
+    await b.run_turn("fix it")
+    assert _executed(a) == _executed(b), (
+        "the early warning took a call away; it must only add a message")
+
+
+async def test_early_repeat_warn_leaves_the_stop_on_the_old_schedule(tmp_path):
+    # Warning earlier must not kill earlier. Same stop, same iteration budget.
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    cfg.agent.max_iterations = 25
+    loop = _noop_edit_loop(tmp_path, cfg, n=8)
+    out = await loop.run_turn("fix it")
+    assert "stopped" in out and "without making progress" in out
+    assert _executed(loop) < cfg.agent.max_repeat_calls
+
+
+async def test_early_repeat_warn_ignores_read_only_repeats(tmp_path):
+    # Scoped to mutating batches: a re-read is often legitimate (compaction
+    # tells the model to do exactly that — see _forgive_rereads).
+    (tmp_path / "a.txt").write_text("hello")
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    loop = make_loop(tmp_path, [
+        native_call("read_file", path="a.txt")] * 3
+        + [{"role": "assistant", "content": "done"}], cfg=cfg)
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("look at it")
+    assert _early(events) == []
+
+
+async def test_early_repeat_warn_fires_once_per_signature(tmp_path):
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    loop = _noop_edit_loop(tmp_path, cfg, n=8)
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("fix it")
+    assert len(_early(events)) == 1
+
+
+async def test_raising_max_repeat_calls_still_disables_the_warning(tmp_path):
+    # Cranking max_repeat_calls is how the repeat guard gets turned off (tests
+    # above use 999 to isolate other paths). The early warning is defined as
+    # "one occurrence before the threshold", not an absolute 2, so it must not
+    # quietly re-arm a nudge in that regime.
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 999
+    loop = _noop_edit_loop(tmp_path, cfg, n=5)
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("fix it")
+    assert _early(events) == []
+
+
+async def test_early_repeat_warn_off_emits_nothing(tmp_path):
+    cfg = Config()
+    cfg.agent.max_repeat_calls = 3
+    cfg.agent.early_repeat_warn = False
+    loop = _noop_edit_loop(tmp_path, cfg)
+    events = []
+    loop._on_event = events.append
+    await loop.run_turn("fix it")
+    assert _early(events) == []
+
+
 async def test_error_stall_nudged_then_recovers(tmp_path):
     # The subtler stuck signature: the model VARIES its edits every turn (so the
     # identical-call detector never fires) yet keeps hitting the same error. Each
