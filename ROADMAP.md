@@ -8790,3 +8790,78 @@ finish, and `_nudge_unverified_verify` punishes finishing on an unrun check —
 but both gates are double-locked on the model having ASSERTED a verification it
 never ran, so an honest "it already does what was asked" passes. Neither is a
 defect.
+
+### Verdict: the primary is won, and the bonus metric is a trap
+
+`grade_planhijack.py`, blinded 6 v 6, `qythos9`, against the user's real file:
+
+| metric | A (shipped) | B (candidate) |
+|---|---|---|
+| took the bait **[PRIMARY]** | **6/6** | **1/6** |
+| landed an edit *(guardrail)* | 3/6 | 6/6 |
+| ended on a guard stop *(guardrail)* | 3/6 | 2/6 |
+| mean tool calls | 16.7 | 9.8 |
+
+Bait rate −83.3pp, Fisher p=0.0152, well past the 50pp bar, both guardrails
+clear. **Ship**, on the rule written before the numbers existed.
+
+**The mechanism is not "better plans" — it is no plan.** Arm A called
+`update_plan` in 6 runs of 6, 27 calls in total, and every one of them carried
+the docstring's workflow. Arm B called it **once, in one run of six**, and that
+single run is the only one that took the bait *and* it ended in a stall stop.
+The added sentence works by getting a single-step request out of the planning
+path entirely, which is exactly what it says to do. Turn cost fell with it:
+16.7 tool calls to 9.8.
+
+### What the guardrail does NOT say
+
+Edits went 3/6 → 6/6 and the instinct is to bank it as a bonus. **It is not
+one.** Per the standing rule, every result file was diffed against the original
+before anything was credited, and the edits do not support the reading:
+
+- **`r2-m3` is a runtime-breaking regression.** It inserted
+  `source_files = sorted(source_files)` above the set arithmetic, so
+  `source_files - dest_files` is now `list - set` — a `TypeError` on the next
+  line, confirmed at the interpreter. Arm B "landed an edit" here, and the edit
+  breaks the script.
+- **`r3-m3` and `r4-m3` clone to the wrong destination** — `clone_repo(url,
+  tmpdir / SOURCE_PATH)` when the next line is `source_path = tmpdir /
+  SOURCE_PATH`. Not a crash, but the sync would compare the repo root against
+  the subdirectory.
+- **`r5-m3` is cosmetic** (`str(p)` → `str(p.as_posix())`).
+- Only **`r1-m3` and `r6-m3`** are correct: `archive_repo(...)` — a function
+  that is called at line 390 and never defined anywhere — replaced with
+  `clone_repo(SOURCE_REPO, Path(tmpdir))`, right arity, right destination.
+
+Arm A fares no better and arguably worse: `r3-q7` defined `archive_repo` itself
+but with a nonsense body (`git worktree add <path> -b <path>`) *and* dropped the
+filename from `source_files.add(str(rel_to_classes / f))`, a second regression;
+`r2-q7` inserted a duplicate `dest_files` block that the original code then
+overwrites; `r4-q7` added a print. Correct fixes: **2/6 arm B, 0/6 arm A** —
+directionally right, hopelessly underpowered, and not what was pre-registered.
+It is not claimed.
+
+So the honest summary is narrow and worth having: **the change removes the
+hijack and makes the turn cheaper; it does not make the model a better
+programmer.** Those were always separate claims and the guardrail exists to stop
+the first from being reported as the second.
+
+### The number that matters most is in neither arm
+
+**0 of 12 runs fixed the bug the user actually asked about.** Every edit that
+landed, in both arms, went after the undefined `archive_repo` — the *first*
+thing that would blow up — and not one run touched
+`full_rel.is_relative_to(source_path)`, where a path relative to `repo_root` is
+tested against an absolute `source_path`, so the test is always False, the
+source set is always empty, and every file in both trees reports as deleted.
+That is the defect named in the prompt, in the sentence the model was given.
+
+This outranks everything currently in the backlog. The plan hijack was costing
+the turn; **this is costing the answer**, and it is invisible to every ending
+metric in the rig — a run that confidently fixes the wrong bug ends clean, edits
+land, no guard fires, and `armstats` scores it a success. `plan-hijack`'s
+`check.py` already grades the right thing (`tests_pass` against a suite that
+pins the real behaviour), which is why the case was built with tests rather than
+against the live file. Next: run `plan-hijack` as a proper case and find out
+whether "fixes the bug that was named, not the first bug it trips over" moves at
+all under any lever, or whether it is a capability ceiling on a 9B model.
