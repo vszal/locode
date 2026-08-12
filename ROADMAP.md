@@ -9230,3 +9230,64 @@ as a **secondary**, with its criterion fixed here, before any lever run exists:
 > reproduction, not activity.
 
 Rule 61 still applies to both: n=12 licenses a direction, not a magnitude.
+
+## 5.115 — The metric with headroom is the one the lever is actually about
+
+`bugfix-notest`, `qythos9`, n=8, before and after the 5.112 hardening:
+
+| | as built | docstring softened |
+|---|---|---|
+| `fixed_named` | 8/8 (textual) | **7/8** |
+| `fixed_decoy` | 0/8 | **0/8** |
+| `runs_clean` | 0/8 | **0/8** |
+| runs executing no `bash` at all | 8/8 | **8/8** |
+
+The pre-stated criterion fired and the remedy did not work. Softening the
+docstring cost one run out of eight; `totals[category] = revenue` inside a
+function called `compute_category_totals` gives the bug away on its own, and the
+only way to hide it further is to make the defect subtler than the live one this
+case was built from. So, stated plainly rather than worked around:
+
+**`fixed_named` cannot measure `require_run_before_edit` on this case.** It sits
+at a 7/8 ceiling for a reason that has nothing to do with the lever.
+
+### What is at the floor, on both cases, is the same thing
+
+| | `bugfix-notest` | `plan-hijack` |
+|---|---|---|
+| runs executing no successful `bash` | 8/8 | 8/8 |
+| defect only visible by running | `fixed_decoy` 0/8 | `fixed_bug` 0/8 |
+| clean-finish | 0.88 | 1.00 |
+
+Sixteen runs across two unrelated cases, and the model executed the code it was
+editing **zero times**. That is not a case property. `bugfix-notest`'s decoy is
+an undefined name that raises `NameError` on the first line of output — the
+cheapest possible thing to find by running, invisible without it, fixed 0/8.
+
+This is the sharpest available test of the lever's actual claim, which was never
+about finding a bug from a docstring. It is: *you have not run anything, so your
+edit is a guess.*
+
+### Pre-registration, before any lever run exists
+
+The primary metric moved after I saw the baselines, and pretending otherwise
+would be worse than saying it. What did **not** move is the mechanism: 5.112
+specified this lever to make the model reproduce before editing, and
+`fixed_decoy`/`runs_clean` measure exactly that, while `fixed_named` measures
+whether a docstring leaks the answer. The baselines did not choose a favourable
+metric; they retired an inapplicable one and left the mechanism's own metric at
+the floor. Both numbers stay in the report either way.
+
+> **`bugfix-notest`, n≥12 paired.** SHIP if `runs_clean` rises by ≥25pp **and**
+> `fixed_named` does not fall (7/8 is the reference; a fall of more than one run
+> is a fail) **and** clean-finish does not fall by more than one run **and**
+> mean tool calls do not rise by more than 25%. `fixed_decoy` is reported and is
+> expected to move with `runs_clean`; if `runs_clean` rises while `fixed_decoy`
+> does not, the model is running the script and ignoring the traceback, which is
+> a comprehension finding and **not** a ship.
+
+The `plan-hijack` secondary keeps the criterion set in 5.114, unchanged.
+
+A null on both is a real outcome and gets written up as one. The honest prior
+from 5.112 still stands: the model may run something and still not connect the
+output to the request, and this lever is the cheapest way to find that out.
