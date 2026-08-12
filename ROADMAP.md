@@ -7075,17 +7075,34 @@ high-exposure string because the correction did not survive its own
 pre-registered test. If it is ever fixed it must be justified as
 *truthfulness*, not as performance, and it does not get another A/B.
 
-### Lever 0f is now causally confirmed
+### Lever 0f — confirmed on tool choice, NOT on score *(corrected, see 5.92)*
 The D2 revert was the only change in the base arm between b130 and b132:
 
-| exec-ambig, base arm | b130 (D2 live) | b132 (D2 reverted) |
-|---|---|---|
-| `replace_lines` calls | 121 | **0** |
-| `fully_fixed` | 8/24 | **19/24** |
+| exec-ambig, base arm | b130 (D2 live) | b132 (D2 reverted) | status |
+|---|---|---|---|
+| `replace_lines` calls | 121 | **0** | **holds** |
+| `fully_fixed` | 8/24 | 19/24 | **withdrawn** |
 
-A prohibition naming a case inside a tool's description makes that tool *salient
-for the case it prohibits*. Removing the sentence removed the behaviour
-entirely. This is the strongest single causal result in the log.
+**Corrected within the hour by the 5.92 audit.** I first wrote this section as
+"causally confirmed … the strongest single causal result in the log," resting on
+both rows. Only the first row survives:
+
+- **The tool-choice inversion holds.** 121 → 0 is a per-call count with n in the
+  hundreds, on a tool whose description was the only thing that changed, and it
+  is an on/off, not a shift. Overdispersion in a per-run score does not touch it.
+- **The score row is withdrawn.** 8/24 → 19/24 is a *cross-sweep* per-run
+  comparison on a case measured at **8.1× binomial overdispersion** (5.92).
+  Cross-sweep score deltas on this case are not readable, so D2 cannot be
+  credited with the exec-ambig collapse or its recovery. Rule 58 says exactly
+  this and I wrote the sentence anyway.
+
+Note the structural problem this exposes: **D2 has never had a within-sweep
+A/B.** Both b130 arms carried it and neither b132 arm did, so every D2 number is
+cross-sweep by construction — which is the original sin, since D2 shipped
+without an A/B in the first place. The lever-0f *design rule* still stands on the
+tool-choice evidence, which is strong and mechanistically tied to the string:
+a prohibition naming a case inside a tool description makes that tool salient
+for the case it prohibits. Describe only what a tool IS for.
 
 ## 5.91 — pre-registered: is the exec-bugfix collapse the echo guard, or drift?
 
@@ -7097,8 +7114,20 @@ unidentified.
 |---|---|---|---|---|
 | `fully_fixed` | 12/24 | 8/24 | 0/24 | 0/24 |
 
-20/48 → 0/48 across the split is far outside sampling noise, so the decline is
-real. The case is **not** the cause: `evals/cases/exec-bugfix/` has no functional
+~~20/48 → 0/48 across the split is far outside sampling noise, so the decline is
+real.~~ **Struck by 5.92, before the sweep returned.** That Fisher test treats
+runs as i.i.d.; this case runs at **4.0× binomial overdispersion**, so the
+effective n is roughly a quarter of what I fed it and the decline is *not*
+established. exec-bugfix has a documented 9-consecutive-arm all-zero stretch
+(b101→b108) that recovered to 64% with no code cause ever found. The present
+0/24, 0/24 is well inside its own history.
+
+The sweep below is unaffected and still worth running: it is **within-sweep and
+paired**, which is the one design that survives a sweep-level effect. But the
+prior has moved hard toward branch 2, and branch 4 (inconclusive) is now a
+likely and acceptable outcome rather than a disappointment.
+
+The case is **not** the cause: `evals/cases/exec-bugfix/` has no functional
 commit since `6a7a4ee` (pre-b128), the seed files date from Jul 21, and one b132
 cand run still passed — so the case is unchanged and remains solvable.
 
@@ -7144,5 +7173,73 @@ exec-bugfix 0/24, which predates it and had no cleanup. It remains a possible
 confound for the b130-cand 15/24 vs b132-cand 1/24 gap, which is separately
 unexplained. No source edits during a sweep — this was a housekeeping command
 and it should have waited.
+
+## 5.92 — both eval cases are severely overdispersed. No cross-sweep score is readable.
+
+Found while waiting on the 5.91 sweep, by pulling the *full* history of
+exec-bugfix instead of the last four sweeps. It corrects two things I had
+already written, one of them committed an hour earlier.
+
+Pooling every base arm with ≥5 runs and testing heterogeneity against the
+binomial expectation:
+
+| case | arms | pooled | χ²/df | reading |
+|---|---|---|---|---|
+| exec-ambig | 11 | 103/254 (41%) | **8.1×** | never read across sweeps |
+| exec-bugfix | 29 | 87/345 (26%) | **4.0×** | never read across sweeps |
+
+If runs were independent draws at a fixed per-case rate, χ²/df would sit near 1.
+At 4–8× there is a large **sweep-level random effect**: something that varies
+between sweeps — server state, cache, ordering, time of day — moves whole arms
+together. Runs within a sweep are correlated, so the effective n is ~4–8× smaller
+than the raw count.
+
+### The base-arm history that makes it concrete
+exec-bugfix, in chronological order: `0,0,0,1,1,4,0,2,3,5,0,0,0,0,0,0,9,9,8,9,4,
+7,2,12,8,0,0` (out of 5–24). Two facts jump out:
+
+1. A **9-consecutive-arm all-zero stretch** (b101→b108, base *and* cand), which
+   then recovered to 9/14 = 64% at b110. No code cause was ever identified for
+   either the collapse or the recovery.
+2. The current 0/24, 0/24 is a **4-arm** zero stretch. It is less unusual than
+   the one this case has already produced and survived.
+
+### What this corrects
+- **5.91's premise is struck.** "20/48 → 0/48 is far outside sampling noise" was
+  a Fisher test on non-i.i.d. data. The exec-bugfix decline is not established
+  as real, let alone as code-caused.
+- **5.90's lever-0f score row is withdrawn.** I credited the D2 revert with
+  exec-ambig 8/24 → 19/24. That is cross-sweep on the *8.1×* case — the worst
+  possible place to read a score delta. The tool-choice row (`replace_lines`
+  121 → 0, per-call, n in the hundreds, on/off) stands; the score row does not.
+  D2 has never had a within-sweep A/B and every number attached to it is
+  cross-sweep by construction.
+
+Both errors are the same error, and it is the one **rule 58 already names**. I
+wrote the rule and then reached across sweeps twice in one session because the
+numbers were large and pointed where I expected. Size is not independence.
+
+### Rule 62
+**Compute a case's overdispersion before using it in any argument, and re-check
+it as arms accumulate.** A per-run score may be compared *only* between the two
+arms of one sweep. Across sweeps, per-run scores are for describing history, not
+for supporting a claim — no matter how large the gap. Per-call metrics
+(n in the hundreds, within-arm) remain the readable channel, which is what 5.86b
+concluded from the other direction.
+
+### Consequences to act on
+- The `--clean` A/B design is **vindicated**: paired, interleaved, same-session
+  arms are the only thing that survives a sweep-level effect. Never grade a
+  candidate by comparing it to a previous sweep's number.
+- Every banked verdict should be re-checked for cross-sweep reasoning. 5.86a
+  audited *exposure* (was the effect outside the ±6 A/A band) but assumed
+  within-sweep comparisons throughout; it did not ask whether any decision leaned
+  on a cross-sweep delta. **Queued, and it is the next audit.**
+- The A/A floor of ±6 (5.86b) was measured within a single sweep and is
+  therefore still valid as stated — it is a *within*-sweep floor. It does not
+  bound cross-sweep variation, which is much larger. Do not reuse it that way.
+- Consider reporting exec-bugfix as **descriptive only** until a lower-variance
+  version exists. It has produced two long zero-stretches and a 0→64% swing with
+  no attributable cause; as a decision instrument it is close to useless.
 
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
