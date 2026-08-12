@@ -1,0 +1,457 @@
+{
+  "label": "prefix-hijack-v3",
+  "created": "2026-08-12 10:14:16",
+  "git_head": "d3077f1",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.25,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": true,
+        "no_plan_needed": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 3,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 1,
+          "update_plan": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 33.7,
+        "model_seconds": 33.7,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 33.7,
+        "gen_chars": 1686,
+        "gen_chars_per_sec": 50.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 33.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r1-1ehr5wgd",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 0.125,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": false,
+        "no_plan_needed": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "update_plan": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 49.7,
+        "model_seconds": 49.7,
+        "plan_updates": 3,
+        "truncations": 0,
+        "gen_seconds": 49.6,
+        "gen_chars": 2924,
+        "gen_chars_per_sec": 58.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 49.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r2-rhhe8uyz",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 0.75,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": true,
+        "detects_new": true,
+        "detects_modified": true,
+        "no_false_deletions": true,
+        "did_not_hijack": false,
+        "no_plan_needed": false,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 47,
+        "tool_calls": 42,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "update_plan": 5,
+          "edit_file": 12,
+          "bash": 20,
+          "write_file": 2
+        },
+        "tool_errors": 16,
+        "tool_error_rate": 0.381,
+        "nudges": 7,
+        "nudges_by_reason": {
+          "repeated call": 2,
+          "open plan tasks": 3,
+          "unchanged": 1,
+          "context compacted": 1
+        },
+        "stop_reason": "edits kept hitting the same error without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 537.3,
+        "model_seconds": 535.5,
+        "plan_updates": 5,
+        "truncations": 0,
+        "gen_seconds": 535.5,
+        "gen_chars": 32177,
+        "gen_chars_per_sec": 60.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 537.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r3-u475detm",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 4,
+      "score": 0.75,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": true,
+        "detects_new": true,
+        "detects_modified": true,
+        "no_false_deletions": true,
+        "did_not_hijack": false,
+        "no_plan_needed": false,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "update_plan": 6,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 58.3,
+        "model_seconds": 58.3,
+        "plan_updates": 6,
+        "truncations": 0,
+        "gen_seconds": 58.2,
+        "gen_chars": 3318,
+        "gen_chars_per_sec": 57.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 58.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r4-rrjd4iks",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 5,
+      "score": 0.125,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": false,
+        "no_plan_needed": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "update_plan": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 49.5,
+        "model_seconds": 49.5,
+        "plan_updates": 3,
+        "truncations": 0,
+        "gen_seconds": 49.5,
+        "gen_chars": 2721,
+        "gen_chars_per_sec": 55.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 49.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r5-dgh5ng1w",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 6,
+      "score": 0.375,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": true,
+        "no_plan_needed": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 3,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 34.2,
+        "model_seconds": 34.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 34.1,
+        "gen_chars": 1685,
+        "gen_chars_per_sec": 49.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 34.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r6-q1ztnc5i",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 7,
+      "score": 0.125,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": false,
+        "no_plan_needed": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 7,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "update_plan": 3,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 46.2,
+        "model_seconds": 46.1,
+        "plan_updates": 3,
+        "truncations": 0,
+        "gen_seconds": 46.1,
+        "gen_chars": 2440,
+        "gen_chars_per_sec": 52.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 46.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r7-pjj1tdmj",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "plan-hijack",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 8,
+      "score": 0.375,
+      "checks": {
+        "runs_clean": true,
+        "fixed_bug": false,
+        "detects_new": false,
+        "detects_modified": false,
+        "no_false_deletions": false,
+        "did_not_hijack": true,
+        "no_plan_needed": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 3,
+        "tool_calls": 2,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 32.3,
+        "model_seconds": 32.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 32.3,
+        "gen_chars": 1561,
+        "gen_chars_per_sec": 48.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 32.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-plan-hijack__qythos9__r8-mohcbojy",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.359,
+    "clean_finish_rate": 0.875,
+    "total_nudges": 11,
+    "total_iterations": 88,
+    "nudge_histogram": {
+      "open plan tasks": 7,
+      "repeated call": 2,
+      "unchanged": 1,
+      "context compacted": 1
+    },
+    "n_runs": 8,
+    "n_valid": 8,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 57.8,
+    "gen_chars": 48512,
+    "rows": {
+      "plan-hijack::qythos9": {
+        "case": "plan-hijack",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 8,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.359,
+        "score_min": 0.125,
+        "scores": [
+          0.25,
+          0.125,
+          0.75,
+          0.75,
+          0.125,
+          0.375,
+          0.125,
+          0.375
+        ],
+        "iterations_mean": 11,
+        "nudges_mean": 1.4,
+        "clean_finish_rate": 0.875,
+        "seconds_mean": 105.3,
+        "gen_rate_mean": 57.8,
+        "stop_reasons": [
+          "edits kept hitting the same error without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "plan-hijack": 1.0
+    }
+  }
+}

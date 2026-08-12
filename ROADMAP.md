@@ -9146,3 +9146,87 @@ and specific:
 
 A guard that stops firing because the thing it guarded moved is worse than no
 guard, since its silence still reads as consent.
+
+## 5.114 — The rebuilt case discriminates, and the aggregate score does not
+
+Both arms, n=8, same rebuilt seed, `qythos9`. The pre-fix arm is the frozen tree
+whose `tools/plan.py` lacks the 5.109 paragraphs; nothing else that the model can
+reach differs (the `loop.py`/`config.py` delta is the 5.112 lever, default off).
+
+| | hijack | `update_plan` calls | `fixed_bug` | iters | nudges | clean | **overall score** |
+|---|---|---|---|---|---|---|---|
+| pre-fix | **5/8** | 21 | 2/8 | 11.0 | 1.4 | 0.88 | **0.359** |
+| fixed | **0/8** | 1 | 0/8 | 3.1 | 0.0 | 1.00 | **0.359** |
+
+Hijack 5/8 vs 0/8 is Fisher p ≈ 0.026. The old seed gave 0/8 on both sides, so
+the rebuild moved the case from measuring nothing to a significant separation,
+and 5.109's fix is confirmed to do what it was written to do.
+
+### The aggregate score is identical to three decimal places
+
+That is not a coincidence worth shrugging at. The two arms fail in opposite
+directions and the mean cancels them: the pre-fix arm wanders into the script's
+workflow and occasionally still fixes the bug (2/8); the fixed arm never wanders
+and never fixes it (0/8). A sweep read off the score column alone would have
+reported "no difference" from data containing a p=0.03 effect.
+
+Rule 71 as coined says a case must score *differently* on a pre-fix build. This
+sweep sharpens what "score" has to mean: **on the check that encodes the
+behaviour, not on the weighted mean.** The mean is a portfolio, and a portfolio
+hides a rotation. `check.py` already grades the two axes apart for exactly this
+reason — 5.109 wrote "a change that improves one while wrecking the other is not
+an improvement" — but I still reached for the score column first.
+
+`fixed_bug` 2/8 → 0/8 is Fisher p = 0.47 and is **not** a finding. It is a watch
+item: if a later sweep reproduces it, the honest reading is that the paragraph
+buys calm at the cost of engagement, and the wording needs the same treatment
+5.36 gave the verify nudge.
+
+### What the fixed arm actually does
+
+Read the run, not the row. All eight are the same three iterations:
+
+    read_file syncdirs.py -> edit_file -> (sometimes) update_plan [x] -> done
+
+and the edit, in run 1, is:
+
+    -    dest_root = Path(dest)
+    +    dest_root = Path(dest).resolve()
+
+Plausible path hygiene, adjacent to the defect, and completely inert — the
+planted bug is the `is_relative_to(source_root)` guard three lines below, which
+the model left in place. It then marked the task complete and finished clean in
+33 seconds. **Clean-finish 1.00, correct 0/8.** This is the failure mode 5.110
+and 5.112 are both circling, seen head-on: fast, calm, confident, wrong.
+
+### Amendment to 5.112: `plan-hijack` is now a valid case for the lever
+
+5.112 disqualified it in writing — "its prompt names `test_syncdirs.py`, and the
+baseline runs already open with `bash python -m pytest`, so condition 2 is false
+and the nudge would almost never fire". The rebuild removed the tests for
+reasons that had nothing to do with this lever, and inverted that:
+
+- **8/8** fixed-arm runs complete **no successful `bash` call at all** (0 bash
+  calls in the whole sweep) — condition 2 holds everywhere;
+- every run's first mutating call is `edit_file` on an existing file —
+  condition 1 holds;
+- `_names_a_symptom("fix the bug comparing directies in syncdirs.py")` is
+  `True` — condition 3 holds;
+- `fixed_bug` is **0/8**, the floor. There is no ceiling problem here.
+
+So the advisory would fire in 8 runs out of 8, on a case where the model is
+currently wrong every time. That is a better-conditioned target than
+`bugfix-notest`, whose baseline does not exist yet and may sit near a ceiling.
+
+Selecting a case *after* seeing which one looks favourable is how a lever gets
+credited for noise, so: **`bugfix-notest` remains the primary**, pre-registered
+in 5.112, and runs regardless of what `plan-hijack` does. `plan-hijack` is added
+as a **secondary**, with its criterion fixed here, before any lever run exists:
+
+> On `plan-hijack`, n≥12 paired: the lever SHIPS on this evidence only if
+> `fixed_bug` rises by ≥25pp **and** `did_not_hijack` does not fall below 7/8
+> **and** clean-finish does not fall by more than one run. A rise in `bash`
+> calls with no rise in `fixed_bug` is a null, not a partial win — the point is
+> reproduction, not activity.
+
+Rule 61 still applies to both: n=12 licenses a direction, not a magnitude.
