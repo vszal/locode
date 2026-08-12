@@ -8569,3 +8569,39 @@ candidate, and therefore not a threat to any SHIP verdict. It would mean the
 floor is too high, not too low, and that some INCONCLUSIVE calls were real
 effects buried under a bias-inflated bar. Nothing to correct; something to
 remember if a lever ever misses the floor narrowly.
+
+## 5.107 — aa17-slotfix: the decision rule, written before the number
+
+Written while the sweep is at run 15 of 32. I have seen one interim reading —
+2/7 vs 2/6 — and it is disclosed in 5.105 and again here, because a rule
+"fixed in advance" by someone who has already peeked is worth less and should be
+labelled as such. Nothing below is chosen to fit it.
+
+**Same metric as `aa16-slot`, unchanged:** runs landing ≥1 edit, per arm, Fisher
+two-sided on 16 v 16, computed by the already-committed
+`evals/grade_slot.py aa17-slotfix`. Same gate: `is_calibration` and an empty
+`git diff <base_sha> -- locode/`.
+
+| outcome | reading | what I do |
+|---|---|---|
+| p ≥ 0.05 **and** gap within ±25pp | **Fix validated.** The 68.8pp gap was the leak, or was era-specific and is now gone either way. | Close 5.105 reading 1. Resume grading levers. Keep rule 68. |
+| p ≥ 0.05 but gap 25–50pp | **Ambiguous.** Underpowered against a halved effect; a real residual bias could hide here. | Do NOT resume lever grading. Run `aa18` at r=24 before anything else. |
+| p < 0.05 | **The leak was not the cause.** Reading 2 wins: the worktree-vs-live-tree asymmetry is the real defect. | Make BOTH arms worktrees — `git stash create` the live tree into a throwaway commit and check that out — then re-run the A/A. Rule 69 was right to make me doubt the attribution. |
+
+The ±25pp band is not a statistic, it is the range the six clean A/As live in
+(their landing gaps are 0.0pp four times over, with the two informative ones at
+0.0 and 0.0). Anything materially outside that is not "a floor", it is a finding
+under a different name.
+
+**Power, stated so a null cannot be over-read** (the same caveat `grade_slot.py`
+prints): 16 v 16 detects the ~69pp gap that prompted this at p≈0.0002 and a 50pp
+gap at roughly p≈0.01. It does **not** detect 20pp. A null here means *the
+effect that broke aa16 is gone*, not *the arms are now interchangeable*.
+
+**One thing already ruled out.** The other place an arm name could reach the
+model is the source root, `tempfile.mkdtemp(prefix="locode-ab-base-")` — which
+contains the literal word `base` and would leak through any traceback or tool
+output that printed a path. It does not: grepping all 96 event logs of
+`aa16-slot`, `b132-early0e` and `b131-echoguard` for `locode-ab-base` or
+`Code/locode` returns **zero** model-visible events. The cwd was the only open
+channel. That is worth knowing before rebuilding the rig around the wrong one.
