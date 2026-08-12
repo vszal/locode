@@ -1,4 +1,4 @@
-# locode resume — build 131 (2026-08-11) · D1 NO SHIP (b132, pre-registered); D2 revert CONFIRMED CAUSAL; exec-bugfix collapse UNEXPLAINED, b131-echoguard IN FLIGHT
+# locode resume — build 131 (2026-08-11) · D1 NO SHIP (b132, pre-registered); D2 revert CONFIRMED CAUSAL; exec-bugfix collapse UNEXPLAINED, b131-echoguard ABORTED at 2/32 (user needed the machine); BOTH CASES 4-8x OVERDISPERSED (5.92); SERVER RESTARTED
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -829,7 +829,19 @@ completion. **The repeat death is still the dominant ending.**
      them is a comment. Verified, do not re-derive.
    - `fa12194` is ALSO b128's base arm (8/24), so the base arm is a drift probe
      against its own history. That is the whole design.
-   - Running: `--base fa12194 -c exec-bugfix -r 16` (32 runs, ~75min), label
+   - **ABORTED at run 2/32** on 2026-08-11, user needed the machine. Partial
+     results renamed `b131-echoguard-ABORTED-partial` so they cannot be misread.
+     Design is unchanged and still correct — just relaunch it.
+   - **5.92 moved the prior hard toward branch 2 (drift).** Both cases are
+     4-8x overdispersed; exec-bugfix has a 9-arm all-zero stretch in its history
+     that recovered to 64% with no cause found. Branch 4 (inconclusive) is now
+     an acceptable outcome, not a failure.
+   - **THE 3-DAY SERVER IS GONE.** pid 69851 (up since Aug 8, ran b125->b132)
+     died during the abort; ab.py respawned a fresh one (pid 85569). Every
+     future sweep is on a different server process than every banked result, so
+     cross-sweep comparison is now doubly unreadable. Recalibrate before
+     trusting any comparison to a pre-2026-08-11 number.
+   - Relaunch: `--base fa12194 -c exec-bugfix -r 16` (32 runs, ~75min), label
      `b131-echoguard`, log `ab191.log`, grader `grade191.py`, watcher writes
      `verdict191.txt`. **No source edits until it exits.**
    - Gates (rule 54, both sys.exit): base MUST show 0 echo nudges + 0 echo stops
