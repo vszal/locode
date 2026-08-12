@@ -8496,3 +8496,59 @@ worktree-vs-live-tree difference back on the table as the real defect.
 Interim, at 13 of 32 runs: **2/7 base vs 2/6 cand**, −4.8pp, p=1.0. Pointing
 null, far too early to grade, and recorded here only so the final number cannot
 be quietly reconciled against a memory of what I hoped for.
+
+## 5.106 — Archive audit: the exposure is three sweeps, not the archive
+
+5.105's first draft told me to re-read every verdict that turned on a per-run
+metric. That is the wrong instruction, and the archive can say so itself: the
+arm-slot asymmetry is measurable directly, in every A/A ever run, because they
+all ran through the same rig. Seven exist.
+
+| A/A | era (server) | n | score delta, W/L/T | mean landed edits, base \| cand | gave up |
+|---|---|---|---|---|---|
+| b94-AA-noisefloor | pre-pid, Aug 7 | 8 | +0.281, W5/L0/T3 | 2.88 \| 3.25 | 0 \| 0 |
+| b94-AA2 | pre-pid, Aug 7 | 8 | +0.062, W2/L2/T4 | 3.25 \| 4.38 | 0 \| 0 |
+| b102-floor | pre-pid, Aug 8 | 8 | +0.000, W1/L1/T6 | 8.38 \| 9.50 | 0 \| 0 |
+| aa14-calib | pre-pid, Aug 8 | 14 | +0.143, W7/L1/T6 | 6.64 \| 5.57 | 0 \| 0 |
+| b121-aa | 69851, Aug 10 | 24 | −0.125, W1/L7/T16 | 3.00 \| 2.50 | 0 \| 0 |
+| b122-v3probe | 69851, Aug 10 | 24 | +0.000, W0/L0/T24 | 2.00 \| 2.00 | 0 \| 0 |
+| **aa16-slot** | **85569, Aug 12** | 16 | −0.031, W0/L1/T15 | **2.81 \| 0.25** | **3 \| 12** |
+
+### Where the exposure actually is
+
+Six of the seven are flat on the edit channel, and the seventh is not close to
+flat. Cross that against which server each A/B ran on (rule 62 fingerprints, now
+doing work they were not designed for):
+
+- **Server 85569** (started Aug 11 21:18) has run exactly **three** A/Bs:
+  `b131-echoguard`, `b132-early0e`, `aa16-slot`. Its only A/A is the broken one.
+  **This is the whole exposed set.**
+- **Server 69851** (Aug 8 16:18 → Aug 11) ran **fourteen** A/Bs, including every
+  `fully_fixed` result the project rests on — b119 through b132-d1-clean, i.e.
+  §5.59, 5.64, 5.66, 5.69, 5.71, 5.74, 5.78, 5.86, 5.90. It has **two same-era
+  A/As, both flat** (b121-aa, b122-v3probe), on the same case those A/Bs used.
+- **Pre-fingerprint** (Aug 2–8) ran the rest, with **four A/As**, all flat on
+  edits.
+
+So: **no verdict outside those three sweeps needs re-reading on slot grounds.**
+The blanket instruction in 5.105 is withdrawn and replaced by this bound. That
+is what rule 67 buys when it is actually applied — a same-era A/A is not just a
+gate on new claims, it is retroactive coverage for the era it sits in.
+
+### The one thing the score channel does hint at
+
+Under a true null the win/loss split of an A/A should be balanced. Two are not:
+`b94-AA-noisefloor` at **W5/L0** (sign test p=0.0625, base-favouring) and
+`b121-aa` at **W1/L7** (p=0.070, *cand*-favouring). Marginal, and opposite in
+direction, and two of seven at α≈0.06 is close to what chance gives — this is a
+whisper, not a finding, and it is logged as one.
+
+But it is worth noting *which* number that first one is. `b94-AA-noisefloor`'s
+mean delta of **+0.281 is the 0.2812 noise floor** the project has required
+deltas to clear ever since §5.14. If any part of that floor is slot asymmetry
+rather than sampling noise, then the floor has been silently absorbing the very
+bias it was never designed to catch — which is *conservative* for crediting a
+candidate, and therefore not a threat to any SHIP verdict. It would mean the
+floor is too high, not too low, and that some INCONCLUSIVE calls were real
+effects buried under a bias-inflated bar. Nothing to correct; something to
+remember if a lever ever misses the floor narrowly.
