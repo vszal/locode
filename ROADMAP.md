@@ -8130,6 +8130,15 @@ score deltas cannot see turn endings).
 
 ### The unregistered finding: the arms fail in opposite ways
 
+> **WITHDRAWN — see 5.104.** The table below attributes the split to the code
+> (b125 vs b131). It is not the code: build 131 lands 0.00 edits/run in the
+> **cand** slot and 1.88 in the **base** slot, and `git diff 62190d5 11c1fd1
+> -- locode/` is empty. The split tracks the arm slot; its cause is under test
+> in `aa16-slot`. The mechanism is a single branch at call 4 (which file the
+> model reads), and the unread-file guard named below is **innocent** — it
+> refused an edit to a genuinely unread file. Read the table as "the two arms
+> of this sweep differed", never as "b131 changed this".
+
 Not pre-registered, therefore a hypothesis and **not** a result (rule 43):
 
 | | base (b125) | cand (b131) |
@@ -8190,3 +8199,139 @@ The near-miss is worth naming: two sections of quantitative argument were built
 on doubled counts and *none of the conclusions moved*, because every claim in
 them was a ratio. That is luck, not method — the same bug under a non-uniform
 sweep shape would have silently re-weighted the pool and moved the shares too.
+
+## 5.104 — b132-early0e: lever 0e v2 NO SHIP, and 5.103's split was misattributed
+
+### The pre-registered verdict: NO SHIP
+
+`grade_early0e.py` was committed (3f18341, 00:32) before the sweep produced a
+number. Both gates passed, so this is a **real negative, not a void sweep**:
+
+- **Gate 1** — base early nudges `0/16`. The base ref predates the lever. ✓
+- **Gate 2** — the lever fired in **16/16 = 100%** of candidate runs, against a
+  ≥60% precondition and a 73% archive prediction. Rule 17 is satisfied: the
+  lever fired, so the sweep grades something.
+
+| | base (b131) | cand (b132) |
+|---|---|---|
+| repeat-stops **[GATING]** | 3/16 (19%) | 3/16 (19%) |
+| clean finishes (`done`) | 0/16 | 0/16 |
+
+**+0.0pp, Fisher two-sided p = 1.0000.** Warning a full occurrence before the
+threshold, for mutating edits, without suppressing the call, moved the outcome
+it was designed to move **not at all** — not within noise, but exactly zero.
+
+**Decision: NO SHIP. `early_repeat_warn` goes to `False` by default.** The code
+and its seven tests stay, behind the flag, so a future design can re-test the
+timing without rebuilding it.
+
+### Unregistered: the lever makes the model *surrender*
+
+Not pre-registered, therefore a hypothesis (rule 43) — but it attributes
+cleanly, which the 5.103 finding did not:
+
+| | build 125 (base) | build 131 (base) | build 131 (cand) | build 132 (cand) |
+|---|---|---|---|---|
+| gave up (self-terminated) | 0/16 | 0/16 | 0/16 | **11/16** |
+| stopped by a guard | 16/16 | 16/16 | 16/16 | 5/16 |
+
+Build 131 surrenders **0/16 in both slots**, so "the arm that lands few edits
+surrenders" is ruled out — build 131 as cand also landed ~0 and still never gave
+up. The only cell that moves is the one with the lever in it. The extra nudge
+appears to read as permission to stop.
+
+This does not trip the rule 8 veto (`done` is 0→0, a floor, not a fall), so the
+NO SHIP above rests on the gating metric alone, as pre-registered. But it points
+the same way, and it is a caution about nudge volume in general: build 132's
+candidate arm fired **225** nudges against build 131's 200, and bought a 0.0pp
+change and eleven surrenders.
+
+### Correcting 5.103: the split tracks the ARM SLOT, not the build
+
+5.103's unregistered table attributed an edit-granularity split to the code
+(base = b125 surgical, cand = b131 whole-function). **That attribution is
+withdrawn.** The same build 131 sits on both sides of these two sweeps:
+
+| build 131 | mean landed edits | single-line edits |
+|---|---|---|
+| in the **cand** slot (b131) | **0.00** | 0% |
+| in the **base** slot (b132) | **1.88** | 67% |
+
+Code identity is *verified*, not assumed: `git diff 62190d5 11c1fd1 -- locode/`
+is empty, so b131's live-tree candidate and b132's worktree baseline ran
+byte-identical `locode/`. Both sweeps ran on the same server, pid 85569, with no
+restart between them (rule 62). Whatever produces the split, it is not the code.
+
+Two candidate confounds are eliminated:
+
+- **Time within the sweep.** `ab.py:376` alternates the arm order every repeat,
+  and the per-run series bears that out — b131's base alternates 3/0/0/3/… start
+  to finish with no trend, and both halves average 1.50.
+- **Live-tree contamination.** The `created` field is written at the *last*
+  persist, not the first, so b131 ran 22:31→00:18 and b132 00:33→01:58. Every
+  `locode/` commit of that night (852efe6 at 00:27:57 onward) falls outside both
+  windows, and the last source change before them was b6853bd at 17:09.
+
+### The mechanism: one branch, at call 4
+
+Reading r3 of b132 rather than its summary (the standing rule) shows the arms
+are *identical* through call 3 — same 284 `prompt_chars`, same 69-character
+first reply, same ~21s. They diverge at a single decision:
+
+```
+base   1.bash 2.bash 3.read_file test_textkit.py 4.read_file textkit.py   -> 5.edit_file OK
+cand   1.bash 2.bash 3.read_file test_textkit.py 4.read_file test_textkit.py -> 5.edit_file REFUSED
+```
+
+Base reads the **source**; cand re-reads the **test**. Cand then edits
+`textkit.py`, which it has never read, and the unread-file guard correctly
+refuses it. Everything downstream — the 19-line `old` blocks, the
+`replace_lines` fallbacks, the zero landed edits — follows from that one branch.
+
+Two corrections fall out of this:
+
+1. **The unread-file guard is innocent.** It fired exactly as designed, on an
+   edit to a genuinely unread file. Nothing in 5.103 should be read as a defect
+   report against it.
+2. **Granularity is a symptom, not a cause.** 5.103 called the 1-line/19-line
+   median split "a prompt-level effect." It is downstream of which file got read
+   at call 4; a model that has not read the source can only reconstruct a whole
+   function from memory.
+
+The outcome is strongly **bimodal** — a run lands 3 edits or it lands 0 — so a
+per-run mean over 16 hides a coin flip. What is *not* explained is why the flip
+is so lopsided by slot: **18/32 base runs land ≥1 edit against 2/32 cand runs**,
+far past what one branch at fair odds would give.
+
+### Rule 67, and the pre-registered A/A that tests this
+
+I initially dismissed the slot hypothesis using `aa14-calib`, whose
+byte-identical arms show no split (65%/62%). That reasoning was wrong:
+`aa14-calib` ran **Aug 8**, four days and six builds earlier, on a server whose
+identity was not even recorded (`? ?`). It measures a noise floor that no longer
+exists.
+
+> **Rule 67.** An A/A calibration expires with its era. Before using one to
+> dismiss an asymmetry, check it against the *current* server process and build
+> — a stale A/A describes a floor that has since moved. Re-run it instead.
+
+So: **`aa16-slot`**, launched before these numbers were written up — 16 pairs,
+`exec-bugfix`, `--allow-identical`, base = a worktree at HEAD, cand = the live
+tree, same server pid 85569.
+
+**Decision rule, fixed in advance.** Metric: runs landing ≥1 edit, per arm,
+Fisher two-sided on 16 v 16.
+
+- **p < 0.05** → the arm slot itself biases the outcome. Every paired A/B in the
+  archive compares a worktree against the live tree, so all of them carry it,
+  and the design must be fixed — both arms as worktrees — **before any further
+  lever is graded**. This would be the most consequential methodology defect
+  found so far.
+- **p ≥ 0.05** → no slot effect detectable at this size. The b131/b132 split
+  then stands as unexplained sampling variation, 5.103's table stays *withdrawn*
+  rather than re-attributed, and no lever verdict is disturbed.
+
+Power is honest here rather than assumed: the observed 18/32-vs-2/32 gap is
+~56% vs ~6%, which 16 v 16 detects at p≈0.005. A null therefore rules out an
+effect *of that size*, which is the one at issue — it does not rule out a small
+one.
