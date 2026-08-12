@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–68.** All 55 numbers actually in use are below. Thirteen numbers
+**Complete for 1–69.** All 56 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -74,6 +74,7 @@ anchor is authoritative if one ever drifts.
 | 66 | Before reporting any absolute `n` from an event-log instrument, check the denominator against the file count. `ab.json` carries one run entry per *arm*, so `for run in runs` with the arm passed separately reads every event file twice. Shares survive a uniform miscount; counts do not. | §5.103 |
 | 67 | An A/A calibration expires with its era. Before using one to dismiss an asymmetry, check it against the *current* server process and build — a stale A/A describes a noise floor that has since moved. Re-run it instead. | §5.104 |
 | 68 | The treatment label must never reach the subject. No arm name, build number, or condition tag may appear in anything the model can read — the prompt, the cwd, filenames, or tool output — and a rig change that touches any of those channels is not done until an A/A says the arms are indistinguishable. | §5.105 |
+| 69 | A defect that was always present cannot, by itself, explain an effect that appeared once. Before crediting a long-standing bug with a new anomaly, find the calibrations that already ran through it — if they are clean, either something changed alongside it or the bug is not the cause. | §5.105 |
 
 ⚠ = **reconstructed.** The number is cited but never stated outright anywhere in
 `ROADMAP.md`; the wording is inferred from its use sites and is **not** a
@@ -124,4 +125,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **69**.
+graders. Next free number: **70**.

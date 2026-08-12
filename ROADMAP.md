@@ -8441,8 +8441,58 @@ directly, since its arms were identical, so every gap it shows is pure bias:
 - **Within-slot comparisons survive**, because the leak is a constant inside a
   slot. That is why 5.104's surrender finding holds in its restated form.
 
+### The attribution is weaker than the leak
+
+Written after the section above, on evidence that cuts against it. The leak
+channel has been in the harness since it was written, so **every A/A in the
+archive ran through it** — and each one therefore measures what the leak was
+worth in its own era. Four do, and four say *nothing*:
+
+| A/A | case | mean landed edits, base \| cand | runs landing ≥1 | `done` |
+|---|---|---|---|---|
+| b102-floor (Aug 8) | exec-bugfix | 8.38 \| 9.50 | 8/8 vs 8/8 | 3/8 vs 2/8 |
+| aa14-calib (Aug 8) | exec-bugfix | 6.64 \| 5.57 | 14/14 vs 14/14 | 3/14 vs 5/14 |
+| b121-aa (Aug 10) | exec-ambig | 3.00 \| 2.50 | 24/24 vs 24/24 | 0/24 vs 0/24 |
+| b122-v3probe (Aug 10) | exec-ambig | 2.00 \| 2.00 | 24/24 vs 24/24 | 0/24 vs 0/24 |
+| **aa16-slot (Aug 12)** | exec-bugfix | **2.81 \| 0.25** | **12/16 vs 1/16** | 0/16 vs 0/16 |
+
+Not one of the four leans the way aa16-slot does; two lean the other way. So a
+defect that was *always* present cannot, on its own, explain an effect that
+appeared *once*.
+
+Two readings, and the sweep in flight separates them:
+
+1. **The leak is real and newly load-bearing.** The channel was always open, but
+   only recently did the model start acting on it — note the same case's edit
+   volume collapsed between eras (8.38 → 2.81 mean landed edits on `exec-bugfix`
+   base arms), so this is a different agent from the one those floors describe.
+2. **The leak is real but is not what aa16-slot measured.** Something else that
+   differs by arm — the worktree-vs-live-tree difference is the obvious
+   candidate — produced the 68.8pp gap, and closing the leak will not close it.
+
+Both readings agree the leak had to be closed; rule 68 stands on the code
+inspection, not on the sweep. What is *not* established is the causal claim in
+"The mechanism" above. Downgrade it to a hypothesis (rule 43) until `aa17` says
+otherwise, and read the earlier headline accordingly.
+
+> **Rule 69.** A defect that was always present cannot, by itself, explain an
+> effect that appeared once. Before crediting a long-standing bug with a new
+> anomaly, find the calibrations that already ran through it — if they are
+> clean, either something changed alongside it or the bug is not the cause.
+
+Note also what the four clean A/As do *not* establish. On `runs landing ≥1 edit`
+three of them sit at the **ceiling**, 100% in both arms, where no split is
+expressible. A metric pinned at its maximum cannot bound a bias, so those rows
+are not evidence of blinding — they are no evidence at all, and reading them as
+reassurance is the same error rule 67 names. Only `b102-floor` and `aa14-calib`
+have room to move on it, and only on `done` and mean edits.
+
 ### Open
 
-`aa17-slotfix` is the validation: the same A/A on the same server, post-fix. It
-has to come back null. If a gap survives a blinded A/A, the leak was not the
-only channel and the worktree-vs-live-tree difference is back on the table.
+`aa17-slotfix` is the validation: the same A/A, same server (pid 85569),
+post-fix. Null closes reading 1; a surviving gap closes reading 2 and puts the
+worktree-vs-live-tree difference back on the table as the real defect.
+
+Interim, at 13 of 32 runs: **2/7 base vs 2/6 cand**, −4.8pp, p=1.0. Pointing
+null, far too early to grade, and recorded here only so the final number cannot
+be quietly reconciled against a memory of what I hoped for.
