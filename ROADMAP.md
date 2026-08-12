@@ -9033,3 +9033,26 @@ And the honest prior is that this may not convert at all — the model may run
 something and still not connect the output to the named symptom, in which case
 the finding is that the gap is comprehension rather than procedure, and this
 lever is the cheapest way to learn that.
+
+### `bugfix-notest`: the headroom criterion, stated before the baseline
+
+One property of the seed is worth flagging before any number exists, because
+noticing it afterwards would look like tuning. `compute_category_totals` carries
+an honest docstring — *"Sum revenue for every row… total revenue for that
+category across all of its rows"* — which directly contradicts the line below it
+(`totals[category] = revenue`). A careful reader can therefore find the named
+bug without running anything, which is some of the pressure this case is meant
+to apply.
+
+It stays, for fidelity: the live file documented `get_changed_files`'s intent
+too, and the model still missed the bug in all twelve runs. Real code has
+docstrings, and stripping them to make a case hard is how a case stops measuring
+the thing it was built from.
+
+But it means the baseline could come in too high to measure anything. So, fixed
+in advance: **if `fixed_named` baselines at 80% or above, the case has no
+headroom for `require_run_before_edit` and the seed gets hardened** — softening
+that docstring to describe the report rather than the arithmetic — and the
+hardened version is re-baselined before any lever runs against it. Below 80%,
+the case is used as built. Either way the decision is made on the baseline, not
+on a lever result.
