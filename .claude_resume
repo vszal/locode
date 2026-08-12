@@ -1,4 +1,4 @@
-# locode resume — build 131 (2026-08-11) · D1 NO SHIP (b132, pre-registered); D2 revert CONFIRMED CAUSAL; exec-bugfix collapse UNEXPLAINED, b131-echoguard RELAUNCHED and running; 5.92 RETRACTED by 5.93 (confounded stat); SERVER RESTARTED
+# locode resume — build 131 (2026-08-11) · D1 NO SHIP (b132, pre-registered); D2 revert CONFIRMED CAUSAL; exec-bugfix collapse UNEXPLAINED, b131-echoguard RELAUNCHED and running; 5.92 RETRACTED by 5.93, 5.93's OVERREACH retracted by 5.94 — read 5.94, not either; SERVER RESTARTED; rule 62 now enforced by `metrics.py --servers`
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -832,12 +832,19 @@ completion. **The repeat death is still the dominant ending.**
    - Aborted once at 2/32 (user needed the machine), partial results renamed
      `b131-echoguard-ABORTED-partial` so they cannot be misread, then
      RELAUNCHED on a fresh server. Currently running.
-   - **IGNORE 5.92 — retracted by 5.93.** I briefly believed both cases were
-     4-8x overdispersed and struck this sweep's premise. The statistic pooled
-     base arms running DIFFERENT BUILDS against a single-rate null, so it
-     measured the project working, not noise. Hold base_ref constant (real SHAs
-     only — HEAD/HEAD~1 resolve differently per sweep) and repeats are
-     consistent. The premise stands; this sweep matters.
+   - **IGNORE 5.92 — retracted by 5.93. Then read 5.94, not 5.93.** 5.92 pooled
+     base arms running DIFFERENT BUILDS against a single-rate null, so its
+     4-8x overdispersion measured the project working, not noise; 5.93 killed
+     it correctly. But 5.93 then went further and called the sweep-level effect
+     absent, which contradicts two sections I had already written (4.4-build-38:
+     build-identical sweeps differing at p=0.030; 5.47: a restart alone moved
+     VERIFIED 0-7/14 -> 4-11/14 with code constant). 5.94 restores those. Net
+     for this sweep: the premise stands and it matters — but the defense is
+     "same server process," not "noise is binomial."
+   - **Rule 62 (final form).** Before attributing ANY cross-sweep difference,
+     both must hold: (1) you have diffed the two arms' code and can state the
+     delta, and (2) the same server process ran both. Check (2) with
+     `python evals/metrics.py --servers`.
    - **THE 3-DAY SERVER IS GONE.** pid 69851 (up since Aug 8, ran b125->b132)
      died during the abort; ab.py respawned a fresh one (pid 85569). Every
      future sweep is on a different server process than every banked result, so
@@ -944,7 +951,12 @@ backfills history. 49 sweeps backfilled and TRACKED in git, which matters
 because `events/` is gitignored — metrics.json is the ONLY durable record of the
 per-call channel. Schema splits per_run vs per_call and marks each `readable`.
 Write new graders against it instead of re-implementing collect() a fourth time;
-28 hermetic tests in `tests/test_eval_metrics.py`, mutation-checked.
+32 hermetic tests in `tests/test_eval_metrics.py`, mutation-checked.
+`metrics.py --servers` prints every sweep in creation order and draws an
+explicit restart line wherever the server pid/started pair changes — that is
+the rule-62 check, mechanized so it stops depending on memory. Each
+metrics.json also carries `server` {pid, started, model} and `created`.
+Sweeps before b119 show `?`: they predate ab.py's fingerprint.
 
 - `evals/ab.py --base REF -m MODEL -c CASE -r N --label L` — paired A/B, git
   worktree baseline vs the **LIVE WORKING TREE** candidate. **Source edits are
