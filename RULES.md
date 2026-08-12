@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**This index is partial and says so.** It covers 27 numbers. At least 23 more
+**This index is partial and says so.** It covers 28 numbers. At least 23 more
 are cited in `ROADMAP.md` (2, 9, 12, 14–17, 19–23, 25–27, 29–31, 38, 46, 55) and
 are not yet extracted. Absence from this table means unindexed, not nonexistent.
 
@@ -44,6 +44,7 @@ the § anchor is authoritative if one ever drifts.
 | 60 | Don't rewrite redundant nudge text for aesthetics. Change it only with evidence it costs behaviour. | L7014 · §5.89 |
 | 61 | Compute statistical power *before* running a sweep. If the hoped-for effect is smaller than the noise band, don't run it on a per-run threshold. | L6891 · §5.86b |
 | 62 | Before attributing any cross-sweep difference, BOTH must hold: (1) diff the two arms' code and state the delta; (2) confirm the same server process ran both. Check (2) with `python evals/metrics.py --servers`. | L7378 · §5.94 |
+| 63 | A "did the model comply" classifier must be derived from what the instruction asked for, not from generic novelty — for any nudge that says "go back and look again", the two are opposites. | L7599 · §5.97 |
 
 ⚠ = **reconstructed.** The number is cited but never stated outright anywhere in
 `ROADMAP.md`; the wording above is inferred from its use sites and is not a

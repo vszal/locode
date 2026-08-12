@@ -7559,4 +7559,66 @@ for "short run". `fully_fixed` is reported, not gated on.
 **Queued.** Behind b131-echoguard — one experiment at a time, and no source edits
 while a sweep runs.
 
+## 5.97 — nudge compliance, measured: the specific ones are obeyed ~100%, the vague one ends the turn
+
+An empirical version of the instruction-surface audit (5.77), which read the
+strings. This reads what the model *did next*. Same corpus as 5.96 — every
+b12x/b13x sweep, 752 runs.
+
+For each nudge, the tool of the very next call:
+
+| nudge | n | next call | reading |
+|---|---|---|---|
+| `repeated edit` | 28 | **100% `read_file`** | says "STOP editing, RE-READ the file" — obeyed every single time |
+| `stall on a stale reading` | 80 | **100% `bash`** | obeyed |
+| `unverified edits` | 574 | **77% `bash`**, 16% `read_file` | says "run it or re-read it" — 93% did one of the two |
+| `every tool call failing` | 51 | 100% a different tool | obeyed |
+| `same failure (2 in a row)` | 571 | 96% a different tool | obeyed |
+| **`repeated call`** | **383** | **61% the turn simply ended** | 16% bash, 10% edit_file, 8% replace_lines, 4% read_file |
+
+The pattern is sharp and it is about the text, not the trigger. Every nudge that
+names **one concrete next action** — re-read this file, run the test — is
+followed by that action essentially always. The one nudge that offers a menu
+(`_nudge_repeat`: "try a genuinely different approach (different arguments, a
+different tool, or re-read the file/error first), **or** … give your final answer
+in plain text now") ends the turn 61% of the time. Offered an exit, a weak model
+takes the exit. That is 5.89's "the weak nudge is `repeated call`", now with a
+mechanism rather than an impression.
+
+### The correction that produced this
+The first pass classified the next call by whether its **(name, args) had been
+seen before** and reported `repeated edit` as the *worst* nudge in the set —
+"28 fires, 0% produce a new action, 46% repeat the identical call." That was
+exactly backwards. The nudge's instruction *is* "re-read the file", and a
+re-read of a file already read is by construction a previously-seen call. The
+metric counted perfect compliance as repetition. Classifying by intent — which
+tool, against what the nudge asked for — inverted the finding.
+
+Third time today that a first-pass statistic pointed the wrong way (5.93, 5.96,
+this). All three were caught by looking at what a run actually did instead of
+trusting the aggregate. **Rule 63: an automatic classifier for "did the model
+comply" must be derived from what the instruction asked for, not from generic
+novelty. Novelty and compliance are different things, and for any nudge that
+says "go back and look again" they are opposites.**
+
+### What this does to lever 0e (5.96) — pre-registration amendment
+It strengthens it, and it settles the wording question 5.85 left open.
+
+`repeated edit` is the **most-obeyed nudge in the system** and it fires 28 times,
+against a population of **719** same-result duplicate mutating calls (5.96) — it
+is throttled by `max_repeat_calls`, not by lack of effect. Lever 0e's change is
+therefore not "add a new intervention"; it is "let the intervention that already
+works reach the calls it was written for."
+
+Amendment, recorded before the change exists and before the sweep that grades it:
+the occurrence-2 wording is now specified, not open. **Model it on
+`_nudge_repeat_edit`: one imperative next action, no menu, no offered exit.** Do
+NOT reuse `_nudge_repeat`'s text, which the table above shows converts to a
+turn-end more often than to anything else.
+
+Unchanged: the REJECT line, and the refusal to claim that suppressing duplicates
+converts failures into successes. **Compliance is not improvement** — b126
+remains the case where the model obeyed an intervention into a worse place, and
+100% obedience is exactly what makes that failure mode available.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
