@@ -7861,7 +7861,32 @@ repetition, now by counting a harness kill as the model choosing to stop. The
 rule keeps its number and its wording. The 61% figure it was coined alongside
 is withdrawn.
 
-*(Instrument: `nudge_era.py`, scratch. The `stopped`-vs-`turn_end` split
-belongs in `evals/metrics.py` before any nudge is graded again.)*
+### The rest of the table is clean — and `repeated call` is an outlier
+
+Running the same three-way split across every other nudge in 5.97:
+
+| nudge | fires | next tool | harness stop | model ended |
+|---|---|---|---|---|
+| `stall on a stale reading` | 160 | **100.0%** | 0.0% | 0.0% |
+| `every tool call failing` | 348 | 97.1% | 0.6% | 2.3% |
+| `unverified edits` | 2,196 | 96.3% | 3.6% | 0.1% |
+| `same failure (2 in a row)` | 3,396 | 88.3% | 10.7% | 1.1% |
+| `repeated edit` | 166 | 84.3% | 15.7% | 0.0% |
+| **`repeated call`** | **1,556** | **41.0%** | **55.3%** | **3.7%** |
+
+Model-ended is 0–2.3% for all of them, so no other row was distorted by the
+merged bucket and 5.97's other conclusions stand. But the contrast is the
+finding: every nudge in this system gets a tool call 84–100% of the time
+except one. `repeated call` is not a badly worded nudge among well-worded
+ones — it is the only nudge that routinely fires inside a run that is already
+being killed. That is a scheduling defect, and no rewrite reaches it.
+
+(Fire counts here run 3–6× 5.97's — 3,396 vs 571 for `same failure`, 2,196 vs
+574 for `unverified edits`. 5.97's counting is unreconstructed; the shares are
+what carry the argument, and they are computed over every sweep in the
+archive.)
+
+*(Instrument: `evals/nudge_next.py`, shipped with the split built in so this
+defect cannot recur silently.)*
 
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
