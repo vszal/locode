@@ -8759,3 +8759,34 @@ The generalisation worth keeping is about the *evidence*, not the plumbing:
 **"the script has a restore trap" is a claim about intent; `git status` is a
 claim about fact.** Prefer designs where the wrong state is unrepresentable to
 designs where it is merely cleaned up afterwards.
+
+### Audit sweep alongside 5.109: what else the model is told twice
+
+The plan hijack came out of a defect in what the model *reads*, so the same pass
+was run over every other model-visible string — all fourteen tool descriptions,
+the system prompt, and the twenty-odd nudges. Most of it is coherent; two things
+are worth recording, one as a finding and one as a non-finding.
+
+**Finding (backlog, needs an A/B — do not change blind).** The system prompt's
+fence rules say *"Emit the block and nothing else when calling a tool."* The
+compaction notice says the opposite: *"after you examine something, state what
+you concluded from it in plain text… before you move to the next one."* Prose
+alongside a call is in fact accepted (`loop.py:651` explicitly keeps narration
+attached to native calls), so the harness is fine with both — but the model has
+been told, in its most-read block, that narration is a violation, and the notice
+that contradicts it arrives exactly when the context is under pressure and the
+running notes matter most. Priority: below editing, above ending-classification.
+The lever is one clause in `_FENCE_INSTRUCTIONS` ("…and nothing else" → a
+carve-out for a one-line statement of what you concluded), and it is a
+system-prompt change, so it needs a proper paired A/B, not a pilot.
+
+**Non-finding, recorded so it is not re-audited.** `edit_file` and
+`replace_lines` each redirect to the other, which looks like a loop and is not:
+they partition on the axis that actually matters (deletes → `edit_file` with an
+empty `new`, because content anchors are shift-immune; indentation and
+unmatchable text → `replace_lines`). The two verify gates look like they
+contradict `_nudge_verify`'s escape hatch — that nudge invites a plain-text
+finish, and `_nudge_unverified_verify` punishes finishing on an unrun check —
+but both gates are double-locked on the model having ASSERTED a verification it
+never ran, so an honest "it already does what was asked" passes. Neither is a
+defect.
