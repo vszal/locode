@@ -6845,6 +6845,58 @@ survived is that the effects were large, not that the method was sound. A
 smaller true effect would have been unreadable, and 5.81 shows I was willing to
 write a threshold at 13/24 anyway.
 
+## 5.86b — the floor was derivable from first principles. I never needed the A/A.
+
+5.86 called the unread `b121-aa` "the expensive one." It is worse than that.
+The band it revealed is a three-line power calculation:
+
+    95% band on a base-vs-cand difference = 1.96 * sqrt(2 * n * p * (1-p))
+
+At n=24, p≈0.5, that is **±6.8 runs**. The observed A/A spread was **6**. The
+calibration sweep confirmed arithmetic; it did not discover anything. I could
+have run that calculation before writing any threshold, at any point in the last
+three weeks, for free.
+
+### The instrument limit, stated once and for all
+
+| runs/arm | 95% noise band on the delta |
+|---|---|
+| 14 | ±5.2 runs (**37 points**) |
+| 24 | ±6.8 runs (**28 points**) |
+| 48 | ±9.6 runs (20 points) |
+| 96 | ±13.6 runs (14 points) |
+
+Exact Fisher, base 12/24: **the candidate must reach 20/24 — a jump of 8 runs,
+33 points — to clear p<0.05.** And to detect a realistic 17-point effect
+(50%→67%) at all requires **n=96 per arm**: 192 runs, ~7.5 hours for one case.
+
+**So the per-run channel at r24 cannot see any wording change worth making.** A
+change that converts 3 or 4 runs in 24 — which is a genuinely good change — is
+permanently invisible there, no matter how many times it is re-run. That is not
+a calibration failure to be fixed by better thresholds; it is the instrument's
+resolution. 5.27 said the score channel could not grade these changes and
+blamed tie rates. The real reason is simpler and was computable.
+
+### What actually has power
+Per-call rates, which is where the pivot in 5.87 goes. At n≈200 calls per arm
+the same formula gives a ±10-point band, and the observed mechanism effects have
+been 40–60 points (0%→62% not-found; 0→121 calls; 29%→1% no-ops). Those are
+5–6× their own noise. That is why every surviving verdict in 5.86a is a
+mechanism verdict.
+
+> **Rule 61 — compute the power before running the sweep, not after.**
+> `1.96*sqrt(2*n*p*(1-p))` costs nothing. If the effect you are hoping for is
+> smaller than the band, the sweep cannot answer the question and must not be
+> run with a per-run threshold on it. Choose a per-call metric, or raise n to
+> what the calculation demands, or accept that you are running a mechanism
+> probe and say so in the pre-registration.
+
+### Consequence for the queue
+Lever 0e (the nine-iteration-late repeat detector) was heading for a
+pre-registration with a `fully_fixed` REJECT line. **That design is dead on
+arrival** — rewrite it against per-call quantities (iteration index of the first
+duplicate, duplicates per run, calls-after-nudge) before it runs.
+
 ## 5.87 — pre-registration: D1 against a clean baseline
 
 Written and committed BEFORE the sweep runs. Base `b6853bd` (build 131 = echo

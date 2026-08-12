@@ -924,3 +924,13 @@ completion. **The repeat death is still the dominant ending.**
 - **The stall-signature fix** (5.13d): three hypotheses, all refuted.
 - Whitespace-normalising the `old` match: **zero** of 187 misses were whitespace.
 - **The pytest duration string as the stall-fragmentation cause**: tested, wrong.
+
+61. COMPUTE THE POWER BEFORE RUNNING THE SWEEP. 1.96*sqrt(2*n*p*(1-p)) is the
+    95% band on a base-vs-cand difference in RUNS. At r24 that is +/-6.8 — the
+    b121-aa A/A measured 6, so the calibration sweep only confirmed arithmetic.
+    Exact Fisher from base 12/24: the candidate must reach **20/24** to clear
+    p<0.05. Detecting a 50%->67% effect needs **n=96 per arm**. The per-run
+    channel at r24 therefore CANNOT see any wording change worth making; that
+    is resolution, not calibration. Use per-call metrics (n=90-300, band ~10
+    points, observed effects 40-60 points) or raise n or declare it a mechanism
+    probe. ROADMAP 5.86b.
