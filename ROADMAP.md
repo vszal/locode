@@ -7409,4 +7409,46 @@ What has still never moved: every ship/revert decision came from a within-sweep
 paired comparison under a rule fixed in advance, and none of them changed across
 any of the four corrections.
 
+## 5.95 — the server field shipped; the archive cannot answer the era question
+
+Two follow-ups to 5.94, one done and one a negative result worth recording so it
+is not attempted a second time.
+
+**Shipped.** `metrics.json` now carries `server` {pid, started, model} and
+`created`, `READ_FIRST` states rule 62, and `python evals/metrics.py --servers`
+prints every sweep in creation order with an explicit restart line wherever the
+pid/started pair changes. All 47 historical sweeps regenerated; 32 hermetic
+tests. Run against the archive it reproduces 5.94's table mechanically — b119
+through b132 on pid 69851, then a restart line before the in-flight
+`b131-echoguard` on 85569. Sweeps before b119 print `?`: `ab.py` did not
+fingerprint the server yet, and that gap is permanent.
+
+**The negative result.** The obvious next question is the rule-62-legal version
+of what 5.92 botched: *within one server era, holding `base_ref` to a real SHA,
+how much does the same base arm move?* The archive cannot answer it. Grouping
+all 47 sweeps by (base SHA, case, server pid) and keeping groups of ≥2 yields
+six groups, and exactly one carries a pid — `3f3650f`/exec-ambig on 69851, which
+is 0/14, 0/24, 1/1, 0/2. A group that is all zeros has no variance to measure.
+Every other repeated group predates the fingerprint, so its era is unknown by
+construction:
+
+| base SHA | case | server | base arms |
+|---|---|---|---|
+| 3f3650f | exec-ambig | 69851 | 0/14, 0/24, 1/1, 0/2 |
+| 89cf3bc | exec-bugfix | unknown | **5/8, 0/8**, 0/2 |
+| e95c979 | exec-bugfix | unknown | 0/8, 0/14 |
+| 68bb85a | syntax-fix | unknown | 3/3, 10/10, 10/10 |
+| 5cc7ef2 | exec-bugfix | unknown | 0/1, 1/6 |
+
+The `89cf3bc` row is the interesting one and also the point: identical base SHA,
+5/8 → 0/8, and **no way to tell whether a restart fell between them.** That is
+not evidence for the effect; it is an illustration of why the field had to
+exist. The era-controlled A/A is answerable only going forward, from b119 on,
+and only once two sweeps happen to share a SHA *and* a pid. Nobody should spend
+another session mining the back-catalogue for it.
+
+Deliberately not done: back-filling pids from process history or file mtimes.
+An inferred fingerprint would be indistinguishable in the schema from a recorded
+one, and rule 62 is only worth anything if its inputs are observations.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
