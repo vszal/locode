@@ -8657,3 +8657,105 @@ Every future A/A is now also a **blinding check**, and gets read as one. Rule 68
 made the label a defect; rule 67 already made same-era calibration mandatory.
 Together they mean the rig re-proves itself every time the noise floor is
 measured, which is the only way a defect this old goes undetected for a week.
+
+## 5.109 — The plan hijack: why "it just quits" is not a quitting bug
+
+The report was one sentence: *"I don't know what's been improved. Qythos just
+quits on me."* Attached was a live session. The request was to fix one bug in
+one file — `sync_gke_compute_classes.py`, a script that syncs a skills repo.
+What qythos9 did:
+
+1. read the file;
+2. called `update_plan` with **six** tasks. Items 1–5 were *the script's own
+   documented workflow*, lifted almost verbatim out of its module docstring —
+   clone `google/skills`, identify what changed, stage the diffs, apply them,
+   clean up. Item 6 was the user's actual request, last;
+3. started on item 1. Ran `git checkout skills/cloud/gke-compute-classes`
+   inside a `_staged-diffs` directory. Ran the identical command again;
+4. `⏹ stopped (the model repeated the same tool call without making progress)`
+   — 6 iterations, 4 tool calls, 1 nudge, 36.4s.
+
+**The stop is the last symptom, and the guard that fired is the only part of
+the system that behaved correctly.** By the time the repeat guard tripped, the
+turn had been lost four steps earlier, at the plan. The model had committed
+itself, in writing, to executing the program instead of repairing it, and then
+did exactly what it had written down. Every downstream mechanism — the nudge,
+the repeat detector, the stop — was faithfully serving a corrupt goal.
+
+This is worth stating plainly because the last several weeks of levers all sit
+downstream: nudges, repeat thresholds, verify prompts, ending classification.
+None of them could have saved this turn. A goal set wrong in iteration 1 is not
+recoverable by better prosecution of that goal in iterations 2–6.
+
+### Why the plan absorbed the docstring
+
+`update_plan`'s description told the model *when* to plan and *how to format*
+it. It never said what a plan **is**. To a 9B model that has just read a file
+whose docstring contains a prominent numbered list, "record your task list" and
+"here is a numbered list" are a very short distance apart — and the tool then
+re-renders that list back into the transcript on every update, so the wrong goal
+is restated more often than the user's request is.
+
+Two sentences were added, both about identity rather than mechanics: that fixing
+one bug or changing one file is a **single step** and needs no plan at all, and
+that the plan is *what you will do*, never a summary of code you just read —
+naming the docstring/README case explicitly and saying where it leads.
+
+### The case
+
+`evals/cases/plan-hijack/` is the failure, reduced and made self-contained:
+`syncdirs.py` carries a five-step numbered workflow in its docstring and one
+real bug (a path compared relative-to-root against an absolute root, so the
+source set is always empty), and `test_syncdirs.py` pins the behaviour — 4 of 6
+tests fail on the seed, all 6 pass on the one-line fix. The seed contains no
+URL, no `git clone`, nothing network-shaped: the bait is entirely the shape of
+the docstring. Verified by hand both directions before the case was committed.
+
+`check.py` scores the fix and the hijack **separately** — `fully_fixed`,
+and `did_not_hijack` (any `update_plan` naming ≥2 of the script's own workflow
+steps), plus `no_plan_needed` as the leading indicator. A run can wander and
+still recover; a lever that improves one while wrecking the other is not an
+improvement, and collapsing them into one score would hide exactly that trade.
+Reading the *tool call* rather than the workspace matters here: the evidence for
+this defect never touches a file.
+
+### The first sweep is void: two runners, one working tree
+
+The 6v6 was launched twice. The first launch was orphaned rather than killed
+(`PPID 1`, still swapping files 60 minutes later); the second was started
+believing the first was dead. Both ran the same script, and that script switched
+arms by **copying `plan_A.py` or `plan_B.py` over `locode/tools/plan.py` in the
+live tree**. So while instance 2 was running what it recorded as arm B,
+instance 1 could — and at least once did — overwrite `plan.py` with arm A
+underneath it. Both also wrote transcripts into the same output directory, and
+instance 2's `rm -rf "$OUT"` truncated instance 1's files.
+
+**No run from that sweep can be attributed to an arm.** All four transcripts are
+discarded. Nothing was graded from them, and no claim in this document rests on
+them.
+
+Two independent defects, one root cause. The arm lived in a *mutable shared
+location*, so (a) concurrency corrupted it and (b) a hard kill skipped the
+restore trap and left the working tree on the baseline — my fix silently absent
+from the tree, caught only by `git status`. That second failure had already
+happened once the day before and been "fixed" by adding the trap. A trap is not
+a fix for a `kill -9`.
+
+The rerun removes the mutation instead of guarding it: each arm is a **frozen
+copy of the package**, chosen with `PYTHONPATH`, and the live tree is never
+written to. A lock directory makes a second instance refuse to start rather than
+silently interleave. The copies are named `src_q7` / `src_m3` rather than
+`src_A` / `src_B`, because a traceback can print the interpreter's source path
+and rule 68 admits no exceptions for channels that only *sometimes* carry.
+
+**Rule 70. An A/B arm must never live in a mutable location the running system
+reads.** Swapping files in the working tree to switch arms is not an
+implementation detail: it makes the arm assignment a race, it survives no
+interruption, and it silently reverts the change under test. Freeze each arm as
+its own tree and select it read-only. A runner that mutates shared state must
+also refuse to start twice.
+
+The generalisation worth keeping is about the *evidence*, not the plumbing:
+**"the script has a restore trap" is a claim about intent; `git status` is a
+claim about fact.** Prefer designs where the wrong state is unrepresentable to
+designs where it is merely cleaned up afterwards.
