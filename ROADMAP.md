@@ -7889,4 +7889,101 @@ archive.)
 *(Instrument: `evals/nudge_next.py`, shipped with the split built in so this
 defect cannot recur silently.)*
 
+## 5.101 — lever 0e, redesigned: the nudge has exactly one attempt of runway *by construction*
+
+5.100 measured a median of 1 iteration from the `repeated call` nudge to the
+stop and called it "overrun". Reading `loop.py:997–1053` shows that is not a
+tendency, it is the control flow:
+
+```
+if seen_streak >= max_repeat_calls - 1:        # >= 2  ->  the THIRD attempt
+    if batch_sig not in nudged_repeat:
+        nudged_repeat.add(batch_sig)
+        ...nudge...
+        continue                               # the call is SUPPRESSED
+    ...
+    return self._stop("the model repeated the same tool call ...")
+```
+
+The nudge `continue`s without executing, so `repeat_streaks` is never updated
+(the update at :1126 runs after execution) and the streak stays at 2. The next
+time that signature appears, the threshold is met again, `batch_sig` is already
+in `nudged_repeat`, and control falls straight through to `_stop`. **The nudge
+and the kill are one attempt apart, always.** The 51%-at-≤1-iteration figure
+is the design, not the model.
+
+Two consequences that reframe lever 0e:
+
+1. **No wording can fix this.** One attempt is not enough runway for any
+   message. 5.100 said "a scheduling defect no rewrite reaches"; this is why.
+2. **The warning and the kill are welded together.** The lever is to separate
+   them, not merely to move both earlier.
+
+### The occurrence-2 simulation (rule 16)
+
+Replaying the archive with a threshold of 1 for mutating batches — what the
+5.96 pre-registration proposed:
+
+| | recent era (b126–b132, 478 runs) | whole archive (2,043 runs) |
+|---|---|---|
+| runs where the real nudge fires | 37% | 63% |
+| runs where occurrence-2 would fire | **73%** | 74% |
+| runs gaining a nudge they never get today | **40%** | 24% |
+| earlier, where both fire (median) | 5 iterations | 5 iterations |
+| runway before the stop: real | median 3, **29% get ≤1** | median 1, 51% get ≤1 |
+| runway before the stop: occurrence-2 | median 6, **12% get ≤1** | median 6, 7% get ≤1 |
+
+Coverage roughly doubles and runway roughly doubles, consistently in both eras
+(rule 64 satisfied). The simulation bounds **timing only** — suppressing a call
+changes everything after it, so it says nothing about whether the earlier nudge
+would work.
+
+### Why the 5.96 pre-registration is wrong anyway
+
+The proposal was to fire *and suppress* at occurrence 2. Checking what the
+second identical mutating call actually returns, recent era, n=748:
+
+| result | share |
+|---|---|
+| reported SUCCESS | **60.4%** |
+| no-op / already done | 16.0% |
+| error: ambiguous | 10.2% |
+| error: other | 7.0% |
+| error: `old` not found | 6.4% |
+
+Six out of ten are calls the tool layer accepted. Some of those are the
+gemmacoder12 duplication pathology the `repeated_edit` exception at :1122 was
+written for — a byte-identical `replace_lines` "succeeding" with a fresh diff
+while duplicating content — but some are surely a genuine second site needing
+the same fix. Suppressing all 748 to catch the bad ones is a large, unbounded
+behaviour change bundled into a timing experiment. **Rule 28.**
+
+### Pre-registration: lever 0e v2 — warn early, kill on the old schedule
+
+**The change.** For batches where every call is a mutating edit, emit the
+repeat nudge at occurrence 2 **without suppressing the call** (no `continue`).
+Leave the suppression and the `_stop` exactly where they are, at the existing
+`max_repeat_calls - 1` threshold. Nothing is blocked that is not blocked today;
+the only difference is that the warning arrives ~5 iterations earlier and in
+40% more runs.
+
+**Primary metric.** Runs reaching a clean finish, per arm. Per-run, so it is
+underpowered by construction (rule 61) — it is reported, not gated.
+
+**Gating metric** (per-call, n in the hundreds, rule 58): the share of runs
+ending in `_stop("repeated the same tool call")`. This is the outcome the
+lever is designed to prevent and it is defined for every run (rule 48).
+
+**Threshold.** SHIP requires the drop to clear both the binomial band and 7pp,
+the calibrated A/A figure (rule 57). REJECT if clean finishes fall at all
+(rule 8 — endings must not fall, whatever else moves).
+
+**Precondition, and it is a gate, not a print (rule 54):** the candidate arm
+must show occurrence-2 nudges firing in ≥60% of runs. The simulation says 73%;
+below 60% the lever did not fire and the sweep grades nothing (rule 17).
+
+**Not bundled:** no wording change ships with this. The nudge text stays
+byte-identical so the sweep tests timing alone (rule 28). The wording question
+is now moot anyway — 5.100 retired the "remove the offered exit" amendment.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
