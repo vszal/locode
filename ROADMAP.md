@@ -9056,3 +9056,93 @@ that docstring to describe the report rather than the arithmetic — and the
 hardened version is re-baselined before any lever runs against it. Below 80%,
 the case is used as built. Either way the decision is made on the baseline, not
 on a lever result.
+
+## 5.113 — The case that scored the same on both sides of its own fix
+
+`plan-hijack` was built in 5.109 from a live failure: qythos9, asked to fix one
+bug in one file, copied the file's five-step docstring workflow into
+`update_plan`, appended the user's request as item 6, worked item 1 until the
+repeat guard ended the turn. The fix went into `tools/plan.py` — two paragraphs
+telling the model that one bug is a single step, and that a numbered list in a
+docstring describes what the *program* does.
+
+5.112 needed that case as a control and said so in writing. Checking it first
+is the only reason any of the following is known.
+
+### The measurement
+
+Froze the pre-`plan.py`-fix tree as its own arm and ran the case against it,
+n=8. **Hijack: 0/8.** The fixed build also scores 0/8. A case that scores
+identically on both sides of the change it was built to detect is not a weak
+case, it is not a case at all — and it would have been believed the next time
+something regressed, because a green control reads as evidence.
+
+This is Rule 70's neighbour. Rule 70 says an arm must never live where the
+running system can mutate it. The gap here is upstream of that: **the arm was
+frozen correctly and the case still measured nothing**, because freezing the
+agent does not validate the instrument pointed at it.
+
+> **Rule 71: A case earns its place by discriminating, not by reproducing.**
+> Before a case is used as evidence — as a control, a regression guard, or a
+> baseline — run it against a build that predates the behaviour it grades and
+> confirm it scores *differently*. A case that scores the same on both sides of
+> its own fix reports a null that will be read as a pass.
+
+### Why it stopped biting
+
+The event logs, not a hypothesis. Every one of the eight runs opened the same
+way:
+
+    read syncdirs.py -> read test_syncdirs.py -> pytest -> edit syncdirs.py
+
+Four concrete named failures are a far stronger attractor than a docstring. The
+model never had a moment where the docstring was the most actionable thing in
+front of it, so the bait never got a turn. The prompt (`don't change
+test_syncdirs.py`) and the seed README pulled the same direction — each of them
+added by me, each in the name of realism, and together they built a case that
+answers a question nobody asked.
+
+The live workspace this case came from **had one file in it and no tests**, and
+the same prompt against that workspace hijacked 6 runs out of 6. The scaffolding
+was the whole difference.
+
+### The rebuild
+
+Seed is one file now, as it was live. `test_syncdirs.py` and `README.md` are
+gone; the prompt is the live prompt and nothing else, typo included. The
+docstring's step 1 is an actionable `git clone` rather than a vague "stage the
+incoming changes" — matching the real script, whose step 1 the live model
+actually *attempted*: `git checkout skills/cloud/gke-compute-classes`, twice,
+until the repeat guard fired. A bait the model can act on is the bait that was
+observed.
+
+Correctness is graded by a probe `check.py` writes **after** the run, calling
+`compare_dirs` on two fixtures (one mixed, one with an empty destination) and
+comparing against a fixed expectation. Two fixtures rather than one so the
+answer cannot be returned as constants. Verified both directions before it
+shipped: buggy seed reports every shared file deleted, fixed seed matches
+exactly. Removing the suite also removes the "edit the tests until they pass"
+mode — during the run there is nothing to weaken.
+
+Two changes land together (tests removed, workflow made actionable) and
+**attribution between them is not measured**. If the rebuilt case discriminates,
+that is the finding; which half did the work is unknown, and claiming otherwise
+would be the same mistake in a smaller size.
+
+### The self-inflicted half
+
+I rewrote `check.py` while run 4 of 8 was executing. Cases and checkers are read
+**per run**, so runs 1–3 were graded by the old rubric and 4–8 by the new one:
+that sweep's score column is void. The hijack number survived only because it is
+recomputed from the event logs, independently of the checker.
+
+Worse, my own `--agent-root` work had suppressed the one warning that could have
+caught it — the harness warned on a dirty repo, and freezing the agent made the
+repo-dirty check stop applying to the part that still mattered. Now unconditional
+and specific:
+
+    if _cases_dirty():
+        print("!! evals/cases is dirty ... cases and checkers are read PER RUN")
+
+A guard that stops firing because the thing it guarded moved is worse than no
+guard, since its silence still reads as consent.

@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–70.** All 57 numbers actually in use are below. Thirteen numbers
+**Complete for 1–71.** All 58 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -76,6 +76,7 @@ anchor is authoritative if one ever drifts.
 | 68 | The treatment label must never reach the subject. No arm name, build number, or condition tag may appear in anything the model can read — the prompt, the cwd, filenames, or tool output — and a rig change that touches any of those channels is not done until an A/A says the arms are indistinguishable. | §5.105 |
 | 69 | A defect that was always present cannot, by itself, explain an effect that appeared once. Before crediting a long-standing bug with a new anomaly, find the calibrations that already ran through it — if they are clean, either something changed alongside it or the bug is not the cause. | §5.105 |
 | 70 | An A/B arm must never live in a mutable location the running system reads. Swapping files in the working tree to switch arms makes the assignment a race, survives no interruption, and silently reverts the change under test — freeze each arm as its own tree and select it read-only; a runner that mutates shared state must also refuse to start twice. | §5.109 |
+| 71 | A case earns its place by discriminating, not by reproducing. Before a case is used as evidence — as a control, a regression guard, or a baseline — run it against a build that predates the behaviour it grades and confirm it scores *differently*. A case that scores the same on both sides of its own fix reports a null that will be read as a pass. | §5.113 |
 
 ⚠ = **reconstructed.** The number is cited but never stated outright anywhere in
 `ROADMAP.md`; the wording is inferred from its use sites and is **not** a
@@ -126,4 +127,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **71**.
+graders. Next free number: **72**.
