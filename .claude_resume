@@ -1,4 +1,4 @@
-# locode resume — build 131 (2026-08-11) · D1 NO SHIP (b132, pre-registered); D2 revert CONFIRMED CAUSAL; exec-bugfix collapse UNEXPLAINED, b131-echoguard ABORTED at 2/32 (user needed the machine); BOTH CASES 4-8x OVERDISPERSED (5.92); SERVER RESTARTED
+# locode resume — build 131 (2026-08-11) · D1 NO SHIP (b132, pre-registered); D2 revert CONFIRMED CAUSAL; exec-bugfix collapse UNEXPLAINED, b131-echoguard ABORTED at 2/32 (user needed the machine); 5.92 RETRACTED by 5.93 (confounded stat); SERVER RESTARTED
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -832,10 +832,12 @@ completion. **The repeat death is still the dominant ending.**
    - **ABORTED at run 2/32** on 2026-08-11, user needed the machine. Partial
      results renamed `b131-echoguard-ABORTED-partial` so they cannot be misread.
      Design is unchanged and still correct — just relaunch it.
-   - **5.92 moved the prior hard toward branch 2 (drift).** Both cases are
-     4-8x overdispersed; exec-bugfix has a 9-arm all-zero stretch in its history
-     that recovered to 64% with no cause found. Branch 4 (inconclusive) is now
-     an acceptable outcome, not a failure.
+   - **IGNORE 5.92 — retracted by 5.93.** I briefly believed both cases were
+     4-8x overdispersed and struck this sweep's premise. The statistic pooled
+     base arms running DIFFERENT BUILDS against a single-rate null, so it
+     measured the project working, not noise. Hold base_ref constant (real SHAs
+     only — HEAD/HEAD~1 resolve differently per sweep) and repeats are
+     consistent. The premise stands; this sweep matters.
    - **THE 3-DAY SERVER IS GONE.** pid 69851 (up since Aug 8, ran b125->b132)
      died during the abort; ab.py respawned a fresh one (pid 85569). Every
      future sweep is on a different server process than every banked result, so
@@ -936,6 +938,14 @@ completion. **The repeat death is still the dominant ending.**
 9. 5.19 option 3 (low): name the similarity in a fuzzy success message.
 
 ## Instruments
+`evals/metrics.py <label> | --all [--print]` — derives `metrics.json` per sweep
+from ab.json + events/. Standalone and post-hoc: safe to run mid-sweep, and it
+backfills history. 49 sweeps backfilled and TRACKED in git, which matters
+because `events/` is gitignored — metrics.json is the ONLY durable record of the
+per-call channel. Schema splits per_run vs per_call and marks each `readable`.
+Write new graders against it instead of re-implementing collect() a fourth time;
+28 hermetic tests in `tests/test_eval_metrics.py`, mutation-checked.
+
 - `evals/ab.py --base REF -m MODEL -c CASE -r N --label L` — paired A/B, git
   worktree baseline vs the **LIVE WORKING TREE** candidate. **Source edits are
   forbidden while a sweep runs.** Docs, ROADMAP.md and gitignored files are safe.
