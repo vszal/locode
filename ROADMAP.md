@@ -7792,4 +7792,76 @@ the first thing to verify when the current sweep frees up cycles.
 *(Instrument: `occ_calib.py`, scratch. Worth promoting into `evals/metrics.py`
 as a standing per-sweep bucket if 5.97 needs the same audit.)*
 
+## 5.100 — correcting 5.97: the repeat nudge is not taken as an exit, it is overrun by the cap
+
+Rule 64 sent me back to §5.97's nudge-compliance table, which pooled the whole
+archive. The pooling turned out to be the smaller problem. The bigger one is
+that its outcome classifier conflated two events that mean opposite things.
+
+**5.97 reported: `repeated call` fires 383 times and "61% the turn simply
+ended."** I built the nudge-design principle on that line — a menu with an
+offered exit gets taken, so occurrence-2 must be one imperative with no exit.
+
+Re-running it with "the turn ended" split into *the model stopped calling
+tools* versus *the harness killed the run*:
+
+| outcome after a `repeated call` nudge | n | share |
+|---|---|---|
+| **harness stop** (`stopped` event) | 855 | **55.1%** |
+| next tool call | 637 | 41.1% |
+| **model actually ended its turn** | **59** | **3.8%** |
+
+n = 1,551 across the archive. (5.97's 383 is a different, unreconstructed
+count; the ratio matters more than the base here, and every sweep is included
+above.)
+
+**The model takes the offered exit 3.8% of the time, not 61%.** The 61% was
+overwhelmingly the harness's own guard firing. Of the 855 stops, **479 are
+"the model repeated the same tool call without making progress"** — the repeat
+cap — and 330 are the stall cap. So the actual sequence is: nudge fires → the
+model repeats anyway → the cap executes the run.
+
+### The nudge arrives one iteration before the guillotine
+
+Iterations from the first `repeated call` nudge to the `stopped` event:
+
+| population | n | median | mean | ≤1 iteration |
+|---|---|---|---|---|
+| whole archive | 1,166 | **1** | 3.2 | **51%** |
+| five most recent sweeps | 206 | 2 | 4.5 | 24% |
+
+Half the time the nudge gets a single iteration to work before the run is
+killed. It is not being ignored and it is not being taken as an exit — it is
+being **overrun**.
+
+### What this changes
+
+1. **The "remove the exit" half of 5.97's amendment is retired.** It was
+   designed against a 61% exit-taking rate that does not exist. Deleting the
+   final-answer clause would fix a behaviour occurring 3.8% of the time, and
+   rule 60 says don't touch working nudge text without evidence it costs
+   behaviour. 59 events is not that evidence.
+2. **The "one imperative, name a tool" half stands**, but on rule 19/9 —
+   nudges that name a tool and demand a call are obeyed — not on this table.
+3. **Lever 0e is now the whole fix, and its thesis is confirmed.** 5.85 called
+   the detector "late, not wrong". That is exactly what a median gap of 1
+   iteration says. Firing earlier is not a refinement of the wording change,
+   it is the only change with room to matter.
+4. **5.97's other rows need the same split before they are quoted.** The
+   `unverified edits` row (574 fires, 77% bash) and `same failure` row (571
+   fires, 96% different tool) classify by next tool and so are unaffected. The
+   rows to re-read are any that counted an ending.
+
+### Rule 63 stands; its evidence does not
+
+Rule 63 — a compliance classifier must be derived from what the instruction
+asked for — was coined off this table and is, if anything, reinforced: I got
+the classifier wrong twice on the same data, first by counting a re-read as
+repetition, now by counting a harness kill as the model choosing to stop. The
+rule keeps its number and its wording. The 61% figure it was coined alongside
+is withdrawn.
+
+*(Instrument: `nudge_era.py`, scratch. The `stopped`-vs-`turn_end` split
+belongs in `evals/metrics.py` before any nudge is graded again.)*
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
