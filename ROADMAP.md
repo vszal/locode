@@ -6778,9 +6778,14 @@ What survives is the per-call mechanism metrics. `old`-not-found rate, first-aim
 depth, and tool choice are measured over 90–276 calls, not 24 runs, and their
 effects have been an order of magnitude larger than their sampling error
 (0→121 calls; 0/134 → 74/119 not-found). Every conclusion drawn from those
-holds. The b126 rejection (5.78) stands on exactly that footing — its per-run
-delta was 17→8, inside the noise band, but its mechanism evidence (aim 16/24 →
-0/24, not-found 0% → 62%) is not.
+holds. The b126 rejection (5.78) has mechanism evidence (aim 16/24 → 0/24,
+not-found 0% → 62%) that is far outside any sampling error.
+
+**Correction, made an hour after the above was written.** I first wrote that
+b126's per-run delta of 17→8 was "inside the noise band." It is **−9/24, which
+is outside ±6.** I understated a banked verdict's strength. The audit in 5.86a
+is what caught it — which is the point of running one instead of asserting the
+conclusion.
 
 > **Rule 57 — calibrate before you threshold.** A decision rule on a metric
 > whose A/A spread you have not measured is not pre-registration, it is
@@ -6800,6 +6805,45 @@ delta was 17→8, inside the noise band, but its mechanism evidence (aim 16/24 �
   D12, ahead of the remaining 5.77 items.
 - **Re-base decision rules on per-call metrics** (rule 57/58). Applied in 5.87.
 - The 5.85 lever-0e work stays queued behind 5.87 — one experiment at a time.
+
+## 5.86a — exposure audit: how much rests on per-run deltas inside the band
+
+Rule 59 in practice. Rather than asserting "the mechanism verdicts stand," I
+recomputed every banked sweep's per-run `fully_fixed` delta from its `ab.json`,
+scaled to a /24 equivalent, and checked it against the ±6 A/A band.
+
+**12 of 23 case-level comparisons sit inside the band.** The reassuring part is
+*which* ones:
+
+| decision | sweep | delta/24 | |
+|---|---|---|---|
+| SHIP build 125 | b125-occurrence | **+15.0** | outside |
+| SHIP build 108 | b108-callnotword | **+12.0** | outside |
+| SHIP build 116 | b116-noopcap | **+12.0** | outside |
+| SHIP build 120 | b120-ambigblock | **+12.0** | outside |
+| REVERT build 126 | b128-uniquefirst | **−9.0** | outside |
+| REVERT build 121 | b124-noop | **−11.0** | outside |
+| REVERT the b119 flag | b119-readguard | **−10.3** | outside |
+| b126 (as run) | b126-attribution | **−11.0** | outside |
+| *(no verdict)* | b130 exec-ambig | +4.0 | **inside** |
+| *(A/A, defines the band)* | b121-aa | −6.0 | — |
+
+**Every ship-or-revert decision I have made was driven by an effect outside the
+band.** The 12 inside it are the sweeps that were called INCONCLUSIVE anyway,
+plus b130, which is now formally unjudged. No banked decision needs reversing.
+
+Two honest caveats, neither of which changes that conclusion:
+- **±6 is one A/A sample**, not a confidence interval. It is a point estimate of
+  spread. −9 clears it but not comfortably; +12 and +15 clear it decisively.
+- **The band is measured on exec-ambig at r24.** Scaling r14 exec-bugfix rows to
+  /24 inflates their apparent variance (one run = 1.7/24). The resume already
+  carries a separate r14 exec-bugfix floor (mean delta +0.1429). The r14 rows
+  above are indicative only; the r24 rows are the ones that carry decisions.
+
+What this audit does *not* license is comfort. The reason the big decisions
+survived is that the effects were large, not that the method was sound. A
+smaller true effect would have been unreadable, and 5.81 shows I was willing to
+write a threshold at 13/24 anyway.
 
 ## 5.87 — pre-registration: D1 against a clean baseline
 
