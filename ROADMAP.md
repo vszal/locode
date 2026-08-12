@@ -7621,4 +7621,71 @@ converts failures into successes. **Compliance is not improvement** — b126
 remains the case where the model obeyed an intervention into a worse place, and
 100% obedience is exactly what makes that failure mode available.
 
+## 5.98 — the ambiguity message is disobeyed in exactly the way it prohibits, and that is where the no-op edits come from
+
+Same corpus (752 runs). **1,445 `edit_file` calls received the ambiguous-match
+error.** What the model did on its very next call:
+
+| next action | n | share | and how it turned out |
+|---|---|---|---|
+| lengthened `old` | 603 | 41.7% | **397 of them (66%) sent `old` == `new` — a pure no-op** |
+| added `occurrence` | 349 | 24.2% | **349/349 SUCCESS. A 100% hit rate over 349 uses.** |
+| switched to `read_file` | 174 | 12.0% | |
+| switched to `replace_lines` | 128 | 8.9% | |
+| switched to `bash` / `ls` | 104 | 7.2% | |
+| re-sent the identical edit | 49 | 3.4% | 49/49 ambiguous again — pure waste |
+| other | 38 | 2.6% | |
+
+The message (`fs.py:1406`) is not vague. It says: *"Do NOT rewrite your edit — it
+is fine as it is. Send the SAME call again … and ADD one field: `occurrence`."*
+It names one action, gives the numbering, and shows each match. **41.7% of the
+time the model rewrites the edit anyway — the single thing the sentence
+prohibits — and two thirds of those rewrites are no-ops.**
+
+**This is the user-reported bug.** "edit_file ✗ This edit does NOTHING: `new` is
+identical to `old` … at least 4 of these in one session." 397 of them are sitting
+in the archive, and they are downstream of one message.
+
+### It is not ignorance of the selector
+`occurrence` is used **1,123 times** across these sweeps, and **67% of those uses
+are spontaneous** — no ambiguity error immediately preceding. The model knows the
+field, reaches for it unprompted, and it works every time. What fails is
+compliance with the specific instruction at the specific moment.
+
+### Mechanism: UNDETERMINED, and two tests that failed to discriminate
+The obvious hypothesis is that the message's own match listing (`_match_locations`
+prints the lines around every match) supplies the text the model then pastes into
+both `old` and `new`. Two checks were run and **neither discriminates** — recorded
+so nobody re-runs them:
+
+1. *Is the no-op's text contained in the ambiguity message?* **397/397 yes** — and
+   worthless as evidence. The listing shows file content and `old` is also file
+   content, so containment holds under every hypothesis. It looked like a 100%
+   result for about a minute.
+2. *Was the file never read, so the span could only come from the message?*
+   **397/397 had read it.** Every run reads before editing, so this can never
+   separate the two sources on this corpus.
+
+Distinguishing them needs a designed change, not more mining. The competing
+explanation is well supported inside this project: **lever 0f is CONFIRMED CAUSAL
+(5.90) — a prohibition naming a case makes that case salient.** "Do NOT rewrite
+your edit" may be manufacturing the rewrites. That is the cheaper test and it has
+the stronger prior.
+
+### Candidate levers, ranked, none of them started
+- **0g — drop the prohibition.** Delete "Do NOT rewrite your edit — it is fine as
+  it is" and lead with the imperative. Directly tests lever 0f on this message.
+  One-clause change; primary metric `occurrence` uptake among the 1,445, which is
+  a per-call channel with excellent power.
+- **0h — shorten or drop the match listing.** Tests the copy hypothesis. Riskier:
+  the listing is what lets the model *choose* a number, and 5.66/5.67 already
+  burned two sweeps discovering the model obeys whichever demand leads.
+- **0i — escalate the channel.** Deliver the instruction as a user-role nudge
+  rather than a tool result. 5.97 measured near-100% compliance for user-role
+  nudges naming one action, against 24% here. Tempting, but the two populations
+  are not matched, so treat that contrast as a hypothesis and not a finding.
+
+Sequence: 0g first (cheapest, strongest prior, one clause). One at a time, per
+rule 28 — do not bundle these.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
