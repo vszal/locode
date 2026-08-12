@@ -6835,4 +6835,58 @@ Also recorded, ungated, to settle 5.86 item 3: base exec-bugfix `fully_fixed`.
 ~8/24 implicates D2; ~0/24 implicates drift and forces a full recalibration
 before any further wording work.
 
+## 5.88 — D12: the prohibition audit. Lever 0f is narrower than feared; nothing else changes.
+
+Ran the lever-0f sweep 5.86 called for, over the **runtime** strings from
+`build_registry()` rather than the source (rule 51). 12 tools, **8 negated
+clauses**. Each was tested against banked call data before any judgement.
+
+| clause | shape | empirical signature | action |
+|---|---|---|---|
+| `replace_lines`: "MORE THAN ONCE is NOT a reason to come here" | **cross-tool routing** | 0 → 121 calls | reverted (5.86) |
+| `edit_file`: "CANNOT make an indentation-only or whitespace-only change… use replace_lines" | **cross-tool routing** | **0/1132 edits** were whitespace-only | none |
+| `edit_file`: "do NOT include the line-number prefixes" | arg format | **0/2940** args carried a prefix | none |
+| `replace_lines`: "do NOT include the number prefixes in `new`" | arg format | as above | none |
+| `edit_file`: "SMALLEST unique snippet… NOT the whole file" | arg sizing | banked-good; not-found 0% | none |
+| `edit_file`: "if `old` appears more than once, do NOT rewrite it — set `occurrence`" | recovery + positive action | the highest-value sentence in the file | none |
+| `write_file`: "never emit the whole document in one call" | arg sizing + positive redirect | not measured; no reported failure | none |
+| `replace_lines`: "never re-issue the same start/end after an edit" | staleness warning + positive redirect | not measured; high stated value | none |
+
+**The audit's output is: change nothing.** That is the finding, not a failure to
+find one. The temptation after discovering a lever is to justify the search by
+rewriting text on the strength of the theory alone — which is exactly what D2
+and b126 were, and both lost. A prohibition with no measurable signature stays.
+
+### What lever 0f actually is, narrowed
+Not "negation confuses the model." The failure shape is specific:
+
+> **A negation that names a SITUATION and routes it away from the tool being
+> described.** It puts the situation's keywords in that tool's description, and
+> retrieval matches situation to description without reading polarity.
+
+Argument-format negations ("do not include the prefixes") name a *token
+pattern*, not a situation, and have no routing function — measured at 0/2940.
+Capability statements paired with a positive redirect ("use replace_lines
+instead") did not fire either: 0/1132 whitespace-only attempts. D2 was the sole
+instance of the dangerous shape in the codebase, and it is gone.
+
+Revised guidance, weaker than 5.86's first draft: **do not add new cross-tool
+routing prohibitions without an A/B.** Existing ones are cleared.
+
+### Side finding: the no-op edit rate, which is what the user actually reported
+"`edit_file` … ✗ This edit does NOTHING: `new` is identical to `old`" was
+reported from a live session. Rate of `new == old` among all `edit_file` calls,
+base arms, by build:
+
+| sweep (base arm) | edits | `new == old` |
+|---|---|---|
+| b125-occurrence | 141 | **41 (29%)** |
+| b128-uniquefirst | 310 | 22 (7%) |
+| b130 | 213 | **3 (1%)** |
+
+Down roughly 30×. This is a cross-sweep comparison, but of the class rule 58
+*permits* — a per-call rate with n=141–310 and an effect far outside sampling
+error. The reported defect is substantially fixed; the `occurrence` work
+(build 125) is where most of it went.
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
