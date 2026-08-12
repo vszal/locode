@@ -1,4 +1,4 @@
-# locode resume — build 131 (2026-08-11) · D1 NO SHIP (b132, pre-registered); D2 revert CONFIRMED CAUSAL; exec-bugfix collapse UNEXPLAINED, b131-echoguard RELAUNCHED and running; 5.92 RETRACTED by 5.93, 5.93's OVERREACH retracted by 5.94 — read 5.94, not either; SERVER RESTARTED; rule 62 now enforced by `metrics.py --servers`
+# locode resume — build 131 (2026-08-11) · NEXT WORK = lever 0g, the ambiguity-message prohibition (5.98, 397 no-op edits sourced); b131-echoguard RUNNING, auto-grades to verdict191.txt; D1 NO SHIP; D2 revert CONFIRMED CAUSAL; read 5.94 not 5.93; SERVER RESTARTED; rule 62 checked by `metrics.py --servers`
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -943,6 +943,33 @@ completion. **The repeat death is still the dominant ending.**
 8. 5.13a: render the NORMALIZED call into history so the model stops learning
    its own malformed shape.
 9. 5.19 option 3 (low): name the similarity in a fuzzy success message.
+
+## THE EDIT FINDING (5.96–5.98) — the next code work, all measured, none started
+Four analyses off the archive (752 runs, 13,695 calls), no source touched:
+- **397 no-op edits found and sourced (5.98).** 1,445 edits hit the ambiguous-
+  match error. Its message says "Do NOT rewrite your edit … ADD one field:
+  `occurrence`". 41.7% rewrite anyway — the prohibited thing — and 66% of those
+  send `old`==`new`. That IS the user's "this edit does NOTHING" report.
+  `occurrence` succeeds **349/349** and is used 1,123x overall (67% unprompted),
+  so this is compliance failure, not ignorance.
+- **Lever 0g is the next experiment**: delete "Do NOT rewrite your edit — it is
+  fine as it is." Tests confirmed-causal lever 0f on this message. One clause;
+  primary metric = `occurrence` uptake among the 1,445 (per-call, good power).
+  0h (shorten the match listing) and 0i (deliver as a user-role nudge) behind it.
+  **One at a time (rule 28).** Mechanism for the copying is UNDETERMINED — two
+  discriminating tests already failed, both recorded in 5.98; do not re-run them.
+- **Nudge compliance measured (5.97).** Every nudge naming ONE action is obeyed
+  ~100% (`repeated edit`→read_file 28/28, `stall on a stale reading`→bash 80/80,
+  `unverified edits`→bash-or-read 93%). `repeated call` offers a menu with an
+  exit and 61% of its 383 fires END THE TURN. Wording rule for anything new:
+  one imperative, no menu, no offered exit.
+- **Lever 0e re-diagnosed (5.96).** The repeat guard is not late — it wants a
+  THIRD identical call and the model rarely tries one. 719 same-result duplicate
+  mutating calls across 56% of runs; `repeated edit` (the most-obeyed nudge in
+  the system) reaches only 28 of them. Pre-registered: fire at occurrence 2 for
+  mutating tools, new wording, SHIP needs >7pp AND outside the binomial band.
+- Duplicate-rate A/A floor is MEASURED: +4.0/+1.7/+3.7/0.0/−6.4/+4.3 pp over six
+  A/A sweeps, every one inside its binomial band. Per-call behaves; per-run does not.
 
 ## Instruments
 `RULES.md` — the numbered methodology rules, indexed (27 of ~50; the rest are
