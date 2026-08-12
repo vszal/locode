@@ -4303,6 +4303,33 @@ def test_names_a_symptom_stays_quiet_on_feature_requests():
         assert not _names_a_symptom(text), text
 
 
+def test_names_a_symptom_ignores_the_three_calibrated_idioms():
+    # The first draft of this predicate fired on 12 of the 12 case prompts.
+    # Each line below is one of the idioms that made it a constant.
+    from locode.agent.loop import _names_a_symptom
+    for text in (
+            # second-person negation: an instruction, not a symptom
+            "Write DESIGN.md as a file. Do not write any code yet.",
+            "fix limits.py so every test passes. Do not change the tests.",
+            "be concrete — don't list options without choosing",
+            # break/broken in the decomposition sense
+            "write PLAN.md — milestones, each broken into numbered tasks",
+            "the plan must break the work into milestones",
+            # a symptom noun turned into a topic by the noun after it
+            "describe how crash recovery works and the failure modes",
+            "document the error handling for each endpoint"):
+        assert not _names_a_symptom(text), text
+
+
+def test_names_a_symptom_keeps_third_person_negations():
+    # The split that makes the negation family usable at all: "Do not change"
+    # is an instruction, "won't compile" is a report.
+    from locode.agent.loop import _names_a_symptom
+    assert _names_a_symptom("parser.py has a syntax error and won't compile")
+    assert _names_a_symptom("the loader doesn't handle unicode")
+    assert _names_a_symptom("the totals aren't adding up")
+
+
 def test_mutates_existing_only_counts_content_already_on_disk(tmp_path):
     from locode.agent.loop import _mutates_existing
 

@@ -2140,11 +2140,36 @@ _WRITE_VERB_RE = re.compile(
 # request is enough, because this predicate is ANDed with two far stronger
 # conditions (nothing executed yet, and a mutating edit to an existing file) and
 # is not the one carrying the specificity.
+#
+# Calibrated against all 12 case prompts, where the first draft fired 12/12 —
+# a constant, not a predicate. Three exclusions came out of that, each for a
+# real idiom rather than a one-off:
+#
+#   NEGATIONS split cleanly by person. Second-person "Do not change the tests",
+#   "Do not write any code yet" are INSTRUCTIONS and accounted for five of the
+#   false fires; third-person "won't compile", "doesn't handle unicode" are
+#   symptom reports. Only the third-person forms are kept, and nothing is lost:
+#   every prompt that is genuinely a defect report also carries a real symptom
+#   word (syntax-fix has "error", plan-hijack has "bug").
+#
+#   BREAK/BROKEN is usually decomposition here — "broken into numbered tasks",
+#   "break the work into milestones" — so the family requires that into/down/up
+#   does not follow.
+#
+#   A symptom noun followed by a TOPIC noun is documentation about failure, not
+#   a report of one: "crash recovery", "the failure modes you considered",
+#   "error handling". design-doc is entirely made of these.
+_TOPIC_NOUN = (r"(?!\s+(?:recovery|mode|modes|handling|handler|handlers|path"
+               r"|paths|case|cases|scenario|scenarios|condition|conditions"
+               r"|state|states|message|messages|reporting)\b)")
 _SYMPTOM_RE = re.compile(
-    r"\b(?:bugs?|buggy|broke(?:n|s)?|breaks?|breaking"
-    r"|fail(?:s|ed|ing|ure|ures)?|crash(?:es|ed|ing)?|errors?|erroring"
+    r"\b(?:bugs?|buggy"
+    r"|(?:broke|broken|breaks|breaking)\b(?!\s+(?:\w+\s+){0,2}(?:into|down|up)\b)"
+    r"|fail(?:s|ed|ing)?\b|fail(?:ure|ures)\b" + _TOPIC_NOUN +
+    r"|crash(?:es|ed|ing)?\b" + _TOPIC_NOUN +
+    r"|errors?\b" + _TOPIC_NOUN + r"|erroring"
     r"|wrong(?:ly)?|incorrect(?:ly)?|invalid|mistake[ns]?"
-    r"|do(?:es)?n't|do(?:es)? not|isn't|is not|aren't|are not"
+    r"|does\s?n't|does not|isn't|is not|aren't|are not"
     r"|won't|will not|can't|cannot|never (?:works?|fires?|runs?|returns?)"
     r"|misbehav\w*|regress(?:es|ed|ion|ions)?|traceback|exception)\b",
     re.IGNORECASE,
