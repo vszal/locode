@@ -8967,3 +8967,69 @@ running now to settle it. If the pre-fix arm does not hijack on this seed, the
 bait is too weak and the seed needs to be made more like the file it came from —
 that is a fault in the case, and better to find now than the first time it is
 trusted to catch something.
+
+## 5.112 — Pre-registration: `require_run_before_edit`, and the case it needs
+
+Written before any run of this lever exists. 5.111 relocated the problem: the
+model does not fail to *find* the named bug, it fails to *look for it* when
+nothing shows it the symptom. The steer that follows is "reproduce before you
+edit", and the codebase already contains its sibling.
+
+### The precedent
+
+`require_read_before_edit` (build 93, `config.py:168`) is the same shape one
+level down: before build 93 the model reconstructed the target function from a
+pytest traceback and edited from memory, `old` matched nothing, and across all
+10 runs of both arms it landed at most one successful edit and fixed none of the
+three seeded bugs. One read costs one iteration; the guess-loop cost five to
+seven and ended in surrender. That lever is a **hard reject**, and it can be,
+because a read is always possible.
+
+### Why the new one must be softer
+
+A run is *not* always possible — some tasks have nothing to execute. So
+`require_run_before_edit` is specified as a **one-shot advisory**, not a gate:
+it fires at most once per turn, on the first mutating edit, and the model's next
+attempt goes through whatever it does. Firing conditions, all required:
+
+1. the edit is the turn's first mutating call (`edit_file`, `replace_lines`,
+   `write_file` onto an existing file);
+2. no `bash` call has completed successfully this turn — nothing has been run;
+3. the request is defect-shaped (names a symptom: fails, broken, wrong, error,
+   crash, "doesn't"), the same style of prompt inspection `_expected_artifacts`
+   already does.
+
+Wording follows the 5.32/5.36 recipe that converted twice: name the call first,
+forbid answering in prose, demote the reasoning to the tail. Default **off** in
+config, so it ships dark and is turned on only by the A/B arm.
+
+### The case it cannot be measured on
+
+**`plan-hijack` is the wrong case for this lever and would report a false null.**
+Its prompt names `test_syncdirs.py`, and the baseline runs already open with
+`bash python -m pytest` — condition 2 is false, so the nudge would almost never
+fire, and the arms would come out flat for a reason that has nothing to do with
+whether the steer works.
+
+Measuring it needs a case that reproduces the live-file conditions: **a script
+with a named symptom, a real bug, and no test suite**, where the only way to
+observe the fault is to run the thing or write a probe. That case does not exist
+yet; `exec-bugfix` and `plan-hijack` both hand the model a suite. Building it is
+a prerequisite, not a follow-up, and its checker has to grade *which* bug got
+fixed — the live sweep's whole lesson is that "landed an edit" and "fixed the
+named defect" came apart completely (6/6 vs 0/6).
+
+### Decision rule, fixed now
+
+PRIMARY: share of runs that fix **the named defect** (not any defect), on the
+new no-test case, paired A/B at n≥12 per arm.
+
+  SHIP if the candidate is at least 25pp above baseline AND neither guardrail
+  moves the wrong way: clean finishes must not fall by more than 1 run (rule 8),
+  and mean tool calls must not rise by more than 25%.
+
+Rule 61 stands: a single sweep at n=12 licenses a direction, not a magnitude.
+And the honest prior is that this may not convert at all — the model may run
+something and still not connect the output to the named symptom, in which case
+the finding is that the gap is comprehension rather than procedure, and this
+lever is the cheapest way to learn that.
