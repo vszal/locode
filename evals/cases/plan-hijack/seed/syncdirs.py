@@ -1,19 +1,20 @@
+#!/usr/bin/env python3
 """
-One-way file sync from a source tree into a destination tree.
+Sync script to copy changes from the upstream skills repo to the local checkout (one-way).
 
 This script:
-1. Stages the incoming changes into a temporary review directory
-2. Identifies which files are new, modified, or deleted in the source
-3. Reviews the staged directory and prints the summary for approval
-4. Optionally applies the staged changes to the destination directory
-5. Cleans up the temporary staging directory
+1. Clones the upstream repository into a temporary directory
+2. Identifies changes (new, modified, deleted files) in the source
+3. Stages changes to the _staged-diffs directory for review
+4. Optionally applies staged changes to the local ./toolkit directory
+5. Cleans up the temporary clone
 
-The destination directory is assumed to be a checkout that someone else
-may also be editing.
+The local ./toolkit directory is assumed to be checked out from the
+downstream repository.
 
 Usage:
-    python syncdirs.py --source ./src --dest ./out            # Stage for review
-    python syncdirs.py --source ./src --dest ./out --apply    # Stage and apply
+    python syncdirs.py              # Stage changes for review
+    python syncdirs.py --apply      # Stage and apply changes immediately
 
 Author: locode
 Date: 2024
@@ -25,9 +26,36 @@ import argparse
 import hashlib
 import os
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, List, Optional
+
+# Repository URLs
+SOURCE_REPO = "https://github.com/example-org/skills.git"
+SOURCE_PATH = "skills/toolkit"
+DEST_REPO = "https://github.com/example-user/skills.git"
+DEST_PATH = "toolkit"
+
+# Local working directory (where the downstream repo is checked out)
+LOCAL_DIR = Path("./toolkit")
+
+# Where staged changes are written for review before they are applied.
+STAGING_DIR = Path("./_staged-diffs")
+
+
+def run_cmd(cmd: List[str], cwd: Optional[Path] = None, check: bool = True) -> str:
+    """Run a shell command and return its output."""
+    result = subprocess.run(
+        cmd, cwd=cwd, capture_output=True, text=True, check=check
+    )
+    return result.stdout
+
+
+def clone_source(tmpdir: str) -> Path:
+    """Clone the upstream repository and return the path to the synced subtree."""
+    run_cmd(["git", "clone", "--depth", "1", SOURCE_REPO, tmpdir])
+    return Path(tmpdir) / SOURCE_PATH
 
 
 def _file_hash(path: Path) -> str:
@@ -133,11 +161,9 @@ def apply_changes(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Sync files one way from a source directory to a "
-        "destination directory."
+        description="Sync files one way from the upstream skills repo into "
+        "the local checkout."
     )
-    parser.add_argument("--source", required=True, help="Source directory.")
-    parser.add_argument("--dest", required=True, help="Destination directory.")
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -152,28 +178,37 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    new_files, modified_files, deleted_files = compare_dirs(
-        args.source, args.dest
-    )
-
-    print(f"new:      {len(new_files)}")
-    print(f"modified: {len(modified_files)}")
-    print(f"deleted:  {len(deleted_files)}")
-
-    if not args.apply:
-        print("Dry run only; pass --apply to write these changes.")
-        return
-
-    staging_dir = args.staging_dir or tempfile.mkdtemp(prefix="syncdirs-")
-    created_temp = args.staging_dir is None
+    tmpdir = tempfile.mkdtemp(prefix="syncdirs-clone-")
     try:
-        stage_changes(args.source, staging_dir, new_files + modified_files)
-        apply_changes(
-            staging_dir, args.dest, new_files, modified_files, deleted_files
+        source_path = clone_source(tmpdir)
+
+        new_files, modified_files, deleted_files = compare_dirs(
+            str(source_path), str(LOCAL_DIR)
         )
+
+        print(f"new:      {len(new_files)}")
+        print(f"modified: {len(modified_files)}")
+        print(f"deleted:  {len(deleted_files)}")
+
+        if not args.apply:
+            print("Dry run only; pass --apply to write these changes.")
+            return
+
+        staging_dir = args.staging_dir or tempfile.mkdtemp(prefix="syncdirs-")
+        created_temp = args.staging_dir is None
+        try:
+            stage_changes(
+                str(source_path), staging_dir, new_files + modified_files
+            )
+            apply_changes(
+                staging_dir, str(LOCAL_DIR), new_files, modified_files,
+                deleted_files,
+            )
+        finally:
+            if created_temp:
+                shutil.rmtree(staging_dir, ignore_errors=True)
     finally:
-        if created_temp:
-            shutil.rmtree(staging_dir, ignore_errors=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":
