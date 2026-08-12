@@ -7688,4 +7688,108 @@ the stronger prior.
 Sequence: 0g first (cheapest, strongest prior, one clause). One at a time, per
 rule 28 — do not bundle these.
 
+## 5.99 — lever 0g is retired: its target population went extinct at build 125
+
+**5.98 ranked 0g top on a number that averages across my own fix.** The
+headline there was: of 1,445 `edit_file` calls that hit the ambiguous-match
+error, only **24.2% added `occurrence`**, while 41.7% lengthened `old` — and
+**397 of those sent `old` == `new`**, a no-op. I read that as a compliance
+failure caused by the message's "Do NOT rewrite your edit" prohibition, and
+queued lever 0g to delete the clause.
+
+That pool spans the whole archive. The archive spans build 83 to build 132.
+`occurrence` the *parameter* landed at build 123 (`57de838`), and the message
+that **tells the model it exists** landed as the b125 candidate. Pooling over
+all of it averages the before and the after of a lever I had already shipped.
+
+### The measurement
+
+For every ambiguity error in every sweep, bucket what the model did next.
+The buckets are exhaustive and mutually exclusive, so columns sum to n — no
+denominator drift.
+
+| era | sweeps | n (ambig) | `occurrence` | no-op (`old`==`new`) | other edit |
+|---|---|---|---|---|---|
+| before the b125 message | b99 … b125-base | ~1,300 | **0.0%** in every arm | 42.9 – 66.7% | 23 – 75% |
+| from the b125 candidate on | b125-cand … b132 | 796 | **72.7 – 100%** | **0.0%** in every arm | **0.0%** in every arm |
+
+The two eras do not overlap on either metric. `occurrence` uptake is exactly
+zero in all 40 arms before the message and never below 72.7% in any arm after
+it. The no-op is the mirror image: present in every arm from b99 to b125-base,
+**absent from every arm since**.
+
+b132-d1-clean, the most recent completed sweep, is the cleanest read:
+
+```
+base   54 ambiguity errors → 54 occurrence (100%),  0 no-op,  0 other edit
+cand  244 ambiguity errors → 202 occurrence (82.8%), 0 no-op,  0 other edit
+                             42 switched to a non-edit tool
+```
+
+Those 42, plus the equivalents in b126/b128/b130, are 78 `bash` and 18
+`read_file` — re-run the tests, re-read the file. Both are sane recoveries,
+not pathologies.
+
+### What this means
+
+1. **Lever 0g is retired.** The behaviour it was designed to unlock — "rewrite
+   the edit instead of reaching for `occurrence`" — occurs **0 times in 244**
+   in the current code. There is nothing left to convert.
+2. **0h and 0i go with it.** Both propose rewriting the same message
+   (shorten the match listing; escalate to a user-role nudge). That message is
+   the single most effective lever this project has shipped: it moved uptake
+   from 0% to ~90% and drove the no-op population to zero. Rewriting it now
+   would be exactly what **rule 60** forbids — changing nudge text without
+   evidence it costs behaviour — and the prohibition clause 0g wanted to delete
+   is *inside the thing that worked*.
+3. **The user's original complaint is closed on this path.** "edit is not
+   strong … `new` is identical to `old`" was real and is measured: 397 no-ops
+   in the archive. Every one of them predates b125. The remaining edit
+   weaknesses, if any, are not this one.
+
+### Lever 0e re-checked against the same confound — it survives
+
+5.96 pooled the same archive to size the duplicate-call problem, so it earns
+the same audit. Splitting the duplicate rate by sweep:
+
+| sweep | base | cand | runs with ≥1 duplicate |
+|---|---|---|---|
+| b121-aa | 25.8% | 29.5% | 24/24, 24/24 |
+| b124-noop | 28.9% | 30.0% | 24/24, 24/24 |
+| b126-attribution | 32.9% | 34.6% | 24/24, 24/24 |
+| b128-uniquefirst | 33.4% | 40.7% | 48/48, 48/48 |
+| b130-d1-occurrence-early | 38.4% | 41.8% | 47/48, 48/48 |
+| b132-d1-clean | 38.6% | 38.3% | 48/48, 48/48 |
+
+No cliff, no era boundary — the rate is 26–42% in all twelve arms and every
+run in the archive but one carries a duplicate. b132, the newest data, sits at
+38%. Meanwhile the repeat nudge fired in only **11 of 96 runs** there. The
+detector is late and rare while the behaviour is universal, which is precisely
+5.85's diagnosis, now confirmed on current-era data rather than a pooled
+average.
+
+**So 0e is the next experiment, not 0g** — same conclusion 5.96/5.97 reached,
+but now for a reason that survives the audit that killed 0g.
+
+### Rule 64
+
+**Rule 64: the archive spans your own fixes — never rank a lever on a rate
+pooled across it.** Any statistic computed over all sweeps is an average over
+code eras, and the boundary is usually a lever already shipped. Split the rate
+by sweep and look for the cliff *before* the number reaches a recommendation.
+
+This is not rule 24, 26 or 62 restated. Those govern *comparing* one sweep
+against another. This one governs *pooling* them into a single figure, which
+hides the comparison instead of making a bad one — 5.98 never compared
+anything, and that is exactly how the confound got through.
+
+Rule 64 also retro-audits cheaply: every archive-wide number in this document
+should be re-read as "averaged over builds 83–132". §5.96's duplicate rate has
+now been checked and holds. §5.97's nudge-compliance table has not, and its
+`repeated call` → 61% turn-end finding is the one that matters most — that is
+the first thing to verify when the current sweep frees up cycles.
+
+*(Instrument: `occ_calib.py`, scratch. Worth promoting into `evals/metrics.py`
+as a standing per-sweep bucket if 5.97 needs the same audit.)*
+
 *(pre-roadmap history is in `evals/LOG.md`, Rounds 1–12.)*
