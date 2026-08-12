@@ -7986,6 +7986,60 @@ below 60% the lever did not fire and the sweep grades nothing (rule 17).
 byte-identical so the sweep tests timing alone (rule 28). The wording question
 is now moot anyway — 5.100 retired the "remove the offered exit" amendment.
 
+### 5.101a — amendment: writing the patch broke "timing alone"
+
+Drafting the code (`apply_0e_v2.py`, anchors validated against build 132)
+surfaced something the pre-registration above got wrong. It says the early
+nudge reuses whatever text the late block would have used. It cannot:
+
+```
+if repeat_varied.get(batch_sig) and all(... _MUTATING_EDIT_TOOLS ...):
+    self._nudge_repeat_edit(...)      # reason: "repeated edit"
+else:
+    self._nudge_repeat(calls, unread) # reason: "repeated call"
+```
+
+`repeat_varied[batch_sig]` is written at :1123 under `seen_streak >= 1`, i.e.
+*after the second call executes*. At the occurrence-2 check `seen_streak == 1`
+and the key has never been touched, so the guard is **always false** and the
+mirror-the-late-block reading would emit `_nudge_repeat` 100% of the time —
+the weaker of the two messages, by a wide margin:
+
+| nudge | fires (archive) | next event is a tool call | runway ≤1 iteration |
+|---|---|---|---|
+| `repeated call` (`_nudge_repeat`) | 1,056 | 41.0% | 51% |
+| `repeated edit` (`_nudge_repeat_edit`) | 83 | **84.3%** | 17% |
+
+And the compliance is specific, not diffuse: of the 166 `repeated edit` fires
+scanned per-arm, the next tool is `read_file` in 81.9% — exactly what the text
+asks for ("STOP editing, RE-READ the file"). So the patch calls
+`_nudge_repeat_edit`.
+
+**That makes this a bundled intervention, and it is declared as one.** Versus
+base, two things move for a mutating repeat: *when* the warning arrives
+(occurrence 2, not 3) and *which* of two existing texts arrives (the edit
+variant, where base would have sent the call variant ~93% of the time). The
+"tests timing alone" sentence above is retracted. The unit under test is "an
+earlier, edit-specific warning on mutating repeats"; a win does not attribute
+between the two halves, and the follow-up that separates them is queued.
+
+**Do not read the 84.3% as the text's causal effect.** `repeated edit` only
+fires when `repeat_varied` is set — results are already shifting under the
+repeat, which is itself a population that is likelier to keep acting. The table
+justifies *choosing* the better-performing message; it does not measure it.
+This is the mistake 5.99 and 5.100 were both corrections for (rule 24, and the
+`read-a-winning-run-before-crediting-it` note).
+
+**Two implementation notes.** (1) The early nudge emits the reason string
+`"repeated edit"` **byte-identical** to the late one, plus an `"early": true`
+key on the event. A new reason string would have silently merged into the same
+bucket anyway — `harness._NUDGE_BUCKETS` matches by substring — so the flag is
+what makes the ≥60% precondition gradable at all; the model never sees it.
+(2) `nudged_repeat_early` deliberately does **not** get added to
+`_forgive_rereads` / `_forgive_nudged_verifies`. Both are scoped to re-readable
+tools and never forgive a mutating edit; the early set contains nothing but
+mutating batches, so the two never intersect.
+
 ## 5.102 — the instruments have tests, and a mutation-testing trap worth a number
 
 `evals/ambig_next.py` and `evals/nudge_next.py` retired three levers and
