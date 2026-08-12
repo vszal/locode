@@ -1186,7 +1186,19 @@ def cmd_run(args) -> int:
     results_dir = RESULTS_DIR / label
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    if _git_dirty():
+    agent_root = args.agent_root.resolve() if args.agent_root else None
+    if agent_root is not None:
+        if not (agent_root / "locode" / "__init__.py").is_file():
+            print(f"no locode package under {agent_root}", file=sys.stderr)
+            return 2
+        # Say it out loud. A sweep that silently measured the wrong tree is
+        # indistinguishable from one that measured the right tree and found
+        # nothing (rule 70), and this is the moment to catch it.
+        print(f"** agent under test: {agent_root}  (not the installed tree)\n",
+              flush=True)
+    elif _git_dirty():
+        # Only meaningful without --agent-root: with a frozen arm the live
+        # tree's edits do not reach the agent being measured.
         print(f"!! working tree is dirty at {_git_head()} — each case spawns a "
               "fresh locode and imports the tree AS IT IS THEN, so edits made "
               "during this sweep change what is being measured. Fine for a "
@@ -1215,7 +1227,8 @@ def cmd_run(args) -> int:
                 n += 1
                 print(f"[{n}/{total}] {case.id} · {model} · run {rep}…",
                       flush=True)
-                r = run_case(case, model, rep, results_dir, keep=not args.clean)
+                r = run_case(case, model, rep, results_dir, keep=not args.clean,
+                             agent_root=agent_root)
                 runs.append(r)
                 flag = "ok" if r.metrics.get("clean_finish") else "STOPPED"
                 print(f"        score={r.score:.2f} iters={r.metrics.get('iterations')} "
@@ -1443,6 +1456,10 @@ def main(argv=None) -> int:
                    help="delete scratch workspaces after each run")
     r.add_argument("--force", action="store_true",
                    help="start even on battery power (expect throttling)")
+    r.add_argument("--agent-root", type=Path, default=None,
+                   help="run a DIFFERENT locode source tree than the installed "
+                        "one (a frozen arm). Cases, checks and results still "
+                        "come from this repo; only the agent under test moves.")
     r.set_defaults(func=cmd_run)
 
     rep = sub.add_parser("report", help="print a saved results file")

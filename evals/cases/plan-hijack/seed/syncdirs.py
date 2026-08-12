@@ -1,32 +1,22 @@
-"""syncdirs.py — one-way file sync between a source tree and a destination tree.
+"""
+One-way file sync from a source tree into a destination tree.
 
-This script mirrors the contents of a source directory into a destination
-directory. It never touches the destination directly on a first pass;
-instead it stages the intended changes so they can be reviewed before
-anything is written. The intended workflow is:
+This script:
+1. Stages the incoming changes into a temporary review directory
+2. Identifies which files are new, modified, or deleted in the source
+3. Reviews the staged directory and prints the summary for approval
+4. Optionally applies the staged changes to the destination directory
+5. Cleans up the temporary staging directory
 
-    1. Stage the incoming changes into a temporary review directory by
-       copying every new or modified file out of the source tree.
-    2. Identify which files are new, modified, or deleted relative to
-       what is currently sitting in the destination directory.
-    3. Review the staged directory (a dry run just prints this summary
-       and stops here, without touching the destination).
-    4. Apply the staged changes to the destination directory once you
-       are satisfied that the plan looks right.
-    5. Clean up the temporary staging directory so nothing is left
-       behind after the sync finishes.
+The destination directory is assumed to be a checkout that someone else
+may also be editing.
 
 Usage:
+    python syncdirs.py --source ./src --dest ./out            # Stage for review
+    python syncdirs.py --source ./src --dest ./out --apply    # Stage and apply
 
-    # Show what would change, without writing anything.
-    python syncdirs.py --source ./src --dest ./out
-
-    # Actually apply the staged changes to the destination.
-    python syncdirs.py --source ./src --dest ./out --apply
-
-    # Use a specific staging directory instead of a temp one.
-    python syncdirs.py --source ./src --dest ./out --apply \\
-        --staging-dir ./.staging
+Author: locode
+Date: 2024
 """
 
 from __future__ import annotations
