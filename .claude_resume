@@ -1,4 +1,4 @@
-# locode resume — build 130 (2026-08-11) · b126 REVERTED; echo bug fixed; b130 IN FLIGHT
+# locode resume — build 132 (2026-08-11) · D2 REVERTED (it inverted tool choice); b130 VOID, no verdict; b132 IN FLIGHT
 
 ## THE BIG ONE, read first: the score channel cannot grade these changes (5.27)
 Every verdict since 5.24 has read "mechanism moved a long way, score
@@ -32,6 +32,20 @@ that banked pairs (`$CLAUDE_JOB_DIR/tmp/power.py`):
   read as evidence about the change; it is evidence about the sample.
 
 ## Noise floor
+**READ THIS BEFORE WRITING ANY THRESHOLD (rule 57).**
+
+**`exec-ambig|qwencoder14|r24`, `fully_fixed` = ±6/24.** From `b121-aa`,
+IDENTICAL arms: **base 12/24, cand 6/24**. A 25-point swing from nothing. This
+run finished days before 5.76 and sat unread while five sweeps were graded
+against per-run thresholds inside its band (5.86, rule 59). Consequences:
+- **Never gate on per-run `fully_fixed` at r24.** Report it; do not threshold
+  it. 5.81's "REJECT if < 13/24" was a coin flip dressed as a rule.
+- **Never gate on cross-sweep reproduction of a per-run score** (rule 58).
+  5.81's "base should land near 17/24" was unsound when written.
+- **Per-call rates ARE admissible cross-sweep**: n=90–300 calls, and observed
+  effects (0→121 calls; 0%→62% not-found; 29%→1% no-ops) dwarf sampling error.
+  Every mechanism-channel verdict, incl. the b126 rejection, stands on this.
+
 **`exec-bugfix|qwencoder14|r14` = +0.1429** (W7/L1/T6, 8 informative, sign-flip
 p=0.141), from `aa14-calib`, both arms build 109. **This is the floor to judge
 r14 sweeps against.** The r8 figure below is retained only for older verdicts.
@@ -641,6 +655,26 @@ completion. **The repeat death is still the dominant ending.**
     finished turn. Rewording is not a fix; guard the echo. Check any new
     assistant-role injection against this before shipping it.
 
+57. CALIBRATE BEFORE YOU THRESHOLD. A decision rule on a metric whose A/A spread
+    you have not measured is numerology, not pre-registration. Read the noise
+    floor at the TOP of this file first, then set the line outside it. b121-aa
+    existed and would have voided 5.81's rule before it was written.
+
+58. NEVER GATE ON CROSS-SWEEP REPRODUCTION OF A PER-RUN METRIC. Sweeps are
+    paired within themselves for a reason. A sanity check must be either a
+    within-sweep quantity or a per-call rate with n in the hundreds. 5.87's gate
+    is "base replace_lines calls <= 10" — within-sweep, per-call, and it needs
+    no earlier sweep's score to interpret.
+
+59. AN UNREAD RESULT IS WORSE THAN NO RESULT. It costs the compute AND buys
+    false confidence. When a sweep finishes, read it against every OPEN
+    question, not just the one it was launched for.
+
+60. WHEN AN AUDIT'S ANSWER IS "CHANGE NOTHING", SHIP THAT ANSWER. After finding
+    a lever the pull is to justify the search by rewriting text on the theory
+    alone. D2 and b126 were both exactly that, and both lost. A prohibition with
+    no measurable signature stays. (5.88 cleared 7 of 8 negated clauses.)
+
 ## Next levers, in order
 0. ~~STALE-STALL BUG~~ — **SHIPPED as build 120 (`54b594b`) and CREDITED by
    b123.** DONE 0/24 -> 8/24, Fisher p=0.0039, and the mechanism is 1:1: the 8
@@ -762,19 +796,50 @@ completion. **The repeat death is still the dominant ending.**
      ECHO, not the wording: any fixed string in assistant history is copyable,
      so rewording only relocates the attractor. 3 regression tests.
 
-0b-ix. **D1 — build 130, b130 IN FLIGHT.** The last 5.77 P0: `edit_file` says
-   `old` "must match once unless replace_all is true", false since build 123,
-   and `occurrence` never appears in the first 400 chars. The fix states the
-   rule truthfully and moves `occurrence` from 56% to **25%** of the string.
-   - `--base 5a97a06` (build 129), exec-ambig + exec-bugfix, r24 = 96 runs,
-     ~4h. Log `$CLAUDE_JOB_DIR/tmp/ab130.log`. **No source edits until it
-     exits.**
-   - This is a BET, not bookkeeping (see rule 52 as amended). 5.74 + lever 0d
-     predict the failure: naming the rescue earlier LICENSES a narrower aim,
-     narrower is deeper, deeper is more indented, this model mis-indents.
-   - Rule fixed in ROADMAP 5.81: exec-ambig fixed <13/24 REJECTS. SHIP needs
-     ambig >=15/24 AND not-found <=10% AND zero CANDIDATE false completions.
-     Anything between -> **stop editing this string.**
+0b-ix. **D1 — b130 is VOID. NO VERDICT. Re-running as b132.** (5.86/5.87)
+   D1 states `old`'s match rule truthfully and moves `occurrence` from 56% to
+   **25%** of `edit_file`'s description.
+   - **b130 did not grade.** 5.81's precondition (base exec-ambig ~17/24) failed
+     at 8/24, and it textually precedes and voids the REJECT line below it.
+     `grade130.py` printed REJECT anyway because the precondition was a
+     `print()` and the REJECT an `if()` — the exact failure rule 54 exists to
+     prevent. **D1 is unjudged, not rejected, and not reverted.**
+   - I am NOT re-grading it on b130's favourable paired numbers (exec-bugfix
+     0/24 -> 15/24 p=2.4e-06; not-found 47% -> 0%). Favourable evidence gets the
+     same treatment as unfavourable or the pre-registration is worthless.
+   - **Why the baseline collapsed: D2, which I shipped without an A/B.** See
+     lever 0f. Reverted in build 131; b132's base is `b6853bd`.
+   - b132 IN FLIGHT: `--base b6853bd`, exec-ambig + exec-bugfix, r24 = 96 runs,
+     ~4h. Log `$CLAUDE_JOB_DIR/tmp/ab132.log`, grader
+     `$CLAUDE_JOB_DIR/tmp/grade87.py`. **No source edits until it exits**
+     (cand = live working tree = build 132).
+   - Rule fixed in ROADMAP 5.87, now on PER-CALL metrics (rules 57/58):
+     SHIP needs cand not-found <=10% AND `occurrence` uptake >= base+15pt AND
+     replace_lines <=10 calls in both arms AND zero cand false completions.
+     REJECT if not-found >= base+10pt or any cand false completion.
+     `fully_fixed` is REPORTED, NOT GATED. Gate is within-sweep and per-call.
+   - Ungated, settles 5.86 item 3: base exec-bugfix `fully_fixed` ~8/24 means D2
+     caused the b130 collapse; ~0/24 means something is DRIFTING and everything
+     needs recalibration before more wording work.
+
+0f. **A PROHIBITION RAISES SALIENCE FOR THE CASE IT PROHIBITS.** D2 (build 128,
+   shipped with NO A/B) replaced "or a snippet that isn't unique" in
+   `replace_lines`' description with "a snippet that simply appears MORE THAN
+   ONCE is NOT a reason to come here — stay in edit_file". exec-ambig base arm,
+   24 runs: `replace_lines` calls went **0 -> 121**, the most-used tool in the
+   run. Runs that stayed in `edit_file` were **8/8** fully_fixed; runs that
+   touched `replace_lines` were **0/16**. Opportunity is uniform (every
+   exec-ambig run has duplicates by construction), and the first
+   `replace_lines` call followed an ambiguity error in **0/16** runs — so it is
+   retrieval from the tool list, not error-driven fallback, and not a survivor
+   marker. Reverted byte-identical to `fa12194` in build 131.
+   - **NARROWED by the 5.88 audit — do not over-apply.** The dangerous shape is
+     a negation that names a SITUATION and routes it away from the tool being
+     described. Argument-format negations name a token pattern, not a
+     situation, and measured 0/2940. `edit_file`'s "CANNOT do indentation-only,
+     use replace_lines instead" measured 0/1132. **7 of 8 negated clauses in
+     the runtime tool text are cleared and stay as written** (rule 60).
+   - Standing rule: **no new cross-tool routing prohibition without an A/B.**
 
 0e. **THE REPEAT DETECTOR IS NINE ITERATIONS LATE.** First duplicate tool call
    lands at absolute iteration **6** (p25 5, p75 7); the `repeated call` nudge
