@@ -9780,3 +9780,70 @@ build that predates the fix. Note for the design: the surface that *worked*
 (ambiguous, 87%) shows every candidate location and names one field to add. The
 branch that fails names the error and describes the leftover in prose. 0b-iii
 says the tool surface is where this model actually moves.
+
+## 5.123 — the stranded-tail branch: diagnosed, designed, and gated on exposure
+
+Follows 5.122's 0/181. Four hypotheses died on the way to the actual mechanism;
+recording them because three were mine and plausible.
+
+**Dead: "the message shows no file snippet."** It does — `_seam_window`
+(fs.py:842) renders line numbers and markers, close to Aider's approach. The
+SWE-agent ablation had primed me for this one and I nearly designed against it.
+
+**Dead: "the model's `new` has an unbalanced triple-quote, so Python reports
+the error downstream and our lineno test wrongly concludes 'outside'."** Only
+9%; `new` is balanced in 79%.
+
+**Dead: "the prose diagnosis is confidently wrong."** It is right. The region
+really did end mid-block.
+
+**Alive, and it reframes everything: all 217 are `replace_lines`, never
+`edit_file`.** That tool takes `path/start/end/new` — the model picks a **blind
+line range** and never quotes what it is replacing, so it cannot see that its
+range clips a docstring. 89% of these rejections are `unterminated
+triple-quoted string literal`, reported a median **46 lines** below the edit.
+217 of the 313 b127+ `replace_lines` failures — 69% — are this one shape.
+`edit_file`, which forces the model to quote `old`, produces none of it.
+
+So the message is not wrong, it is **unactionable**: it says "extend the region
+so it covers that whole block" without ever naming the line the block starts
+at. And the window meant to give 2 lines of context spans `min(hi,err)-2` to
+`err+2`, which when the two are 46 lines apart renders the whole gap — median
+**34 lines**, 51% over 20, markers stranded at opposite ends, 124 of 245 long
+enough to be clipped in the log.
+
+**Prior art, and it converges.** SWE-agent runs the identical guard (flake8
+`--select=...E999`, revert on new error) and its ablation is worth +3.0pp on
+SWE-bench. Its message carries three components — error type, the window as it
+*would* look applied, and the original — and the paper reports that dropping
+the snippets makes the agent "re-issue the same command more frequently",
+which is our 52% fail-again exactly. Aider, from the opposite architecture
+(apply-then-repair, never refuse), lands on the same primitive: `TreeContext`
+with `line_number=True`, `loi_pad=3`, `mark_lois=True`, rendering "See relevant
+line below marked with █". Neither describes the fault in prose; both render it,
+bounded, and mark it. Our own 87%-vs-0% pair says the same thing in-house: the
+ambiguous-match message that works shows every candidate and names ONE field to
+change.
+
+**The design that follows.** Not "add a snippet" — bound the two we have and
+compute the answer:
+ 1. Two bounded windows (±3, per Aider) — one at the seam, one at the error —
+    never the gap between them.
+ 2. Name the clipped construct's real boundary: we hold `start`, `end`, and a
+    before-text that parses, so the delimiter the range split is computable.
+ 3. Deliver it as a one-field change in the ambiguous-match shape that scores
+    87%: "your range 16-30 splits the docstring spanning lines 12-39 — send the
+    SAME call with `start: 12`", not "re-read the file and extend the region".
+ 4. Per lever 0f, none of this goes in the tool description.
+
+**GATED — do not build yet.** Exposure is **qwencoder14's, not qythos9's**.
+qythos9 makes **0** `replace_lines` calls in 94 archived runs. That looks
+fatal but is not evidence: those runs are 48 bugfix-notest / 24 repro-only /
+22 plan-hijack and only **2** exec-bugfix, the case generating 217 of the 245
+events. Zero out of two is no information, and shipping on the strength of the
+qwencoder14 number would repeat the git-URL lever's 0/12 (rule 17).
+
+Next action is therefore a cheap exposure probe, not a build: qythos9 on
+exec-bugfix at n=12, counting `replace_lines` calls and stranded-tail
+rejections. If it does not reach for the tool the lever is moot on the default
+model; if it does, the design above is pre-registered and ready.
