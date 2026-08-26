@@ -9714,3 +9714,69 @@ vehicles, and now the error path as a lever — five straight estimates that a
 defect was real and reachable, five nulls, all in the same direction. Build 136
 still rests on bugfix-notest alone. The archive is now the cheapest instrument
 in the rig and should run before any lever, not after.
+
+## 5.122 — mining the archive end to end: three healthy layers, and 0/181
+
+Continuation of 5.121, same instrument (`evals/mine.py`), no GPU. The question
+was where the next lever lives. The archive answered by clearing three suspects
+and convicting a fourth.
+
+**Cleared: the nudge layer.** Compliance is 94–97% on every nudge with usable
+n. Two carry real within-case signal — `unverified edits` (spread 0.240:
+`SAME call again` −0.215 against compliers at +0.009) and `same failure (2 runs
+in a row)` (spread 0.200, −0.188 vs +0.012) — but the non-compliant population
+is 27 and 49 runs. Converting *every* one is worth ~0.01 overall. Not a lever.
+
+**Cleared: the repeat guard, and a confound I walked into.** `was stopped` is
+the strongest run-level feature in the archive by 2× (centred spread 0.318:
+clean +0.195, stopped −0.123, and 986/1610 runs stop). That looked like 436
+premature kills — 94% of stopping signatures are SPREAD OUT, median span 15
+iterations, and 78% land a successful edit between occurrences. It is not.
+Reading a trajectory (aa14-calib exec-bugfix r11) shows `read_file textkit.py`
+recurring 8× over 40 iterations with the landed-edit reset firing repeatedly —
+which is *why* the run reached iteration 41 instead of dying at 9 — and the
+final stop following two occurrences with only a failed edit between. The guard
+is working as designed. Runs get stopped **because** they are failing: exactly
+the confound named for nudges at the top of 5.121 and then walked into anyway,
+one layer down. A guardrail's firing correlates with the trouble it fires on;
+that is not evidence the guardrail costs anything.
+
+**Cleared: the ambiguous-match surface, which is a shipped win.** Pooled
+recovery after `` `old` appears N times `` reads 17%, which looks broken. Split
+by build it is 0% on b87–b121 and 84–90% on b127–b132; on b127+ it is 87%
+recovery, 0% fail-again, n=389. §5.66/5.67's `occurrence` field worked. The
+pooled number was build mix — rule 75 in a second costume, and worth noting
+that the trap hides *wins* as readily as it manufactures them.
+
+**Convicted: the syntax guard's stranded-tail branch.** Rank the b127+ edit
+failures by whether the model recovers, not by frequency:
+
+    `old` ambiguous      n=389   87% land    0% fail again
+    `old` not found      n=235   34% land   47% fail again
+    would break syntax   n=283    5% land   40% fail again   17% bail
+
+and then split that last row by its own two branches, same builds:
+
+    error INSIDE the supplied text    n= 22   55% land    0% fail again
+    error OUTSIDE it (stranded tail)  n=181    0% land   52% fail again
+
+**0 of 181 on current builds**, and the failing branch is 181 of 203 recent
+cases. This is the branch §5.9x added *for* this population, after measuring
+that 31 of 58 rejections broke outside the supplied text and the old message
+sent the model to re-inspect text that was fine. The diagnosis was right; the
+remedy does not work.
+
+Honest limit on the comparison: inside/outside is not randomised, and outside
+is genuinely the harder problem — the model must repair a leftover tail it did
+not write. So the 55-point gap is part message, part difficulty, and no lever
+should be sized from it. What does not depend on the confound is the absolute
+floor: **zero successes in 181 attempts.** Whatever the difficulty, a message
+with no successes is not carrying the model, and unlike every other suspect
+here it has the exposure (181) and the headroom (0%) to be worth a build.
+
+Next: design against that branch, per rule 74 checking each ship clause against
+the mechanism as it is written, and per rule 71 validating any case against a
+build that predates the fix. Note for the design: the surface that *worked*
+(ambiguous, 87%) shows every candidate location and names one field to add. The
+branch that fails names the error and describes the leftover in prose. 0b-iii
+says the tool surface is where this model actually moves.

@@ -1,5 +1,7 @@
 # locode resume
 Last session: 2026-08-26. Build 139, 1337 tests green.
+Archive mining (evals/mine.py) is now the first move on any lever. It has
+retired four candidates and found the current one without spending GPU.
 Two sessions' work below; the 2026-08-15 items are still open where marked.
 
 ## Newest first: the error-path lever is DEAD too (§5.121, rule 75)
@@ -37,6 +39,42 @@ lever 0e v2. One line to revive.
   seed/ is copied. For state a seed dir cannot hold (a git repo — a nested
   `.git` cannot be committed; a path only knowable at run time). Failure marks
   the run `invalid`, not 0.0. 3 tests in test_harness.py.
+
+## NEXT LEVER — FOUND BY MINING, NOT ARGUING (§5.122). START HERE.
+**The syntax guard's stranded-tail branch: 0 successes in 181 attempts on
+current builds.** `locode/tools/fs.py:884` — when `replace_lines`/`edit_file`
+would introduce a SyntaxError, the message forks:
+  * error INSIDE the text the model supplied  -> n= 22, **55%** next edit lands
+  * error OUTSIDE it ("leftover tail")        -> n=181, **0%**, 52% fail again
+Same builds, same tool, same model. The failing branch is 181 of 203 recent
+syntax refusals. §5.9x added that branch deliberately for this population; the
+diagnosis was right and the remedy does not work.
+
+CAVEAT to carry into the design: inside/outside is NOT randomised — outside is
+genuinely harder (repair a tail the model did not write), so do not size a
+lever off the 55-point gap. The un-confounded fact is the absolute floor, 0/181.
+
+DESIGN HINT: the sibling surface that WORKS is the ambiguous-match message
+(87% recovery, n=389) — it SHOWS every candidate location and names ONE field
+to add. The failing branch names the error and describes the leftover in prose.
+0b-iii: the tool surface is where this model moves.
+
+## Ranked b127+ edit failures by RECOVERY (not frequency — that ranking lies)
+    `old` ambiguous      n=389   87% land    0% fail again   <- shipped win
+    `old` not found      n=235   34% land   47% fail again   <- second target
+    would break syntax   n=283    5% land   40% fail again   17% bail
+39% of all edit attempts on b127+ still fail (1315/3356).
+
+## Cleared by the same mining — do NOT re-prospect these
+- **Nudge layer is healthy.** 94-97% compliance everywhere. The two nudges with
+  real within-case signal have 27 and 49 non-compliant runs; converting all of
+  them is worth ~0.01. 
+- **Repeat guard works as designed.** `was stopped` is the biggest run-level
+  feature (spread 0.318) but it is CONFOUNDED — runs are stopped because they
+  are failing. Verified by reading aa14-calib exec-bugfix r11: the landed-edit
+  reset fires repeatedly and is why that run reached it41 instead of it9.
+- **Ambiguous-match is a shipped win**, 0% -> 88% across builds. Pooled reads
+  17% only because old builds drag it down (rule 75 hiding a win, not a loss).
 
 ## THE FINDING — SUPERSEDED, kept for the trajectory detail (see §5.121)
 Against build 136, n=12, qythos9 does one of exactly two things with a repo URL:
