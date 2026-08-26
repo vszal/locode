@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–72.** All 59 numbers actually in use are below. Thirteen numbers
+**Complete for 1–73.** All 60 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -78,6 +78,7 @@ anchor is authoritative if one ever drifts.
 | 70 | An A/B arm must never live in a mutable location the running system reads. Swapping files in the working tree to switch arms makes the assignment a race, survives no interruption, and silently reverts the change under test — freeze each arm as its own tree and select it read-only; a runner that mutates shared state must also refuse to start twice. | §5.109 |
 | 71 | A case earns its place by discriminating, not by reproducing. Before a case is used as evidence — as a control, a regression guard, or a baseline — run it against a build that predates the behaviour it grades and confirm it scores *differently*. A case that scores the same on both sides of its own fix reports a null that will be read as a pass. | §5.113 |
 | 72 | A cost clause in a ship criterion must be denominated per successful outcome, not per run. An absolute cap on tool calls, iterations or wallclock will veto any lever whose mechanism *is* the extra work, and will pass a lever that stays cheap by continuing to fail. State the cap as cost per success, or as a floor on an efficiency the change must not wreck. | §5.116 |
+| 73 | A case does not test a failure mode until the workspace forecloses every route that avoids it. Enumerate the escape hatches first — a local copy that can be read, a URL that doubles as a filesystem path, a test suite that names the bug — and close them. An open hatch does not make the case noisy; it makes it measure the model's best path instead of its worst, and report a pass. | §5.119 |
 
 ⚠ = **reconstructed.** The number is cited but never stated outright anywhere in
 `ROADMAP.md`; the wording is inferred from its use sites and is **not** a

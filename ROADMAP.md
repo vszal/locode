@@ -9479,3 +9479,127 @@ accepted the 111% tool-call rise on `bugfix-notest`. Build 136 stands.
 Compliance is also worth recording: the advisory fired and the model ran
 something in **12 of 12** candidate runs. Whatever else is uncertain, the steer
 itself is not being ignored.
+
+## 5.119 — The lever that never fired, and the escape hatches that hid it
+
+The 08-15 session picked one next lever and stopped before starting it: **empty
+results, where the nudge names the wrong hypothesis.** The live sighting was
+sharp. `git ls-tree -r --name-only main <URL> <path>` exits 0 with no output,
+because `ls-tree` reads the local object database and takes the URL as a
+pathspec; the empty-results nudge then offers the model five remedies — "the
+path, the ref, the directory, the pattern or the repo" — every one of them a
+claim about the TARGET, when the target was fine and the verb was wrong. The
+model dropped the pathspec, the only move the nudge allowed, and the turn died.
+
+The surface was chosen deliberately (the tool RESULT, not the nudge text, per
+0b-iii) and the code came out clean: `locode/tools/gitremote.py`, 26 tests,
+wired into `shell.py` at the one place `_EMPTY_OK` is returned. Then rule 71
+was applied, and the whole thing came apart.
+
+### The measurement
+
+`evals/cases/git-url-empty` against build 136, which predates the fix. n=12.
+
+    trap fired (URL handed to a local-only git command)     0 / 12
+
+Not "rare". Zero. qythos9 does one of exactly two things with a repo URL:
+
+  * **Clones and answers perfectly — 4/12.** `git clone git://... upstream`,
+    then reads the files out of the clone. There is nothing here to fix.
+  * **Strips the URL to its basename — 6/12, the dominant failure.**
+
+        git ls-tree -r upstream.git --name-only | grep '^handlers/' | sort
+          -> fatal: Not a valid object name upstream.git       (rc 128)
+        [byte-identical repeat]
+          -> fatal: Not a valid object name upstream.git
+        [repeat guard: one nudge, then the turn ends]
+
+No URL appears in the failing command at all. No URL detector could ever have
+seen it. By rule 17 the lever has not been tested; by rule 7 it does not ship on
+the strength of the argument above, however good the argument is. `ENABLED` is
+False, the module and tests and case are kept switched off — lever 0e v2's
+disposition — and one line revives it if a case ever grades it.
+
+### The premise was also wrong, and that is worth separating out
+
+The lever was scoped on "local-only git subcommands take URLs silently, which is
+the worst possible signal". Measured, that class is much smaller. Handed a URL
+where a *revision* goes, git is loud and specific:
+
+    git show|log|rev-list|diff-tree main <URL>  -> fatal: invalid object name 'file'.
+    git cat-file -p main <URL>                  -> fatal: too many arguments
+
+The silent class is exactly **a URL landing in a PATHSPEC position**, where
+matching nothing is a legitimate answer: `ls-tree`, `ls-files`, `log -- <url>`,
+`diff -- <url>`. The scoping note asserted a family; the family has four members.
+
+### The finding is better than the lever
+
+That 6/12 is not a smaller version of the empty-results problem. It is a sharper
+one, and it points at a different surface. The model is not mishearing an
+ambiguous silence — silence is genuinely ambiguous, which is the whole reason
+`_EMPTY_OK` exists. It is ignoring a **specific, correct, complete error message
+that names the exact problem**, and then re-issuing the identical command. The
+missing hypothesis is the same ("the command itself cannot answer this
+question"); the surface is the ERROR path, where the signal was never missing.
+
+The machinery fires correctly here too — the repeat guard nudges, then stops. So
+this is once again a CONTENT question, and resume item 0b governs it: this model
+obeys whichever demand a message leads with, so the fix must REMOVE a demand,
+not add a competing one.
+
+### Rule 73, earned by three drafts
+
+Building the case took three drafts, and all three failed the same way. Each one
+left the model a route that avoided the failure entirely:
+
+  1. The vendored copy sat at `handlers/`. The pathspec then matched the LOCAL
+     tree, so the trap printed the workspace's own files — a confident wrong
+     answer, not the silence under study.
+  2. Upstream was a `file://` URL. A `file://` URL spells out a filesystem path,
+     so the model ran `ls` on it, found `upstream.git` sitting there, `cd`'d in
+     and queried it as a local repo. Correct answer, zero URLs, trap never
+     armed.
+  3. A stale vendored copy was left in place and the prompt asked which file
+     upstream had ADDED. The model answered by reading the stale copy:
+     "upstream added parse.py and route.py" — read straight off the only thing
+     in front of it, never touching the network.
+
+None of these is a bug in the case. Each is the model taking a better path than
+the one being measured, which is what a good model does. But the case then
+reports on that better path, and the failure it was built for never gets a turn.
+
+**RULE 73: a case does not test a failure mode until the workspace forecloses
+every route that avoids it.** Enumerate the escape hatches before running it —
+a local copy that can be read, a URL that doubles as a path, a test suite that
+names the bug — and close them. An open hatch does not make the case noisy; it
+makes it measure the model's best path instead of its worst, and report a pass.
+
+The closed version: upstream is served by a `git daemon` on loopback:9419 (so
+the remote is reachable ONLY as a URL, and the case is still entirely offline),
+the workspace is a git repo (outside one the trap is a loud `fatal: not a git
+repository`), and nothing is vendored, so every filename in the expected answer
+exists only at the far end of the URL. That version measured 0/12 honestly.
+
+### Rig: `setup.sh`
+
+The case needed workspace state a `seed/` directory cannot hold — a git repo (a
+nested `.git` cannot be committed) and a URL only knowable at run time — so the
+harness grew an optional `evals/cases/<id>/setup.sh`, run with `bash` in the
+workspace after `seed/` is copied. It carries no arm label and its output never
+reaches the model (rule 68). A non-zero exit marks the run `invalid` rather than
+scoring it 0.0, so a rig failure cannot deflate an arm. Three tests.
+
+### Variance, for whoever writes the first threshold here
+
+Same code, same case, back to back: **3/4 clean-finish at n=4, then 1/8 at n=8.**
+Rule 57 applies before anyone gates on a per-run rate from this case.
+
+### The standing pattern, now four deep
+
+`bugfix-notest`, `plan-hijack`, `repro-only`, `git-url-empty`. Four cases built
+to trap this model, four that measured something else instead. The 08-15 reading
+was "qythos9 reads code well; it does not run it". This one extends it: handed a
+remote, it also does the RIGHT thing more often than the wrong one. My estimate
+of what is subtle enough to trap it has now been wrong four times, in the same
+direction each time. Build 136 still rests on `bugfix-notest` alone.
