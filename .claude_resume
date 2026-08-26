@@ -1,6 +1,31 @@
 # locode resume
-Last session: 2026-08-26. Build 138, 1322 tests green, main at 55dcdce.
+Last session: 2026-08-26. Build 139, 1337 tests green.
 Two sessions' work below; the 2026-08-15 items are still open where marked.
+
+## Newest first: the error-path lever is DEAD too (§5.121, rule 75)
+Killed by the ARCHIVE before a line of it was built — no code, no GPU. All
+three premises were wrong:
+ 1. The failing branch is not the lethal one: 83% of FAIL-branch runs stop vs
+    90% of ok-branch. No error-vs-success discriminator exists.
+ 2. `_nudge_repeat` already works. After it fires, `SAME call again` is **3%**;
+    the modal response (59%) is its own last clause, "give your final answer".
+    The demand I meant to REMOVE is the one the model actually acts on.
+ 3. And the raw scores that seemed to justify keeping it (0.57 vs 0.48) were
+    **entirely case mix**. Centred within (case,model) every bucket lands
+    within 0.015 of the case mean: the post-nudge branch carries NO score
+    signal, so no reword of `_nudge_repeat` can pay.
+Rules 9/19 are still breached by `_nudge_repeat` — now logged as known-cosmetic,
+not worth a build.
+
+**New standing instrument: `evals/mine.py` (15 tests).** Run it BEFORE scoping
+any lever. `--list-nudges` for the menu; `--nudge REASON` for exposure + the
+centred outcome table. It prints pooled AND centred side by side on purpose —
+a gap between them IS case mix (rule 75), not a tie-break.
+
+**Five straight nulls now**, all in the same direction (my "this defect is real
+and reachable" estimate). bugfix-notest / plan-hijack / repro-only /
+git-url-empty as vehicles, error-path as a lever. Build 136 still rests on
+bugfix-notest alone. Next lever: mine first, argue second.
 
 ## Shipped/decided THIS session (2026-08-26)
 **The git-URL lever: NO SHIP.** Built it, built a case for it, measured it,
@@ -13,7 +38,7 @@ lever 0e v2. One line to revive.
   `.git` cannot be committed; a path only knowable at run time). Failure marks
   the run `invalid`, not 0.0. 3 tests in test_harness.py.
 
-## THE FINDING — better than the lever it replaces. START HERE.
+## THE FINDING — SUPERSEDED, kept for the trajectory detail (see §5.121)
 Against build 136, n=12, qythos9 does one of exactly two things with a repo URL:
   * **clones and answers perfectly — 4/12.** Nothing to fix.
   * **strips the URL to its BASENAME — 6/12, the dominant failure:**
@@ -30,9 +55,12 @@ it is ignoring a specific, correct, complete error message — git names the
 exact problem — and then re-issuing the identical command. No URL appears in
 the failing command at all, which is why no URL detector could ever see it.
 
-Next lever should target that. Note the repeat guard DOES fire here (nudge,
-then stop), so this is again a CONTENT question, not a machinery question —
-and 0b applies: the fix must remove a demand, not re-rank one.
+RESOLVED 2026-08-26: the repeat guard fires here and DOES its job (97% stop
+repeating). Exposure is real archive-wide — 39% of repeat-nudges follow a
+failing call, and the biggest contributor is not git but `replace_lines`
+returning "NOT applied — would introduce a SyntaxError" byte-identically four
+times. But the branch is outcome-neutral, so there is nothing to win. See the
+top section.
 
 ## Premise correction (measured 2026-08-26, supersedes the 08-15 scoping)
 The silent class is NOT "local-only git subcommands take URLs". Handed a URL

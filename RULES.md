@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–74.** All 61 numbers actually in use are below. Thirteen numbers
+**Complete for 1–75.** All 62 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -131,3 +131,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
 graders. Next free number: **73**.
+| 75 | A comparison between buckets of pooled runs means nothing until each score is centred within its (case, model) stratum. Buckets are not randomised — the model chooses which one it lands in, and that choice correlates with the case, so pooled means measure case mix. Report the centred number or none. | §5.121 |

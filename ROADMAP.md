@@ -9646,3 +9646,71 @@ procedure it corrects is the one used from here on, not this sweep.
 
 5.116 is therefore the recorded exception, grandfathered on its evidence. It is
 the last one.
+
+## 5.121 — the error-path lever, killed by the archive before it was built
+
+The 08-26 resume named the error-path finding as the next lever: qythos9 gets
+`fatal: Not a valid object name upstream.git`, a specific and complete error,
+and re-issues the identical command. `_nudge_repeat` is what fires there, and
+it looked like the textbook 0b shape — four competing demands in one message
+("Stop repeating it" / "read one of those next" / "try a genuinely different
+approach" / "give your final answer in plain text now"), naming no tool and
+demanding no call, in breach of rules 9 and 19.
+
+Per rule 16 the fix went at the archive before the GPU: 2,233 event logs,
+98 sweeps. Three measurements, and each one killed a premise.
+
+**Exposure is real.** 1,175 `repeated call` nudges, 634 repeat-stops. Of the
+961 nudges with a readable prior result, **374 (39%) follow a FAILING call** —
+and 129 of those follow two byte-identical error texts. The git shape is not a
+git problem: the biggest single contributor is `replace_lines` returning
+`NOT applied — this edit would introduce a SyntaxError at line 43` four times
+in a row. Against the 0/12 of the lever this replaced, that is a genuine
+population.
+
+**Premise 1 — dead. The failing branch is not the lethal one.** 83% of
+FAIL-branch runs end in a stop against 90% of ok-branch runs. The error path is
+if anything *less* terminal. There is no error-vs-success discriminator to
+build on. (And "died" here is itself a bad word: these runs score 0.5 on
+average. A `stopped` event is a turn ending, not a failure — the mirror of the
+`ab.py`-is-blind-to-turn-endings trap, made in the opposite direction.)
+
+**Premise 2 — dead, and backwards. The nudge already works.** First action
+after the nudge, n=961: `SAME call again` **3%**. `different tool` 31%, `same
+tool, diff args` 7%, **`gave final answer` 59%**. The leading demand ("Stop
+repeating it") is obeyed 97% of the time. The nudge is not being ignored; the
+modal response is its own last clause. So the thing to remove — the surrender
+clause — is the thing the model actually acts on, and on the raw numbers it was
+the *best*-scoring bucket: mean 0.57, 92% ≥0.5, zero zeros, against 0.48 for
+carrying on with a different tool. Deleting it would have been a harm.
+
+**Premise 3 — dead, and it takes premise 2's evidence with it.** That 0.57
+vs 0.48 is entirely case mix. Centred within (case, model), every bucket
+collapses onto the case mean:
+
+    gave final answer     n=442   -0.000
+    different tool        n=224   +0.000
+    same tool, diff args  n= 41   -0.001
+    SAME call again       n= 15   +0.015
+
+**What the model does after a repeat nudge carries no score signal at all.**
+Not "the escape hatch is good" — nothing here is good or bad. The branch is
+outcome-neutral, so there is no reword of `_nudge_repeat` that can pay. NO
+SHIP, and nothing built: cost was log mining, no code, no sweep.
+
+Note what the raw comparison would have licensed. It pointed the right way by
+accident — "don't delete the clause" survives — but for a reason that does not
+exist, and the same arithmetic run on a lever I liked would have manufactured a
+0.09 effect out of case mix. Hence **rule 75**: a comparison between buckets of
+pooled runs means nothing until each score is centred within its (case, model)
+stratum. Buckets are not randomised — the model chooses which one it lands in,
+and that choice correlates with the case. Report the centred number or none.
+
+Rules 9 and 19 still hold and `_nudge_repeat` still breaches them; that is now
+a known-cosmetic breach, logged and not worth a build.
+
+Standing count: bugfix-notest, plan-hijack, repro-only, git-url-empty as
+vehicles, and now the error path as a lever — five straight estimates that a
+defect was real and reachable, five nulls, all in the same direction. Build 136
+still rests on bugfix-notest alone. The archive is now the cheapest instrument
+in the rig and should run before any lever, not after.
