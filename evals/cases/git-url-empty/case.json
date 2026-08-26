@@ -1,0 +1,8 @@
+{
+  "id": "git-url-empty",
+  "track": "execute",
+  "description": "a question that can only be answered by reading a remote git repo the workspace has a file:// URL for. The trap: `git ls-tree <ref> <url>` inside a repo exits 0 and prints NOTHING, so the wrong command is indistinguishable from a true empty answer. Answer is prose, not an edit -- see check.py.",
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "replace_lines", "bash", "ls", "grep", "glob", "update_plan"],
+  "timeout": 900,
+  "weight": 1.0
+}

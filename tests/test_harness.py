@@ -854,3 +854,48 @@ class TestRunNames:
     def test_no_arm_leaves_both_names_equal(self):
         run_id, stamp = harness.run_names("exec-bugfix", "qwencoder14", 3)
         assert run_id == stamp == "exec-bugfix__qwencoder14__r3"
+
+
+# --------------------------------------------------------------------------
+# the setup.sh hook
+# --------------------------------------------------------------------------
+def _case_with_setup(tmp_path, script):
+    """A minimal Case whose directory carries the given setup.sh."""
+    h = _load_harness()
+    d = tmp_path / "case"
+    d.mkdir()
+    (d / "setup.sh").write_text(script)
+    return h, h.Case(id="c", track="execute", description="", path=d, prompt="p")
+
+
+def test_setup_hook_runs_in_the_workspace(tmp_path):
+    # The one fact the script cannot be given at author time is where it is;
+    # everything it needs to build (a git repo, a file:// URL into the scratch
+    # dir) hangs off `pwd`.
+    h, case = _case_with_setup(tmp_path, "set -e\npwd > where.txt\ntouch built\n")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    assert h._run_setup(case, ws) == ""
+    assert (ws / "built").is_file()
+    assert (ws / "where.txt").read_text().strip().endswith("ws")
+
+
+def test_setup_hook_failure_is_reported_not_swallowed(tmp_path):
+    # A half-built workspace is not a hard case, it is no case at all. The run
+    # has to be marked invalid rather than scored 0.0, which would deflate the
+    # arm for a rig failure that has nothing to do with the code under test.
+    h, case = _case_with_setup(tmp_path, "set -e\necho 'no upstream here' >&2\nexit 3\n")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    err = h._run_setup(case, ws)
+    assert err and "exit 3" in err and "no upstream here" in err
+
+
+def test_no_setup_script_is_not_an_error(tmp_path):
+    h = _load_harness()
+    d = tmp_path / "case"
+    d.mkdir()
+    case = h.Case(id="c", track="execute", description="", path=d, prompt="p")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    assert h._run_setup(case, ws) == ""

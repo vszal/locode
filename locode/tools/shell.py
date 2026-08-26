@@ -18,6 +18,7 @@ import os
 import signal
 
 from locode.tools.base import ToolContext, ToolResult
+from locode.tools.gitremote import hint as git_url_hint
 from locode.tools.installhint import install_hint
 
 _MAX_OUTPUT = 64 * 1024
@@ -102,4 +103,17 @@ class Bash:
         # against a path prefix that did not exist in the repo, four of them
         # byte-identical, until the repeat guard ended the turn. So: state that
         # it ran, give the query reading, and rule out the unchanged re-run.
-        return ToolResult(text.rstrip() or _EMPTY_OK)
+        if text.rstrip():
+            return ToolResult(text.rstrip())
+        # ...unless the emptiness is a broken command wearing a true answer's
+        # clothes. `git ls-tree <ref> <URL>` reads the LOCAL object database and
+        # takes the URL as a pathspec: exit 0, no output, identical to "nothing
+        # matched". _EMPTY_OK's advice — question the assumption behind the
+        # query — is then actively wrong, because the assumption was fine and
+        # the verb was not, and the model spends the turn rephrasing a question
+        # that cannot be asked this way. See tools/gitremote.py.
+        #
+        # Note this result deliberately does NOT match _NOINFO_RESULTS any more,
+        # so it does not feed the empty-streak counter: it carries information,
+        # and a streak of them is not a model that is learning nothing.
+        return ToolResult(git_url_hint(cmd) or _EMPTY_OK)

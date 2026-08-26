@@ -53,3 +53,28 @@ async def test_bash_cancel_kills_process(ctx):
     ctx.cancel.cancel()  # fires the kill hook
     res = await asyncio.wait_for(task, timeout=3)
     assert res.is_error and "interrupted" in res.content
+
+
+async def test_silent_git_url_query_is_named_as_a_broken_command(ctx):
+    # The empty result that is NOT an answer, exercised against REAL git. In a
+    # repo, `git ls-tree <ref> <URL>` takes the URL as a pathspec, matches
+    # nothing, and exits 0 in silence -- and _EMPTY_OK's advice ("question the
+    # assumption behind the query") is then exactly wrong: the assumption was
+    # fine, the verb was not. Outside a repo the same command dies with `fatal:
+    # not a git repository`, so the repo here is the trap, not scenery.
+    setup = ("git init -q -b main . && echo x > f.txt && git add -A && "
+             "git -c user.email=t@t -c user.name=t commit -qm i")
+    prep = await Bash().run({"cmd": setup}, ctx)
+    assert prep.ok, prep.content
+
+    res = await Bash().run(
+        {"cmd": "git ls-tree -r --name-only main file:///tmp/up.git docs/"}, ctx)
+    assert res.ok and not res.is_error
+    assert "git clone" in res.content
+    assert "cannot take a URL" in res.content
+    assert "ran fine" not in res.content   # _EMPTY_OK must NOT be what came back
+
+
+async def test_ordinary_empty_query_still_gets_the_generic_reading(ctx):
+    res = await Bash().run({"cmd": "grep -r nothing-here . || true"}, ctx)
+    assert res.ok and "nothing matched" in res.content

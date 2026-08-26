@@ -13,6 +13,15 @@ Layout
       case.json     required. See CASE SCHEMA below.
       prompt.md     required. The user turn handed to `locode -p`.
       seed/         optional. Copied into the scratch workspace before the run.
+      setup.sh      optional. Run with `bash` in the workspace AFTER seed/ is
+                    copied, before the agent starts. For workspace state that
+                    cannot be checked into a seed directory: a git repo (a
+                    nested `.git` cannot be committed), or a path that is only
+                    knowable at run time, like a `file://` URL into the scratch
+                    dir. It runs identically in both arms and its output is
+                    never shown to the model, so it carries no arm label
+                    (rule 68). A non-zero exit fails the run loudly rather than
+                    handing the model a half-built workspace.
       check.py      optional. `def check(ctx) -> dict[str, bool|float]` —
                     case-specific outcome checks (files written, tests green).
 
@@ -370,6 +379,34 @@ def run_names(case_id: str, model: str, repeat: int, arm: str = "") -> tuple[str
             f"{case_id}__{model}__r{repeat}")
 
 
+_SETUP_TIMEOUT = 120
+
+
+def _run_setup(case: Case, workdir: Path) -> str:
+    """Run the case's optional `setup.sh` in the workspace. "" on success.
+
+    Kept deliberately dumb: `bash setup.sh` with cwd set to the workspace, no
+    arguments, no environment of our own. Anything the script needs to know it
+    can read from `pwd`, which is the one fact it could not have been given at
+    author time. Nothing it prints reaches the model — the workspace it leaves
+    behind is its entire output — so it is arm-blind by construction.
+    """
+    script = case.path / "setup.sh"
+    if not script.is_file():
+        return ""
+    try:
+        proc = subprocess.run(["bash", str(script)], cwd=workdir, text=True,
+                              capture_output=True, timeout=_SETUP_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return f"timed out after {_SETUP_TIMEOUT}s"
+    except OSError as e:
+        return f"could not launch: {e}"
+    if proc.returncode != 0:
+        tail = (proc.stdout + proc.stderr).strip().splitlines()
+        return f"exit {proc.returncode}: {tail[-1] if tail else '(no output)'}"
+    return ""
+
+
 def run_case(case: Case, model: str, repeat: int, results_dir: Path,
              keep: bool = True, agent_root: Path | None = None,
              arm: str = "") -> RunResult:
@@ -380,6 +417,17 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
     seed = case.path / "seed"
     if seed.is_dir():
         shutil.copytree(seed, workdir, dirs_exist_ok=True)
+
+    setup_err = _run_setup(case, workdir)
+    if setup_err:
+        # A half-built workspace is not a hard case, it is no case at all.
+        # Scoring it 0.0 would deflate the arm for a rig failure, so the run is
+        # marked invalid and drops out of the comparison entirely.
+        return RunResult(case=case.id, track=case.track, model=model,
+                         repeat=repeat, score=0.0, checks={}, metrics={},
+                         returncode=-1, timed_out=False, seconds=0.0,
+                         workdir=str(workdir), error=setup_err,
+                         invalid=f"setup.sh failed: {setup_err}", arm=arm)
 
     log_path = results_dir / "events" / f"{run_id}.jsonl"
     log_path.parent.mkdir(parents=True, exist_ok=True)
