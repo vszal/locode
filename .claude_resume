@@ -1,98 +1,90 @@
 # locode resume
-Last session: 2026-08-15 (paused by the user mid-thread — next lever decided,
-nothing started). Build 136, tree clean, 1291 tests green, main at 5066241.
+Last session: 2026-08-26. Build 138, 1322 tests green, main at 55dcdce.
+Two sessions' work below; the 2026-08-15 items are still open where marked.
 
-## Shipped this session
-- **build 136: `require_run_before_edit` default ON.** bugfix-notest n=12 paired,
-  A/A floor -0.012: runs_clean 0/12 -> 11/12, fully_fixed 0/12 -> 11/12,
-  score 0.286 -> 0.929 (p=0.001). 1291 tests green.
-  Reversible: `require_run_before_edit = false`.
-- Rebuilt `plan-hijack` (seed = one file, no tests, probe-graded). Now
-  discriminates 5/8 pre-fix vs 0/8 fixed.
-- New case `repro-only` (saturated — see below).
-- New rules: **71** (a case must discriminate against a pre-fix build, not just
-  reproduce), **72** (cost clauses denominate per successful outcome, not per run).
-- ROADMAP §5.113–§5.118.
+## Shipped/decided THIS session (2026-08-26)
+**The git-URL lever: NO SHIP.** Built it, built a case for it, measured it,
+shelved it. `locode/tools/gitremote.py` + 26 tests + `evals/cases/git-url-empty`
+all exist; `gitremote.ENABLED = False`, `hint()` inert. Same disposition as
+lever 0e v2. One line to revive.
+- Rule 71 check against build 136 (pre-fix): **trap fired 0/12.**
+- New harness feature: `evals/cases/<id>/setup.sh`, run in the workspace after
+  seed/ is copied. For state a seed dir cannot hold (a git repo — a nested
+  `.git` cannot be committed; a path only knowable at run time). Failure marks
+  the run `invalid`, not 0.0. 3 tests in test_harness.py.
 
-## Open judgment call for the user
+## THE FINDING — better than the lever it replaces. START HERE.
+Against build 136, n=12, qythos9 does one of exactly two things with a repo URL:
+  * **clones and answers perfectly — 4/12.** Nothing to fix.
+  * **strips the URL to its BASENAME — 6/12, the dominant failure:**
+        git ls-tree -r upstream.git --name-only | grep '^handlers/' | sort
+          -> fatal: Not a valid object name upstream.git      (rc 128)
+        [byte-identical repeat]
+          -> fatal: Not a valid object name upstream.git
+        [repeat guard nudges once, then stops the turn]
+
+**The missing hypothesis is the same one ("the command itself cannot answer
+this question") but the SURFACE IS THE ERROR PATH, NOT THE EMPTY PATH.** And
+this is the sharper version: the model is not mishearing an ambiguous silence,
+it is ignoring a specific, correct, complete error message — git names the
+exact problem — and then re-issuing the identical command. No URL appears in
+the failing command at all, which is why no URL detector could ever see it.
+
+Next lever should target that. Note the repeat guard DOES fire here (nudge,
+then stop), so this is again a CONTENT question, not a machinery question —
+and 0b applies: the fix must remove a demand, not re-rank one.
+
+## Premise correction (measured 2026-08-26, supersedes the 08-15 scoping)
+The silent class is NOT "local-only git subcommands take URLs". Handed a URL
+where a revision goes, git is loud: `show|log|rev-list|diff-tree` ->
+`fatal: invalid object name 'file'`; `cat-file` -> `too many arguments`.
+The silent class is exactly **a URL landing in a PATHSPEC position**:
+`ls-tree`, `ls-files`, `log -- <url>`, `diff -- <url>`. (`git grep -- <url>`
+is silent but exits 1, so the error-side guards already see it.)
+
+## The case, and what three failed drafts cost (all recorded in check.py)
+`evals/cases/git-url-empty` — needs `setup.sh` for three load-bearing reasons:
+ 1. The workspace must BE a git repo. Outside one the trap is a loud
+    `fatal: not a git repository`, i.e. no trap.
+ 2. Upstream must be reachable ONLY as a URL. Draft 2 used `file://` and
+    measured nothing — the URL spells out a path, so the model ls'd it, found
+    `upstream.git`, cd'd in, queried it locally. Correct answer, zero URLs.
+    Now a **`git daemon` on loopback:9419**, base `/tmp/locode-eval-gitd`,
+    started on demand by setup.sh. Fully offline, no network, deterministic.
+ 3. Nothing is vendored in the workspace. Draft 1 put the copy at `handlers/`,
+    so the pathspec matched the LOCAL tree and the trap printed a confident
+    wrong answer. Draft 3 kept a stale copy at `vendor/handlers/` and the model
+    answered by READING it. Every filename in the answer now exists only at the
+    far end of the URL.
+Leftover daemon after a sweep: `pkill -f 'git daemon.*9419'`.
+
+## Variance worth pricing before writing any threshold here (rule 57)
+Same code, same case, back to back: **3/4 clean at n=4 vs 1/8 at n=8.**
+
+## Still open for the user (carried from 2026-08-15, NOT yet reviewed)
 5.116 shipped build 136 **in breach of its own pre-registered 25% tool-call cap**
 (actual +111%). Argument: the clause was wrong when written — a lever whose
-mechanism IS adding a tool call must always breach an absolute cap. Flagged to
-the user; not yet reviewed by them.
+mechanism IS adding a tool call must always breach an absolute cap. Rule 72 was
+coined from it. Needs a yes/no.
 
-## The live finding to build on
-Three cases in a row failed as vehicles for the reproduce-before-edit lever:
-  bugfix-notest named bug — found by reading 7/8
-  plan-hijack            — script cannot be run at all (fake git clone URL)
-  repro-only             — found by reading 12/12, saturated 1.00 both arms
-**qythos9 reads code well; it does not run it.** A defect a careful reader can
-catch is not a test of reproduction. My "subtle" estimate was wrong twice in the
-same direction.
+## The standing finding (2026-08-15, now four cases deep)
+bugfix-notest / plan-hijack / repro-only / git-url-empty all failed as vehicles.
+**qythos9 reads code well; it does not run it — and when handed a remote it
+does the RIGHT thing more often than the wrong one.** My "this is subtle enough
+to trap it" estimate has now been wrong four times in the same direction.
+Build 136 still rests on bugfix-notest alone.
 
-## NEXT LEVER — DECIDED, NOT STARTED (user picked it 2026-08-15, then paused
-## the thread). Build this first; the fourth repro case below moves to second.
-
-**EMPTY RESULTS: the nudge names the wrong hypothesis.** Live sighting #2 (the
-first is recorded in `locode/tools/shell.py`'s own comment, at six consecutive
-empty git queries). Observed run: 8 iterations, 7 tool calls, 4 nudges, stopped.
-
-    bash git ls-tree -r --name-only main https://github.com/google/skills.git skills/cloud
-      -> exit 0, no output
-    [nudge: every call returning empty]
-    bash git ls-tree -r --name-only main https://github.com/google/skills.git | head -30
-      -> exit 0, no output
-    [stopped: every tool call kept coming back empty]
-
-**All the machinery fired correctly. The CONTENT of the nudge is what failed.**
-`_nudge_no_information` (loop.py:1876) says the fault is "the **path, the ref,
-the directory, the pattern or the repo** you are asking about" — every item is
-about the TARGET. The real fault was the COMMAND: `git ls-tree` reads the local
-object database and cannot take a URL at all, so the URL was parsed as a
-pathspec. The model then did the most reasonable thing the nudge allowed — drop
-the `skills/cloud` pathspec — which could never work. **Verified 2026-08-15 in a
-scratch repo: `git ls-tree -r --name-only main <URL>` exits 0 with ZERO output
-even with no pathspec at all.** The nudge's remedies ("list the parent
-directory, list the whole tree") are also unreachable here: they presuppose a
-local repo and nothing was ever cloned.
-
-**Missing hypothesis: "the command itself cannot answer this question."** For
-git it is a sharp class — `ls-tree`/`log`/`show`/`cat-file` are local-only;
-`ls-remote`/`clone`/`fetch`/`archive --remote` take URLs — and handing a URL to
-the first group is SILENTLY EMPTY rather than an error, the worst possible
-signal.
-
-**CHOSEN SURFACE — the tool RESULT, not the nudge text.** Have `bash` detect a
-local-only git subcommand handed a URL-shaped argument and return that specific
-fact instead of the generic `_EMPTY_OK` (shell.py:29). Rationale, from this
-repo's own history: 0b-iii — six builds of rewriting the MESSAGE moved nothing,
-one sentence in the tool DESCRIPTION moved 7/24 -> 22/24 ("I have been tuning
-the wrong surface"). **REJECTED alternative: widening the nudge text**, because
-resume item 0b closes that surface — this model obeys whichever demand the
-sentence leads with and only that one, so a second hypothesis likely just swaps
-which one gets obeyed; the fix must REMOVE a demand, not re-rank it.
-
-Scope honestly: this fixes git-with-a-URL, NOT "empty because the command was
-wrong" in general. The general version is unreachable.
-
-Still owed before it ships: a case that DISCRIMINATES (rule 71 — run it against
-a pre-fix build and confirm it scores differently) and a paired A/B with an A/A
-floor. Rule 7: do not ship this on the strength of the argument above.
-Touch points: `_EMPTY_OK` shell.py:29 · `_NOINFO_RESULTS` loop.py:67 ·
-`_is_noinfo` loop.py:76 · streak/stop loop.py:1221 · nudge loop.py:1865 ·
-`max_noinfo_calls = 3` (config.py:259, config.toml.example:143).
-
-## Then: a FOURTH case whose defect depends on **runtime state the source does not
-contain** — actual bytes in the data file (BOM, stray space, duplicate key), an
-environment/library difference, an ordering that only appears at scale. The code
-must look correct because it IS correct, given assumptions the data breaks.
+## Then: a case whose defect depends on RUNTIME STATE the source does not contain
+Actual bytes in a data file (BOM, stray space, duplicate key), an environment or
+library difference, an ordering that only appears at scale. The code must look
+correct because it IS correct, given assumptions the data breaks.
 bugfix-notest's decoy has this shape by accident, which is why it is the only
-place the lever has shown an effect. Build 136 currently rests on that one case.
+place the reproduce-before-editing lever has ever shown an effect.
 
 ## Unblocked (2026-08-12)
-Milestone emails work again: the user exported `RESEND_API_KEY` from `~/.zshrc`,
-so it is in the Bash tool's environment. Use `$RESEND_API_KEY` directly and do
-NOT read ~/Code/price-check/.env. Set a non-default User-Agent (a non-JSON 403
-from Resend is a Cloudflare UA block, not an auth failure).
+Milestone emails work: `RESEND_API_KEY` is exported in the Bash environment. Use
+it directly, do NOT read ~/Code/price-check/.env. Set a non-default User-Agent
+(a non-JSON 403 from Resend is a Cloudflare UA block, not an auth failure).
 
 ## Backlog (unchanged)
 `_FENCE_INSTRUCTIONS` "...and nothing else" carve-out A/B; D8/D9/D10;
