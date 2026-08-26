@@ -61,11 +61,14 @@ Leftover daemon after a sweep: `pkill -f 'git daemon.*9419'`.
 ## Variance worth pricing before writing any threshold here (rule 57)
 Same code, same case, back to back: **3/4 clean at n=4 vs 1/8 at n=8.**
 
-## Still open for the user (carried from 2026-08-15, NOT yet reviewed)
-5.116 shipped build 136 **in breach of its own pre-registered 25% tool-call cap**
-(actual +111%). Argument: the clause was wrong when written — a lever whose
-mechanism IS adding a tool call must always breach an absolute cap. Rule 72 was
-coined from it. Needs a yes/no.
+## Settled 2026-08-26 (was the open judgment call)
+5.116's breach of its own pre-registered 25% tool-call cap: **ratified, build 136
+stands** — the clause forbade the lever's mechanism rather than guarding waste,
+and 5.118 has since shown the cost on a case it cannot help is +1 call / +7s.
+But the override was raised AFTER unblinding, and that part is now closed:
+**rule 74** — a pre-registered clause may be waived only by an objection already
+on record before the results were seen. 5.116 is the grandfathered exception and
+the last one. See §5.120.
 
 ## The standing finding (2026-08-15, now four cases deep)
 bugfix-notest / plan-hijack / repro-only / git-url-empty all failed as vehicles.

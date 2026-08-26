@@ -9603,3 +9603,46 @@ was "qythos9 reads code well; it does not run it". This one extends it: handed a
 remote, it also does the RIGHT thing more often than the wrong one. My estimate
 of what is subtle enough to trap it has now been wrong four times, in the same
 direction each time. Build 136 still rests on `bugfix-notest` alone.
+
+## 5.120 — 5.116's override is ratified, and gets the constraint it was missing
+
+Reviewed by the user 2026-08-26, ten days after it shipped. **Build 136 stands.**
+The substantive argument in 5.116 holds: a 25% absolute cap on tool calls,
+applied to a lever whose entire mechanism is *to add a tool call*, forbids the
+mechanism rather than guarding against waste, and Rule 72 is the right repair.
+§5.118 has since supplied the evidence 5.116 did not have — on `repro-only`, a
+case the lever cannot help, its whole cost is +1 tool call and +7s with no
+correctness or clean-finish penalty in 12 runs.
+
+### What was actually wrong with it, and it is not the argument
+
+The argument was raised **after the sweep was unblinded**. That is the part that
+must not become normal. "The clause was wrong when it was written" is a true
+statement here and an unfalsifiable one in general: it is available post-hoc for
+almost any clause that fails, it is always more articulate than the clause it
+overrides, and nothing in the process was checking. Pre-registration survives on
+the discipline of eating a failed clause; an escape hatch that only ever opens
+after the numbers are in is not a repair, it is the failure mode.
+
+The fix is not to forbid the override — 5.116 shows it can be correct — but to
+move it earlier, where it costs something to make and can still be wrong.
+
+> **Rule 74: a pre-registered clause may be waived only by an objection already
+> on record before the results were seen.** When the criterion is written, check
+> every clause against the lever's own mechanism — *could a working version of
+> this lever satisfy this?* — and fix any clause a successful lever would have
+> to breach, then, in the pre-registration. Afterwards, a clause with no prior
+> objection stands: failing it is a NO SHIP, and the remedy is a corrected
+> criterion and a re-run, not an argument. Rule 72 says how to write the cost
+> clause so this does not arise; this rule says what to do when it does.
+
+Applied to the case at hand: had 5.115 asked "can a lever that adds a tool call
+pass a 25% tool-call cap?", the answer was available before a single run existed,
+and the clause would have been written per-success from the start. Nothing about
+the outcome would have changed — 6.9 calls per fix against a baseline with no
+finite cost per fix passes any sane cost-per-success clause — which is precisely
+why the re-run option was declined: the correction is procedural, and the
+procedure it corrects is the one used from here on, not this sweep.
+
+5.116 is therefore the recorded exception, grandfathered on its evidence. It is
+the last one.
