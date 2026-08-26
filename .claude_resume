@@ -1,5 +1,6 @@
 # locode resume
-Last session: 2026-08-26. Build 139, 1337 tests green.
+Last session: 2026-08-26. Build 139, 1337 tests green. OSS prior art now in play:
+read SWE-agent/Aider before designing any message surface (§5.123).
 Archive mining (evals/mine.py) is now the first move on any lever. It has
 retired four candidates and found the current one without spending GPU.
 Two sessions' work below; the 2026-08-15 items are still open where marked.
@@ -40,24 +41,50 @@ lever 0e v2. One line to revive.
   `.git` cannot be committed; a path only knowable at run time). Failure marks
   the run `invalid`, not 0.0. 3 tests in test_harness.py.
 
-## NEXT LEVER — FOUND BY MINING, NOT ARGUING (§5.122). START HERE.
-**The syntax guard's stranded-tail branch: 0 successes in 181 attempts on
-current builds.** `locode/tools/fs.py:884` — when `replace_lines`/`edit_file`
-would introduce a SyntaxError, the message forks:
+## NEXT LEVER — DIAGNOSED AND DESIGNED, GATED ON EXPOSURE (§5.122/§5.123)
+**The syntax guard's stranded-tail branch: 0 successes in 181 attempts.**
+`locode/tools/fs.py:884` — when an edit would introduce a SyntaxError the
+message forks:
   * error INSIDE the text the model supplied  -> n= 22, **55%** next edit lands
   * error OUTSIDE it ("leftover tail")        -> n=181, **0%**, 52% fail again
-Same builds, same tool, same model. The failing branch is 181 of 203 recent
-syntax refusals. §5.9x added that branch deliberately for this population; the
-diagnosis was right and the remedy does not work.
 
-CAVEAT to carry into the design: inside/outside is NOT randomised — outside is
-genuinely harder (repair a tail the model did not write), so do not size a
-lever off the 55-point gap. The un-confounded fact is the absolute floor, 0/181.
+THE MECHANISM (measured, §5.123). Three of my own hypotheses died first: the
+message DOES render a line-numbered snippet; `new` is balanced in 79%; the prose
+diagnosis is CORRECT. What is true: **all 217 come from `replace_lines`, never
+`edit_file`.** replace_lines takes path/start/end/new — a BLIND line range, the
+model never quotes what it replaces — so it cannot see its range clips a
+docstring. 89% are `unterminated triple-quoted string literal` reported a median
+**46 lines** downstream; 69% of ALL b127+ replace_lines failures are this shape.
+The message is not wrong, it is UNACTIONABLE: "extend the region to cover that
+whole block" never names the line the block starts at. And `_seam_window`
+(fs.py:842) spans min(hi,err)-2..err+2, so its intended 2 lines of context
+render a median **34** (124 of 245 long enough to be clipped).
 
-DESIGN HINT: the sibling surface that WORKS is the ambiguous-match message
-(87% recovery, n=389) — it SHOWS every candidate location and names ONE field
-to add. The failing branch names the error and describes the leftover in prose.
-0b-iii: the tool surface is where this model moves.
+THE DESIGN (pre-registered, not built):
+ 1. Two bounded ±3 windows — seam and error — never the gap between them.
+ 2. Compute the clipped construct's real boundary (we hold start/end and a
+    before-text that parses, so the split delimiter is derivable).
+ 3. Deliver as a ONE-FIELD change in the 87%-recovery ambiguous-match shape:
+    "your range 16-30 splits the docstring spanning 12-39 — send the SAME call
+    with `start: 12`". Not "re-read the file and extend the region".
+ 4. Lever 0f: none of this goes in the tool description.
+
+PRIOR ART (both converge, neither uses prose). SWE-agent runs the identical
+guard (flake8 --select=...E999, revert on new error), worth +3.0pp on SWE-bench;
+its message carries error + would-be-applied window + original, and its ablation
+says dropping the snippets makes the agent "re-issue the same command more
+frequently" — our 52%. Aider, opposite architecture (apply-then-repair), still
+renders bounded context with the offending line marked (loi_pad=3, mark_lois).
+
+**GATE — RUNNING 2026-08-26: `b139-qythos9-exposure`** (qythos9, exec-bugfix,
+n=12). Exposure is qwencoder14's: qythos9 makes **0** replace_lines calls in 94
+archived runs, but only **2** of those are exec-bugfix, the case producing 217
+of the 245 events. Zero out of two is no information. If the probe shows qythos9
+does not reach for replace_lines, the lever is moot on the default model (rule
+17, the way the git lever died at 0/12). If it does, build the design above.
+
+CAVEAT for sizing: inside/outside is NOT randomised — outside is genuinely
+harder. Do not size off the 55-point gap; the clean fact is the floor, 0/181.
 
 ## Ranked b127+ edit failures by RECOVERY (not frequency — that ranking lies)
     `old` ambiguous      n=389   87% land    0% fail again   <- shipped win
