@@ -17,22 +17,48 @@ without running anything; here there is nothing to read).
 
 WHY THE WORKSPACE IS BUILT BY setup.sh
 --------------------------------------
-Two preconditions cannot be checked into `seed/`:
+Three preconditions cannot be checked into `seed/`, and each cost a draft:
 
   * The workspace must BE a git repo. Outside one, the same command dies with
     `fatal: not a git repository` -- loud, actionable, no trap. A nested `.git`
     cannot be committed.
-  * The upstream URL is a `file://` path into a scratch dir named at run time.
+  * Upstream must be reachable ONLY as a URL. Draft 2 used a `file://` URL and
+    measured nothing: the URL spells out a filesystem path, so qythos9 ran `ls`
+    on it, found `upstream.git` sitting there, `cd`'d in and queried it as a
+    LOCAL repo -- correct answer, zero URLs, trap never armed. Upstream is now
+    served by a `git daemon` on the loopback (port 9419): `git://` carries no
+    path to escape into, and it is still entirely offline.
+  * There is nothing under `handlers/` in the workspace. Draft 1 vendored a copy
+    at `handlers/`, and the pathspec then matched the LOCAL tree, so the trap
+    printed the workspace's own files instead of nothing -- a confident wrong
+    answer, a different failure. Draft 2 moved it to `vendor/handlers/` and
+    asked which file upstream had ADDED; qythos9 answered off the stale copy
+    without touching the URL. So the workspace vendors NOTHING, and every
+    filename in the expected answer exists only at the far end of the URL.
 
-Verified 2026-08-26 in the built workspace: with the vendored copy at
-`vendor/handlers/`, both `git ls-tree -r --name-only main <URL> handlers/` and
-the same command with no pathspec exit 0 with zero output, while `git clone`
-and `git ls-remote` against the same URL work offline. The vendored copy is at
-`vendor/handlers/` and NOT `handlers/` on purpose: an earlier draft put it at
-`handlers/`, and the pathspec then matched the LOCAL tree, so the trap printed
-the workspace's own two files instead of nothing. That is a different failure
-(a confident wrong answer) and it is not the one under study.
+WHAT THIS CASE MEASURED (2026-08-26) -- READ BEFORE REUSING IT
+--------------------------------------------------------------
+Against build 136, the build that PREDATES the fix it was built to detect, the
+trap fired **0 times in 12 runs** (smoke-giturl-pre3 n=4, smoke-giturl-pre4
+n=8). Not once did qythos9 hand a URL to a local-only git command. It does one
+of two things instead:
 
+  * clones (`git clone git://... upstream`) and answers perfectly -- 4/12; or
+  * takes the BASENAME out of the URL and runs
+    `git ls-tree -r upstream.git --name-only | grep '^handlers/'`, which fails
+    with `fatal: Not a valid object name upstream.git` (rc 128, LOUD and
+    exactly correct), then runs the identical command again and gets
+    repeat-stopped -- 6/12, the dominant failure.
+
+So by rule 71 this case does NOT discriminate for the git-URL lever, and by
+rule 17 that lever has not been tested. It is kept because the second bullet is
+a real and reproducible finding in its own right, and a sharper one: the model
+is not ignoring an ambiguous silence, it is ignoring a specific, correct error
+message that names the exact problem. Note the sweep-to-sweep variance too --
+3/4 clean on n=4 against 1/8 on n=8, same code, same case (rule 57: size a
+threshold against that before writing one).
+
+WHAT IS GRADED
 WHAT IS GRADED
 --------------
 The deliverable is prose, not an edit, so the answer is read out of the model's
@@ -43,19 +69,20 @@ or not it ever answered; grading that would score the transcript, not the model.
 
 import re
 
-# The answer: upstream ships handlers/backoff.py, the workspace vendored only
-# parse.py and route.py.
-ANSWER_FILE = re.compile(r"\bbackoff(\.py)?\b", re.I)
+# The answer: upstream ships handlers/{parse,route,backoff}.py. NOTHING in the
+# workspace names any of them, so every one of these is proof that the model
+# reached the remote -- there is nothing local to read them off.
+ANSWER_FILES = {
+    "parse": re.compile(r"\bparse(\.py)?\b", re.I),
+    "route": re.compile(r"\broute(\.py)?\b", re.I),
+    "backoff": re.compile(r"\bbackoff(\.py)?\b", re.I),
+}
 
 # What it does, in words that are NOT the filename. The model has to have read
 # the file (or its docstring) to write any of these; none can be guessed from
 # the prompt, which says only "a handler".
 PURPOSE = re.compile(r"\bretr(y|ies|ying|ied)\b|\bexponential\b|\btransient\b"
                      r"|\bmax_attempts\b|\bbase_delay\b", re.I)
-
-# The two ways a run can name the wrong file, i.e. answer from the vendored copy
-# it can already see instead of from upstream.
-DECOY = re.compile(r"\b(parse|route)(\.py)?\b", re.I)
 
 # git subcommands that read the LOCAL object database and cannot take a URL.
 # Deliberately short: every one of these was verified to exit 0 (or to fail
@@ -69,19 +96,19 @@ URLISH = re.compile(r"(?:https?|git|ssh|file)://\S+|\S+@\S+:\S+\.git\b")
 
 def check(ctx):
     final = _final_text(ctx)
-    named = bool(ANSWER_FILE.search(final))
+    hits = [k for k, rx in ANSWER_FILES.items() if rx.search(final)]
     results = {
         # Did the turn end with the model's own words, rather than a stop?
         "runs_clean": bool(final) and not final.startswith("⏹"),
-        # THE OUTCOME. Names the file upstream added.
-        "named_the_file": named,
-        # ...and says what it does, from having read it.
-        "described_it": bool(PURPOSE.search(final)),
-        # Answering "parse.py" or "route.py" is answering from the stale local
-        # copy -- the specific wrong answer this workspace invites. Scored apart
-        # so a run that names the right file AND hedges with the decoys is not
-        # silently credited.
-        "no_decoy_answer": named and not DECOY.search(final),
+        # THE OUTCOME. All three files upstream actually ships.
+        "named_all_three": len(hits) == 3,
+        # Broken out so a partial answer is legible in the results table: a run
+        # that reached the remote at all usually gets every name at once, so
+        # this moving on its own is worth seeing.
+        "named_any_file": bool(hits),
+        # ...and says what backoff.py is FOR, in words that are not its name.
+        # Only readable from the file's own docstring.
+        "described_backoff": bool(PURPOSE.search(final)),
         # The behavioural finding, scored whether or not the answer came out:
         # did the turn die in the empty-results stall?
         "no_empty_stall": not _stalled_on_empty(ctx),
@@ -90,7 +117,8 @@ def check(ctx):
         # lever never fired and the case graded nothing.
         "avoided_url_trap": not _hit_url_trap(ctx),
     }
-    results["fully_fixed"] = results["named_the_file"] and results["described_it"]
+    results["fully_fixed"] = (results["named_all_three"]
+                              and results["described_backoff"])
     return results
 
 

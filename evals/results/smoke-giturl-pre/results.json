@@ -1,0 +1,93 @@
+{
+  "label": "smoke-giturl-pre",
+  "created": "2026-08-26 07:46:34",
+  "git_head": "fff49ad",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "git-url-empty",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 0.429,
+      "checks": {
+        "runs_clean": true,
+        "named_the_file": false,
+        "described_it": false,
+        "no_decoy_answer": false,
+        "no_empty_stall": true,
+        "avoided_url_trap": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 12,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "ls": 6,
+          "read_file": 3,
+          "bash": 2
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 76.6,
+        "model_seconds": 76.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 38.1,
+        "gen_chars": 1586,
+        "gen_chars_per_sec": 41.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 76.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-git-url-empty__qythos9__r1-0o32asy0",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.429,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 0,
+    "total_iterations": 12,
+    "nudge_histogram": {},
+    "n_runs": 1,
+    "n_valid": 1,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 41.6,
+    "gen_chars": 1586,
+    "rows": {
+      "git-url-empty::qythos9": {
+        "case": "git-url-empty",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.429,
+        "score_min": 0.429,
+        "scores": [
+          0.429
+        ],
+        "iterations_mean": 12,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 76.8,
+        "gen_rate_mean": 41.6,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "git-url-empty": 1.0
+    }
+  }
+}

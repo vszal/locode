@@ -43,12 +43,26 @@ model git's argument grammar.
 
 Pure function of the command string; returns None — no hint, this empty result
 is the model's ordinary business — for everything else.
+
+NOT SHIPPED (2026-08-26). `ENABLED` is False and `hint()` is therefore inert in
+the live path. The case built to grade this — `evals/cases/git-url-empty` —
+fired the trap **0 times in 12 runs** against the pre-fix build: qythos9 either
+clones the URL (4/12) or strips it to a basename and runs
+`git ls-tree -r upstream.git`, which fails LOUDLY and which no URL detector can
+see (6/12). By rule 17 the lever has not been tested and by rule 7 it does not
+ship on the strength of the argument above, however good the argument is. It is
+kept, switched off, because the mechanism is real and correct and a case that
+can grade it may yet exist — the same disposition as lever 0e v2.
 """
 
 from __future__ import annotations
 
 import re
 import shlex
+
+# Off. See the NOT SHIPPED note above; flip to True only alongside a case that
+# actually exercises it.
+ENABLED = False
 
 _SEGMENT_RE = re.compile(r"&&|\|\||;|\||\n")
 
@@ -106,6 +120,8 @@ def hint(cmd: str) -> str | None:
 
     Only called when `cmd` exited 0 and printed nothing at all.
     """
+    if not ENABLED:
+        return None
     for segment in _SEGMENT_RE.split(cmd or ""):
         parsed = _parse_git(segment)
         if not parsed:

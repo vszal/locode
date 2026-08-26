@@ -1,0 +1,243 @@
+{
+  "label": "smoke-giturl-pre3",
+  "created": "2026-08-26 07:53:17",
+  "git_head": "fff49ad",
+  "git_dirty": true,
+  "runs": [
+    {
+      "case": "git-url-empty",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "named_all_three": true,
+        "named_any_file": true,
+        "described_backoff": true,
+        "no_empty_stall": true,
+        "avoided_url_trap": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 10,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "ls": 4,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.1,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 43.8,
+        "model_seconds": 43.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 43.7,
+        "gen_chars": 2090,
+        "gen_chars_per_sec": 47.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 43.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-git-url-empty__qythos9__r1-owfhoa3j",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "git-url-empty",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "named_all_three": true,
+        "named_any_file": true,
+        "described_backoff": true,
+        "no_empty_stall": true,
+        "avoided_url_trap": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 14,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "read_file": 6,
+          "ls": 5,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.077,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 54.4,
+        "model_seconds": 54.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 54.3,
+        "gen_chars": 2592,
+        "gen_chars_per_sec": 47.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 54.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-git-url-empty__qythos9__r2-zhjwn4si",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "git-url-empty",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "named_all_three": true,
+        "named_any_file": true,
+        "described_backoff": true,
+        "no_empty_stall": true,
+        "avoided_url_trap": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 12,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "ls": 5,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.091,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 47.4,
+        "model_seconds": 47.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 47.3,
+        "gen_chars": 2259,
+        "gen_chars_per_sec": 47.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 47.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-git-url-empty__qythos9__r3-a78fgqdg",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "git-url-empty",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 4,
+      "score": 0.286,
+      "checks": {
+        "runs_clean": false,
+        "named_all_three": false,
+        "named_any_file": false,
+        "described_backoff": false,
+        "no_empty_stall": true,
+        "avoided_url_trap": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "ls": 3,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 25.7,
+        "model_seconds": 25.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 25.6,
+        "gen_chars": 1106,
+        "gen_chars_per_sec": 43.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 25.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-git-url-empty__qythos9__r4-km601dir",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.822,
+    "clean_finish_rate": 0.75,
+    "total_nudges": 1,
+    "total_iterations": 45,
+    "nudge_histogram": {
+      "repeated call": 1
+    },
+    "n_runs": 4,
+    "n_valid": 4,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 47.1,
+    "gen_chars": 8047,
+    "rows": {
+      "git-url-empty::qythos9": {
+        "case": "git-url-empty",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 4,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.822,
+        "score_min": 0.286,
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          0.286
+        ],
+        "iterations_mean": 11.2,
+        "nudges_mean": 0.2,
+        "clean_finish_rate": 0.75,
+        "seconds_mean": 43.0,
+        "gen_rate_mean": 47.1,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "git-url-empty": 1.0
+    }
+  }
+}

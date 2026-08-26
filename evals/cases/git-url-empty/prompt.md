@@ -1,1 +1,1 @@
-upstream added a handler we never vendored. which file is it, and what does it do?
+what does upstream ship under handlers/? list the files and say what each one is for. the repo url is in vendor_sync.py

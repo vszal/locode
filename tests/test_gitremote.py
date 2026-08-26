@@ -8,7 +8,23 @@ behaviour asserted below about real git was measured (2026-08-26), not assumed
 
 import pytest
 
+from locode.tools import gitremote
 from locode.tools.gitremote import hint
+
+
+@pytest.fixture(autouse=True)
+def _enabled(request, monkeypatch):
+    """The lever is shipped OFF (rule 7: it has no case that can grade it), so
+    every test below turns it on to exercise the detector underneath. Tests
+    with "shipped" in the name opt out -- they assert the shipped state."""
+    if "shipped" in request.node.name:
+        return
+    monkeypatch.setattr(gitremote, "ENABLED", True)
+
+
+def test_shipped_state_is_off():
+    assert gitremote.ENABLED is False
+    assert hint("git ls-tree -r --name-only main " + URL) is None
 
 URL = "file:///tmp/upstream.git"
 
