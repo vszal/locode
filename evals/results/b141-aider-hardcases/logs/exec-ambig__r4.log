@@ -1,0 +1,25 @@
+Warning: Input is not a terminal (fd=0).
+────────────────────────────────────────────────────────────────────────────────
+Warning for openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx: Unknown
+context window size and costs, using sane defaults.
+You can skip this check with --no-show-model-warnings
+
+https://aider.chat/docs/llms/warnings.html
+
+Aider v0.86.2
+Model: openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx with diff 
+edit format
+Git repo: none
+Repo-map: disabled
+Added limits.py to the chat.
+Added test_limits.py to the chat.
+
+I'll run the tests to see which ones are failing.                               
+
+                                                                                
+ python3 -m pytest -q                                                           
+                                                                                
+
+Tokens: 3.5k sent, 26 received.
+
+python3 -m pytest -q

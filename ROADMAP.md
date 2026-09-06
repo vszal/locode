@@ -10035,3 +10035,97 @@ another sweep of this one.
 
 Eighth null in a row, and the first one measured against something outside the
 repo.
+
+## §5.127 — the post-green tail, fixed and confirmed; and aider on the hard cases
+
+Two questions closed here: did the build-141 nudge change work, and does locode
+still look good against aider once the cases get harder than `exec-bugfix`.
+
+### The fix works, and the score table said otherwise
+
+The first read of the A/B was wrong, and wrong in an instructive way. Pooled
+score went 0.911 (b140) → 0.880 (b141) and mean `exec-bugfix` iterations were
+flat, 15.8 → 16.0. On those two numbers the change looks like a regression, and
+that is what I said out loud before looking further.
+
+Mean iterations was the wrong statistic. Decomposing each run into the segment
+before the suite first goes green and the tail after it:
+
+| arm | runs reaching green | pre-green iters | post-green tail |
+|---|---|---|---|
+| b140 | 5/6 | 10, 10, 10, 10, (6) | 5, 6, 5, 6, (1) — mean 4.6 |
+| b141 | 4/6 | 10, 10, 10, 10 | 3, 3, 3, 3 — mean 3.0 |
+
+Pre-green is *identical* — 10 iterations in every run of both arms, which is
+what you want from a change that is supposed to be inert until the suite passes.
+The tail drops by 2.6 iterations and its variance collapses to zero. The lever
+fired exactly as designed: every green b140 run emits two `open plan tasks`
+nudges, every green b141 run emits exactly one.
+
+The pooled score moved because b141 had one extra run fail — r4 and r6 both died
+on the same sub-task, `test_truncate_shortens_and_appends_suffix_at_exact_limit`,
+against b140's one such death in r2. And those three failing runs emit **zero**
+`open plan tasks` nudges, because they never reached green. The patched branch
+did not execute in any run that moved the score. The delta cannot be attributed
+to the change; it is one binomial coin-flip at n=6 on an untouched path.
+
+**Rule 78: a change can only be blamed for outcomes in runs where its code path
+actually executed, so before attributing a delta to it, confirm the branch fired
+in the runs that moved.**
+
+This is rule 17's mirror. Rule 17 says a lever that fires zero times has not been
+tested; rule 78 says a lever that fires zero times has not been *convicted*
+either. Both failures here were mine in the same session — I nearly reverted a
+working change on a statistic that averaged over a segment the change does not
+touch.
+
+**Disposition: KEEP build 141.**
+
+### Aider on the hard cases
+
+`grade_external.py` scores an external tool's workspace with the case's own
+`check.py`. It refused `exec-stall-trap` outright — that case grades on
+`ctx.events` and an external tool emits none — which is the correct behaviour
+and leaves three gradeable cases.
+
+| case | locode (b140) | aider (diff, `--auto-test`) | aider edits applied |
+|---|---|---|---|
+| exec-ambig | 1.000 | 0.500 (6/6) | 0/6 |
+| exec-pinpoint | 1.000 | 0.500 (6/6) | 0/6 |
+| repro-only | 0.833 | 0.500 (6/6) | 2 per run |
+
+The flags were fair — `--test-cmd "python3 -m pytest -q" --auto-test` was passed,
+so aider had its repair loop available. It never got to use it. On `exec-ambig`
+and `exec-pinpoint` the model's entire output is 26 tokens: *"I'll run the tests
+to see which ones are failing."* It proposes an investigative first step,
+`--message` mode ends after one exchange, and aider exits having written nothing.
+
+That is the mechanism, and it is architectural rather than incidental:
+**aider's repair loop is edit-triggered; locode's is turn-triggered.** Auto-test
+only engages after an edit lands, so a model that opens by looking before
+leaping gets no second turn. Locode's loop is turn-based and simply carries on —
+and `exec-ambig`/`exec-pinpoint` are cases where looking first is the *correct*
+opening. Small models do this reliably: the same 26 tokens, all six runs.
+
+Which brings the earlier null into focus. §5.126 found locode and aider
+equivalent on `exec-bugfix` and closed with the caveat that this said nothing
+about harder cases. Run the harder cases and the equivalence disappears, in
+locode's favour, for a reason the easy case structurally could not expose: on
+`exec-bugfix` the model happens to open with an edit.
+
+**Rule 79: a competitor decoding greedily returns the identical run every time,
+so its repeats are not samples — report it as n=1 and do not quote a spread.**
+
+Every aider run of a given case returned byte-identical token counts. The 6/6
+consistency above is one observation reported six times, and treating it as a
+tight confidence interval would be a fabrication. It does mean the *locode* side
+carries all the variance in this comparison, which is worth remembering when
+reading the two columns as if they were symmetric.
+
+### What is still open
+
+The remaining `exec-bugfix` failure mode is untouched by any of this: qythos9
+grinds on `truncate`'s exact-limit case, emits `same failure (3 runs in a row)`,
+and the loop stops it after 8 unproductive iterations. That is the genuine
+"goes astray" instance the original complaint was about, it survives build 141,
+and it is the next target.
