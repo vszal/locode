@@ -36,3 +36,28 @@ perfect".
 - The **iteration** difference (qwen38 ~5-6 vs qythos9 ~9 across three cases)
   is a separate, more consistent observation and is not what this p-value is
   about. It is reported descriptively, untested.
+
+## Amendment 1 (14:07, after launch, before any extension run was graded)
+
+The prereg above said both arms share the same agent root. On checking, they
+did not: the original `qwen38-repro` n=8 ran against the **installed tree**
+(stage 5 passed no `--agent-root`), while `qythos9`'s 0.819 came from stage 3
+against **frozen-b142**. The stage-6 extension runs against frozen-b142 for
+both models.
+
+**Pooling is still legitimate, and this was verified rather than assumed.**
+`diff -rq frozen-b142/locode locode` reports exactly one differing file,
+`__init__.py`, and the entire diff is `__build__ = 142` → `146`. That constant
+is a splash-screen tripwire with no reader anywhere in `locode/` or `evals/`;
+all four commits touching `locode/` since b142 changed only that literal, with
+the real work in `evals/`. The agent under test is byte-identical.
+
+Two things recorded so this is not repeated:
+- The trees diverged **only because I bumped `__build__` for a harness-only
+  change** (build 146). `evals/LOG.md` shows the repo's own convention is *not*
+  to bump for harness edits. The bump was harmless but it manufactured a
+  rig-difference scare during a live sweep, which is exactly the cost the
+  convention exists to avoid.
+- Every future sweep intended for pooling passes `--agent-root` explicitly,
+  including when the intent is "the current tree". Relying on the default made
+  two arms differ silently.
