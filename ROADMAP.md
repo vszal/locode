@@ -10273,3 +10273,52 @@ both it landed on the right value on the next attempt. That is exactly the
 behaviour P2 asks for. Two is not a sample, and this is recorded as a
 mechanism observation, not a benefit claim — the benefit test is ARM F/G,
 where the exposure actually lives.
+
+## §5.130 — the e2e gap, and why it could not be read
+
+`e2e-spec-to-code` is the largest remaining hole in the suite. ARM E's twelve
+runs score 0.70 eleven times, 0.80 once, 0.50 once — a spread that tight is not
+variance, it is the same components failing every time. The check breakdown says
+which:
+
+| check | fails |
+|---|---|
+| `wrote_design_doc` / `wrote_plan_doc` / `wrote_module` / `wrote_tests` | 0–1 / 12 |
+| `plan_has_tasks` | 11 / 12 |
+| `own_tests_pass` | **12 / 12** |
+| `independent_spec_check` | **12 / 12** |
+
+So the model reliably produces all four deliverables and reliably fails to make
+any of them work. Nine of twelve runs are stopped by the loop.
+
+**A hypothesis killed before it was built (rule 46).** The first reading of the
+trajectories suggested the model writes tests against a signature it never
+built — r10 passes a dict where the spec says a TOML path, r11 passes an env
+mapping as the second positional — and then grinds on the module while never
+reconsidering the test. That would have justified a "your test may be the wrong
+one" nudge. Measured: runs where a test fails three times running, the
+implementation is edited three or more times, and the test file is never
+touched — **0/12 on `e2e`, 0/12 on the b141 arm, 0/20 on `exec-ambig`.** Every
+e2e run edits its own test file. The pathology is not that the model refuses to
+revisit its tests. No build.
+
+Of the three modules that could be reconstructed and run against the case's own
+independent checker, two fail the same way: an environment variable
+`APP__N` is not matched to the default key `n`, so the loader reports "no
+default for this environment variable" for a key that is right there. That is
+spec comprehension, not a loop pathology, and no nudge fixes it.
+
+**Why only three of twelve.** The other nine reconstructions were syntactically
+broken by the reconstruction, not by the model: `telemetry.py` clips long event
+fields, so a `write_file` of a 2 kB module is recorded as the first N characters
+plus `…<clipped N chars>`, and the sweeps ran with `--clean`, which deletes the
+workdir after scoring. Between the two, the agent's actual output for a failed
+run was unrecoverable — rule 3 defeated on precisely the runs worth reading.
+
+Build 143 fixes the rig rather than the agent: `run_case` now snapshots the
+final workspace into `<results>/workspaces/<stamp>/` before the workdir is
+removed, skipping caches and VCS metadata, capping per-file and total bytes, and
+naming anything it skipped. It is best-effort and swallows its own errors — a
+scored run must never be lost to a failed copy. Four tests cover it. This
+changes no agent behaviour; the conclusions above stand as they are, and the
+next e2e sweep will be readable.

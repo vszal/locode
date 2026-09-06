@@ -407,6 +407,56 @@ def _run_setup(case: Case, workdir: Path) -> str:
     return ""
 
 
+# Directories that are never worth snapshotting: caches, VCS metadata, and
+# anything a package manager can recreate.
+_SNAPSHOT_SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", ".venv",
+                       "venv", "node_modules", ".mypy_cache", ".ruff_cache"}
+_SNAPSHOT_MAX_FILE = 256 * 1024
+_SNAPSHOT_MAX_TOTAL = 4 * 1024 * 1024
+
+
+def _snapshot_workspace(workdir: Path, results_dir: Path, stamp: str) -> None:
+    """Copy the run's final workspace into the results directory.
+
+    Without this the only record of what the agent actually wrote is the event
+    log, and `telemetry.py` clips long fields -- so a `write_file` of a 2 kB
+    module is stored truncated and the file cannot be reconstructed afterwards.
+    That defeats rule 3 on exactly the runs worth reading: the ones that failed
+    a check and whose workdir `--clean` then deleted. Snapshotting is cheap,
+    survives the workdir's deletion, and makes a results directory
+    self-contained.
+
+    Best effort throughout: a snapshot failure must never lose a scored run.
+    """
+    dest = results_dir / "workspaces" / stamp
+    skipped: list[str] = []
+    total = 0
+    try:
+        for src in sorted(workdir.rglob("*")):
+            rel = src.relative_to(workdir)
+            if any(part in _SNAPSHOT_SKIP_DIRS for part in rel.parts):
+                continue
+            if not src.is_file() or src.is_symlink():
+                continue
+            size = src.stat().st_size
+            if size > _SNAPSHOT_MAX_FILE:
+                skipped.append(f"{rel} ({size} bytes, over per-file cap)")
+                continue
+            if total + size > _SNAPSHOT_MAX_TOTAL:
+                skipped.append(f"{rel} ({size} bytes, over total cap)")
+                continue
+            out = dest / rel
+            out.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, out)
+            total += size
+        if skipped:
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "_SKIPPED.txt").write_text("\n".join(skipped) + "\n")
+    except Exception:
+        # A run that scored is worth more than a complete snapshot.
+        pass
+
+
 def run_case(case: Case, model: str, repeat: int, results_dir: Path,
              keep: bool = True, agent_root: Path | None = None,
              arm: str = "") -> RunResult:
@@ -504,6 +554,7 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
                           infra_error=metrics.get("infra_error"),
                           launch_error=launch_error)
 
+    _snapshot_workspace(workdir, results_dir, stamp)
     if not keep:
         shutil.rmtree(workdir, ignore_errors=True)
     return RunResult(case.id, case.track, model, repeat, score, checks, metrics,
