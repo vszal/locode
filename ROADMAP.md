@@ -10509,3 +10509,67 @@ The qythos9 arms are unchanged — on that model almost every edit lands, so the
 two rules agree. P1′ still clears by a wide margin. The 62%-rejected-edit rate
 on qwencoder14 is a finding in its own right and is not what this build was
 built to address.
+
+## §5.135 — ARM G lands: build 142 is inert, and the e2e case was measuring the wrong thing
+
+ARM G (build 142, revert note live) completed on `qwencoder14` at 12:32. The
+three-case table against ARM F (build 141, identical rig, note absent):
+
+| case | ARM F | ARM G | Δ | stops F→G |
+|---|---|---|---|---|
+| exec-bugfix | 0.467 | 0.475 | +0.008 | 30/30 → 30/30 |
+| exec-ambig  | 0.550 | 0.500 | −0.050 | 18/20 → 20/20 |
+| e2e-spec-to-code | 0.800 | 0.808 | +0.008 | 12/12 → 11/12 |
+
+**Verdict: NO KEEP as a scoring lever.** The note is safe — no case regressed
+beyond noise, and `exec-ambig`'s −0.050 is two runs of twenty. It is also not
+worth its complexity: nothing moved.
+
+The pre-registered predictions, graded honestly:
+
+- **P1′ (≥10 live notes) — PASS, decisively.** 62 live `edit reverted to a
+  tested state` firings across the three cases (20 + 36 + 6), against a bar of
+  10. The mechanism fires. The detector predicted 6 for e2e and the loop emitted
+  exactly 6; after the §5.134 fix it is now exact on every arm checked.
+- **P2 (novel value beats control) — FAIL.** exec-ambig 41.7% novel against a
+  47.6% control; e2e 33.3% against 16.7%; exec-bugfix 5% against 0%. Mixed sign,
+  and it loses on the case with the most firings. Per §5.133a the control
+  comparison is the one to believe, not the bare plurality.
+- **P6 (firings per exposed run falls) — FAIL.** exec-bugfix 1.31→1.82,
+  exec-ambig 3.82→4.00. e2e appears to pass at 3.00→1.50, but total firings were
+  **identical at 6** in both arms; the ratio moved only because exposure spread
+  from 2 runs to 4. A denominator artifact is not evidence the note shortens a
+  cycle, and it is not scored as a pass.
+
+**Why it is inert** is now well supported: the note addresses a gap between
+*exposure* and *capability* that no tested model occupies. `qythos9` escapes the
+revert cycle unaided 71% of the time and is exposed only 13%. `qwencoder14` is
+exposed 43–55% but emits a novel value 0–5% of the time with the note or
+without it. Telling a model it has gone in a circle does not supply the idea it
+lacked.
+
+### The e2e case was scoring scaffolding, not work
+
+ARM F's `e2e-spec-to-code` scored **0.800 on all twelve runs** — a constant, not
+a mean. Eight of ten checks passed 12/12; two failed 12/12. Its dynamic range
+across the arm was zero, and it cost ~50 minutes of GPU per arm to measure
+nothing.
+
+Splitting the ten checks explains it. Eight are **scaffolding** — did a file get
+written, does it contain a keyword (`wrote_design_doc`, `plan_has_milestones`,
+`wrote_module`, `wrote_tests`, …). Two are **substantive** — does the work run
+(`own_tests_pass`) and is it right (`independent_spec_check`). A model that
+emits four plausible documents that do not work banks 0.800. The case was
+rewarding the appearance of completion, and 24/24 runs collected that floor.
+
+Rule 82 said to confirm with a second population before calling a check inert,
+and ARM G supplied it: **`own_tests_pass` passed once** (repeat 4 — 18
+iterations, `stop_reason` None, the only clean self-terminating finish in 24
+runs). So it is reachable, not inert — the check is fine, the weighting is not.
+`independent_spec_check` remains 0/24 and is still unproven either way; by rule
+82 it does not yet get called a floor.
+
+`plan_has_tasks` is the counter-example that vindicates rule 80: 1/12 before the
+regex was broadened, 12/12 after, with no change to any model.
+
+Coined **rule 83**.
