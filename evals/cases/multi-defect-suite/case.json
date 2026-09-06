@@ -1,0 +1,9 @@
+{
+  "id": "multi-defect-suite",
+  "track": "execute",
+  "description": "five independent defects behind one red test suite -- a breadth-and-persistence case whose score is the fraction actually fixed. See ROADMAP 5.140.",
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "replace_lines", "bash", "ls", "grep", "glob", "update_plan"],
+  "timeout": 1200,
+  "weight": 1.5,
+  "extra_args": ["--max-iterations", "60", "--max-wallclock", "900"]
+}
