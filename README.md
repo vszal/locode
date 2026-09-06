@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/locode-logo.png" alt="locode" width="220">
+</p>
+
 # locode
 
 A Claude Code–style **agentic CLI for local LLMs** served by an
@@ -7,10 +11,6 @@ can ask you multiple-choice questions — all driven by an on-device model, with
 **tolerant tool-use harness** built for local models that function-call
 unreliably (mis-escaped JSON, fenced vs. native tool calls, flat vs. nested
 argument schemas).
-
-> ### 🚧 Work in progress
-> locode is under active development. It's **installable today** (see
-> [Install](#install)), but still early — interfaces may change.
 
 ## Why
 
@@ -70,6 +70,45 @@ First run writes a short starter config to `~/.config/locode/config.toml`
 [`config.toml.example`](config.toml.example) for every available option and
 its default.
 
+### Example configuration
+
+A complete, working `~/.config/locode/config.toml`. Aliases are yours to
+choose; anything containing `/` is treated as a full Hugging Face id, so
+aliases are a convenience, not a requirement.
+
+```toml
+[model]
+default = "qwen38"          # loaded at startup; override per-run with -m
+
+[aliases]
+qwen38      = "lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly"   # ~11 GB
+qythos9     = "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx"  # ~9.6 GB
+qwencoder14 = "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
+qwen4i      = "mlx-community/Qwen3-4B-Instruct-2507-4bit"   # fast, trivial edits
+
+[thinking]
+# Some models emit chain-of-thought locode can't stream, which looks like a
+# hang. "off" suppresses it; "auto" defers to the model's own template.
+qythos9 = "off"
+
+[agent]
+max_iterations = 50         # a multi-file task can need dozens
+
+[permissions]
+deny_paths = ["~/.ssh", "~/.aws", "~/.config/gh"]   # hard-denied even under --yolo
+
+[server]
+port = 8081
+memory_reserve_gb = 5.0     # refuse a model that would not leave this much free
+```
+
+**Picking a default.** Judge a local model by *iterations-to-done*, not
+tokens/sec — the two can disagree sharply. In our evals `qwen38` decodes about
+four times slower per character than `qythos9` and still finishes tasks in less
+wall-clock time, because it needs roughly half as many steps. On a memory-tight
+machine (16 GB) prefer `qythos9`: at ~11 GB, `qwen38` will not fit under the
+memory budget. See [`MODELS.md`](MODELS.md).
+
 ## Development setup (from source)
 
 ```bash
@@ -99,8 +138,8 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
   ```toml
   [thinking]
   # alias or model-id substring -> "on" | "off" | "auto"
-  qythos9 = "off"   # suppress reasoning (enable_thinking=false)
-  devstral24 = "on" # force it on for hard diagnosis
+  qythos9 = "off"    # suppress reasoning (enable_thinking=false)
+  devstral24 = "on"  # force it on for hard diagnosis
   ```
   Unlisted models use locode's per-model default; `"auto"` omits the kwarg and
   lets the model's own template decide.
@@ -143,9 +182,20 @@ Configurable in `~/.config/locode/config.toml`.
 .venv/bin/python -m pytest -q   # no network — the model server / HTTP is mocked
 ```
 
-## Status
+## Project status
 
-Early MVP, under active development. Packaged installation (`install.sh` +
-`locode upgrade`/`uninstall`), web tools, and the permission model are in place;
-concurrency (multi-model serving) and `bash` sandboxing remain on the roadmap,
-and interfaces may change.
+locode is in production use for day-to-day local-model coding work, and is
+covered by a suite of ~1,385 tests that run without network access.
+
+**In place:** the tolerant tool parser, the agent loop with its repeat/stall
+detectors and cancellation, the permission layer, filesystem + shell + web
+tools, server lifecycle management with per-model memory budgeting, packaged
+installation (`install.sh`, `locode upgrade`, `locode uninstall`), and an eval
+harness used to gate behavioural changes.
+
+**Not yet:** concurrent multi-model serving, and `bash` sandboxing — shell
+commands run with your privileges, so use `deny_paths` and think before
+`--yolo` on an untrusted task.
+
+**Compatibility:** the config format and CLI flags are stable; anything in
+`locode.*` should be treated as internal.
