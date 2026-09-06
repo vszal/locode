@@ -1,0 +1,356 @@
+{
+  "label": "b150-blind-calib",
+  "created": "2026-09-06 15:56:44",
+  "git_head": "8e47c2b",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "multi-defect-blind",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "fixed_thousands_separator": true,
+        "fixed_running_balance": true,
+        "fixed_category_ranking": true,
+        "fixed_month_key": true,
+        "fixed_even_split": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 10,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 6,
+          "bash": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.1,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1,
+          "unverified edits": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 158.8,
+        "model_seconds": 158.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 158.7,
+        "gen_chars": 4542,
+        "gen_chars_per_sec": 28.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 158.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-multi-defect-blind__qwen38__r1-y1dtzar7",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "multi-defect-blind",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "fixed_thousands_separator": true,
+        "fixed_running_balance": true,
+        "fixed_category_ranking": true,
+        "fixed_month_key": true,
+        "fixed_even_split": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 5,
+          "bash": 3
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1,
+          "unverified edits": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 159.2,
+        "model_seconds": 159.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 159.1,
+        "gen_chars": 4330,
+        "gen_chars_per_sec": 27.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 159.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-multi-defect-blind__qwen38__r2-loxlt4h8",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "multi-defect-blind",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "fixed_thousands_separator": true,
+        "fixed_running_balance": true,
+        "fixed_category_ranking": true,
+        "fixed_month_key": true,
+        "fixed_even_split": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 10,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "ls": 1,
+          "edit_file": 5,
+          "bash": 3
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1,
+          "unverified edits": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 157.3,
+        "model_seconds": 157.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 157.2,
+        "gen_chars": 4402,
+        "gen_chars_per_sec": 28.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 157.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-multi-defect-blind__qwen38__r3-hv_3dkdg",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "multi-defect-blind",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "fixed_thousands_separator": true,
+        "fixed_running_balance": true,
+        "fixed_category_ranking": true,
+        "fixed_month_key": true,
+        "fixed_even_split": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 5,
+          "bash": 3
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1,
+          "unverified edits": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 162.0,
+        "model_seconds": 161.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 161.8,
+        "gen_chars": 4447,
+        "gen_chars_per_sec": 27.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 162.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-multi-defect-blind__qwen38__r4-l50z0p5d",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "multi-defect-blind",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "fixed_thousands_separator": true,
+        "fixed_running_balance": true,
+        "fixed_category_ranking": true,
+        "fixed_month_key": true,
+        "fixed_even_split": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 5,
+          "bash": 2
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1,
+          "unverified edits": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 141.9,
+        "model_seconds": 141.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 141.8,
+        "gen_chars": 3820,
+        "gen_chars_per_sec": 26.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 142.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-multi-defect-blind__qwen38__r5-xgnnusy8",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "multi-defect-blind",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "fixed_thousands_separator": true,
+        "fixed_running_balance": true,
+        "fixed_category_ranking": true,
+        "fixed_month_key": true,
+        "fixed_even_split": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "edit_file": 5,
+          "bash": 3
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1,
+          "unverified edits": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 155.7,
+        "model_seconds": 155.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 155.6,
+        "gen_chars": 4189,
+        "gen_chars_per_sec": 26.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 155.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-multi-defect-blind__qwen38__r6-ftwlzm7h",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 1.0,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 18,
+    "total_iterations": 57,
+    "nudge_histogram": {
+      "edited before running": 6,
+      "slow progress": 6,
+      "unverified edits": 6
+    },
+    "n_runs": 6,
+    "n_valid": 6,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 27.5,
+    "gen_chars": 25730,
+    "rows": {
+      "multi-defect-blind::qwen38": {
+        "case": "multi-defect-blind",
+        "track": "execute",
+        "model": "qwen38",
+        "n": 6,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "iterations_mean": 9.5,
+        "nudges_mean": 3,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 156.0,
+        "gen_rate_mean": 27.5,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "multi-defect-blind": 1.0
+    }
+  }
+}

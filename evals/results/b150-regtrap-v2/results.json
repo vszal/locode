@@ -1,0 +1,463 @@
+{
+  "label": "b150-regtrap-v2",
+  "created": "2026-09-06 16:11:56",
+  "git_head": "8e47c2b",
+  "git_dirty": true,
+  "runs": [
+    {
+      "case": "regression-trap",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "lookup_ignores_case": true,
+        "labels_preserve_entered_case": true,
+        "whitespace_still_collapsed": true,
+        "case_variant_replaces_entry": true,
+        "lookup_folds_case_and_whitespace": true,
+        "missing_lookup_returns_none": true,
+        "did_not_edit_tests": true,
+        "suite_green": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 103.0,
+        "model_seconds": 102.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 102.3,
+        "gen_chars": 2649,
+        "gen_chars_per_sec": 25.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 103.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-regression-trap__qwen38__r1-rmig95wq",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "regression-trap",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "lookup_ignores_case": true,
+        "labels_preserve_entered_case": true,
+        "whitespace_still_collapsed": true,
+        "case_variant_replaces_entry": true,
+        "lookup_folds_case_and_whitespace": true,
+        "missing_lookup_returns_none": true,
+        "did_not_edit_tests": true,
+        "suite_green": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 99.7,
+        "model_seconds": 99.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 99.1,
+        "gen_chars": 3098,
+        "gen_chars_per_sec": 31.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 99.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-regression-trap__qwen38__r2-xap9po40",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "regression-trap",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "lookup_ignores_case": true,
+        "labels_preserve_entered_case": true,
+        "whitespace_still_collapsed": true,
+        "case_variant_replaces_entry": true,
+        "lookup_folds_case_and_whitespace": true,
+        "missing_lookup_returns_none": true,
+        "did_not_edit_tests": true,
+        "suite_green": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 104.4,
+        "model_seconds": 103.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 103.5,
+        "gen_chars": 2733,
+        "gen_chars_per_sec": 26.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 104.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-regression-trap__qwen38__r3-_ib4s48r",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "regression-trap",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "lookup_ignores_case": true,
+        "labels_preserve_entered_case": true,
+        "whitespace_still_collapsed": true,
+        "case_variant_replaces_entry": true,
+        "lookup_folds_case_and_whitespace": true,
+        "missing_lookup_returns_none": true,
+        "did_not_edit_tests": true,
+        "suite_green": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 103.4,
+        "model_seconds": 102.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 102.5,
+        "gen_chars": 2591,
+        "gen_chars_per_sec": 25.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 103.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-regression-trap__qwen38__r4-yg6bz71h",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "regression-trap",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "lookup_ignores_case": true,
+        "labels_preserve_entered_case": true,
+        "whitespace_still_collapsed": true,
+        "case_variant_replaces_entry": true,
+        "lookup_folds_case_and_whitespace": true,
+        "missing_lookup_returns_none": true,
+        "did_not_edit_tests": true,
+        "suite_green": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 101.9,
+        "model_seconds": 101.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 101.0,
+        "gen_chars": 2591,
+        "gen_chars_per_sec": 25.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 102.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-regression-trap__qwen38__r5-kfiji75q",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "regression-trap",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "lookup_ignores_case": true,
+        "labels_preserve_entered_case": true,
+        "whitespace_still_collapsed": true,
+        "case_variant_replaces_entry": true,
+        "lookup_folds_case_and_whitespace": true,
+        "missing_lookup_returns_none": true,
+        "did_not_edit_tests": true,
+        "suite_green": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 9,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "edit_file": 3,
+          "bash": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.222,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 167.2,
+        "model_seconds": 166.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 166.0,
+        "gen_chars": 5530,
+        "gen_chars_per_sec": 33.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 167.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-regression-trap__qwen38__r6-yi3looia",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "regression-trap",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "lookup_ignores_case": true,
+        "labels_preserve_entered_case": true,
+        "whitespace_still_collapsed": true,
+        "case_variant_replaces_entry": true,
+        "lookup_folds_case_and_whitespace": true,
+        "missing_lookup_returns_none": true,
+        "did_not_edit_tests": true,
+        "suite_green": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 4,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 100.1,
+        "model_seconds": 99.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 99.6,
+        "gen_chars": 3141,
+        "gen_chars_per_sec": 31.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 100.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-regression-trap__qwen38__r7-94va5pxd",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "regression-trap",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "lookup_ignores_case": true,
+        "labels_preserve_entered_case": true,
+        "whitespace_still_collapsed": true,
+        "case_variant_replaces_entry": true,
+        "lookup_folds_case_and_whitespace": true,
+        "missing_lookup_returns_none": true,
+        "did_not_edit_tests": true,
+        "suite_green": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 106.8,
+        "model_seconds": 106.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 105.9,
+        "gen_chars": 2855,
+        "gen_chars_per_sec": 26.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 106.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-regression-trap__qwen38__r8-zcwvpnmb",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 1.0,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 8,
+    "total_iterations": 47,
+    "nudge_histogram": {
+      "slow progress": 8
+    },
+    "n_runs": 8,
+    "n_valid": 8,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 28.6,
+    "gen_chars": 25188,
+    "rows": {
+      "regression-trap::qwen38": {
+        "case": "regression-trap",
+        "track": "execute",
+        "model": "qwen38",
+        "n": 8,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "iterations_mean": 5.9,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 110.9,
+        "gen_rate_mean": 28.6,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "regression-trap": 1.0
+    }
+  }
+}
