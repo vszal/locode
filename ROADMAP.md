@@ -10129,3 +10129,106 @@ grinds on `truncate`'s exact-limit case, emits `same failure (3 runs in a row)`,
 and the loop stops it after 8 unproductive iterations. That is the genuine
 "goes astray" instance the original complaint was about, it survives build 141,
 and it is the next target.
+
+## §5.128 — the revert: an edit that puts a file back to a tested version
+
+§5.127 left one thing open — qythos9 grinds on `truncate`'s exact-limit case and
+the loop stops it after 8 unproductive iterations. Reading that trajectory
+(b141 `exec-bugfix` r4) gives the mechanism, and it is embarrassingly simple:
+
+```
+it6   edit  cut = limit - len(suffix) + 1  ->  + 2
+it7   test  still fails      ⟳ same failure (2 runs in a row)
+it8   read  test_textkit.py
+it9   edit  cut = limit - len(suffix) + 2  ->  + 1     ← back to the original
+it10  test  still fails      ⟳ same failure (3 runs in a row)
+it12  edit  title_case ...   ← abandons truncate, breaks a passing test
+```
+
+At it9 the model returns the file to the exact content the suite rejected at
+it0. The assertion it needs has been sitting in its context the whole time —
+pytest printed `assert 'abc...' == 'ab...'` for `truncate("abcdefghij", 5)`,
+which fixes `cut` at 2, i.e. no `+` term at all. It never tried that value. It
+tried `+2`, then `+1` again, then gave up on the function.
+
+Worth being clear about what is *not* wrong here. The feedback is not truncated
+or degraded: the model receives 1254 characters including the full assertion
+diff. Locode told it to read the test and it did, twice. This is not a case of
+the harness starving the model of information.
+
+What the harness has and the model does not is the **edit history**. Its context
+holds a summarised version; the loop holds the exact pairs. So the loop can say
+the one thing the model cannot work out for itself: you have already run the
+tests against this content.
+
+### Counting before building (rule 46)
+
+Reverts are common: 763 of 2322 archived runs (32.9%) contain an edit whose
+`(old, new)` is the reverse of one already landed on the same file.
+
+Common is not the same as harmful, and the obvious confound is edit count — a
+run going badly makes more edits and so gets more chances to revert. Holding
+landed edits fixed kills that objection:
+
+| case | 3 edits | 4 | 5 | 6 |
+|---|---|---|---|---|
+| exec-bugfix, no revert | 0.912 | 1.000 | 0.929 | 0.875 |
+| exec-bugfix, revert | 0.375 | 0.417 | **0.368** | **0.408** |
+| e2e-spec-to-code, no revert | 0.700 | 0.700 | 0.600 | 0.800 |
+| e2e-spec-to-code, revert | 0.700 | 0.700 | 0.700 | 0.750 |
+
+Same number of edits, half the score — but only on the debugging case. On
+`e2e-spec-to-code` the effect is flat at every stratum, which makes sense:
+building from a spec, there is no red oracle to oscillate against and backing
+out an experiment is ordinary editing. `exec-stall-trap` moves like
+`exec-bugfix` (0.778 → 0.333 at three edits).
+
+That split is the design. The note is gated on a test having FAILED this turn.
+The gate keeps 100% of the reverts on the two debugging cases and drops a third
+of the benign ones on `e2e-spec-to-code`.
+
+### The null next door
+
+The same trajectory suggested a second lever — at it12 the model breaks a
+passing test while chasing another, and failures go from two to three. That is
+detectable (compare failing-test sets across consecutive runs) and has 17.6%
+exposure, and raw it looks real: 0.729 against 0.654 on `exec-bugfix`.
+
+Controlled for edit count it evaporates, and worse than evaporates — it flips
+sign stratum to stratum: 0.938 vs 0.500 at three edits, 0.883 vs 1.000 at four,
+0.486 vs **0.808** at five, 0.578 vs 0.500 at six. Regression-introducing runs
+score *better* in one of the four populated strata. The raw gap was the edit-
+count confound and nothing else. **NO BUILD.**
+
+Recording it because it is the same control, applied the same way, on the same
+data, on the same day — and it let one signal through and killed the other.
+A control that never rejects anything is not a control.
+
+### Build 142, and what it must show
+
+`_revert_note` fires on an edit that lands `(new, old)` after `(old, new)` on
+the same path, while a test has failed this turn. It is appended after
+`result_sig` is computed — the same discipline the same-failure note follows,
+because an annotation folded into that signature would make every repeat look
+novel and silently disable the repeat guard on the runs it exists for. A test
+pins that ordering.
+
+Predicted exposure, computed on landed edits only (the archive scan above
+counted attempts, which overstates it): `exec-bugfix` 23% of runs, `exec-ambig`
+23%, `e2e-spec-to-code` 14%, `exec-stall-trap` **3%**.
+
+That last number changed the sweep. `exec-stall-trap` was in the first draft of
+the A/B; at n=12 it would expect 0.4 firings, which is rule 17 in its purest
+form — an arm that cannot exercise the lever it is there to test. It is out,
+and `exec-ambig` is in at n=20, with `exec-bugfix` at n=30 and
+`e2e-spec-to-code` at n=12 as the false-positive control. Pre-registered in
+`PREREG-revert.md`: the mechanism predictions P1/P2 are what the sweep is for,
+and the score prediction P4 is explicitly the weakest, because ~7 firings per
+arm cannot resolve a score delta. If P1 fails, the answer is a bigger sweep,
+not a reading of the score table — that is the b141 lesson (rule 78) applied in
+advance rather than in hindsight.
+
+Both arms run from frozen worktrees. The `b141-doctrack` probe running
+concurrently was started against the live tree and had build 142 committed
+underneath it mid-sweep; it is only usable if no revert note fired in it, which
+is checkable and checked.
