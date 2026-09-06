@@ -24,7 +24,8 @@ class Registry:
         return self._items.get(normalize_key(name))
 
     def labels(self):
-        """Every entry's name, as it was entered, in alphabetical order."""
+        """Every entry's name in normalised form, keeping the capitalisation
+        it was entered with, in alphabetical order."""
         return sorted(self._items)
 
     def __len__(self):
