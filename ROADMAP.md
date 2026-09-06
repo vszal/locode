@@ -10400,3 +10400,38 @@ measurements, and they change how a score delta should be read:
 
 Neither observation argues for deleting a check. It argues for subtracting them
 before reading a delta, which is rule 81.
+
+## §5.133 — ARM F, and a correction to §5.132
+
+ARM F (frozen b141, qwencoder14, the control) finished. It is a far harsher arm
+than anything qythos9 produced:
+
+| case | n | score | iters | stopped | revert exposure | firings |
+|---|---|---|---|---|---|---|
+| `exec-bugfix` | 30 | 0.467 | 16.8 | **30/30** | 20 runs (67%) | 24 |
+| `exec-ambig` | 20 | 0.550 | 32.2 | 18/20 | 18 runs (90%) | 49 |
+| `e2e-spec-to-code` | 12 | 0.800 | 25.5 | 12/12 | 2 runs (17%) | 6 |
+
+`tests_pass` and `fully_fixed` are 0/30 on `exec-bugfix`; every run is stopped
+by the loop. Arm integrity confirmed: zero `edit reverted` nudges, as a b141
+build must produce.
+
+**Exposure across the arm is 40 runs of 62, with 79 firings.** P1′ asked for
+ten notes across the three cases; ARM G should see roughly eight times that.
+The qythos9 A/B was not a small effect — it was the wrong population, and this
+is the size of the right one.
+
+**Correction to §5.132.** That section said `did_not_edit_tests` had never once
+failed, 232/232. ARM F breaks it: r22 and r26 edited the tests, and r15 and r25
+broke `suite_intact`. Both guards fired for the first time in the archive, and
+both on the same weaker model. The rule 81 arithmetic still holds for the runs
+it was computed over, but the claim it rested on — that this check is a fixed
+floor — was true only of qythos9. A tripwire that has never fired has not been
+shown to be inert; it may only mean the archive was built on models good enough
+not to trip it. That is worth more than the floor correction: it is the same
+mistake as §5.128's, one level up. An always-true observation drawn from a
+population is a fact about the population.
+
+`e2e` scores 0.800 here against ARM E's 0.692, but the two are graded by
+different versions of `plan_has_tasks` (amendment 4) and run different models.
+Not a comparison.
