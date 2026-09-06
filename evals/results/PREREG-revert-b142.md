@@ -83,3 +83,27 @@ comparable to ARM F/G's on that one check — which costs nothing, since D/E ran
 qythos9 and F/G run qwencoder14 and were never a valid cross-comparison. The
 D-vs-E and F-vs-G contrasts, which are the ones the pre-registration is about,
 are each internally consistent.
+
+## Amendment 5 — P6, pre-registered before the qwencoder14 data exists
+
+`evals/revert_exposure.py` (build 144) scores a control arm for the cycle the
+note would have caught. Run against the qythos9 arms it gives:
+
+| arm | runs | exposed | firings | firings per exposed run |
+|---|---|---|---|---|
+| ARM D (b141, control) | 30 | 4 (13%) | 7 | 1.75 |
+| ARM E (b142, treatment) | 30 | 2 (7%) | 2 | 1.00 |
+
+**P6: in the qwencoder14 arms, firings per exposed run falls from ARM F to
+ARM G.** This is the statistic the note is actually built to move: it cannot
+stop a model entering the cycle the first time — nothing has been ruled out
+yet — it can only stop the model *staying* in it. Exposure rate itself should
+be roughly equal across arms; if ARM G's exposure rate falls too, that is a
+bonus, not the prediction.
+
+Stated now, with ARM F seven runs in and ARM G not started, because the qythos9
+numbers above (1.75 → 1.00, on six exposed runs total) are far too small to
+carry any weight on their own and would be pure hindsight if quoted afterwards.
+ARM F's first eight runs show 62% exposure, so the qwencoder14 arms should
+supply roughly 20 exposed runs each on `exec-bugfix` alone — enough for this
+ratio to mean something.
