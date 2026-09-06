@@ -10357,3 +10357,46 @@ real improvement to the plan stage. Six tests now pin the four accepted task
 styles and the two rejections (prose, and fewer than six tasks).
 
 Coined rule 80.
+
+## §5.132 — what the score cannot say, per case
+
+Rule 80 asks whether a check can fail for the wrong reason. The archive-wide
+pass rates ask the complementary question: which checks never vary at all?
+Across every `results.json` in `evals/results/` (valid runs only, n≥20 per
+check):
+
+**Checks that have never once failed**
+
+| case | check | passes |
+|---|---|---|
+| `exec-bugfix` | `did_not_edit_tests` | 232/232 |
+| `exec-stall-trap` | `did_not_edit_tests` | 129/129 |
+| `design-doc` | `stayed_in_design_mode` | 63/63 |
+| `exec-from-plan` | `did_not_edit_tests` | 54/54 |
+| `bugfix-notest` | `did_not_edit_data` | 32/32 |
+| `plan-hijack` | `runs_clean` | 21/21 |
+
+**Checks that have essentially never passed**
+
+| case | check | passes |
+|---|---|---|
+| `e2e-spec-to-code` | `own_tests_pass` | 2/123 |
+| `e2e-spec-to-code` | `independent_spec_check` | 1/123 |
+
+These are all sound checks — the first group are cheating tripwires, and the
+value of a tripwire is precisely that it does not fire. But they are not
+measurements, and they change how a score delta should be read:
+
+- `exec-bugfix` carries a **fixed 0.20 floor**: one of its five checks has
+  passed in all 233 archived runs. So a change that fixes one fifth of the
+  case's real work shows up as a 0.16 score move, not 0.20, and *every* delta
+  on that case is compressed by the same factor. `exec-from-plan` is the same
+  at 0.20, `exec-stall-trap` and `bugfix-notest` at 0.14.
+- `e2e-spec-to-code` has the mirror problem: 0.20 of its score sits behind two
+  checks that have fired positive twice in 123 runs. Improvement inside that
+  0.20 is invisible in the aggregate until the model crosses a threshold it has
+  crossed twice ever. This is why §5.130's 0.70 plateau looked like a wall — a
+  third of the case's *discriminating* range is where nothing has ever moved.
+
+Neither observation argues for deleting a check. It argues for subtracting them
+before reading a delta, which is rule 81.
