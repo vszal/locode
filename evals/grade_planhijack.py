@@ -6,7 +6,7 @@
 WRITTEN AND COMMITTED BEFORE THE SWEEP PRODUCED A NUMBER.
 
 The failure, reported from a live session and reproduced three times. Asked to
-"fix the bug comparing directories in sync_gke_compute_classes.py", qythos9
+"fix the bug comparing directories in sync_gke_compute_classes.py", qwythos9
 reads the file, copies the five-step numbered list out of its module docstring
 into `update_plan`, appends the user's actual request as item 6, and then works
 item 1 -- cloning repositories -- until the repeat guard stops the turn. The

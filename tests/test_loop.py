@@ -2115,7 +2115,7 @@ def test_is_verify_bash_tolerates_non_string_cmd():
     assert not loop_mod._is_verify_bash("")
 
 
-# --- verify-task crediting (qythos9 add-test open-plan re-do loop) -------------
+# --- verify-task crediting (qwythos9 add-test open-plan re-do loop) -------------
 def test_is_verify_task_matches_run_verify_tests_only():
     from locode.agent.plan import Task
     m = lambda s: loop_mod._is_verify_task(Task(text=s))
@@ -2133,7 +2133,7 @@ def test_is_verify_task_matches_run_verify_tests_only():
 
 
 async def test_green_test_credits_forgotten_verify_task_and_finishes(tmp_path):
-    # qythos9 add-test, measured 2026-07-27: the model wrote the code, ran the
+    # qwythos9 add-test, measured 2026-07-27: the model wrote the code, ran the
     # suite to green, but ended narrating "All tests pass" WITHOUT marking its
     # own "run the tests" task done. The plan stayed open, the open-tasks nudge
     # fired, and the model re-ran the passing tests to a repeat-stop. A green

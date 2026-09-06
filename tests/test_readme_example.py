@@ -39,7 +39,7 @@ def test_locode_loads_the_example(tmp_path, example_block):
     assert cfg.server.port == 8081
     assert cfg.server.memory_reserve_gb == 5.0
     assert cfg.permissions.deny_paths == ["~/.ssh", "~/.aws", "~/.config/gh"]
-    assert cfg.thinking == {"qythos9": "off"}
+    assert cfg.thinking == {"qwythos9": "off"}
 
 
 def test_example_default_matches_the_shipped_default(example_block):

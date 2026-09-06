@@ -67,20 +67,20 @@ class ServerConfig:
 @dataclass
 class ModelConfig:
     # qwen38 (Qwen3.8-27B, 3-bit, ~11 GB) is the out-of-box default as of
-    # 2026-09-06. It beat the previous default qythos9 on `repro-only` — the one
+    # 2026-09-06. It beat the previous default qwythos9 on `repro-only` — the one
     # eval case with dynamic range left — 20/20 perfect runs against 9/20,
-    # Fisher exact p=0.0138 even when qythos9 is granted its single best sweep
+    # Fisher exact p=0.0138 even when qwythos9 is granted its single best sweep
     # (ROADMAP §5.138). The other three cases are at ceiling for both models, so
     # this is one demonstrated win plus three ties, not a sweep.
     #
     # It is also *faster in wallclock despite decoding ~4x slower per character*
-    # (95s vs 116s on repro-only): it needs ~5-6 iterations where qythos9 needs
+    # (95s vs 116s on repro-only): it needs ~5-6 iterations where qwythos9 needs
     # ~9. Judge a local model by iterations-to-done, not tokens/sec.
     #
     # Caveat for smaller machines: at ~11 GB it needs more headroom than the
-    # 9.6 GB qythos9, and server/manager.py:_check_memory_budget will refuse it
+    # 9.6 GB qwythos9, and server/manager.py:_check_memory_budget will refuse it
     # under (total RAM - memory_reserve_gb). On a 16 GB box set
-    # default = "qythos9" in config.toml. Override per-run with -m.
+    # default = "qwythos9" in config.toml. Override per-run with -m.
     default: str = "qwen38"
     # Per-turn generation ceiling. A whole write_file/edit_file call — the file
     # body included — must fit in ONE completion, and on a reasoning distill the
@@ -190,7 +190,7 @@ class AgentConfig:
     # is an acceptable answer.
     #
     # DEFAULT ON since build 136. Measured on `bugfix-notest`, n=12 paired,
-    # qythos9, against an A/A noise floor of -0.012 taken the same day:
+    # qwythos9, against an A/A noise floor of -0.012 taken the same day:
     #
     #     runs_clean       0/12 -> 11/12      fixed_decoy   0/12 -> 11/12
     #     fully_fixed      0/12 -> 11/12      fixed_named  12/12 -> 11/12

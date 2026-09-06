@@ -624,7 +624,7 @@ class AgentLoop:
 
                 # A large document written as one write_file truncates at the
                 # token limit: the JSON string never closes, extract() recovers
-                # nothing, and the whole partial reply is lost — the qythos9
+                # nothing, and the whole partial reply is lost — the qwythos9
                 # "long mode writes 40k and NOTHING lands" failure. When that
                 # happens, salvage the partial content and land it, then (below,
                 # after it runs) steer the model to APPEND the rest. Bounded so a
@@ -802,7 +802,7 @@ class AgentLoop:
                     # own "run the tests" task, so the plan still shows it open.
                     # The open-tasks nudge below would then tell the model to "do
                     # the work" — i.e. re-run the tests it already passed. Measured
-                    # live (qythos9 add-test, 2026-07-27): green suite, plan stuck
+                    # live (qwythos9 add-test, 2026-07-27): green suite, plan stuck
                     # at 2/3, the model re-ran pytest every turn to a repeat-stop
                     # on a task it had finished. A green test IS that task's
                     # completion, so credit it here. Double-scoped — a green result
@@ -1317,7 +1317,7 @@ class AgentLoop:
         hotel, then india), so the same-error stall never fires and the repeat
         guard never fires either, because each call is genuinely new. Nine such
         iterations in a row were observed after compaction dropped the file
-        contents out from under qythos9. Whatever the errors say, a batch in
+        contents out from under qwythos9. Whatever the errors say, a batch in
         which nothing succeeded is not progress. Denied and unknown-tool calls
         are excluded — they never reached a tool, and denials have their own
         counter.

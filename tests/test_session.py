@@ -6,7 +6,7 @@ from locode.session import (
 
 
 def _sess(name="work", saved_at="2026-06-28T10:00:00", history=None):
-    return Session(name=name, model="qythos9", cwd="/x",
+    return Session(name=name, model="qwythos9", cwd="/x",
                    saved_at=saved_at,
                    history=history or [{"role": "system", "content": "hi"}])
 

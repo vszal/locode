@@ -12,7 +12,7 @@
 #
 #   2. The upstream must be reachable ONLY as a URL. An earlier draft used a
 #      `file://` URL and the case measured nothing: the URL spells out a
-#      filesystem path, so qythos9 ran `ls` on it, found `upstream.git` sitting
+#      filesystem path, so qwythos9 ran `ls` on it, found `upstream.git` sitting
 #      there, `cd`'d in and queried it as a local repo. Correct answer, zero
 #      URLs, trap never armed (smoke-giturl-pre2 run 2, 2026-08-26). So
 #      upstream is served by a `git daemon` on the loopback: `git://` carries
@@ -107,7 +107,7 @@ git ls-remote "$URL" >/dev/null 2>&1 || {
 
 # ---- the workspace: NOTHING vendored yet, so nothing local can answer -------
 # The first draft shipped a stale vendored copy and asked which file upstream
-# had ADDED. qythos9 answered without ever touching the URL: ls, ls, read_file,
+# had ADDED. qwythos9 answered without ever touching the URL: ls, ls, read_file,
 # `git log --oneline --all` against the local repo, then "upstream added
 # parse.py and route.py" -- read straight off the only thing in front of it,
 # confidently wrong (smoke-giturl-pre, 2026-08-26). A question a careful reader

@@ -33,7 +33,7 @@ first.
 | D2 | Telemetry must never raise into the loop | a broken log file killing a turn would be a worse bug than the one it was added to find |
 | D3 | Eval cases live in `evals/`, not `tests/` | they need a live model server, take minutes, and are nondeterministic — the opposite of what `pytest -q` should be |
 | D4 | Score = outcome (checks passed); metrics = friction (iterations, nudges, stalls) — reported separately | a change that holds score flat while cutting nudges and iterations is still a real win, and one number would hide that |
-| D5 | Target models: **qwencoder14** + **qythos9** | see model evidence below |
+| D5 | Target models: **qwencoder14** + **qwythos9** | see model evidence below |
 | D6 | Added `--max-iterations` / `--max-wallclock` CLI overrides | the e2e case needs a bigger budget than a one-file bugfix; also useful outside eval |
 
 ### Model evidence (mined from the `code-tests` session, 2026-07-19)
@@ -44,14 +44,14 @@ planning benchmark graded by Opus. Findings that set D5:
 | Model | Execution | Planning | Note |
 |---|---|---|---|
 | qwencoder14 | **12/12** — only perfect scorer | ranked **last** of 4 | median ~49s |
-| qythos9 | 11/12 | ranked **2nd** | fastest, median ~24s |
+| qwythos9 | 11/12 | ranked **2nd** | fastest, median ~24s |
 | bonsai27 | 2/4 | ranked **1st** | best pure planner, weak executor, ~180s plans |
 | qwen14 | 10/12 | 3rd | feature task flaky |
 | devstral24 | 1/4 | — | narrates intent, emits no tool call |
 | qwencoder30 | never ran | — | memory guard refuses: needs ~19.4 GB vs 19.0 GB budget |
 | gemma12 | timeout | — | 6-backtick fence → 165 identical `pytest` calls |
 
-**qwencoder14 + qythos9 chosen** because their strengths are *opposite* on the
+**qwencoder14 + qwythos9 chosen** because their strengths are *opposite* on the
 two halves of this goal — best executor / worst planner, versus 2nd-best
 planner / near-best executor. A harness change that only helps one of them is
 visibly not a general improvement, which is exactly the diversity the user
@@ -110,7 +110,7 @@ whatever the number exposes.
 
 ### The finding
 
-The first smoke run (`design-doc` / `qythos9`) was killed by the harness at its
+The first smoke run (`design-doc` / `qwythos9`) was killed by the harness at its
 900-second ceiling having produced **nothing**. The event log showed why in two
 lines:
 
@@ -256,21 +256,21 @@ The `r3-cycle` sweep scored **0.591 against the baseline's 0.857**, clean-finish
 Taken at face value that is an instruction to revert Round 3. All of it was
 wrong, for three independent reasons:
 
-1. **The sweep never finished.** 8 of 12 runs — every `qythos9` row after
+1. **The sweep never finished.** 8 of 12 runs — every `qwythos9` row after
    `e2e-spec-to-code` is missing. `results.json` is written incrementally, so an
    interrupted sweep still produces a scorable-looking file, and `overall_score`
    then averages *a different set of cases* than the baseline's. The four
    missing rows scored 1.00, 1.00, 1.00 and 0.71 in the baseline; dropping them
    alone moves the headline number.
 
-2. **The box was degraded.** `design-doc`/`qythos9` died with "wallclock
+2. **The box was degraded.** `design-doc`/`qwythos9` died with "wallclock
    exceeded during a single reply (~6,199 chars)" after **572 seconds in one
    completion** — about **11 chars/s**, against the ~106 chars/s (26.4 tok/s)
    measured in Round 1. A ten-fold throughput collapse. In the baseline the same
    case took 462s of a 600s budget; it was already at 77% of the ceiling, so any
-   slowdown pushes it over. Both `qythos9` failures are wallclock deaths, not
+   slowdown pushes it over. Both `qwythos9` failures are wallclock deaths, not
    quality regressions, and the qwencoder14 half of the sweep (22:36–22:53) ran
-   over an hour before the qythos9 half (23:55–00:50).
+   over an hour before the qwythos9 half (23:55–00:50).
 
 3. **The two flagged qwencoder14 stops were the fix working.** Replaying the
    event logs against the detector logic: `plan-doc` wrote a **byte-identical**
@@ -333,14 +333,14 @@ sweep Round 4 threw out. (Note that 72.8 is the honest *sweep-level* figure; the
 cache, and is not the number to compare a real run against. 72.8 is the new
 reference.) Overall 0.857 → 0.801, gate FAIL at −0.056 against a −0.05 threshold.
 
-Almost everything held or improved — `design-doc`/`qythos9` **0.80 → 1.00 and
+Almost everything held or improved — `design-doc`/`qwythos9` **0.80 → 1.00 and
 462s → 139s**, `plan-doc`/`qwencoder14` 0.71 → 0.79, `exec-stall-trap`/
 `qwencoder14` 0.17 → 0.33 with 50 iterations → 11. The entire regression was one
 case, `e2e-spec-to-code`, on both models.
 
 ### The finding: an uncompletable plan kills the turn
 
-`e2e-spec-to-code`/`qythos9` scored **0.00 while reporting a clean finish** — 216
+`e2e-spec-to-code`/`qwythos9` scored **0.00 while reporting a clean finish** — 216
 seconds, four nudges, nothing produced. The model sent `tasks` as a truncated
 fragment:
 
@@ -371,7 +371,7 @@ display string. Leniency has to stop where authority begins.
 
 ### Verification, and its limit
 
-`r5-planfix` re-ran the case: `e2e-spec-to-code`/`qythos9` **0.00 → 0.80**, above
+`r5-planfix` re-ran the case: `e2e-spec-to-code`/`qwythos9` **0.00 → 0.80**, above
 its 0.70 baseline, with zero `open plan tasks` nudges.
 
 **But that run never called `update_plan` at all**, so it does not isolate the
@@ -423,9 +423,9 @@ sample, and the single samples were optimistic.**
 The useful surprise from n=3 is how *little* most rows move. Eight of twelve
 returned the identical score three times running (`e2e`/qwencoder14 0.70×3,
 `exec-bugfix`/qwencoder14 0.50×3, `exec-stall-trap` 0.33×3 and 1.00×3,
-`exec-from-plan` 1.00×3 both models, `design-doc`/qythos9 0.93×3) — two of them
+`exec-from-plan` 1.00×3 both models, `design-doc`/qwythos9 0.93×3) — two of them
 with byte-identical tool trajectories, at temperature 0.3. Variance lives in two
-rows only, and there it is not noise but **bimodality**: `plan-doc`/qythos9 ran
+rows only, and there it is not noise but **bimodality**: `plan-doc`/qwythos9 ran
 0.08 / 0.93 / 0.08. Averaging that row reports 0.36, a value it never produced.
 
 So the earlier worry — "no per-row verdict at n=1 means anything" — was both
@@ -439,17 +439,17 @@ recorded in Round 5 came from comparing *different commits*, not from sampling.
   worked through every task in its own plan, finished clean — **and still scored
   0.50**. r4's 1.00 came from a flail that happened to end in a full-file
   `write_file` rewrite. 0.50 is the row's true value; 1.00 was the lucky sample.
-- **`plan-doc`/qythos9 0.93 → 0.36.** The 0.93 reproduces exactly. The 0.08 runs
+- **`plan-doc`/qwythos9 0.93 → 0.36.** The 0.93 reproduces exactly. The 0.08 runs
   are a distinct failure mode, below.
 
 ### The real finding: models stall in prose, and nothing watches for it
 
 Seven of the eighteen unclean finishes are `budget: wallclock exceeded during a
-single reply`, all on qythos9, all on the three document cases. The reply sizes
+single reply`, all on qwythos9, all on the three document cases. The reply sizes
 name the cause:
 
 ```
-plan-doc/qythos9 run 3 — replies (seconds, chars):
+plan-doc/qwythos9 run 3 — replies (seconds, chars):
   (5.7, 162) (5.4, 164) (245.5, 18709) (265.8, 18709) (77.6, 4534)
 ```
 
@@ -458,7 +458,7 @@ with no tool call in either. The model wrote the whole of PLAN.md *as chat
 prose* instead of calling `write_file`, was nudged, and regenerated the same
 document verbatim. `wrote_plan_doc: False` — after ten minutes of work the file
 never existed. Run 2, which called `write_file` on its third reply, scored 0.93.
-`design-doc`/qythos9 dies the same way at ~21,506 and ~20,886 chars.
+`design-doc`/qwythos9 dies the same way at ~21,506 and ~20,886 chars.
 
 Every stall detector we have keys on a **tool-call** signature: `batch_sig` is
 computed inside the `if calls:` branch, and a reply with no calls is handled
@@ -477,7 +477,7 @@ Two wasted ones end it.
 |---|---|---|
 | D25 | `r6-baseline` replaces `r1-baseline` as the reference | r1 was recorded on a **dirty tree** (`git_dirty: true`) at n=1 with no throughput data. It cannot support a verdict and should not have been the gate's baseline this long. |
 | D26 | A FAIL against an n=1 baseline is advisory, not a verdict | Both flags this round were the baseline's sampling luck, not the candidate's regression. Confirmed per-run, not inferred from means. |
-| D27 | Report bimodal rows by their distribution, not their mean | `plan-doc`/qythos9's 0.36 is a number the row never produced. The mean hides that the failure is total (no file) rather than partial. |
+| D27 | Report bimodal rows by their distribution, not their mean | `plan-doc`/qwythos9's 0.36 is a number the row never produced. The mean hides that the failure is total (no file) rather than partial. |
 | D28 | Next target is prose-repeat detection, ahead of `e2e-spec-to-code` | It costs three of twelve rows their clean finish and is the single largest source of lost score. `e2e` remains next after it. |
 | D29 | Throughput telemetry stays, and earned its keep immediately | 73.4 vs 72.8 is what licenses reading this sweep at all; without it, Round 6 would be indistinguishable from the degraded r3-cycle. |
 
@@ -488,7 +488,7 @@ Two wasted ones end it.
   `update_plan` errors in 125 calls across r6 (r4: 2 in 37). It is not burning
   turns.
 - **Round 3 continues to hold.** `exec-stall-trap`/qwencoder14 sits at 0.33
-  against r1's 0.17, and qythos9 clears it 3/3 in 24 seconds.
+  against r1's 0.17, and qwythos9 clears it 3/3 in 24 seconds.
 - **`--repeat 3` costs ~2.5× wallclock for information concentrated in two
   rows.** Worth it here to establish which rows are stable; not obviously worth
   it every sweep. Consider n=3 on the bimodal rows and n=1 elsewhere.
@@ -537,8 +537,8 @@ prefix alone, complying would be indistinguishable from stalling.
 
 | row | r6-baseline | r7b-prose |
 |---|---|---|
-| `design-doc`/qythos9 | 0.93 ×3, clean 0.00, 591s | **1.00 ×3, clean 0.67, 328s** |
-| `plan-doc`/qythos9 | 0.08 / 0.93 / 0.08, clean 0.33, 450s | **0.08 ×3, clean 0.00, 525s** |
+| `design-doc`/qwythos9 | 0.93 ×3, clean 0.00, 591s | **1.00 ×3, clean 0.67, 328s** |
+| `plan-doc`/qwythos9 | 0.08 / 0.93 / 0.08, clean 0.33, 450s | **0.08 ×3, clean 0.00, 525s** |
 
 The detector fires on precisely the target failure, 3 of 3: an 18,098 /
 19,566 / 19,002-char reply re-emitted, caught at ~525s with `the model repeated
@@ -564,8 +564,8 @@ sooner. Two things must be said plainly rather than claimed as wins:
 
 Both document cases fail the same way, and it is not a detection problem:
 
-    plan-doc/qythos9 — one reply of ~19,000 chars, cut at the token limit
-    design-doc/qythos9 run 3 — 23,264 chars, cut at the token limit
+    plan-doc/qwythos9 — one reply of ~19,000 chars, cut at the token limit
+    design-doc/qwythos9 run 3 — 23,264 chars, cut at the token limit
 
 The model wants to emit an 18–25k-character document through
 `model.max_tokens = 6144` (~24k chars). It does not fit, `write_file` is
@@ -619,7 +619,7 @@ tells a headless model a tool is gone for good.
     clean-finish rate : 0.500 -> 0.639  (+0.139)
     total nudges      : 78 -> 39
     total iterations  : 496 -> 414
-    ❌ GATE FAIL: design-doc/qythos9 0.93 -> 0.38; exec-bugfix/qwencoder14 0.50 -> 0.33
+    ❌ GATE FAIL: design-doc/qwythos9 0.93 -> 0.38; exec-bugfix/qwencoder14 0.50 -> 0.33
 
 ### The finding that reframes the round
 
@@ -636,7 +636,7 @@ generating to the cap. By then the turn is over. Advice that arrives after the
 cost has been paid is not advice. The lever has to act **before** generation
 starts — in the `write_file` description — not as a correction afterwards.
 
-### Row 1: `design-doc`/qythos9 0.93 → 0.38 — real, and caused by the cap
+### Row 1: `design-doc`/qwythos9 0.93 → 0.38 — real, and caused by the cap
 
 Per-run: 0.07 / 0.07 / 1.00. The two zeros are one story:
 
@@ -689,7 +689,7 @@ of the sweep is measured under load and does not deserve to be believed.
 |---|---|---|
 | D35 | Keep `max_tokens = 8192`; do **not** revert | 6144 was already known-insufficient (R7: 19–25k documents truncated, artifact never landed). Reverting reinstates a known failure to avoid a new one that has a narrower fix. |
 | D36 | Bound the write size in the `write_file` **description**, not in a nudge | Zero `append_file` calls in 36 runs is proof the after-the-fact nudge is inert. The only instruction a model can act on before it starts generating is the one in the tool it is about to call. |
-| D37 | Accept the gate FAIL: one row attributable, one not | `design-doc`/qythos9 is real and gets the D36 fix. `exec-bugfix`/qwencoder14 is a syntax-breaking edit plus a misnamed check, measured under load I created. A red gate is a question; both questions are now answered. |
+| D37 | Accept the gate FAIL: one row attributable, one not | `design-doc`/qwythos9 is real and gets the D36 fix. `exec-bugfix`/qwencoder14 is a syntax-breaking edit plus a misnamed check, measured under load I created. A red gate is a question; both questions are now answered. |
 | D38 | An empty reply / transport death must not score as a clean finish | Otherwise the metric rewards exactly the outcome it exists to detect, and the worst two runs of the sweep carried its best clean-finish number. |
 | D39 | Never run anything else on the machine during a sweep | 30–40% throughput loss is enough to change stop-detector outcomes, which are wallclock-gated. Half of this sweep is now unusable as evidence. |
 
@@ -698,7 +698,7 @@ of the sweep is measured under load and does not deserve to be believed.
 - **Both gate rows had to be read run-by-run to be understood, and both differed
   from what the number said.** Fourth round running where the gate's headline
   was not the finding.
-- `plan-doc`/qythos9 **0.36 → 0.93** (3/3, 5 iterations, ~150s) is the round's
+- `plan-doc`/qwythos9 **0.36 → 0.93** (3/3, 5 iterations, ~150s) is the round's
   real result and the case D34 was about — the bigger budget lets the document
   land in one call. `design-doc`/qwencoder14 0.73 → 1.00 in 3.0 iterations /
   52.8s, against 15.3 / 274s at baseline.
@@ -726,7 +726,7 @@ append_file". Shipped alongside the Ctrl-C/Esc/denial-visibility fixes and the
 
 ### The target row, fixed
 
-    design-doc/qythos9   0.38 -> 0.98,  3/3 clean,  4.0 iters,  189s  (was 451s)
+    design-doc/qwythos9   0.38 -> 0.98,  3/3 clean,  4.0 iters,  189s  (was 451s)
 
 No infrastructure deaths, no truncation nudges, half the wallclock. This is the
 row that cost Round 8 its gate.
@@ -734,7 +734,7 @@ row that cost Round 8 its gate.
 ### But not by the mechanism the instruction described
 
 **`append_file` was called zero times again — 0 for 72 runs across two sweeps.**
-And qythos9 did not obey the 6000-character number either: its design docs came
+And qwythos9 did not obey the 6000-character number either: its design docs came
 in at 11,675 / 11,882 / 13,557 characters, *larger* than the 9,662 of r8's one
 surviving run. What the sentence actually did was stop the runaway — 35,726 and
 32,654 became ~12k — without changing anything it literally asked for. The
@@ -784,7 +784,7 @@ The real length is recoverable from the suffix, and the numbers above use it.
 
 - **The gate passed and the interesting finding was still in the flagged row.**
   Fifth round running.
-- `plan-doc`/qythos9 r2 wrote **22,860 characters in one call** and hit the
+- `plan-doc`/qwythos9 r2 wrote **22,860 characters in one call** and hit the
   wallclock stop, so the runaway is reduced, not eliminated.
 - The new `⏹ infrastructure:` label did its job: zero infrastructure deaths this
   sweep, which is itself the evidence that r8's two were caused by the 8192 cap
@@ -806,10 +806,10 @@ old cap with a 632-char stub and an edit loop.
 
     overall score     : 0.807 -> 0.651  (-0.156)
     clean-finish rate : 0.667 -> 0.444  (-0.223)
-    design-doc/qythos9: 0.98 -> 0.07
+    design-doc/qwythos9: 0.98 -> 0.07
 
 It fixed the row it aimed at — `plan-doc` went 0.64 → 0.86 (qwencoder14, 4.0
-iterations, 0 nudges) and 0.95 → 1.00 (qythos9) — and cost more than twice that
+iterations, 0 nudges) and 0.95 → 1.00 (qwythos9) — and cost more than twice that
 everywhere else.
 
 ### The mechanism, unambiguous
@@ -825,7 +825,7 @@ Exactly the Round 8 failure, restored by a wording change.
 So the brake is **the low number stated flatly**, and not the reasoning around
 it. This is worth stating precisely because it is not what the sentence says:
 
-- qythos9 has never obeyed 6000 — under it, documents came in at 11.7k-13.6k.
+- qwythos9 has never obeyed 6000 — under it, documents came in at 11.7k-13.6k.
 - `append_file` has now been called **zero times in 108 runs** across three
   sweeps and two phrasings.
 
@@ -837,7 +837,7 @@ not a wording problem, and no further sentence is going to produce an
 
 ### A latent crash the sweep exposed
 
-`e2e-spec-to-code`/qythos9 r1 died 19 iterations in with the logged text
+`e2e-spec-to-code`/qwythos9 r1 died 19 iterations in with the logged text
 `'new'`. That is `KeyError('new')` from `args["new"]` in `EditFile.run`: the
 model emitted an `edit_file` call without a `new` field, the exception escaped
 `tool.run`, escaped `_run_calls`, escaped `run_turn`, and ended the turn. Any
@@ -848,11 +848,11 @@ visible at all, having been an unexplained blank row before.
 ### Unattributed movement
 
 Four execution rows moved without a mechanism I can point to:
-`exec-from-plan`/qwencoder14 1.00 → 0.50, `exec-from-plan`/qythos9 1.00 → 0.67,
-`exec-stall-trap`/qythos9 1.00 → 0.72, `exec-bugfix`/qythos9 1.00 → 0.83. These
+`exec-from-plan`/qwencoder14 1.00 → 0.50, `exec-from-plan`/qwythos9 1.00 → 0.67,
+`exec-stall-trap`/qwythos9 1.00 → 0.72, `exec-bugfix`/qwythos9 1.00 → 0.83. These
 cases write no documents, and the only shipped change is a tool description plus
 a terminal stop message. Two of the r10 traces show the model planning and never
-executing (`exec-from-plan`/qythos9 r2: two reads, four `update_plan`, zero
+executing (`exec-from-plan`/qwythos9 r2: two reads, four `update_plan`, zero
 edits). The honest reading is that a tool-catalog edit reshuffles sampling for
 every case, and that three runs per row cannot separate that from variance. It
 is not evidence for the rewording; it is a reason the next sweep repeats a known
@@ -892,8 +892,8 @@ of write-ups have assumed it measured, this should have reproduced r9.
     overall score     : 0.807 -> 0.667  (-0.140)
     clean-finish rate : 0.667 -> 0.472  (-0.195)
     ❌ REGRESSION GATE: FAIL
-       design-doc::qythos9        0.98 -> 0.38
-       exec-bugfix::qythos9       1.00 -> 0.50
+       design-doc::qwythos9        0.98 -> 0.38
+       exec-bugfix::qwythos9       1.00 -> 0.50
        exec-from-plan::qwencoder14 1.00 -> 0.17
 
 r10 — a real change, judged a failure and reverted — scored −0.156. Repeating a
@@ -901,7 +901,7 @@ configuration against itself scores −0.140. **The two are indistinguishable.**
 
 ### What this invalidates
 
-`design-doc`/qythos9's longest reply, by round:
+`design-doc`/qwythos9's longest reply, by round:
 
 | round | wording | run 1 | run 2 | run 3 |
 |---|---|---|---|---|
@@ -963,7 +963,7 @@ This also answers D46 from the other direction. `append_file` has zero calls in
 and reaches for `edit_file(old="")` to do it. It was never choosing between the
 two tools; it was never finding the second one.
 
-`exec-bugfix`/qythos9 (1.00 → 0.50) is ordinary sampling: r9's third edit landed
+`exec-bugfix`/qwythos9 (1.00 → 0.50) is ordinary sampling: r9's third edit landed
 on the buggy span and fixed it, r11's landed one line off, "succeeded", left the
 test red, and the model then re-sent it verbatim until the repeat detector fired.
 
@@ -1001,7 +1001,7 @@ model. This is it, and it doubles as D51's raised-n sweep (n=3 → **n=8**).
 
 **The fix.** A large document written as one `write_file` truncates at the token
 limit: the content JSON string never closes, `extract()` recovers nothing, and
-the whole partial reply evaporates — qythos9's `design-doc` "long mode writes 40k
+the whole partial reply evaporates — qwythos9's `design-doc` "long mode writes 40k
 and lands nothing" (r11 scored 0.38, with 0.07 in long mode). Two salvage paths,
 both scoped to `write_file`/`append_file` only (a half-formed `edit_file`/`bash`
 is unsafe to run; a partial *document* is strictly better landed than lost):
@@ -1018,22 +1018,22 @@ is unsafe to run; a partial *document* is strictly better landed than lost):
     ❌ REGRESSION GATE: FAIL
        e2e-spec-to-code::qwencoder14  0.80 -> 0.60
        exec-bugfix::qwencoder14       0.42 -> 0.25
-       exec-from-plan::qythos9        1.00 -> 0.69
+       exec-from-plan::qwythos9        1.00 -> 0.69
 
-**The target moved, decisively.** `design-doc`/qythos9: **0.38 → 0.98** (all 8
-runs "ok", zero STOPPED, the bimodal collapse gone). `exec-bugfix`/qythos9
+**The target moved, decisively.** `design-doc`/qwythos9: **0.38 → 0.98** (all 8
+runs "ok", zero STOPPED, the bimodal collapse gone). `exec-bugfix`/qwythos9
 1.00, `exec-from-plan`/qwencoder14 0.17 → 1.00.
 
 **The gate FAIL is baseline noise, proven by mechanism (D50).** The salvage path
-fired in exactly **5 runs, all qythos9** — `e2e-spec-to-code` (r1/r5/r6/r7) and
+fired in exactly **5 runs, all qwythos9** — `e2e-spec-to-code` (r1/r5/r6/r7) and
 `plan-doc` (r5), traced via `continue truncated write` / `landed its partial file
-first` in the event logs. Both cases *held or improved* (e2e-qythos9 0.70 → 0.76,
-plan-doc-qythos9 0.96). **None of the three flagged rows had any salvage
+first` in the event logs. Both cases *held or improved* (e2e-qwythos9 0.70 → 0.76,
+plan-doc-qwythos9 0.96). **None of the three flagged rows had any salvage
 activity** — the change cannot have caused them:
 
 - `exec-bugfix`/qwencoder14 is a tiny targeted-edit case with no large write at
   all; salvage physically cannot fire. 0.42 → 0.25 is n=3 → n=8 resampling.
-- `exec-from-plan`/qythos9's r11 1.00 was 3/3 luck (its qwencoder14 twin was 0.17
+- `exec-from-plan`/qwythos9's r11 1.00 was 3/3 luck (its qwencoder14 twin was 0.17
   at n=3 and 1.00 at n=8 — n=3 is unreliable in both directions).
 - `e2e`/qwencoder14 never triggered salvage; its wallclock death at ~20,400 chars
   was not a `write_file`.
@@ -1099,11 +1099,11 @@ e2e 0.60 → 0.63. Landing edits ≠ computing correct fixes. qwencoder14 stops
 burning iterations on no-ops but still can't produce the right bugfix — the
 capability wall (M3/3.1), not a loop, is what caps this case now.
 
-**qythos9 looks slightly worse and it is not explained away:** edit fail 24% → 32%,
+**qwythos9 looks slightly worse and it is not explained away:** edit fail 24% → 32%,
 unrecovered no-ops 3 → 9 (spread across 3 runs, concentrated in the wallclock-death
 e2e case), exec-bugfix 1.00 → 0.92, e2e 0.76 → 0.60. n dropped 8 → 6 and the e2e
 truncations confound it, so this is *plausibly* noise — but not proven noise. Flagged
-for re-check if qythos9 edit reliability surfaces again; do not credit the new message
+for re-check if qwythos9 edit reliability surfaces again; do not credit the new message
 with harming the good editor without a mechanism in the logs (per D50/D54).
 
 | # | Decision | Why |
@@ -1120,7 +1120,7 @@ with harming the good editor without a mechanism in the logs (per D50/D54).
 Validation of build 22 (3.1a: inline `SyntaxError at line N` on `.py` writes).
 e2e-spec-to-code only, both models, `--repeat 6`, vs the same case in r13-edithelp.
 
-**The mechanism works.** qythos9 runs that reached pytest with a SyntaxError:
+**The mechanism works.** qwythos9 runs that reached pytest with a SyntaxError:
 **5/6 → 0/6.** The inline warning fired in 3 runs and the model fixed the syntax
 before ever running the tests. A real, general robustness win — a malformed `.py`
 now names its own bad line one call after it lands, instead of surfacing later as
@@ -1134,7 +1134,7 @@ parse" to "parses but wrong," which is exactly where qwencoder14 already sat.
 **The apparent overall gain is noise, not the lever.** e2e mean 0.61 → 0.69, but
 it is entirely doc-stage variance: qwencoder14's `plan_has_tasks` swung 0/6 → 6/6
 and `wrote_plan_doc` 2/6 → 6/6 (PLAN.md formatting, untouched by a syntax check),
-lifting it 0.63 → 0.80; qythos9 swung the *other* way on the same check
+lifting it 0.63 → 0.80; qwythos9 swung the *other* way on the same check
 (3/6 → 0/6), 0.60 → 0.58. A fake +0.17 on one row from n=6 — the cleanest
 demonstration yet of why 2.1 (variance-aware gate) matters.
 
@@ -1148,7 +1148,7 @@ demonstration yet of why 2.1 (variance-aware gate) matters.
 
 ---
 
-## Round 15 — the qythos9 edit-drop, and the tool the eval forgot to allow (`r20-replacelines-live`, HEAD `4635030`, n=6)
+## Round 15 — the qwythos9 edit-drop, and the tool the eval forgot to allow (`r20-replacelines-live`, HEAD `4635030`, n=6)
 
 Builds 23–36 landed through commits (salvage, single-quote recovery, the
 replace_lines fallback, the no-change fast-stall path) without full narrative
@@ -1165,7 +1165,7 @@ prompt line was shipped. (D61.)
 
 **Measuring that non-problem surfaced the real one.** The probe hands the model
 a *misreported* `SyntaxError` (Python blames line 29/32; the true fault is a
-six-quote docstring on line 24) with no "read first" steering. qythos9 failed
+six-quote docstring on line 24) with no "read first" steering. qwythos9 failed
 it **6/6** — but not by blind-editing (0/12). Its *correct* `edit_file` call was
 emitted as Python single-quoted JSON that **dropped the closing `'`**, leaving a
 trailing `}}`; the unterminated string ran to EOF and **swallowed the closing
@@ -1178,7 +1178,7 @@ silently discarded. The turn ended with the fix never executed — the exact
 string and returns it at EOF; `_loose_string`'s run-off-end return strips leaked
 structural closers (`f"…"}}` → `f"…"`) via a new `_strip_structural_tail` (which
 leaves truncated partials untouched, so `salvage_truncated_write` is unaffected).
-Clean calls never reach these branches — proof: **qythos9 harness rows are
+Clean calls never reach these branches — proof: **qwythos9 harness rows are
 pixel-identical to baseline**, and the blindprobe went **6/6 BROKEN → 6/6 OK**
 with *genuine* fixes (all functions intact, not hollow-outs). +4 tests.
 
@@ -1188,7 +1188,7 @@ not available in this session." Root cause: the harness never auto-approved
 `replace_lines` (added build 34) — every case pins its own `allow_tools` and
 all six omitted it — so build 34's own `edit_file → replace_lines` steering sent
 the model into an un-approvable dead-end. Fixed across the default list **and**
-all six pinned cases. qythos9 was untouched throughout (0.92 / 1.00 in every
+all six pinned cases. qwythos9 was untouched throughout (0.92 / 1.00 in every
 sweep), proving the parser change was never implicated.
 
 **The numbers — read across all four sweeps, because two of the four rows are
@@ -1199,12 +1199,12 @@ live):
 
 | row | r17 (b36,no RL) | r18 (b37,no RL) | r19 (b37,no RL) | r20 (b37,RL) | reading |
 |---|---|---|---|---|---|
-| exec-bugfix::qythos9 | 0.92 | 0.92 | 0.92 | **1.00** | **deterministic** — the previously-dropped edit now lands; consistent across every sweep |
-| exec-stall-trap::qythos9 | 1.00 | 1.00 | 1.00 | 1.00 | stable — flat everywhere |
+| exec-bugfix::qwythos9 | 0.92 | 0.92 | 0.92 | **1.00** | **deterministic** — the previously-dropped edit now lands; consistent across every sweep |
+| exec-stall-trap::qwythos9 | 1.00 | 1.00 | 1.00 | 1.00 | stable — flat everywhere |
 | exec-bugfix::qwencoder14 | 0.50 | 0.29 | 0.46 | **0.92** | RL-consistent gain (0.92 vs ~0.4 without it), but n=6 — **suggestive, not credited** |
 | exec-stall-trap::qwencoder14 | 0.92 | 0.72 | 0.33 | 0.44 | **n=6 variance** — every b37 draw is 0.33–0.72 regardless of RL; the 0.92 was a lucky baseline |
 
-**The only clean signal is build 37 on qythos9's edit-bugfix (0.92 → 1.00,
+**The only clean signal is build 37 on qwythos9's edit-bugfix (0.92 → 1.00,
 consistent), plus the deterministic blindprobe (6/6 BROKEN → 6/6 OK).** The two
 qwencoder rows must be read with the D60 discipline, and one of them nearly
 tricked this very writeup (see the correction below).
@@ -1227,7 +1227,7 @@ variance over a capability wall. The lever is retracted (D64 below).
 | # | Decision | Why |
 |---|---|---|
 | D61 | Do NOT ship a "look before you edit" prompt lever | The opening-noop it targets is 0/24 on build 36 — already closed by builds 34–36. No lever without a measured problem (D58/D59). |
-| D62 | Build 37 (`_closing_fence` EOF recovery + `_strip_structural_tail`) is correct and the round's one deterministic win | Fires only on malformed input; qythos9 rows pixel-identical to baseline on the clean path; blindprobe 6/6 BROKEN→OK with genuine fixes; exec-bugfix qythos9 0.92→1.00 consistently. |
+| D62 | Build 37 (`_closing_fence` EOF recovery + `_strip_structural_tail`) is correct and the round's one deterministic win | Fires only on malformed input; qwythos9 rows pixel-identical to baseline on the clean path; blindprobe 6/6 BROKEN→OK with genuine fixes; exec-bugfix qwythos9 0.92→1.00 consistently. |
 | D63 | `replace_lines` must be auto-approved wherever `edit_file` is — **on principle, not for a score** | It is `_PATH_MUTATING` like the other editors and the loop actively steers toward it; denying it in eval dead-ends runs and hides a real product tool. The exec-bugfix qwencoder gain is RL-consistent but n=6 — do NOT credit a score delta. |
 | D64 | **RETRACTED** (superseded self-correction): the exec-stall-trap qwencoder14 0.92→0.44 move is n=6 variance over a capability wall, NOT a replace_lines flailing mode | r19 (no RL) scored 0.33 < r20 (RL) 0.44, so RL cannot be the cause; event logs show correct guard behavior + wrong-fix false-completion. A textbook D60 trap — caught in review, not shipped as a lever. |
 
@@ -1274,7 +1274,7 @@ stored `runs` so pre-build-38 sweeps get the new path for free.
 **Validated against the real sweeps.** Every same-code pair (r18↔r19↔r20) now
 returns **PASS (with REVIEW)** — the non-stationarity can no longer trip the hard
 gate. The genuine build-37 improvement (r17→r20) also PASSes, with its two real
-gains shown (`exec-bugfix` qwencoder +0.42, qythos9 +0.08) and the noisy
+gains shown (`exec-bugfix` qwencoder +0.42, qwythos9 +0.08) and the noisy
 stall-trap drop flagged REVIEW rather than FAILed. Synthetic clean regressions
 (`[1.0]×6 → [0.5]×6`) still hard-FAIL; a broad 3-row 0.07 stable slide FAILs via
 the backstop; a lone deterministic 0.05 drop does not.
@@ -1415,7 +1415,7 @@ band:
 |---|---|---|
 | devstral24 | 0.74 (r22, n=5) | **0/5** |
 | qwencoder14 | 0.71 (r13–15) | **0/6** each sweep |
-| qythos9 | 0.64 (r13–15) | **0/6** each sweep |
+| qwythos9 | 0.64 (r13–15) | **0/6** each sweep |
 
 On all 5 runs devstral24 wrote every artifact (design doc, plan, module, tests)
 but **`own_tests_pass=false` and `independent_spec_check=false` — 0/5 on both.**
@@ -1424,13 +1424,13 @@ the *identical* failure to the incumbents (0/6 own-tests-pass across every recen
 e2e sweep): all three local models write plausible code whose logic is wrong.
 The wall is universal, not model-size-bound.
 
-**exec-stall-trap — devstral24 no-ops; qythos9 already solves it.** mean **0.67**,
+**exec-stall-trap — devstral24 no-ops; qwythos9 already solves it.** mean **0.67**,
 tests_pass **0/6**, and the telling metric: **0 tool calls per run.** devstral24
 announces intent, eats the one announced-intent nudge, and escapes clean in ~17s
 without ever attempting the fix. It out-scores qwencoder14 (0.33, which gets
 *baited into grinding* — the case's purpose — 3–50 tool calls, 0/8 pass) only by
 refusing to engage, banking the "escaped-without-grinding / suite-intact" credit.
-But the config default **qythos9 already solves this case outright** (≈0.98,
+But the config default **qwythos9 already solves this case outright** (≈0.98,
 tests_pass 8/8, ~4 tool calls). devstral24 is strictly *worse* than the model
 we'd actually reach for.
 
@@ -1444,7 +1444,7 @@ runs. Minor; noted for a later harness tweak.
 
 | # | Decision | Why |
 |---|---|---|
-| D71 | Do **not** adopt devstral24 as a hard-case lever | e2e: 0.74, own_tests_pass 0/5 — same wall as the 9–14B models. stall: 0 tool calls, 0/6 pass — worse than qythos9, which already solves it. The 24B capacity buys no correctness on the hard cases. |
+| D71 | Do **not** adopt devstral24 as a hard-case lever | e2e: 0.74, own_tests_pass 0/5 — same wall as the 9–14B models. stall: 0 tool calls, 0/6 pass — worse than qwythos9, which already solves it. The 24B capacity buys no correctness on the hard cases. |
 | D72 | The e2e capability wall is model-size-invariant across the local pool | All three local models get own_tests_pass 0/6(5) on e2e — plausible code, wrong logic. Confirms 3.1 is capability-bound; the payoff is in harness levers (visibility, seen-green gate), not model-swapping. |
 
 **Closes the "just run a bigger local model" hypothesis.** CLAUDE.md's framing of
@@ -1486,7 +1486,7 @@ message with no raw fence. Full suite 596 green.
 ## Round 21 — build-41 regression check + a non-stationarity control (2026-07-25)
 
 Goal: confirm the two new finish-cascade nudges (4.6 seen-green gate, 4.7
-truncation-stop) don't **misfire** on the loaded workhorse. Ran qythos9 on the
+truncation-stop) don't **misfire** on the loaded workhorse. Ran qwythos9 on the
 test-claiming cases — exec-bugfix, exec-from-plan, e2e-spec-to-code — at n=4
 (r25-build41-regress).
 
@@ -1498,14 +1498,14 @@ correctly **trusted** them (scored 1.00) rather than nagging. Builds 40/41
 introduce no spurious nudges.
 
 **A scare that became a control.** exec-bugfix scored **0.50 on all four** runs
-(each repeat-stopped), against a historical qythos9 baseline of 0.92 (r13/r16/r19).
+(each repeat-stopped), against a historical qwythos9 baseline of 0.92 (r13/r16/r19).
 That looked like a regression — until noting the new nudges never fired here, so
 40/41 *couldn't* be the cause. Confirmed it with a same-session A/B: checked out
 the pre-build-40 commit (ce31637, build 30 — has the plan fixes, lacks 40/41) and
-re-ran exec-bugfix qythos9 n=4 (r26-pre40-control) against the *same* loaded
+re-ran exec-bugfix qwythos9 n=4 (r26-pre40-control) against the *same* loaded
 server. Result: **0.50 / 1.00 / 0.50 / 0.50 = 0.625** — the same depressed range.
 
-| build | exec-bugfix qythos9 n=4 | vs historical |
+| build | exec-bugfix qwythos9 n=4 | vs historical |
 |---|---|---|
 | 41 (candidate, r25) | 0.50 0.50 0.50 0.50 → **0.50** | 0.92 (r13/r16/r19) |
 | 30 (pre-40 control, r26) | 0.50 1.00 0.50 0.50 → **0.625** | same session as r25 |
@@ -1603,7 +1603,7 @@ anchored on and the ±3-line echo / compaction can't dislodge it.
 
 **Not yet validated on a live/eval run.** Per D77, offline metrics can't see a
 converging loop, so a green suite is necessary but not sufficient. Next: a live
-gemmacoder12/qythos9 session on a duplication-prone bugfix + an eval sweep,
+gemmacoder12/qwythos9 session on a duplication-prone bugfix + an eval sweep,
 watching that (a) the levers fire when they should, (b) no false-positive nudges
 on legitimate multi-edit work.
 
@@ -1731,8 +1731,8 @@ the outdir absolute (`.resolve()`). Lesson: verify the instrument before
 trusting a night of numbers.
 
 **Pass-1 (16 runs, both models).** Ranked the pathologies. Standout: **indent-bug**
-— both models flail (qythos9 fails outright; gemmacoder12 fixes the file then
-repeat-stops). Root causes differ: qythos9 uses **tabs** where the file uses
+— both models flail (qwythos9 fails outright; gemmacoder12 fixes the file then
+repeat-stops). Root causes differ: qwythos9 uses **tabs** where the file uses
 spaces + mis-ranges the replacement (orphan duplicate `return`), and the
 syntax-guard never engages because the start state is *already invalid* (D83).
 gemmacoder12 *fixes* the file on the first `replace_lines`, then can't tell it's
@@ -1822,7 +1822,7 @@ the first A/B** (one treatment run died), so it was re-run clean.
 
 ### Two paired A/Bs (stash-toggle `--marker _saw_verify_ok`, D80/D85)
 
-| A/B | cases × models × reps | target: syntax-fix gemma | qythos9 (regression) | note |
+| A/B | cases × models × reps | target: syntax-fix gemma | qwythos9 (regression) | note |
 |---|---|---|---|---|
 | #1 (pre-crash-fix) | 4 × 2 × 3 | 0/3 → **1/3** | 3/3 both arms | 1 treatment run killed by the list-cmd crash → understated |
 | #2 (crash-fixed) | syntax-fix+logic-bug × 2 × 5 | **0/5 → 4/5** | 5/5 both arms | clean |
@@ -1833,7 +1833,7 @@ model **work** (control falsely quits in 2 iters; treatment runs py_compile, see
 the real SyntaxError, edits, re-verifies — proven in the rT3 transcript). Of the
 2 treatment repeat-stops: one is a **succeeded** run redundantly re-running
 py_compile (cosmetic), one is a run that **also failed in control** (not gate-
-induced). **Zero false-fire on qythos9** in 20 runs. +6 tests, suite 637 green.
+induced). **Zero false-fire on qwythos9** in 20 runs. +6 tests, suite 637 green.
 
 ### Decisions
 | # | Decision | Why |
@@ -1854,13 +1854,13 @@ the repeat-stop guard catches it. Pure capability/diagnosis miss (D84/D75) — t
 build-50 gate's A/B win stands untouched.
 
 ### The real find: `update_plan` reset every task to open on a word-value
-`add-test qythos9` in pass3 flailed 16it r5 to a repeat-stop — on a **green,
+`add-test qwythos9` in pass3 flailed 16it r5 to a repeat-stop — on a **green,
 finished** task. Transcript: the model sent the `{task: status}` dict shape with
 **word values** — `{"[x] Create primes.py": "finished", ...}`. The tool's
 `{task:status}` recovery (tools/plan.py) checked `has_status_marker("[finished] x")`,
 which is false (`_MARKERS` knew `done` but not `finished`), so it **discarded the
 key's correct `[x]` and reset the task to `[ ]` open**. Plan read `0/3 done`
-forever → the "open plan tasks" nudge fired every turn → qythos9 re-wrote the
+forever → the "open plan tasks" nudge fired every turn → qwythos9 re-wrote the
 already-correct files → repeat-stop. A done-counter stuck at zero converts a
 solved task into an infinite loop.
 
@@ -1883,7 +1883,7 @@ the transcript-confirmed pass3 reproduction. ab.py extended to toggle multiple
 comma-separated files (harness only, no build bump).
 
 ### NEW pathology surfaced by the same transcripts (next target)
-Even with clean-array plans, qythos9 loops on the **last** task: it does the work
+Even with clean-array plans, qwythos9 loops on the **last** task: it does the work
 (`pytest → 4 passed`, plan `2/3 done`) but narrates "All tests pass" in prose
 **without calling update_plan to mark the final task `[x]`**. The `_nudge_open_tasks`
 nudge says "Continue with: Run pytest and verify — do the work now", whose escape
@@ -1908,7 +1908,7 @@ nudge-wording per D84. Needs its own reproduce→design→A/B.
 Round 28's fix (build 51) addressed the *dict-shape 0/N miscount* path to the
 "open plan tasks" loop. Reading the build-51 A/B transcripts surfaced a **second,
 independent path to the identical symptom** on clean-array plans (ab_plandict
-rT2/rC2, qythos9): the model decomposes into e.g. `[x] write code`, `[x] write
+rT2/rC2, qwythos9): the model decomposes into e.g. `[x] write code`, `[x] write
 tests`, `[>] run pytest and verify all tests pass`, runs the suite to green — then
 **narrates "All tests pass" in prose without calling update_plan to mark the final
 task `[x]`**. Plan stays `2/3`, the open-tasks nudge fires, and its escape hatch
@@ -1945,16 +1945,16 @@ dormant-path A/B is neutral; verify whether the fixed path fired before creditin
 
 ### pass4 (build 52 full battery, --max-wall 300) — LIVE confirmation
 What the two dormant A/Bs couldn't give, a fresh battery did: the pass3 shape
-recurred and the fix engaged. **add-test qythos9: `7it green, answered, done=Y`
+recurred and the fix engaged. **add-test qwythos9: `7it green, answered, done=Y`
 — the pass3 `16it r5 repeat-stop` loop is GONE.** The transcript shows it firing:
 plan `2/3` with `▶ Run pytest and ensure all tests pass` current, `pytest → 11
 passed`, then `⟳ verify task credited (tests already green)` (1 credit, **0**
 open-plan nudges) → clean finish. Whole battery: **16/16 done=Y, zero
 false-completions, every case lands correct output.** The 6 PROBLEM rows are all
 gemmacoder12 capability flail (repeat-stops that still LAND — D84; gemma is not
-the workhorse); qythos9 near-spotless (only undefined-vars mild: 6it f1 r1). Net:
+the workhorse); qwythos9 near-spotless (only undefined-vars mild: 6it f1 r1). Net:
 builds 51+52 confirmed working live, no regression, and the "flailer=gemma,
-qythos9=clean" split from Round 27 holds.
+qwythos9=clean" split from Round 27 holds.
 
 ---
 
@@ -1972,12 +1972,12 @@ standing overnight instruction, each stressing a path nothing else exercised:
   fix `.get`. Distinct signal from `syntax-fix` (py_compile) and `add-test`
   (pytest-green). Each check verified to pass-on-fix / fail-on-broken first.
 
-pass5 (both models, --max-iter 25 --max-wall 240): **qythos9 3/3 clean**,
+pass5 (both models, --max-iter 25 --max-wall 240): **qwythos9 3/3 clean**,
 gemmacoder12 3/3 land correct output but with genuine repeat-flail (D84). Every
 one of the 6 runs got the right answer.
 
 ### Finding: replay flagged a FLAWLESS run as flailing (visibility defect)
-`fix-traceback qythos9` did the textbook arc — read → `python3 report.py` (crash)
+`fix-traceback qwythos9` did the textbook arc — read → `python3 report.py` (crash)
 → edit → `python3 report.py` (verify `12`) — yet replay stamped it 🔁 1 repeat
 (→ PROBLEM via `_problem`, which trips on any repeat). The repeat detector had **no
 notion of intervening progress**: it flagged the identical verify-run even though a
@@ -2002,7 +2002,7 @@ Checked whether the agent's own repeat detector shares this blind spot: it does
 NOT. `repeat_streaks` stores the last result per call signature and "only counts
 a repeat when the result is unchanged too" — so a `python3 x.py` that goes
 crash→`12` across a fix is never a stall to the loop. That's why fix-traceback
-qythos9 self-terminated with zero nudges. The gap was only in the observability
+qwythos9 self-terminated with zero nudges. The gap was only in the observability
 tool. Note the two lenses differ by design: the **loop** (behavior) gates on
 call-signature + *result-unchanged*; **replay** (visibility) now gates on
 call-key + *intervening successful mutation*. They agree on every observed case;
@@ -2028,7 +2028,7 @@ typo), verified `show(3)==30`, marked its plan **3/3 done** — then re-emitted 
 stop: "the model repeated the same tool call without making progress." A SUCCESS
 that reads as a FAILURE. Same shape ended all 4 gemma PROBLEM rows in pass6: work
 lands, then the model keeps poking (redundant no-op update_plan / no-op edit /
-identical replace_lines) until the repeat-detector stops it. qythos9 (workhorse)
+identical replace_lines) until the repeat-detector stops it. qwythos9 (workhorse)
 never does this — it stops cleanly. This is the *structural finish-detection*
 family (build-52 class, validated live), NOT the *clearer-text* family (D84).
 
@@ -2076,15 +2076,15 @@ guides it) and `dedup-order` (set()+sorted drops first-seen order — must imple
 order-preserving dedup). Both stress correctness reasoning, not crash-suppression.
 
 ### Results (pass7, 4 reps each)
-- **even-median:** qythos9 4/4 done=Y, gemma 4/4 done=Y. Clean for both.
-- **dedup-order:** qythos9 4/4 done=Y clean. **gemma 0/2 done=N** (both reps PROBLEM,
+- **even-median:** qwythos9 4/4 done=Y, gemma 4/4 done=Y. Clean for both.
+- **dedup-order:** qwythos9 4/4 done=Y clean. **gemma 0/2 done=N** (both reps PROBLEM,
   output still the broken `[1, 2, 3]`) — the first genuine done=N (not lands-anyway)
   in a while.
 
 ### dedup-order gemma failure — DIAGNOSED (D87 transcript + raw event)
 Not missing newlines (the replay preview collapsing `\n`→space was a display artifact;
 raw `args.new` had proper newlines). The real split is **how each model FRAMES the edit**:
-- **qythos9 (wins):** `old = "def dedup(items):\n    return sorted(set(items))"` — anchors
+- **qwythos9 (wins):** `old = "def dedup(items):\n    return sorted(set(items))"` — anchors
   on the **function header** — and `new` re-writes the body with **every line indented 4
   spaces**. Compiles.
 - **gemma (fails):** `old = "return sorted(set(items))"` — anchors on the **bare inner
@@ -2093,8 +2093,8 @@ raw `args.new` had proper newlines). The real split is **how each model FRAMES t
   Syntax-guard (build 47) correctly REFUSES the corruption; gemma re-emits identically → stall.
 
 Verdict: **model-strategy/capability split (D84), NOT a new harness defect.** The guard did
-its job (file left intact, not corrupted — done=N-intact beats done=Y-corrupt). qythos9, the
-workhorse, is robust here; the answer remains "use qythos9."
+its job (file left intact, not corrupted — done=N-intact beats done=Y-corrupt). qwythos9, the
+workhorse, is robust here; the answer remains "use qwythos9."
 
 ### Deferred harness candidate (specified, NOT implemented unsupervised)
 `edit_file` could **auto-reindent a multi-line `new` to the match line's leading
@@ -2103,7 +2103,7 @@ indentation**: when the matched `old` is preceded on its line only by whitespace
 would rescue gemma's col-0 block → valid, and no-op when the model already indented (new's
 first line already at W). BUT it's Opus-tier fs.py surgery with real regression risk against
 the existing D81 indent-preservation / indent-only-noop logic, and it helps only gemma here
-(qythos9 already robust) — so D84-lower value. Deferred to a SUPERVISED session, not cut into
+(qwythos9 already robust) — so D84-lower value. Deferred to a SUPERVISED session, not cut into
 the edit-semantics core overnight. This is a structural-family lever (fixes without needing
 the weak model to read text), which is why it's worth recording rather than discarding.
 
@@ -2112,7 +2112,7 @@ the weak model to read text), which is why it's worth recording rather than disc
 ## Round 33 — build 54: plan-restate finish fires on the FIRST repeat (D89 dormant again)
 
 The `already-correct` case (nothing-to-fix path) surfaced the flail I built build 53
-for, one step earlier. qythos9 is clean (verify → finish, 3it, no edit, r0). gemma
+for, one step earlier. qwythos9 is clean (verify → finish, 3it, no edit, r0). gemma
 flails on the done task in two non-stationary shapes (both done=Y — output stays
 correct, so no corruption):
 
@@ -2150,25 +2150,25 @@ FAILURE on work that in fact landed (done=Y). Unlike the plan-restate, this has 
 clean fix: with no plan there's no completion signal locode can trust, and a repeated
 passing bash is ambiguous (benign re-verify vs genuinely stuck). The deeper root is
 that gemma sometimes skips planning entirely, leaving locode blind to completion.
-Deferred for a supervised session; qythos9 (the workhorse) plans and finishes cleanly.
+Deferred for a supervised session; qwythos9 (the workhorse) plans and finishes cleanly.
 
 ---
 
 ## Round 34 — pass9 full-battery landscape (build 54 regression-clean; workhorse nudge observation)
 
-Ran all 14 cases × {qythos9, gemmacoder12} × 1 rep (pass9) as a build-54 regression
+Ran all 14 cases × {qwythos9, gemmacoder12} × 1 rep (pass9) as a build-54 regression
 sweep + fresh landscape read.
 
 ### Build 54 regression: CLEAN
 No case finished early from the lowered plan-finish threshold. Every multi-step case
 completed with correct check values — rename-across-files (both done=Y, show(3)=30,
 gemma now r0), add-test (green both), read-before-edit (correct url both), fix-traceback
-(RC 0, 12). qythos9 13/14 clean r0. gemma lands every case (done=Y) EXCEPT the known
+(RC 0, 12). qwythos9 13/14 clean r0. gemma lands every case (done=Y) EXCEPT the known
 dedup-order indent-strategy failure (done=N, D84, diagnosed R32) — no new gemma regression.
 
 ### NEW workhorse observation (deferred): open-tasks nudge induces a redundant re-verify
-dedup-order qythos9 done=Y but r1 (PROBLEM) — got the right answer ([3, 1, 2]) but
-flagged a repeat, where pass7 had it 4/4 clean (non-stationary). Transcript: qythos9
+dedup-order qwythos9 done=Y but r1 (PROBLEM) — got the right answer ([3, 1, 2]) but
+flagged a repeat, where pass7 had it 4/4 clean (non-stationary). Transcript: qwythos9
 fixed dedup (edit_file), marked plan 1/2, ran the verify bash (→ [3,1,2] ✓), but its
 plan's "Verify" task was still [ ] open. The `_nudge_open_tasks` nudge then fired with
 "Continue with: Verify fix with python3 -c ..." — i.e. it named the just-completed task
@@ -2189,12 +2189,12 @@ change this round.
 
 Woke on timer with the already-applied fs.py fix gated on the user; ran a lean
 observation battery (diff-report, emits-nothing, dedup-order, indent-bug,
-undefined-vars × {qythos9, gemmacoder12} × 2 reps, pass12) to keep the overnight
+undefined-vars × {qwythos9, gemmacoder12} × 2 reps, pass12) to keep the overnight
 loop observing rather than idling. Goal: watch for any NEW failure shape not
 already gated behind the pending fix.
 
 ### No new shape; the known picture, worse aggregate
-qythos9 10/10 clean r0 across all five cases. gemma flails on the established
+qwythos9 10/10 clean r0 across all five cases. gemma flails on the established
 shapes only: diff-report 2/2 done=N (was 1/3 in pass11 — pure non-stationarity,
 landing worse), dedup-order 2/2 done=N (D84 col-0 reindent, R32), indent-bug 2/2
 PROBLEM but done=Y (repeat), undefined-vars 2/2 PROBLEM done=Y (heavy flail
@@ -2221,8 +2221,8 @@ No code change this round (harness-only run + this log).
 User asked to "continue probing edits tonight to find more problems." Added three
 edit-mechanic probes not covered by the existing battery — dup-match (ambiguous
 `old`, appears twice), two-bugs (two fixes in one file), remove-block (deletion
-edit) — and ran them + diff-report control × {gemmacoder12, qythos9} × 2 (pass13).
-qythos9 8/8 clean r0. gemma surfaced two NEW done=N shapes (dup-match it handled
+edit) — and ran them + diff-report control × {gemmacoder12, qwythos9} × 2 (pass13).
+qwythos9 8/8 clean r0. gemma surfaced two NEW done=N shapes (dup-match it handled
 fine, both reps correct).
 
 ### Finding 1 — two-bugs: PLAN-ONLY FALSE COMPLETION (gemma 2/2 done=N)
@@ -2245,7 +2245,7 @@ gemma deletes via replace_lines BY LINE NUMBER; each deletion shifts the numberi
 so its next numeric target is wrong. It chases the moving target across ~6-14
 replace_lines calls, over-deletes the `def setup()` block and mangles main's return
 (final: `return None`, setup() called but undefined) → NameError/Traceback (RC!=0).
-r1 hit repeat-stop, r2 ran to max-iter. qythos9 (5it clean) deletes with
+r1 hit repeat-stop, r2 ran to max-iter. qwythos9 (5it clean) deletes with
 CONTENT-ANCHORED edit_file (old="    print('DEBUG...')", new="") — two shift-immune
 edits + verify. The failure is number-anchoring on a shifting file.
   Candidate lever (prior art a8e4cbc "steer weak models off line-number edits toward
@@ -2255,8 +2255,8 @@ edits + verify. The failure is number-anchoring on a shifting file.
 
 ### Landscape note
 diff-report control: gemma 2/2 done=Y this run (f1 repeat) — non-stationary, better
-than pass12's 2/2 done=N. qythos9 clean throughout. Both new levers are gemma-only;
-qythos9 remains the reliable workhorse on every edit shape probed.
+than pass12's 2/2 done=N. qwythos9 clean throughout. Both new levers are gemma-only;
+qwythos9 remains the reliable workhorse on every edit shape probed.
 
 No code change this round (probes + observation + this log). Three levers now queued
 for a supervised session: already-applied short-circuit (R35, evidenced), completion
@@ -2264,8 +2264,8 @@ gate (F1), deletion-steering (F2).
 
 ## Round 37 — pass14 edit probes (mid-block clean; insert-const string-literal mangling)
 
-Second edit-probe batch (mid-block, insert-const, append-func × {gemma, qythos9}
-× 2). qythos9 6/6 clean. Lighter yield than pass13; one new gemma done=N, two
+Second edit-probe batch (mid-block, insert-const, append-func × {gemma, qwythos9}
+× 2). qwythos9 6/6 clean. Lighter yield than pass13; one new gemma done=N, two
 negatives.
 
 ### mid-block — CLEAN both models (negative result, useful)
@@ -2279,7 +2279,7 @@ new="SEP = ', \ndef make(rows):") — but the `new` is a BROKEN string literal: 
 emits `SEP = ', ` then a newline, losing the closing quote of the ', ' separator →
 unterminated-string SyntaxError. The build-47 syntax-guard rejects it; gemma
 re-emits the identical mangled edit → repeat-stop → file unchanged → NameError
-Traceback. qythos9 sidesteps: write_file the whole file with a safe placeholder,
+Traceback. qwythos9 sidesteps: write_file the whole file with a safe placeholder,
 then edit_file to refine SEP to ", " (two steps, no inline-escaping trap).
   Caveat: partly VALUE-sensitive — the comma-space separator is escaping-hostile
   (echoes the known "weak models corrupt tool JSON around quotes/braces" note). Real
@@ -2289,18 +2289,18 @@ then edit_file to refine SEP to ", " (two steps, no inline-escaping trap).
 
 ### append-func — gemma flails but LANDS (done=Y, not a hard failure)
 Add cube() to an existing file: gemma r1 f2/r1, r2 f4/n2/r1 — heavy flail but both
-reps end done=Y (9 27). qythos9 4/4 clean. Append is a flail-cost case, not a
+reps end done=Y (9 27). qwythos9 4/4 clean. Append is a flail-cost case, not a
 correctness failure.
 
 Net for the night: pass13 found the two strong new modes (plan-only false completion,
 number-anchored deletion corruption); pass14 adds insert-const as a narrower,
-value-sensitive string-mangling data point. qythos9 clean across every edit shape
+value-sensitive string-mangling data point. qwythos9 clean across every edit shape
 probed (pass13+14: 14/14). No code change; probes + observation + this log.
 
 ## Round 38 — pass15/16 REPRODUCIBILITY check on the pass13/14 edit findings
 
 Re-ran the three candidate gemma edit-failures across more reps to get honest
-frequencies rather than trust single 2/2 snapshots (D89 discipline). qythos9 stayed
+frequencies rather than trust single 2/2 snapshots (D89 discipline). qwythos9 stayed
 clean on every rep of every case. Pooled gemma done=N rates:
 
   remove-block  (number-anchored deletion corruption)  : 4/5  ~80%  ROBUST
@@ -2326,7 +2326,7 @@ clean on every rep of every case. Pooled gemma done=N rates:
     action) is still valid but addresses an intermittent, not a consistent, failure.
 
 ### Landscape (this night, pass13-16, edit-mechanic probes)
-qythos9: clean on 100% of edit shapes probed (fix/replace, delete, insert, append,
+qwythos9: clean on 100% of edit shapes probed (fix/replace, delete, insert, append,
 multi-edit, ambiguous-match, localize-in-large). gemma: reliable on replace/append/
 localize/ambiguous; fails on DELETION (~80%) and escaping-hostile INSERT (100% when
 triggered); intermittently false-completes multi-edit tasks (~29%).
@@ -2342,7 +2342,7 @@ No code change; reproducibility observation + this log.
 ## Round 39 — pass17 deep-nest probe (NEGATIVE: deep indentation is handled)
 
 Probed fixing one line at 5-level (20-space) indentation, dict/quote-free to isolate
-indentation. qythos9 3/3 clean r0. gemma 3/3 done=Y (all correct '3') but flailed on
+indentation. qwythos9 3/3 clean r0. gemma 3/3 done=Y (all correct '3') but flailed on
 2/3 (r1 f3 n2 r2, r3 f1 r1) — the syntax-guard catches mis-indented attempts and
 gemma retries until the deep indentation matches, self-correcting. Flail-cost, NOT a
 correctness failure. Useful negative: indentation precision at depth is NOT a hard
@@ -2354,7 +2354,7 @@ gemma HARD failures (done=N): number-anchored deletion corruption (~80%), inline
 insert of escaping-hostile string values (100%, syntax-guard-contained). gemma
 FLAIL-but-lands (done=Y): append, localize-in-large, deep-nest, ambiguous-match.
 gemma INTERMITTENT: plan-only false completion (~29%). gemma CLEAN-ish: replace/
-mid-block, logic/operator fixes. qythos9: clean on every edit shape probed. No
+mid-block, logic/operator fixes. qwythos9: clean on every edit shape probed. No
 further distinct edit dimensions to probe — map is saturated. No code change.
 
 ## Round 40 — levers #1 + #2 SHIP; lever #2 A/B is decisive (0/5 → 5/5)
@@ -2405,11 +2405,11 @@ insert-const, append-func × both models × 2). Findings:
 - **No description regression** (the b45 risk from touching tool descriptions):
   indent-bug 3/3 clean, mid-block 4/4, dup-match 4/4. The indentation path is
   intact — lever #2 stayed surgical.
-- **append-func qythos9 2/2 Traceback was a HARNESS bug, not a regression.**
-  Replay: qythos9 chose append_file, which was absent from the eval --allow-tool
+- **append-func qwythos9 2/2 Traceback was a HARNESS bug, not a regression.**
+  Replay: qwythos9 chose append_file, which was absent from the eval --allow-tool
   list → denied ("no approver") → function never added → AttributeError. Added
   append_file to the allowlist (the case comment literally says it "probes
-  append_file"); re-run qythos9 2/2 clean. Non-stationary tool choice (pass14 used
+  append_file"); re-run qwythos9 2/2 clean. Non-stationary tool choice (pass14 used
   edit_file) had masked the gap. Evals-only fix, committed.
 - **insert-const gemma improvement is tool choice, NOT a lever.** Replay: gemma
   used write_file (whole-file rewrite), sidestepping the inline-escaping mangle
@@ -2452,7 +2452,7 @@ or the description edits.** Buckets:
   the tool the b45 lesson protects) and the syntax-guard correctly REFUSED a
   corruption (🛡 save). My lever-#2 deletion-steering did not drive it off
   replace_lines for indentation. Confirmed clean.
-- **insert-const qythos9 (out='1comma-space2comma-space3'):** NOT a product
+- **insert-const qwythos9 (out='1comma-space2comma-space3'):** NOT a product
   regression — the model used write_file and wrote the literal words
   "comma-space" as SEP. Root cause was the eval CASE prose: "define SEP as the
   string comma-space (a comma followed by a space)". Harness fix (no build
@@ -2471,7 +2471,7 @@ output. reps=3 × {diff-report, append-func, deep-nest, remove-block} × both
 models split the bucket:
 - **Confirmed benign (output correct every rep; only the repeat-guard fires):**
   append-func gemma 3/3 (out='9 27'), deep-nest gemma 3/3 (out='3'),
-  remove-block both models 6/6 (out='42' debug_left=False). qythos9 clean on all.
+  remove-block both models 6/6 (out='42' debug_left=False). qwythos9 clean on all.
   These stop-nets are robust — the flag is noise, the answer is right.
 - **diff-report gemma — NOT benign: 2/3 WRONG (out='\n', empty).** The reps=1
   wide sweep caught the lucky 1/3 (done=Y) and I'd mis-bucketed it. Root causes,

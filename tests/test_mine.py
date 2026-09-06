@@ -42,13 +42,13 @@ def _repeat_nudge():
 
 
 def test_iter_runs_parses_identity_and_attaches_scores(tmp_path):
-    _sweep(tmp_path, "s1", [("caseA", "qythos9", 1, "base", 0.25, [_run_call()])])
+    _sweep(tmp_path, "s1", [("caseA", "qwythos9", 1, "base", 0.25, [_run_call()])])
     runs = list(mine.iter_runs(tmp_path))
     assert len(runs) == 1
     r = runs[0]
-    assert (r.case, r.model, r.repeat, r.arm) == ("caseA", "qythos9", 1, "base")
+    assert (r.case, r.model, r.repeat, r.arm) == ("caseA", "qwythos9", 1, "base")
     assert r.score == 0.25
-    assert r.stratum == ("caseA", "qythos9")
+    assert r.stratum == ("caseA", "qwythos9")
 
 
 def test_unparseable_filenames_are_skipped_not_guessed(tmp_path):

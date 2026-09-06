@@ -1,7 +1,7 @@
 """Checks for the git-url-empty case.
 
 The case exists because of a live failure. Asked what a remote repo contained,
-qythos9 ran `git ls-tree -r --name-only main <URL> <path>`, got exit 0 and no
+qwythos9 ran `git ls-tree -r --name-only main <URL> <path>`, got exit 0 and no
 output, ran it again without the pathspec, got exit 0 and no output, and the
 turn ended with "every tool call kept coming back empty". Every piece of the
 harness behaved correctly. The command was the thing that was wrong: `ls-tree`
@@ -12,7 +12,7 @@ That failure has a property nothing else in this suite has: the wrong command
 is INDISTINGUISHABLE FROM THE RIGHT ONE returning a true empty answer. Not an
 error, not a stack trace -- exit 0 and silence. It is the worst possible signal,
 and the model cannot read its way out of it, which is the point (three earlier
-cases failed as levers because qythos9 reads code well enough to find the defect
+cases failed as levers because qwythos9 reads code well enough to find the defect
 without running anything; here there is nothing to read).
 
 WHY THE WORKSPACE IS BUILT BY setup.sh
@@ -23,7 +23,7 @@ Three preconditions cannot be checked into `seed/`, and each cost a draft:
     `fatal: not a git repository` -- loud, actionable, no trap. A nested `.git`
     cannot be committed.
   * Upstream must be reachable ONLY as a URL. Draft 2 used a `file://` URL and
-    measured nothing: the URL spells out a filesystem path, so qythos9 ran `ls`
+    measured nothing: the URL spells out a filesystem path, so qwythos9 ran `ls`
     on it, found `upstream.git` sitting there, `cd`'d in and queried it as a
     LOCAL repo -- correct answer, zero URLs, trap never armed. Upstream is now
     served by a `git daemon` on the loopback (port 9419): `git://` carries no
@@ -32,7 +32,7 @@ Three preconditions cannot be checked into `seed/`, and each cost a draft:
     at `handlers/`, and the pathspec then matched the LOCAL tree, so the trap
     printed the workspace's own files instead of nothing -- a confident wrong
     answer, a different failure. Draft 2 moved it to `vendor/handlers/` and
-    asked which file upstream had ADDED; qythos9 answered off the stale copy
+    asked which file upstream had ADDED; qwythos9 answered off the stale copy
     without touching the URL. So the workspace vendors NOTHING, and every
     filename in the expected answer exists only at the far end of the URL.
 
@@ -40,7 +40,7 @@ WHAT THIS CASE MEASURED (2026-08-26) -- READ BEFORE REUSING IT
 --------------------------------------------------------------
 Against build 136, the build that PREDATES the fix it was built to detect, the
 trap fired **0 times in 12 runs** (smoke-giturl-pre3 n=4, smoke-giturl-pre4
-n=8). Not once did qythos9 hand a URL to a local-only git command. It does one
+n=8). Not once did qwythos9 hand a URL to a local-only git command. It does one
 of two things instead:
 
   * clones (`git clone git://... upstream`) and answers perfectly -- 4/12; or

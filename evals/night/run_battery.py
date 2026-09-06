@@ -7,7 +7,7 @@ This is the observation engine for the "run varied prompts, find issues, fix,
 repeat" loop. It reuses evals/replay.py for the pathology summary (repeats,
 no-ops, fails, stop reason) so the numbers here match what a human sees on screen.
 
-    python evals/night/run_battery.py --models gemmacoder12,qythos9 \
+    python evals/night/run_battery.py --models gemmacoder12,qwythos9 \
         --outdir evals/night/results/pass1 [--cases logic-bug,indent-bug] [--reps 1]
 
 Prints a scannable table and writes <outdir>/<case>__<model>__r<n>/{events.jsonl,
@@ -294,7 +294,7 @@ def _case_emits_nothing():
     # the call), hit "changed nothing" repeatedly, then CONFABULATED success
     # ("I have now applied the correct edits…") with no successful edit. This case
     # reproduces the trigger to see if it (a) loops, (b) claims false success, and
-    # whether qythos9 handles it clean.
+    # whether qwythos9 handles it clean.
     files = {"report.py": (
         "def build_report():\n"
         "    rows = [\"item: 1\", \"item: 2\"]\n"
@@ -331,7 +331,7 @@ def _case_diff_report():
     # here is real logic INSIDE the right function among several, in a ~50-line
     # file — the complexity level where the model's edit-then-confabulate failure
     # actually bites. Tests: does gemma loop / claim false success / fail outright,
-    # and does qythos9 hold up.
+    # and does qwythos9 hold up.
     files = {"changes.py": (
         '"""Report what changed between two snapshots of a tree."""\n'
         "\n"
@@ -656,7 +656,7 @@ def run_one(case: str, model: str, rep: int, outdir: Path, *,
            "--show-events", "--allow-tool",
            # append_file is a legitimate mutating tool the user approves
            # interactively; omitting it here denied a model that reached for it
-           # (append-func qythos9) and scored a FALSE Traceback failure unrelated
+           # (append-func qwythos9) and scored a FALSE Traceback failure unrelated
            # to capability — the case comment even says it "probes append_file".
            "edit_file,write_file,append_file,replace_lines,read_file,bash,glob,grep",
            "--max-iterations", str(max_iter), "--max-wallclock", str(max_wall),
@@ -687,7 +687,7 @@ def _problem(row: dict) -> bool:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--models", default="gemmacoder12,qythos9")
+    ap.add_argument("--models", default="gemmacoder12,qwythos9")
     ap.add_argument("--cases", default=",".join(CASES))
     ap.add_argument("--reps", type=int, default=1)
     ap.add_argument("--outdir", required=True)

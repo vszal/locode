@@ -10,9 +10,9 @@ Run it between harness changes; gate the change on `compare`.
 
 ```
 .venv/bin/python evals/harness.py list
-.venv/bin/python evals/harness.py run --model qythos9 --label before
+.venv/bin/python evals/harness.py run --model qwythos9 --label before
 # ... make a harness change ...
-.venv/bin/python evals/harness.py run --model qythos9 --label after
+.venv/bin/python evals/harness.py run --model qwythos9 --label after
 .venv/bin/python evals/harness.py compare evals/results/before evals/results/after
 ```
 
@@ -94,8 +94,8 @@ against the same loaded server. `ab.py` does that for you; see below.
 ## Paired A/B — the honest way to test a change
 
 ```
-python evals/ab.py --base HEAD~1 -m qythos9 --repeat 6
-python evals/ab.py --base v0.1.0 --cand /some/other/tree -m qythos9 -c exec-bugfix
+python evals/ab.py --base HEAD~1 -m qwythos9 --repeat 6
+python evals/ab.py --base v0.1.0 --cand /some/other/tree -m qwythos9 -c exec-bugfix
 ```
 
 The baseline arm is a **git worktree** at `--base`; the candidate is the live
@@ -219,9 +219,9 @@ number would hide that, so they are reported side by side.
 
 ## Target models
 
-`qwencoder14` and `qythos9`, chosen because their strengths are opposite:
+`qwencoder14` and `qwythos9`, chosen because their strengths are opposite:
 qwencoder14 is the strongest executor and the weakest planner of the models
-benchmarked here; qythos9 is the second-best planner and nearly as strong an
+benchmarked here; qwythos9 is the second-best planner and nearly as strong an
 executor, at 2–4× the speed. A harness change that only helps one of them is
 not a general improvement.
 

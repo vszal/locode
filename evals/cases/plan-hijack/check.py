@@ -1,7 +1,7 @@
 """Checks for the plan-hijack case.
 
 The case exists because of a live failure, not a hypothesis. Asked to fix one
-bug in one file, qythos9 read the file, copied the five-step numbered list out
+bug in one file, qwythos9 read the file, copied the five-step numbered list out
 of its module docstring into `update_plan`, appended the user's actual request
 as item 6, and then worked item 1 until the repeat guard stopped the turn. The
 user's report was "it just quits". The quit was the last symptom.

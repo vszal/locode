@@ -26,7 +26,7 @@ from __future__ import annotations
 WINDOW = 8000
 # Largest repeating unit we look for. Real degeneration loops at three scales: a
 # short phrase (`megahyper`, ~9 chars), a sentence template (~300 chars), and a
-# whole multi-paragraph ANALYSIS BLOCK — the qythos9 case that motivated raising
+# whole multi-paragraph ANALYSIS BLOCK — the qwythos9 case that motivated raising
 # this was a 932-char unit ("Based on the error and the context… Let me look at
 # the exact code") repeated verbatim. At 700 that loop was rejected outright for
 # being too long, and even lifting the cap alone would not have helped: a

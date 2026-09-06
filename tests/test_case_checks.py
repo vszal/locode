@@ -53,7 +53,7 @@ def test_checkbox_tasks_count():
 
 
 def test_heading_style_tasks_count():
-    # The style qythos9 actually writes; it used to score zero.
+    # The style qwythos9 actually writes; it used to score zero.
     assert _plan_has_tasks(_HEADINGS)
 
 

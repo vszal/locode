@@ -192,7 +192,7 @@ def salvage_truncated_write(
     fence — the right call for extract(), because an incomplete tool call must not
     be run as if complete. But a large document written in one shot truncates
     exactly this way: the JSON string never closes, extract() returns nothing, and
-    the whole partial reply evaporates (the qythos9 design-doc "long mode writes
+    the whole partial reply evaporates (the qwythos9 design-doc "long mode writes
     40k and nothing lands" failure). Here we target precisely that skipped body —
     the LAST opened-but-unclosed ```tool/```json fence — and loose-parse it,
     reusing _loose_string's run-off-the-end handling.
@@ -411,7 +411,7 @@ def _closing_fence(content: str, i: int) -> int | None:
 
     String context tracks BOTH `"` and `'` delimiters: a value opened with one
     quote keeps the other literal until its own matching close. Weak models
-    (qythos9) emit Python-style single-quoted values whenever the value contains
+    (qwythos9) emit Python-style single-quoted values whenever the value contains
     a `"`, so a value like `'x = \"\"\"doc\"\"\"'` carries an ODD number of
     interior double-quotes. Tracking only `"` desynced on those and mistook the
     real closing ``` for string interior — dropping the whole call. See the
@@ -514,7 +514,7 @@ def _loose_value(text: str, i: int, arg_keys: set[str]):
         return _MISSING, i
     if text[i] in ("'", '"'):
         # A single-quote delimiter is a weak model reaching for Python/JS string
-        # syntax (qythos9 switches to it whenever the value itself contains "),
+        # syntax (qwythos9 switches to it whenever the value itself contains "),
         # so the body follows string-escape rules — `\n` MEANS a newline. Left as
         # a bare token it fed a literal `'…\n…'` into write_file/edit_file and
         # corrupted every multi-line arg. Parse it like a double-quoted string,

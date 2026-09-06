@@ -63,8 +63,8 @@ def test_unknown_model_is_conservative():
 # --- per-model thinking override (config [thinking] table) -----------------
 
 def test_thinking_override_matches_alias_exactly():
-    ov = {"qythos9": "on", "gpt-oss": "off"}
-    assert profiles.lookup_thinking_override(ov, "org/Qwythos-9B", "qythos9") == "on"
+    ov = {"qwythos9": "on", "gpt-oss": "off"}
+    assert profiles.lookup_thinking_override(ov, "org/Qwythos-9B", "qwythos9") == "on"
 
 
 def test_thinking_override_matches_id_substring():

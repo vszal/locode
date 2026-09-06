@@ -4,7 +4,7 @@ from locode.model import repetition as rep
 from locode.model.repetition import is_runaway_repetition, reps_required
 
 
-# The actual loop a user hit on qythos9 (2026-08-02), transcribed from the
+# The actual loop a user hit on qwythos9 (2026-08-02), transcribed from the
 # session: a 932-char analysis block re-emitted verbatim until they pressed Esc.
 # Kept whole rather than reduced to a synthetic string — the thresholds exist to
 # catch THIS, and a paraphrase would not pin the length that broke them.
@@ -42,7 +42,7 @@ Let me look at the exact code to see where this is happening.
 
 # --- the paragraph-scale loop that got through ----------------------------
 
-def test_detects_the_qythos9_analysis_block_loop():
+def test_detects_the_qwythos9_analysis_block_loop():
     # Was invisible: period 932 > the old MAX_UNIT of 700, so it was rejected
     # before repeat-counting ever ran.
     assert is_runaway_repetition(_QYTHOS_BLOCK * 4)

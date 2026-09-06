@@ -64,7 +64,7 @@ class UpdatePlan:
         raw = args.get("tasks")
         # Double-wrap: some models nest the whole call shape inside the argument
         # and send {"tasks": {"tasks": [...]}} (or with a string inside).
-        # Measured 2026-07-25 (qythos9 exec-bugfix) — the nested dict was
+        # Measured 2026-07-25 (qwythos9 exec-bugfix) — the nested dict was
         # hard-rejected, the model resent the identical shape, and the run
         # stall-died *after already solving the task*. Unwrap a single-key
         # {"tasks": X} dict to X and carry on with the value.
@@ -74,7 +74,7 @@ class UpdatePlan:
             has_status_marker(str(k)) for k in raw
         ):
             # {task_text: status} — the model marked the keys AND repeated the
-            # status in the values. Measured 2026-07-25 (qythos9 exec-bugfix):
+            # status in the values. Measured 2026-07-25 (qwythos9 exec-bugfix):
             # sent {"[ ] Run tests": "done", "[>] Fix wrap": "in progress"}. The
             # key's marker and the value can disagree; the value is the live
             # intent, so let it win *when we can read it*. Gated on every key
@@ -82,7 +82,7 @@ class UpdatePlan:
             # mistaken for a plan.
             #
             # But an unintelligible value word must NOT reset the task to open —
-            # measured 2026-07-27 (qythos9 add-test): the model sent
+            # measured 2026-07-27 (qwythos9 add-test): the model sent
             # {"[x] Create primes.py": "finished", ...}, "finished" wasn't a
             # recognized status, every task got slammed back to "[ ]", the plan
             # read 0/N done forever, and the "open plan tasks" nudge drove a

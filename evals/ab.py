@@ -28,8 +28,8 @@ have: *does the thing I just wrote help?*
 
 Usage
 -----
-    python evals/ab.py --base HEAD~1 -m qythos9 --repeat 6
-    python evals/ab.py --base v0.1.0 --cand /path/to/other/tree -m qythos9
+    python evals/ab.py --base HEAD~1 -m qwythos9 --repeat 6
+    python evals/ab.py --base v0.1.0 --cand /path/to/other/tree -m qwythos9
 
 Exit codes mirror `harness.py compare`: 0 = no regression (improved, or no
 detectable difference), 1 = the candidate is worse, 2 = the experiment did not

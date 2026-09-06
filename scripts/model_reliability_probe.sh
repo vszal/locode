@@ -4,11 +4,11 @@
 # *reliably*? Runs a canonical bug-fix task N times against a model and reports
 # the pass rate, per-run latency, and whether any chain-of-thought ("reasoning")
 # leaked into the output. This is a LIVE probe (needs the model server) — it's
-# how we caught qythos9's reasoning-runaway "hangs"; re-run it after any change
+# how we caught qwythos9's reasoning-runaway "hangs"; re-run it after any change
 # to a model's capability profile.
 #
 # Usage:   scripts/model_reliability_probe.sh <model-alias> [runs]
-# Example: scripts/model_reliability_probe.sh qythos9 5
+# Example: scripts/model_reliability_probe.sh qwythos9 5
 #
 # Exit 0 if every run passed (and nothing hung); non-zero otherwise.
 

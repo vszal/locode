@@ -1055,7 +1055,7 @@ class WriteFile:
     #
     # Keep the flat number. What is actually known, and what is not:
     #
-    # qythos9's reply length on design-doc is BIMODAL — it either obeys and
+    # qwythos9's reply length on design-doc is BIMODAL — it either obeys and
     # writes 11-14k chars, or ignores the cap and writes 33-42k, in which case
     # the reply is truncated and no document lands at all. Longest reply per
     # run, by round:

@@ -627,7 +627,7 @@ async def test_grep(ctx, tmp_path):
 
 def test_write_file_states_the_size_cap_as_a_flat_number():
     # Measured twice, in both directions. "Keep content under about 6000
-    # characters" took design-doc/qythos9 0.38 -> 0.98. Softening it to
+    # characters" took design-doc/qwythos9 0.38 -> 0.98. Softening it to
     # "write COMPLETE content ... if it would run past 8000, use append_file"
     # took the same row to 0.07, with 33-41k-char replies and not one
     # successful write_file in three runs. The flat low number is the brake;
@@ -638,7 +638,7 @@ def test_write_file_states_the_size_cap_as_a_flat_number():
     assert "append_file" in desc
 
 
-# --- inline SyntaxError feedback on .py writes (3.1: make qythos9's syntax
+# --- inline SyntaxError feedback on .py writes (3.1: make qwythos9's syntax
 # deaths legible where they happen, not later as a pytest collection traceback) ---
 
 async def test_write_py_with_syntax_error_warns_but_still_saves(ctx, tmp_path):

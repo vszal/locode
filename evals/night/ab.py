@@ -8,7 +8,7 @@ The change must be UNCOMMITTED in the working tree when this starts.
 
     python evals/night/ab.py --fix-file locode/tools/fs.py \
         --marker "parses cleanly" --cases indent-bug,undefined-vars,new-module \
-        --models gemmacoder12,qythos9 --reps 3
+        --models gemmacoder12,qwythos9 --reps 3
 
 --marker is a substring that is present ONLY in the treatment (working-tree)
 version of --fix-file; it's how each arm self-verifies it's testing what it
@@ -73,7 +73,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--marker", required=True,
                     help="substring present only in the treatment version")
     ap.add_argument("--cases", default="indent-bug,undefined-vars,new-module")
-    ap.add_argument("--models", default="gemmacoder12,qythos9")
+    ap.add_argument("--models", default="gemmacoder12,qwythos9")
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--outdir", default=str(ROOT / "evals/night/results/ab"))
     ap.add_argument("--max-iter", type=int, default=18)

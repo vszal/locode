@@ -1603,7 +1603,7 @@ def main(argv=None) -> int:
     r.add_argument("--case", action="append", default=[],
                    help="case id (repeatable); default all")
     r.add_argument("--model", action="append", default=[],
-                   help="model alias (repeatable); default qwencoder14+qythos9")
+                   help="model alias (repeatable); default qwencoder14+qwythos9")
     r.add_argument("--repeat", type=int, default=1)
     r.add_argument("--label", help="results dir name (default: timestamp)")
     r.add_argument("--clean", action="store_true",
@@ -1637,7 +1637,7 @@ def main(argv=None) -> int:
 
     args = p.parse_args(argv)
     if getattr(args, "model", None) is not None and args.cmd == "run" and not args.model:
-        args.model = ["qwencoder14", "qythos9"]
+        args.model = ["qwencoder14", "qwythos9"]
     return args.func(args)
 
 

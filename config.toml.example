@@ -35,9 +35,9 @@ memory_reserve_gb = 5.0
 
 [model]
 default = "qwen38"     # alias (or full "org/model" id) to load at startup
-#   Qwen3.8-27B 3-bit, ~11 GB. Beat qythos9 on the one eval case with
+#   Qwen3.8-27B 3-bit, ~11 GB. Beat qwythos9 on the one eval case with
 #   headroom (20/20 vs 9/20 perfect runs, p=0.0138) and finishes in fewer
-#   iterations despite decoding slower. On a 16 GB box use "qythos9".
+#   iterations despite decoding slower. On a 16 GB box use "qwythos9".
 # Per-turn generation ceiling. A whole write_file/edit_file call — the file
 # body included — must fit in ONE completion, and on a reasoning distill the
 # <think> preamble eats into the same budget, so keep this generous enough to
@@ -259,8 +259,9 @@ timing   = true            # per-turn "~tok · Ns · tok/s" trailer
 # works with no alias defined. No table is shipped in code — the starter
 # config (locode/scaffold.py) seeds a few real 4-bit MLX examples on first run,
 # including the default:
-# qythos9 = "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx"
-# qwen14  = "mlx-community/Qwen3-14B-4bit"
+# qwen38   = "lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly"
+# qwythos9 = "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx"
+# qwen14   = "mlx-community/Qwen3-14B-4bit"
 
 [thinking]
 # Per-model reasoning override: alias or model-id substring -> "on" | "off" |
@@ -268,5 +269,5 @@ timing   = true            # per-turn "~tok · Ns · tok/s" trailer
 # "on"/"off" force the chat-template enable_thinking kwarg; "auto" (the
 # implicit default for unlisted models) omits it and lets the model's own
 # template decide.
-# qythos9 = "off"
+# qwythos9 = "off"
 # devstral24 = "on"

@@ -191,7 +191,7 @@ async def test_a_plain_task_starting_with_a_bracket_still_splits_by_line():
 
 
 async def test_tool_unwraps_a_double_wrapped_dict_argument():
-    """The r15 qythos9 exec-bugfix stall: the model sent the whole call shape
+    """The r15 qwythos9 exec-bugfix stall: the model sent the whole call shape
     nested inside the argument — {"tasks": {"tasks": [...]}}. The old code
     hard-rejected the dict, the model resent the identical shape, and the run
     stall-died AFTER already solving the task. Unwrap the single-key wrapper."""
@@ -239,7 +239,7 @@ async def test_tool_recovers_a_well_formed_json_object_string():
 
 
 async def test_tool_recovers_a_task_to_status_dict():
-    """The r16 qythos9 shape: the model sent a dict mapping marked task text to a
+    """The r16 qwythos9 shape: the model sent a dict mapping marked task text to a
     status word — {"[ ] Run tests": "done", "[>] Fix wrap": "in progress"}. The
     key marker and the value disagree; the value is the live intent and must win,
     or the task stays open forever and the completion gate never lets the turn
@@ -261,7 +261,7 @@ async def test_tool_recovers_a_task_to_status_dict():
 
 
 async def test_tool_recovers_task_status_dict_with_synonym_values():
-    """The r27 qythos9 add-test shape: {"[x] ...": "finished", ...}. "finished"
+    """The r27 qwythos9 add-test shape: {"[x] ...": "finished", ...}. "finished"
     is a done-synonym the marker table didn't used to know, and the old code
     reset every such task to open — the plan read 0/N done forever, the "open
     plan tasks" nudge fired, and a green, finished task was driven into a

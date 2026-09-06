@@ -46,7 +46,7 @@ is the model's ordinary business — for everything else.
 
 NOT SHIPPED (2026-08-26). `ENABLED` is False and `hint()` is therefore inert in
 the live path. The case built to grade this — `evals/cases/git-url-empty` —
-fired the trap **0 times in 12 runs** against the pre-fix build: qythos9 either
+fired the trap **0 times in 12 runs** against the pre-fix build: qwythos9 either
 clones the URL (4/12) or strips it to a basename and runs
 `git ls-tree -r upstream.git`, which fails LOUDLY and which no URL detector can
 see (6/12). By rule 17 the lever has not been tested and by rule 7 it does not

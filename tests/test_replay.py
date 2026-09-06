@@ -63,7 +63,7 @@ def test_call_key_distinguishes_different_args():
 # --- summarize ----------------------------------------------------------------
 def test_summarize_counts_repeats_fails_noops_and_saves():
     events = [
-        {"phase": "turn_start", "model": "qythos9"},
+        {"phase": "turn_start", "model": "qwythos9"},
         {"phase": "iteration", "n": 1},
         _run("edit_file", path="f.py", old="a", new="b"),
         _result("edit_file", "`old` not found in f.py", error=True),      # fail
@@ -77,7 +77,7 @@ def test_summarize_counts_repeats_fails_noops_and_saves():
         {"phase": "stopped", "reason": "no progress", "t": 9.0},
     ]
     s = replay.summarize(events)
-    assert s["model"] == "qythos9"
+    assert s["model"] == "qwythos9"
     assert s["iterations"] == 2
     assert s["tool_calls"] == 3
     assert s["repeats"] == 1

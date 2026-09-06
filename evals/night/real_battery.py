@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Realistic-task battery: the *lived interactive experience* probe.
 
-The night battery (run_battery.py) is saturated for qythos9 — 31/31 clean at
+The night battery (run_battery.py) is saturated for qwythos9 — 31/31 clean at
 f0 n0 r0 in recent sweeps — while the user reports the same model is "basically
 not usable" on simple real tasks. That gap is the point of this file. Every
 run_battery case is a 2-50 line synthetic file, names the file to edit, and
@@ -15,7 +15,7 @@ Each case here is a small but *real* multi-file package where the model must:
 
 Same runner contract as run_battery.py so replay.py/watch.sh work unchanged.
 
-    python evals/night/real_battery.py --models qythos9 \
+    python evals/night/real_battery.py --models qwythos9 \
         --outdir evals/night/results/real1 [--cases locate-symptom] [--reps 3]
 """
 
@@ -434,7 +434,7 @@ def _case_long_context_find():
     # the 100k default this fixture compacts exactly once, right at the end,
     # which would stop being true if the fixture or the default ever drifts.
     # Not trimmed further -- at 40k it compacted after every second read, and
-    # qythos9 responded by inventing notes/golf.py ... notes/tango.py and
+    # qwythos9 responded by inventing notes/golf.py ... notes/tango.py and
     # burning nine iterations on files that never existed. That is a real
     # finding (see the consecutive-error gap in the notes below) but it is a
     # harsher regime than production, and this case is meant to measure
@@ -485,7 +485,7 @@ if __name__ == "__main__":
 def _case_empty_query_diagnosis():
     """Diagnose a bug whose only evidence is that queries come back EMPTY.
 
-    Modelled on a real qythos9 failure. SOURCE_PATH names a directory that
+    Modelled on a real qwythos9 failure. SOURCE_PATH names a directory that
     exists but holds nothing -- the upstream files actually live one level up.
     So the script walks an empty tree, finds no files, and cheerfully prints
     "no differences". Nothing errors anywhere: the script exits 0, and every
@@ -600,7 +600,7 @@ def _problem(row: dict) -> bool:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--models", default="qythos9")
+    ap.add_argument("--models", default="qwythos9")
     ap.add_argument("--cases", default=",".join(CASES))
     ap.add_argument("--reps", type=int, default=1)
     ap.add_argument("--outdir", required=True)

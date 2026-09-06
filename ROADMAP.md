@@ -33,7 +33,7 @@ are user-visible and waste whole generations.*
     `max_repetition_aborts`. Catches short-phrase AND ~330-char sentence-level
     loops. *Caveat: thresholds are conservative but unvalidated against a full
     sweep — confirm no false-positive aborts on real cases before trusting it.*
-  - `[x]` **1.1c Paragraph-scale loops** — *user-observed 2026-08-02 on qythos9;
+  - `[x]` **1.1c Paragraph-scale loops** — *user-observed 2026-08-02 on qwythos9;
     build 72.* The conservative thresholds had a hole big enough to miss a live
     loop: a **932-char analysis block** ("Based on the error and the context…
     Let me look at the exact code") re-emitted verbatim for 241.9s until the
@@ -82,10 +82,10 @@ are user-visible and waste whole generations.*
   20 → 1** — the target metric essentially eliminated. *Caveat: task scores
   barely moved (exec-bugfix qwencoder14 0.25 → 0.29) — landing edits is not the
   same as computing correct fixes; the capability wall is real (see 3.1). And
-  qythos9 looks slightly worse (edit fail 24% → 32%, unrecovered no-ops 3 → 9,
+  qwythos9 looks slightly worse (edit fail 24% → 32%, unrecovered no-ops 3 → 9,
   score 1.00 → 0.92 / e2e 0.76 → 0.60), but n=6 (was 8) and it is concentrated
   in the wallclock-death e2e case — plausibly noise, not confirmed. Worth a
-  re-check if qythos9 edit reliability shows up again.*
+  re-check if qwythos9 edit reliability shows up again.*
 - `[x]` **1.5 Silent false-success no-op edits** — *found 2026-07-24 while
   trying gemmacoder12; user-reported "old==new, same as every model".* Distinct
   from 1.4's exact `old==new` (already caught): the **whitespace-tolerant** (and
@@ -107,19 +107,19 @@ are user-visible and waste whole generations.*
   already strips copied line-number prefixes, so echoing them back is safe.
   +2 fs tests (535 green). *Sweep-validated in r15-editecho (see below).*
 - `[x]` **1.5/1.6 sweep validation (r15-editecho vs r13-edithelp)** — same 2
-  edit-heavy cases × qwencoder14+qythos9 × n=6, build 28. **Mechanisms confirmed
+  edit-heavy cases × qwencoder14+qwythos9 × n=6, build 28. **Mechanisms confirmed
   live:** the build-28 echo fired on 100% of successful edits (108/108); the
   build-27 `noop` status caught 14 silent indent-only no-ops on qwencoder14 (0 on
-  qythos9, which doesn't do them). **Scores: 3 of 4 cells improved** — the target
+  qwythos9, which doesn't do them). **Scores: 3 of 4 cells improved** — the target
   cell most: exec-bugfix qwencoder14 **0.29→0.50, clean-finish 1/6→3/6**;
-  e2e-spec-to-code +0.07 (qwen) / +0.13 (qythos). **1 cell regressed:**
-  exec-bugfix qythos9 0.92→0.75, clean 5/6→0/6 — but *every* run repeat-stopped
+  e2e-spec-to-code +0.07 (qwen) / +0.13 (qwythos). **1 cell regressed:**
+  exec-bugfix qwythos9 0.92→0.75, clean 5/6→0/6 — but *every* run repeat-stopped
   and **3 scored 1.00 (solved) then got killed post-solve**, via two pre-existing
   loop pathologies (not the echo/noop mechanisms): see 1.7. Attribution: the
   regression is variance surfacing old fragilities at n=6, not the 27/28
   mechanisms, which fired correctly.
 - `[x]` **1.7 update_plan double-wrap kills solved runs** — *found 2026-07-25 in
-  the r15 qythos9 exec-bugfix regression.* The model, having already made pytest
+  the r15 qwythos9 exec-bugfix regression.* The model, having already made pytest
   green, tried to mark its plan done but sent the whole call shape nested inside
   the argument: `{"tasks": {"tasks": [...]}}` (dict) or its truncated string half
   `{"tasks": "[ ] run tests"`. The dict form was **hard-rejected** (model resent
@@ -129,7 +129,7 @@ are user-visible and waste whole generations.*
   single-key `{"tasks": X}` wrapper, parses `{`-prefixed JSON strings and pulls
   out their inner `tasks`, and rejects an unrecoverable JSON-object string with
   the real array shape instead of false-accepting it. +4 plan tests (539 green).
-  **Validated (r16-planfix, build 29, exec-bugfix × 2 models × n=6):** qythos9
+  **Validated (r16-planfix, build 29, exec-bugfix × 2 models × n=6):** qwythos9
   fully recovered to the r13 baseline — **0.75→0.92, clean-finish 0/6→5/6**, same
   score vector as r13; the double-wrap recovery fired live in 4 runs (`0/1 → 1/1
   done` → clean finish). qwencoder14 held at 0.46 (>> r13's 0.29; its 5/6
@@ -144,7 +144,7 @@ are user-visible and waste whole generations.*
   Gated on all-keys-marked so an ordinary object isn't mistaken for a plan.
   +2 plan tests (541 green).
 - `[x]` **1.7c update_plan word-value reset (build 51, 2026-07-27)** — 1.7b let the
-  *value* win, but only when it was a single-char/known marker. r27 qythos9 sent
+  *value* win, but only when it was a single-char/known marker. r27 qwythos9 sent
   **word** values — `{"[x] Create primes.py": "finished"}` — and "finished" wasn't
   in `_MARKERS`, so the recovery discarded the key's `[x]` and reset every task to
   open → plan stuck `0/N` → open-tasks nudge drove a green, finished task to a
@@ -233,7 +233,7 @@ are user-visible and waste whole generations.*
 - ~~`[!]`~~ **2.4 (original entry)** — *evidence
   hardened 2026-07-25 (Round 21, D75).* A historical score from another session
   is **not a valid baseline** for a sweep run today: build 30 scored 0.62 on
-  exec-bugfix qythos9 in the r26 session vs 0.92 in its own r13/r16/r19 sessions —
+  exec-bugfix qwythos9 in the r26 session vs 0.92 in its own r13/r16/r19 sessions —
   pure model non-stationarity, same code. So a single sweep vs a saved baseline
   cannot distinguish a real regression from session drift (exactly the two sweeps
   Round 21 spent proving a "0.92→0.50 regression" was noise). The fix is to run
@@ -273,12 +273,12 @@ the lived experience.*
   signal) went from whisper-dim `…` to a visible yellow `⟳` — they read as
   warnings now, not reassurance. `render.format_turn_summary`.
 - `[x]` **4.3 Out-of-box model default.** Flipped the built-in default from
-  qwen14 to **qythos9**, the reliable editor (84% edit success vs 58%; no no-op
+  qwen14 to **qwythos9**, the reliable editor (84% edit success vs 58%; no no-op
   dead-ends). Slower 9B that can hit the generation cap on large writes, but
   editing reliability dominates interactive use. Landed in config.py,
   scaffold.py, config.toml.example, test_config.py (build 26). User decision.
 - `[x]` **4.15 The compaction ratchet + the guards that fought it (builds
-  58-61, 2026-08-01).** User: qythos9 "still falls into repeat loops, stops
+  58-61, 2026-08-01).** User: qwythos9 "still falls into repeat loops, stops
   before plans are finished ... basically not usable" — then supplied a real
   failing session (`~/Code/skills`, `sync_gke_compute_classes.py`). The eval
   said 31/31 clean. Both were true: **every battery case finished far below the
@@ -324,10 +324,10 @@ the lived experience.*
     sweeps. New `evals/night/real_battery.py` case `long-context-find`: six
     ~15k handler modules where the target is identified by *behaviour* (one
     handler reports its neighbour's name in `handled_by`) so no grep can
-    shortcut the reading. qythos9 passes it — reads all six, localizes
+    shortcut the reading. qwythos9 passes it — reads all six, localizes
     correctly, lands the edit on the far side of a compaction.
 - `[x]` **4.16 Consecutive-error guard (build 63).** Surfaced by 4.15's case:
-  after compaction dropped the file contents, qythos9 invented `notes/golf.py`
+  after compaction dropped the file contents, qwythos9 invented `notes/golf.py`
   … `notes/tango.py` and burned **nine consecutive iterations** on files that
   never existed. Nothing stopped it. The repeat guard couldn't (each path is
   genuinely a new call); `max_error_stall` couldn't either, because it keys on
@@ -361,7 +361,7 @@ the lived experience.*
 - `[x]` **4.18 No-information guard (build 65).** From a second live report, and
   a failure mode *none* of the guards above could see: every one of them keys on
   something going **wrong**. Transcript: asked to diagnose why a sync script
-  detects no differences, qythos9 read `SOURCE_PATH = "skills/cloud/…"` out of
+  detects no differences, qwythos9 read `SOURCE_PATH = "skills/cloud/…"` out of
   the script and went looking for that path in git — `ls-remote <url> <path>`,
   `ls-tree -r HEAD <path>`, the same with `2>&1`, the same again. Six
   consecutive **exit-0, empty** results, four byte-identical, until the repeat
@@ -495,7 +495,7 @@ the lived experience.*
     no attribute 'lower'` when a model emitted `cmd` as an argv list — now
     coerced. Paired A/B (stash-toggle, crash-free re-run, syntax-fix+logic-bug ×
     2 models × 5 reps): **target case gemmacoder12 syntax-fix 0/5 → 4/5 done**;
-    qythos9 **5/5 both arms** (zero false-fire); logic-bug unaffected. Extra iters
+    qwythos9 **5/5 both arms** (zero false-fire); logic-bug unaffected. Extra iters
     (4.0→5.1) are the gate making the model *work* instead of falsely quitting in
     2 iterations; the 2 treatment repeat-stops are one benign post-fix re-verify +
     one run that also failed in control (not gate-induced). +6 tests, suite 637.
@@ -503,12 +503,12 @@ the lived experience.*
     reflected the model's (wrong) belief, which the verify gate now corrects at
     source. LOG Round 27.
 - `[x]` **4.14 The "open plan tasks" re-do loop — two root causes (2026-07-27).**
-  Same symptom both times: qythos9 flails to a **repeat-stop re-doing a GREEN,
+  Same symptom both times: qwythos9 flails to a **repeat-stop re-doing a GREEN,
   finished `add-test` task** because the plan never reads complete, so the
   open-tasks nudge fires forever. Found by reading pass3 + ab_plandict transcripts
   (D87). Full method in LOG Rounds 28–29.
   - **build 51 (9249bdf):** `update_plan` `{task: status}` recovery reset every
-    task to OPEN when the dict *value* was an unrecognized status word — qythos9
+    task to OPEN when the dict *value* was an unrecognized status word — qwythos9
     sent `{"[x] Create primes.py": "finished"}`, "finished" wasn't in `_MARKERS`,
     so the key's `[x]` was discarded and the plan stuck at `0/N` forever. Fix:
     finished/complete/completed/not-started/in_progress/started synonyms; new
@@ -638,14 +638,14 @@ the lived experience.*
   harder trades false-positives against legitimate work. Revisit if a stronger
   base model changes the capability picture.
   - **Update 2026-07-25 (build 37, `r20-replacelines-live`): one deterministic
-    convergence win; no new harness lever.** The default model (qythos9) was
+    convergence win; no new harness lever.** The default model (qwythos9) was
     failing a trivial raw-error bugfix **6/6** because its correct `edit_file`
     call, emitted as single-quoted JSON with a dropped closing `'`, left a
     trailing `}}` whose unterminated string swallowed the closing tool fence —
     `_closing_fence` dropped the whole call and the turn ended with the fix
     unexecuted. Build 37's parser recovery (`_closing_fence` EOF-in-string +
     `_strip_structural_tail`) took the blindprobe **6/6 BROKEN → 6/6 OK** and
-    lifted exec-bugfix qythos9 0.92 → **1.00** (consistent across every sweep —
+    lifted exec-bugfix qwythos9 0.92 → **1.00** (consistent across every sweep —
     a real, deterministic fix). Separately, the eval had never auto-approved
     `replace_lines` (build 34's `edit_file` fallback); fixed on principle across
     the default list + all six pinned case allowlists (a real product tool the
@@ -702,7 +702,7 @@ the lived experience.*
     "already done" — non-error, and explicitly steers OFF line numbers. Validated
     gemma 6/6 clean with ZERO flail; combined 11/11 on a former ~80%-fail case.
     Also fixed an eval-harness bug the sweep exposed (append_file missing from the
-    battery allowlist → false qythos9 Traceback). (LOG Round 41.)
+    battery allowlist → false qwythos9 Traceback). (LOG Round 41.)
   - **Update 2026-07-28 (post-build-57, no code change): stability probe →
     lever-#3 evidence.** A reps=3 probe on the 4 "benign flail" cases confirmed
     append-func/deep-nest/remove-block flails ALWAYS end correct (repeat-guard
@@ -715,7 +715,7 @@ the lived experience.*
     target — logged as accumulating justification. **Lever #3 remains
     unbuilt/unapproved; needs explicit user OK before building.** Also reworded
     the insert-const case (harness-only) to remove a "comma-space" literal-string
-    trap that produced a false-negative qythos9 signal. (LOG Rounds 42–43.)
+    trap that produced a false-negative qwythos9 signal. (LOG Rounds 42–43.)
   - **Update 2026-08-02 (build 80, BUILT → MEASURED → REVERTED): rewording the
     silent-rc0 message does NOT buy a clean finish. Do not retry this lever.**
     Hypothesis: on syntax-fix the model fixes the file, runs `py_compile`, gets
@@ -6224,7 +6224,7 @@ locode, which is a little pointed.
     applied). It iterates `edit → pytest` ~5× with identical failures, then the
     loop correctly kills it as no-progress. Nothing the harness can do — it can't
     write the coercion for the model.
-  - **qythos9 — broken syntax / hallucinated stdlib.** 3/6 runs die on
+  - **qwythos9 — broken syntax / hallucinated stdlib.** 3/6 runs die on
     `SyntaxError` (`invalid syntax`, `unexpected character after line
     continuation`); one used `tomllib.dumps` (does not exist). The file will not
     even import, so pytest shows an opaque *collection* traceback
@@ -6233,33 +6233,33 @@ locode, which is a little pointed.
     harness-actionable lever: `write_file`/`append_file`/`edit_file` now
     `compile()` any `.py` result and append a one-line `SyntaxError at line N:
     <msg>` warning to the *successful* result (advisory, never an error — a
-    half-built file may not parse yet). Turns qythos9's frozen-importlib death
+    half-built file may not parse yet). Turns qwythos9's frozen-importlib death
     into a legible, located signal one call after the mistake. +6 tests.
     **Measured (r14-syntax vs r13, e2e, n=6): the mechanism works but does not
-    lift the score.** qythos9 runs that reached pytest with a SyntaxError
+    lift the score.** qwythos9 runs that reached pytest with a SyntaxError
     dropped **5/6 → 0/6** (the inline warning fired in 3 runs; the model fixed
     the syntax before running tests every time) — a real robustness win, worth
     keeping. But `own_tests_pass`/`independent_spec_check` stayed **0/12**:
     removing the syntax roadblock just exposed that the code is *also* logically
     wrong. The wall moved from "won't parse" to "parses but wrong." The apparent
     overall gain (0.61 → 0.69) is doc-stage variance (`plan_has_tasks` swung
-    0/6→6/6 for qwencoder14, the opposite for qythos9), NOT the lever — do not
+    0/6→6/6 for qwencoder14, the opposite for qwythos9), NOT the lever — do not
     credit it (see 2.1).
 - **3.1 conclusion: capability-bound; harness levers exhausted.** own_tests_pass
   and independent_spec_check are 0/12 across both r13 and r14. The doc stages are
   near-maxed and stage 3 is model reasoning — qwencoder14 can't compute
-  coercion/precedence, qythos9's code doesn't pass even once it parses. Further
+  coercion/precedence, qwythos9's code doesn't pass even once it parses. Further
   e2e gains need a stronger executor model, not more harness code. Keep 3.1a on
   its own general merit; stop spending harness effort chasing this case's score.
   - **Update 2026-07-25 (build 40, r22/r23): a bigger LOCAL model does NOT clear
     the wall.** Tested the "stronger executor" claim directly with devstral24
     (Mistral-Small 24B) n=6 on both hard cases. e2e: mean 0.74 (right in the
     incumbent band), and `own_tests_pass` = **0/5**, `independent_spec_check` =
-    **0/5** — the identical failure to qwencoder14/qythos9 (both 0/6 on every
+    **0/5** — the identical failure to qwencoder14/qwythos9 (both 0/6 on every
     recent e2e sweep). The wall is **model-size-invariant across the local
     pool**: all three write plausible code with wrong logic. exec-stall-trap:
     devstral24 no-ops (0 tool calls, 0/6 pass) and is strictly worse than
-    qythos9, which already solves that case (≈0.98, 8/8). Closes the "just run a
+    qwythos9, which already solves that case (≈0.98, 8/8). Closes the "just run a
     bigger local model" hypothesis — the payoff is in harness levers
     (visibility 4.5, seen-green gate 4.6), not model-swapping. LOG Round 19,
     D71/D72.
@@ -6273,7 +6273,7 @@ locode, which is a little pointed.
   validated: qwencoder14 unrecovered no-op dead-ends 20 → 1, edit fail rate
   41% → 20%. Task scores unmoved (capability wall → 3.1).
 - **3.1a Inline `.py` SyntaxError feedback** (build 22, 2026-07-24) — validated:
-  qythos9 pytest-SyntaxError deaths 5/6 → 0/6. Kept on general merit; did NOT
+  qwythos9 pytest-SyntaxError deaths 5/6 → 0/6. Kept on general merit; did NOT
   lift the e2e score (own_tests_pass 0/12 both rounds — capability-bound).
 - **4.1 + 4.2 Interactive visibility** (build 23, 2026-07-24) — live plan
   checklist, end-of-turn summary, louder nudges. +9 tests. Directly targets the
@@ -8663,7 +8663,7 @@ measured, which is the only way a defect this old goes undetected for a week.
 The report was one sentence: *"I don't know what's been improved. Qythos just
 quits on me."* Attached was a live session. The request was to fix one bug in
 one file — `sync_gke_compute_classes.py`, a script that syncs a skills repo.
-What qythos9 did:
+What qwythos9 did:
 
 1. read the file;
 2. called `update_plan` with **six** tasks. Items 1–5 were *the script's own
@@ -8793,7 +8793,7 @@ defect.
 
 ### Verdict: the primary is won, and the bonus metric is a trap
 
-`grade_planhijack.py`, blinded 6 v 6, `qythos9`, against the user's real file:
+`grade_planhijack.py`, blinded 6 v 6, `qwythos9`, against the user's real file:
 
 | metric | A (shipped) | B (candidate) |
 |---|---|---|
@@ -8921,7 +8921,7 @@ test suite — so before treating it as a capability ceiling, the same bug shape
 was run through `plan-hijack`, where `test_syncdirs.py` pins the behaviour and 4
 of 6 tests fail on the seed.
 
-`b134-planhijack-base`, `qythos9`, n=8, build 134:
+`b134-planhijack-base`, `qwythos9`, n=8, build 134:
 
 | check | result |
 |---|---|
@@ -9059,7 +9059,7 @@ on a lever result.
 
 ## 5.113 — The case that scored the same on both sides of its own fix
 
-`plan-hijack` was built in 5.109 from a live failure: qythos9, asked to fix one
+`plan-hijack` was built in 5.109 from a live failure: qwythos9, asked to fix one
 bug in one file, copied the file's five-step docstring workflow into
 `update_plan`, appended the user's request as item 6, worked item 1 until the
 repeat guard ended the turn. The fix went into `tools/plan.py` — two paragraphs
@@ -9149,7 +9149,7 @@ guard, since its silence still reads as consent.
 
 ## 5.114 — The rebuilt case discriminates, and the aggregate score does not
 
-Both arms, n=8, same rebuilt seed, `qythos9`. The pre-fix arm is the frozen tree
+Both arms, n=8, same rebuilt seed, `qwythos9`. The pre-fix arm is the frozen tree
 whose `tools/plan.py` lacks the 5.109 paragraphs; nothing else that the model can
 reach differs (the `loop.py`/`config.py` delta is the 5.112 lever, default off).
 
@@ -9233,7 +9233,7 @@ Rule 61 still applies to both: n=12 licenses a direction, not a magnitude.
 
 ## 5.115 — The metric with headroom is the one the lever is actually about
 
-`bugfix-notest`, `qythos9`, n=8, before and after the 5.112 hardening:
+`bugfix-notest`, `qwythos9`, n=8, before and after the 5.112 hardening:
 
 | | as built | docstring softened |
 |---|---|---|
@@ -9294,7 +9294,7 @@ output to the request, and this lever is the cheapest way to find that out.
 
 ## 5.116 — `require_run_before_edit` converts, and breaches its own cost cap
 
-`bugfix-notest`, `qythos9`, n=12 paired, arms differing by one line
+`bugfix-notest`, `qwythos9`, n=12 paired, arms differing by one line
 (`require_run_before_edit`), frozen as separate trees per Rule 70. An A/A on the
 same case, model and n was taken the same day and returned **−0.012**
 (W0/L1/T11), so the noise floor is measured, not assumed.
@@ -9449,7 +9449,7 @@ than as another attempt:
 | `plan-hijack` | the script cannot be run at all |
 | `repro-only` | found by reading, 12/12 |
 
-**qythos9 reads code well. What it does not do is run it.** So a defect that a
+**qwythos9 reads code well. What it does not do is run it.** So a defect that a
 *careful reader* could catch is not a test of reproduction, no matter how subtle
 it looks to the person writing the seed — and my estimate of "subtle" has now
 been wrong twice in the same direction. A defect that reading genuinely cannot
@@ -9502,7 +9502,7 @@ was applied, and the whole thing came apart.
 
     trap fired (URL handed to a local-only git command)     0 / 12
 
-Not "rare". Zero. qythos9 does one of exactly two things with a repo URL:
+Not "rare". Zero. qwythos9 does one of exactly two things with a repo URL:
 
   * **Clones and answers perfectly — 4/12.** `git clone git://... upstream`,
     then reads the files out of the clone. There is nothing here to fix.
@@ -9599,7 +9599,7 @@ Rule 57 applies before anyone gates on a per-run rate from this case.
 
 `bugfix-notest`, `plan-hijack`, `repro-only`, `git-url-empty`. Four cases built
 to trap this model, four that measured something else instead. The 08-15 reading
-was "qythos9 reads code well; it does not run it". This one extends it: handed a
+was "qwythos9 reads code well; it does not run it". This one extends it: handed a
 remote, it also does the RIGHT thing more often than the wrong one. My estimate
 of what is subtle enough to trap it has now been wrong four times, in the same
 direction each time. Build 136 still rests on `bugfix-notest` alone.
@@ -9649,7 +9649,7 @@ the last one.
 
 ## 5.121 — the error-path lever, killed by the archive before it was built
 
-The 08-26 resume named the error-path finding as the next lever: qythos9 gets
+The 08-26 resume named the error-path finding as the next lever: qwythos9 gets
 `fatal: Not a valid object name upstream.git`, a specific and complete error,
 and re-issues the identical command. `_nudge_repeat` is what fires there, and
 it looked like the textbook 0b shape — four competing demands in one message
@@ -9836,21 +9836,21 @@ compute the answer:
     SAME call with `start: 12`", not "re-read the file and extend the region".
  4. Per lever 0f, none of this goes in the tool description.
 
-**GATED — do not build yet.** Exposure is **qwencoder14's, not qythos9's**.
-qythos9 makes **0** `replace_lines` calls in 94 archived runs. That looks
+**GATED — do not build yet.** Exposure is **qwencoder14's, not qwythos9's**.
+qwythos9 makes **0** `replace_lines` calls in 94 archived runs. That looks
 fatal but is not evidence: those runs are 48 bugfix-notest / 24 repro-only /
 22 plan-hijack and only **2** exec-bugfix, the case generating 217 of the 245
 events. Zero out of two is no information, and shipping on the strength of the
 qwencoder14 number would repeat the git-URL lever's 0/12 (rule 17).
 
-Next action is therefore a cheap exposure probe, not a build: qythos9 on
+Next action is therefore a cheap exposure probe, not a build: qwythos9 on
 exec-bugfix at n=12, counting `replace_lines` calls and stranded-tail
 rejections. If it does not reach for the tool the lever is moot on the default
 model; if it does, the design above is pre-registered and ready.
 
-## 5.124 — the exposure probe answers: qythos9 never reaches the branch
+## 5.124 — the exposure probe answers: qwythos9 never reaches the branch
 
-The gate 5.123 pre-registered. `b139-qythos9-exposure`: qythos9 × exec-bugfix,
+The gate 5.123 pre-registered. `b139-qwythos9-exposure`: qwythos9 × exec-bugfix,
 n=12, build 139, the case that generated 217 of the 245 stranded-tail events.
 Decision rule, written before the run: *if it does not reach for
 `replace_lines` the lever is moot on the default model; if it does, build the
@@ -9865,7 +9865,7 @@ The sharper fact is one layer up. **All 48 `edit_file` calls succeeded — zero
 edit failures in the sweep.** Every one of the 44 tool errors is `bash`, and
 every one of those is a failing `pytest`, which is the case working exactly as
 designed. So `_replace_lines_route` (fs.py:591), the steer that hands the model
-`replace_lines` after an `old`-match failure, **fired zero times**. qythos9
+`replace_lines` after an `old`-match failure, **fired zero times**. qwythos9
 never called the escape hatch because it never needed one.
 
 That is the whole disposition. The stranded-tail branch is real, it is 0/181,
@@ -9884,7 +9884,7 @@ without leaving a trace in the fallback's own numbers; count the upstream
 failures that route into it before scoping a fix to it.** This is the lesson
 5.122 walked past: the 245 events were mined from an archive pooled across
 *models* — the ambiguous-match win (0% → 88%) and edit_file's reliability
-on qythos9 drained the population that feeds `replace_lines`, and drained it
+on qwythos9 drained the population that feeds `replace_lines`, and drained it
 without leaving one trace in `replace_lines`'s own numbers. Rule 64 says don't
 rank on a rate pooled across your own fixes; rule 75 says a pooled bucket
 comparison is case mix. This is the third costume: **model mix**, and it is the
@@ -9980,7 +9980,7 @@ go astray. ROADMAP:821 records *source* teardowns of Aider/Cline/Roo/OpenHands/
 SWE-agent, but this repo had never actually **run** one. Aider is the right
 first candidate — terminal-based, edit-focused, and it drives an
 OpenAI-compatible endpoint, so it can use the identical `:8081` server and the
-identical qythos9 weights. Installed 0.86.2 into an isolated `~/.aider-venv`.
+identical qwythos9 weights. Installed 0.86.2 into an isolated `~/.aider-venv`.
 
 Twelve aider runs on `exec-bugfix` (two six-run arms), against locode's b139
 baseline of twelve. Full numbers in `evals/results/aider-compare-b139/`.
@@ -10124,7 +10124,7 @@ reading the two columns as if they were symmetric.
 
 ### What is still open
 
-The remaining `exec-bugfix` failure mode is untouched by any of this: qythos9
+The remaining `exec-bugfix` failure mode is untouched by any of this: qwythos9
 grinds on `truncate`'s exact-limit case, emits `same failure (3 runs in a row)`,
 and the loop stops it after 8 unproductive iterations. That is the genuine
 "goes astray" instance the original complaint was about, it survives build 141,
@@ -10132,7 +10132,7 @@ and it is the next target.
 
 ## §5.128 — the revert: an edit that puts a file back to a tested version
 
-§5.127 left one thing open — qythos9 grinds on `truncate`'s exact-limit case and
+§5.127 left one thing open — qwythos9 grinds on `truncate`'s exact-limit case and
 the loop stops it after 8 unproductive iterations. Reading that trajectory
 (b141 `exec-bugfix` r4) gives the mechanism, and it is embarrassingly simple:
 
@@ -10235,7 +10235,7 @@ is checkable and checked.
 
 ## §5.129 — ARM E: the safety result, and two firings read in full
 
-ARM E (frozen b142, qythos9) against ARM D (frozen b141, qythos9):
+ARM E (frozen b142, qwythos9) against ARM D (frozen b141, qwythos9):
 
 | case | ARM D score / iters / stops | ARM E score / iters / stops | revert notes |
 |---|---|---|---|
@@ -10246,7 +10246,7 @@ ARM E (frozen b142, qythos9) against ARM D (frozen b141, qythos9):
 Two firings, both on `exec-bugfix`, against a P1 prediction of ~7. The
 prediction was computed on an archive that is 72% `qwencoder14`, and the
 revert pathology is overwhelmingly that model's (22% of 1672 runs, against 2%
-of 597 for qythos9) — so the shortfall is the model-mismatch of §5.128's
+of 597 for qwythos9) — so the shortfall is the model-mismatch of §5.128's
 amendment showing up in the count, not a defect in the detector. P1 is not
 gradeable here; P1′ moves to the qwencoder14 arms.
 
@@ -10328,7 +10328,7 @@ next e2e sweep will be readable.
 Eleven of twelve `e2e-spec-to-code` runs failed `plan_has_tasks`. The plans are
 not the problem. The prompt asks for "milestones, each broken into numbered
 tasks, each task naming the file it touches and how it will be verified", and
-what qythos9 writes is:
+what qwythos9 writes is:
 
 ```
 ### Task 1.1 – Create envcfg.py with imports and ConfigError
@@ -10404,7 +10404,7 @@ before reading a delta, which is rule 81.
 ## §5.133 — ARM F, and a correction to §5.132
 
 ARM F (frozen b141, qwencoder14, the control) finished. It is a far harsher arm
-than anything qythos9 produced:
+than anything qwythos9 produced:
 
 | case | n | score | iters | stopped | revert exposure | firings |
 |---|---|---|---|---|---|---|
@@ -10418,7 +10418,7 @@ build must produce.
 
 **Exposure across the arm is 40 runs of 62, with 79 firings.** P1′ asked for
 ten notes across the three cases; ARM G should see roughly eight times that.
-The qythos9 A/B was not a small effect — it was the wrong population, and this
+The qwythos9 A/B was not a small effect — it was the wrong population, and this
 is the size of the right one.
 
 **Correction to §5.132.** That section said `did_not_edit_tests` had never once
@@ -10426,7 +10426,7 @@ failed, 232/232. ARM F breaks it: r22 and r26 edited the tests, and r15 and r25
 broke `suite_intact`. Both guards fired for the first time in the archive, and
 both on the same weaker model. The rule 81 arithmetic still holds for the runs
 it was computed over, but the claim it rested on — that this check is a fixed
-floor — was true only of qythos9. A tripwire that has never fired has not been
+floor — was true only of qwythos9. A tripwire that has never fired has not been
 shown to be inert; it may only mean the archive was built on models good enough
 not to trip it. That is worth more than the floor correction: it is the same
 mistake as §5.128's, one level up. An always-true observation drawn from a
@@ -10480,7 +10480,7 @@ denominator is every firing above — in this run, all five are (b).
 ## §5.134 — the detector was counting edits that never landed
 
 `revert_exposure.py` was committed claiming it "reproduces the live note
-exactly", on the strength of matching b142/qythos9 at 2 firings. On ARM G it
+exactly", on the strength of matching b142/qwythos9 at 2 firings. On ARM G it
 reported 29 where the loop emitted 20. The claim was true of the arm it was
 checked against and false in general — the same shape of error as §5.128 and
 §5.133, for the third time tonight.
@@ -10489,7 +10489,7 @@ Cause: `loop.py` records an edit's `(old, new)` pair only under
 `not res.is_error`. A rejected edit — stale `old`, file not yet read — never
 enters the history, so nothing can revert *to* it. The mirror counted every
 `edit_file` call. On qwencoder14 that matters enormously: **69 of 111
-`edit_file` calls are rejected**, against a handful on qythos9, which is exactly
+`edit_file` calls are rejected**, against a handful on qwythos9, which is exactly
 why the discrepancy hid on the arm the tool was validated against.
 
 Fixed by pairing each edit with its result event and skipping any with
@@ -10505,7 +10505,7 @@ Fixed by pairing each edit with its result event and skipping any with
 | ARM F `e2e` | 2 runs (17%), 6 firings | **2 (17%), 6** |
 | ARM F total | 40 of 62, 79 firings | **26 of 62, 65 firings** |
 
-The qythos9 arms are unchanged — on that model almost every edit lands, so the
+The qwythos9 arms are unchanged — on that model almost every edit lands, so the
 two rules agree. P1′ still clears by a wide margin. The 62%-rejected-edit rate
 on qwencoder14 is a finding in its own right and is not what this build was
 built to address.
@@ -10542,7 +10542,7 @@ The pre-registered predictions, graded honestly:
   cycle, and it is not scored as a pass.
 
 **Why it is inert** is now well supported: the note addresses a gap between
-*exposure* and *capability* that no tested model occupies. `qythos9` escapes the
+*exposure* and *capability* that no tested model occupies. `qwythos9` escapes the
 revert cycle unaided 71% of the time and is exposed only 13%. `qwencoder14` is
 exposed 43–55% but emits a novel value 0–5% of the time with the note or
 without it. Telling a model it has gone in a circle does not supply the idea it
@@ -10577,25 +10577,25 @@ Coined **rule 83**.
 ## §5.136 — the aider comparison table, completed at build 142
 
 Stage 3 ran the two missing cases against the frozen build-142 worktree on
-`qythos9`, completing the head-to-head. Per rule 79 aider is deterministic on
+`qwythos9`, completing the head-to-head. Per rule 79 aider is deterministic on
 these cases, so its column is banked from the b141 sweep and only locode's
 numbers were re-measured.
 
-| case | locode (qythos9, b142) | aider | aider edits applied |
+| case | locode (qwythos9, b142) | aider | aider edits applied |
 |---|---|---|---|
 | exec-bugfix | 0.967 (n=30) | **1.000** | — |
 | exec-ambig | **1.000** | 0.500 | 0/6 |
 | exec-pinpoint | **1.000** (n=12) | 0.500 | 0/6 |
 | repro-only | **0.717** (n=20) | 0.500 | 2 per run |
 
-Three decisive wins, one narrow loss. **All locode numbers here are `qythos9`.**
+Three decisive wins, one narrow loss. **All locode numbers here are `qwythos9`.**
 The 0.467–0.550 figures in §5.135 are `qwencoder14`, a deliberately weaker model
 chosen for revert *exposure*, not for capability; putting those in this table
 would understate locode by ~0.5 and the comparison would be meaningless.
 
 Two observations worth keeping:
 
-- **`exec-pinpoint` is degenerate on qythos9.** All twelve runs scored 1.000 at
+- **`exec-pinpoint` is degenerate on qwythos9.** All twelve runs scored 1.000 at
   exactly 9 iterations, 1 nudge, 29.8s — variance essentially zero. Like the
   e2e case in §5.135 it has no dynamic range left on this model, but for the
   opposite reason: it is saturated at the ceiling rather than pinned at a
@@ -10612,25 +10612,25 @@ Two observations worth keeping:
 
 ## §5.137 — the two new models, and a harness warning that misfired on one
 
-Stage 4 smoke-tested the two models Victor added. Both are `qythos9`-comparison
+Stage 4 smoke-tested the two models Victor added. Both are `qwythos9`-comparison
 probes, not sweeps; the n's are small and stated.
 
 **`sushicoder`** (Qwen3.5-9b-Sushi-Coder-RL, 5.6 GB) — clearly weaker than the
 incumbent, and the gap is not close:
 
-| case | sushicoder | qythos9 |
+| case | sushicoder | qwythos9 |
 |---|---|---|
 | exec-bugfix | 0.800 (n=5) | 0.967 (n=30) |
 | exec-ambig | 0.500 (n=4) | 1.000 |
 
 Clean-finish on exec-ambig was 0.25 — three of four runs were stopped by a
 detector. The nudge histogram says why: `repetition loop` 7 and `repeated call`
-5 across the two cases. It is fast (92 chars/s, comfortably above `qythos9`)
+5 across the two cases. It is fast (92 chars/s, comfortably above `qwythos9`)
 and it loops. Not a candidate to replace the default; no further GPU spent.
 
 **`qwen38`** (Qwen3.8-27B-3bit, 11 GB) — scored 1.000 on exec-bugfix (n=3) in
-**5.0 iterations**, against `qythos9`'s 9. That is *not* a demonstrated win:
-exec-bugfix is a near-ceiling case for `qythos9` at 0.967 over 30 runs, and
+**5.0 iterations**, against `qwythos9`'s 9. That is *not* a demonstrated win:
+exec-bugfix is a near-ceiling case for `qwythos9` at 0.967 over 30 runs, and
 1.000 over 3 runs is not distinguishable from it. The iteration count is the
 only genuinely interesting number here, and n=3 does not carry it either.
 The real test is `repro-only` — per §5.136 the one case left with actual
@@ -10662,7 +10662,7 @@ three (§5.130, §5.131, §5.134): a diagnostic that reported a confident cause 
 had not earned. Rule 83's phrasing generalises — a check must measure the thing
 it names.
 
-## §5.138 — qwen38 beats qythos9 on repro-only, and qythos9's variance was worse than 12 runs showed
+## §5.138 — qwen38 beats qwythos9 on repro-only, and qwythos9's variance was worse than 12 runs showed
 
 The pre-registered confirmation ran (`PREREG-qwen38-repro.md`, amended once for
 the agent-root check). Extending both arms to n=20:
@@ -10670,7 +10670,7 @@ the agent-root check). Extending both arms to n=20:
 | | perfect runs | mean | iters | wallclock |
 |---|---|---|---|---|
 | `qwen38` | **20/20** | **1.000** | 5.5 | 94.9s |
-| `qythos9` | 9/20 | 0.717 | 8.7 | 115.9s |
+| `qwythos9` | 9/20 | 0.717 | 8.7 | 115.9s |
 
 **Fisher exact two-tailed p = 0.000145.** The pre-registered falsifier — a
 single imperfect `qwen38` run — never occurred: it is 20/20 across two sweeps
@@ -10678,7 +10678,7 @@ launched forty minutes apart.
 
 ### The pooling assumption failed, and the result survives anyway
 
-Before reading the p-value I tested whether the two `qythos9` sweeps could
+Before reading the p-value I tested whether the two `qwythos9` sweeps could
 legitimately be pooled. **They cannot:** stage 3 gave 8/12 perfect, stage 6 gave
 1/8, and Fisher on those two is **p = 0.0281**. Two sweeps of an identical
 configuration disagreed at the 5% level.
@@ -10691,19 +10691,19 @@ nudge mix carries `announced intent` 3 and `repeated call` 3, neither of which
 appears in stage 3.
 
 So the honest reading is that `repro-only` has far more per-run variance on
-`qythos9` than n=12 revealed, and the 0.819 published in §5.136 was a **high
+`qwythos9` than n=12 revealed, and the 0.819 published in §5.136 was a **high
 draw**, not the case's value. That table is corrected above to 0.717 (n=20).
 It still beats aider's 0.500, so §5.136's conclusion is unchanged.
 
 Because pooling is unsafe, the claim is graded on the **most conservative**
-framing available — `qythos9`'s *best* sweep against `qwen38`'s full record:
+framing available — `qwythos9`'s *best* sweep against `qwen38`'s full record:
 
 - pooled (as pre-registered): 9/20 vs 20/20, p = 0.000145
-- **conservative, qythos9's best sweep only: 8/12 vs 20/20, p = 0.0138**
-- qythos9's worst sweep only: 1/8 vs 20/20, p = 0.000007
+- **conservative, qwythos9's best sweep only: 8/12 vs 20/20, p = 0.0138**
+- qwythos9's worst sweep only: 1/8 vs 20/20, p = 0.000007
 
 Significant at alpha = 0.05 under every reading, including the one that grants
-`qythos9` its most favourable data. **`qwen38` wins this case.**
+`qwythos9` its most favourable data. **`qwen38` wins this case.**
 
 ### What is and is not claimed
 

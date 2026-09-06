@@ -183,7 +183,7 @@ def test_recovers_multiple_interior_quotes_and_escaped_newlines():
 
 
 def test_single_quoted_value_decodes_escapes():
-    # qythos9 switches to Python-style single quotes whenever the value contains
+    # qwythos9 switches to Python-style single quotes whenever the value contains
     # a " (so it can avoid escaping) — and then its \n are ESCAPES meaning
     # newlines. Left as a bare token they landed as a literal '…\n…' string and
     # corrupted every multi-line write. Recovery must strip the ' delimiters and
@@ -254,7 +254,7 @@ def test_interior_json_fence_inside_content_not_a_block_boundary():
 
 
 def test_second_call_survives_single_quoted_value_with_odd_double_quotes():
-    # Live qythos9 flailing bug: it emitted read_file AND edit_file back-to-back
+    # Live qwythos9 flailing bug: it emitted read_file AND edit_file back-to-back
     # in one message, with the edit_file `new` a Python-style SINGLE-quoted value
     # carrying an ODD number of interior double-quotes (triple-quote docstrings,
     # f-strings). _closing_fence tracked only `"`, so string state desynced, the
@@ -291,7 +291,7 @@ def test_closing_fence_tracks_single_quote_string_context():
 
 
 def test_closing_fence_recovers_when_unterminated_string_swallows_it():
-    # Build 37 root cause: qythos9's single-quoted `new` DROPPED its closing '
+    # Build 37 root cause: qwythos9's single-quoted `new` DROPPED its closing '
     # entirely, leaving trailing `}}`. The unterminated string then ran to EOF
     # and swallowed the real ``` fence, so the whole edit_file call vanished and
     # the turn ended with the fix unexecuted. _closing_fence must remember the

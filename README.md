@@ -82,14 +82,14 @@ default = "qwen38"          # loaded at startup; override per-run with -m
 
 [aliases]
 qwen38      = "lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly"   # ~11 GB
-qythos9     = "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx"  # ~9.6 GB
+qwythos9    = "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx"  # ~9.6 GB
 qwencoder14 = "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
 qwen4i      = "mlx-community/Qwen3-4B-Instruct-2507-4bit"   # fast, trivial edits
 
 [thinking]
 # Some models emit chain-of-thought locode can't stream, which looks like a
 # hang. "off" suppresses it; "auto" defers to the model's own template.
-qythos9 = "off"
+qwythos9 = "off"
 
 [agent]
 max_iterations = 50         # a multi-file task can need dozens
@@ -104,9 +104,9 @@ memory_reserve_gb = 5.0     # refuse a model that would not leave this much free
 
 **Picking a default.** Judge a local model by *iterations-to-done*, not
 tokens/sec — the two can disagree sharply. In our evals `qwen38` decodes about
-four times slower per character than `qythos9` and still finishes tasks in less
+four times slower per character than `qwythos9` and still finishes tasks in less
 wall-clock time, because it needs roughly half as many steps. On a memory-tight
-machine (16 GB) prefer `qythos9`: at ~11 GB, `qwen38` will not fit under the
+machine (16 GB) prefer `qwythos9`: at ~11 GB, `qwen38` will not fit under the
 memory budget. See [`MODELS.md`](MODELS.md).
 
 ## Development setup (from source)
@@ -138,7 +138,7 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
   ```toml
   [thinking]
   # alias or model-id substring -> "on" | "off" | "auto"
-  qythos9 = "off"    # suppress reasoning (enable_thinking=false)
+  qwythos9 = "off"    # suppress reasoning (enable_thinking=false)
   devstral24 = "on"  # force it on for hard diagnosis
   ```
   Unlisted models use locode's per-model default; `"auto"` omits the kwarg and

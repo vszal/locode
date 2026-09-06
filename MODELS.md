@@ -58,7 +58,7 @@ make a capable model look broken:
   ```toml
   [thinking]
   # alias or model-id substring -> "on" | "off" | "auto"
-  qythos9 = "off"      # suppress (enable_thinking=false)
+  qwythos9 = "off"      # suppress (enable_thinking=false)
   "gpt-oss" = "off"
   devstral24 = "on"    # force enable_thinking=true
   ```
