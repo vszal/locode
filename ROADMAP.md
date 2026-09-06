@@ -10322,3 +10322,38 @@ naming anything it skipped. It is best-effort and swallows its own errors — a
 scored run must never be lost to a failed copy. Four tests cover it. This
 changes no agent behaviour; the conclusions above stand as they are, and the
 next e2e sweep will be readable.
+
+## §5.131 — `plan_has_tasks` was grading formatting, not the requirement
+
+Eleven of twelve `e2e-spec-to-code` runs failed `plan_has_tasks`. The plans are
+not the problem. The prompt asks for "milestones, each broken into numbered
+tasks, each task naming the file it touches and how it will be verified", and
+what qythos9 writes is:
+
+```
+### Task 1.1 – Create envcfg.py with imports and ConfigError
+- **File:** `envcfg.py`
+- **What:** ... define `class ConfigError(Exception): pass`.
+- **Verification:** Run `python3 -c "import envcfg; ..."` and confirm ...
+```
+
+That answers the prompt in full. The check accepted only lines leading with
+`1. `/`1) ` or `- [ ]`, so a heading-style task counted zero, and so did r11's
+`| 1.1 | ... |` table. Broadened to accept any line that leads with a number
+after markdown furniture — heading marks, list bullets, checkbox, table pipe,
+an optional literal `Task`. Counting the (log-clipped, therefore undercounted)
+plan prefixes: old regex 0 on eleven runs, new regex 3–10.
+
+The one run that passed, r5, happened to use a plain numbered list. That is the
+tell: a check whose result tracks the model's markdown taste rather than its
+work.
+
+Two consequences worth stating. First, `e2e` scores from before this commit are
+depressed by roughly one check of ten on nearly every run, so the 0.70 plateau
+in §5.130 is really about 0.77 — the code checks remain the whole story, which
+does not change that section's conclusion. Second, and the reason this is worth
+a section: a formatting-bound check cannot move, so it would have masked any
+real improvement to the plan stage. Six tests now pin the four accepted task
+styles and the two rejections (prose, and fewer than six tasks).
+
+Coined rule 80.

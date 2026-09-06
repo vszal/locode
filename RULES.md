@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–79.** All 66 numbers actually in use are below. Thirteen numbers
+**Complete for 1–80.** All 67 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -85,6 +85,7 @@ anchor is authoritative if one ever drifts.
 | 77 | A competitor's default configuration silently redefines the task, so before comparing, determine which mode it actually chose and whether that mode still exercises the failure class you are measuring. | §5.126 |
 | 78 | A change can only be blamed for outcomes in runs where its code path actually executed, so before attributing a delta to it, confirm the branch fired in the runs that moved. | §5.127 |
 | 79 | A competitor decoding greedily returns the identical run every time, so its repeats are not samples — report it as n=1 and do not quote a spread. | §5.127 |
+| 80 | A check that a correct answer can fail on formatting alone measures style, not the requirement; before reading a check's failure as the model's, confirm a right answer in a different format would pass it. | §5.131 |
 
 ⚠ = **reconstructed.** The number is cited but never stated outright anywhere in
 `ROADMAP.md`; the wording is inferred from its use sites and is **not** a
@@ -135,4 +136,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **80**.
+graders. Next free number: **81**.

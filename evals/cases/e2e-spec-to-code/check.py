@@ -112,8 +112,14 @@ def check(ctx):
     results["wrote_plan_doc"] = len(plan.strip()) >= 400
     results["plan_has_milestones"] = bool(
         re.search(r"(?im)^[#\s*_]*(milestone|M\d+\b)", plan))
-    results["plan_has_tasks"] = len(
-        re.findall(r"(?m)^\s*(?:\d+[.)]\s+|[-*]\s*\[[ x]\]\s*)\S", plan)) >= 6
+    # A task line leads with a number, whatever markdown furniture precedes it:
+    # `1. `, `- [ ] 1)`, `### Task 1.1 -- ...`, or a `| 1.1 | ... |` table row
+    # are all numbered tasks. The original pattern accepted only the first two,
+    # so eleven of twelve b142 runs failed this check while writing plans that
+    # answered the prompt exactly -- it graded formatting, not the requirement.
+    results["plan_has_tasks"] = len(re.findall(
+        r"(?m)^\s*(?:#{1,6}\s*)?(?:[-*]\s*(?:\[[ x]\]\s*)?)?(?:\|\s*)?"
+        r"(?:Task\s+)?\d+(?:\.\d+)*[.):|]?\s+\S", plan)) >= 6
 
     # --- stage 3: code ---------------------------------------------------
     module = ctx.read("envcfg.py")
