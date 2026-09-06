@@ -28,15 +28,26 @@ up the chain. Three tiers:
 ### Tier 1 — local model (cheapest; on-device, free)
 The **primary executor.** Drive it headless: `locode -p "<spec>" -m <alias>
 --allow-tool edit_file,write_file,bash`. Pick the model by weight of task:
-- **`qythos9`** (Qwen3.5-9B Claude-distill, ~9.6 GB, the config **default**) —
-  the everyday execution workhorse. Clean fenced tool JSON, correct arg keys,
-  reliable multi-step editor with zero edit-match misses in eval. Use for a
-  well-scoped function/class/module + its tests, refactors, docstrings.
+- **`qwen38`** (Qwen3.8-27B 3-bit, ~11 GB, the config **default** since
+  2026-09-06) — the everyday execution workhorse. Beat qythos9 on `repro-only`,
+  the one eval case with headroom left, 20/20 perfect runs to 9/20 (p=0.0138
+  even granting qythos9 its best sweep; ROADMAP §5.138). Ties at ceiling on the
+  other three cases. Needs ~5-6 iterations where qythos9 needs ~9, which makes
+  it **faster in wallclock despite decoding ~4x slower per character** — judge a
+  local model by iterations-to-done, not tokens/sec.
+- **`qythos9`** (Qwen3.5-9B Claude-distill, ~9.6 GB, the previous default) —
+  still the reliable editor and the right pick on a memory-tight machine, where
+  qwen38's ~11 GB will not fit. Clean fenced tool JSON, correct arg keys,
+  reliable multi-step editor with zero edit-match misses in eval.
 - **`devstral24`** (Mistral-Small 24B agentic coder, ~14 GB) — the heavier
   executor: reach for it on broader multi-file changes, or when you want it to
   narrate its reasoning as it works. Capability-equal to qythos9 on probes so
   far; the extra capacity is insurance for tasks bigger than those surfaced.
+  Untested against qwen38.
 - **`qwen4i` / `phi4`** — trivial/fast first passes (rename, format, one-liners).
+- **`sushicoder`** — evaluated 2026-09-06 and **rejected**: 0.800/0.500 against
+  qythos9's 0.967/1.000, clean-finish 0.25, and a nudge histogram dominated by
+  repetition loops. Newer and RL-tuned did not translate. Don't reach for it.
 
 Good Tier-1 tasks: "implement `locode/install.py` with this marker read/write
 API and ship `tests/test_install.py` covering each install method", "write the
