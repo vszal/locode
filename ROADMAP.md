@@ -10232,3 +10232,44 @@ Both arms run from frozen worktrees. The `b141-doctrack` probe running
 concurrently was started against the live tree and had build 142 committed
 underneath it mid-sweep; it is only usable if no revert note fired in it, which
 is checkable and checked.
+
+## §5.129 — ARM E: the safety result, and two firings read in full
+
+ARM E (frozen b142, qythos9) against ARM D (frozen b141, qythos9):
+
+| case | ARM D score / iters / stops | ARM E score / iters / stops | revert notes |
+|---|---|---|---|
+| `exec-bugfix` (n=30) | 0.917 / 14.4 / 5 | 0.967 / 14.5 / 2 | **2** |
+| `exec-ambig` (n=20) | 1.000 / 8.0 / 0 | 0.950 / 8.4 / 1 | 0 |
+| `e2e-spec-to-code` (n=12) | 0.633 / 19.0 / 11 | 0.692 / 21.9 / 9 | 0 |
+
+Two firings, both on `exec-bugfix`, against a P1 prediction of ~7. The
+prediction was computed on an archive that is 72% `qwencoder14`, and the
+revert pathology is overwhelmingly that model's (22% of 1672 runs, against 2%
+of 597 for qythos9) — so the shortfall is the model-mismatch of §5.128's
+amendment showing up in the count, not a defect in the detector. P1 is not
+gradeable here; P1′ moves to the qwencoder14 arms.
+
+What ARM E *can* settle is P3, and it does: **no harm is attributable.** By
+rule 78 the two cases with zero firings never executed the new branch, so
+neither the `exec-ambig` dip (one run of twenty) nor the `e2e` rise can be
+credited or charged to the change. The arms are, on those cases, the same
+program. On `exec-bugfix` the branch fired twice and the arm did not regress.
+
+The two firings are worth reading, because they are the mechanism working
+(rule 3):
+
+- **r23**: model sets `cut = limit - len(suffix) + 2`, tests fail, sets it back
+  to `+ 1` — a version already ruled out. The note fires. The next edit is
+  `limit - len(suffix)` — a **third, novel** value, and the correct one. Run
+  goes green four events later.
+- **r18**: same two-version cycle on the same expression, note fires, and the
+  model's next act is a `read_file` on the `truncate` docstring — it goes back
+  to the spec — then edits to `limit - len(suffix)`. `truncate` passes; the
+  run's later trouble is in `title_case`, a different function.
+
+So in 2/2 firings the model left the cycle instead of re-entering it, and in
+both it landed on the right value on the next attempt. That is exactly the
+behaviour P2 asks for. Two is not a sample, and this is recorded as a
+mechanism observation, not a benefit claim — the benefit test is ARM F/G,
+where the exposure actually lives.
