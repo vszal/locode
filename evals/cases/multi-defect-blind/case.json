@@ -1,0 +1,9 @@
+{
+  "id": "multi-defect-blind",
+  "track": "execute",
+  "description": "the same five defects as multi-defect-suite with the test suite removed -- the model must construct its own reproduction. The paired control for whether a red suite is difficulty or localisation (ROADMAP 5.140).",
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "replace_lines", "bash", "ls", "grep", "glob", "update_plan"],
+  "timeout": 1200,
+  "weight": 1.5,
+  "extra_args": ["--max-iterations", "60", "--max-wallclock", "900"]
+}
