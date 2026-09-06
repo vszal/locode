@@ -9972,3 +9972,66 @@ defect.
 
 Seventh null in a row, and the first one that was a product question rather
 than a lever.
+
+## §5.126 — the first competitor run: aider on `exec-bugfix`, and a premise that did not reproduce
+
+The standing complaint is that local models fail at tools: they stall, loop, or
+go astray. ROADMAP:821 records *source* teardowns of Aider/Cline/Roo/OpenHands/
+SWE-agent, but this repo had never actually **run** one. Aider is the right
+first candidate — terminal-based, edit-focused, and it drives an
+OpenAI-compatible endpoint, so it can use the identical `:8081` server and the
+identical qythos9 weights. Installed 0.86.2 into an isolated `~/.aider-venv`.
+
+Twelve aider runs on `exec-bugfix` (two six-run arms), against locode's b139
+baseline of twelve. Full numbers in `evals/results/aider-compare-b139/`.
+
+**The premise did not reproduce, in either harness.** locode's `edit_file`
+applied 48/48. Aider's search/replace applied 7/7. Zero stalls, zero loops,
+zero edit failures on both sides, same model, same box, same day. The
+failure-detection regex was checked against aider's real source strings before
+the zero was believed, so this is a live null rather than a dead pattern.
+
+**What actually differs is round trips: 15.2 versus 1.17, at comparable
+wallclock** (57.6s vs 34–46s). And locode's iterations are not flailing — the
+r1 trajectory is test → read → plan → edit, three times, each edit verified
+against the suite before the next. The 44 "tool errors" in the b139 metrics are
+the failing pytest runs, i.e. correct observations of a red suite. The one
+measured inefficiency is a ~5-of-16-iteration post-green tail — a redundant
+second green test run plus plan-closing turns, matching the nudge histogram
+(`open plan tasks: 14`, `verify task credited: 4`). Bookkeeping, not recovery.
+
+The gap is architectural, not a quality gap. Aider was handed both files on its
+command line and, with `--no-git`, has no repo-map — it *cannot* find a file it
+was not given. locode discovers, plans, edits, verifies, and closes a plan.
+Different jobs; the 13× is what autonomy costs on a case where autonomy buys
+nothing, because the human already knew both filenames.
+
+**The near-miss that produced rule 77.** Aider does not know this model, so it
+silently defaulted to the `whole` edit format — the model rewrites the entire
+file, which deletes the edit-match failure class *by construction* and costs
+~40% more output tokens (922 vs 656 received). The first arm was therefore
+locode's search/replace against aider's whole-file rewrite, and reporting it
+would have manufactured a reliability gap that does not exist. The second arm
+(`--edit-format diff`) is the real comparison, and it also scored zero. A
+competitor's defaults are part of the experiment, not scenery.
+
+**Rule 77: a competitor's default configuration silently redefines the task, so
+before comparing, determine which mode it actually chose and whether that mode
+still exercises the failure class you are measuring.**
+
+Worth noting on our side of the same coin: `write_file` is in `exec-bugfix`'s
+`allow_tools`, and across all 12 locode runs the model chose `edit_file` 48
+times and `write_file` zero. Aider's winning strategy was on locode's menu the
+whole time and never selected. Here it cost nothing.
+
+**Disposition: NO BUILD.** Nothing to fix — the defect this was meant to
+characterise did not appear. The honest limitation is that `exec-bugfix` is one
+83-line file with three bugs visible in a single read and a green/red oracle
+every turn; it does not exercise stalling or looping and did not elicit them.
+So this establishes equivalence *on an easy case* and says nothing about the
+hard ones where the reported failures live. The next move, if this thread is
+continued, is a harder or multi-file case run through both harnesses — not
+another sweep of this one.
+
+Eighth null in a row, and the first one measured against something outside the
+repo.

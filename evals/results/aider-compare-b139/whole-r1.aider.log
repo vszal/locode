@@ -1,0 +1,89 @@
+Warning: Input is not a terminal (fd=0).
+────────────────────────────────────────────────────────────────────────────────
+Warning for openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx: Unknown
+context window size and costs, using sane defaults.
+You can skip this check with --no-show-model-warnings
+
+https://aider.chat/docs/llms/warnings.html
+
+Aider v0.86.2
+Model: openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx with whole 
+edit format
+Git repo: none
+Repo-map: disabled
+Added test_textkit.py to the chat.
+Added textkit.py to the chat.
+
+I have identified and fixed three bugs in textkit.py:                           
+
+ 1 truncate: The calculation for the cut point was incorrect. It was adding 1 to
+   the remaining space after accounting for the suffix, which resulted in       
+   truncating one character too many. The correct logic is simply limit -       
+   len(suffix).                                                                 
+ 2 title_case: The logic for handling "small words" (like "a", "an") was flawed.
+   It was lowercasing them even when they appeared at the start of the sentence.
+   The fix ensures that if a word is in SMALL_WORDS, it is only lowercased if it
+   is not the first word of the text.                                           
+ 3 word_wrap: The condition for adding a word to the current line was using <   
+   width instead of <= width. This caused lines that fit exactly at the         
+   specified width to be incorrectly split. The fix changes the comparison to <=
+   width.                                                                       
+
+Here is the corrected file:                                                     
+
+textkit.py                                                                      
+
+                                                                                
+ @@ -20,11 +20,11 @@                                                            
+      current_len = 0                                                           
+      for word in words:                                                        
+          if not current:                                                       
+              current = [word]                                                  
+              current_len = len(word)                                           
+ -        elif current_len + 1 + len(word) < width:                             
+ +        elif current_len + 1 + len(word) <= width:                            
+              current.append(word)                                              
+              current_len += 1 + len(word)                                      
+          else:                                                                 
+              lines.append(" ".join(current))                                   
+              current = [word]                                                  
+ @@ -43,11 +43,11 @@                                                            
+      longer). If `suffix` alone is longer than `limit`, the cut point is       
+      clamped to 0.                                                             
+      """                                                                       
+      if len(text) <= limit:                                                    
+          return text                                                           
+ -    cut = limit - len(suffix) + 1                                             
+ +    cut = limit - len(suffix)                                                 
+      if cut < 0:                                                               
+          cut = 0                                                               
+      return text[:cut] + suffix                                                
+                                                                                
+                                                                                
+ @@ -63,14 +63,17 @@                                                            
+      of `SMALL_WORDS` membership. Words are separated by single spaces in      
+      the output.                                                               
+      """                                                                       
+      words = text.split()                                                      
+      result = []                                                               
+ -    for word in words:                                                        
+ +    for i, word in enumerate(words):                                          
+          lower = word.lower()                                                  
+          if lower in SMALL_WORDS:                                              
+ -            result.append(lower)                                              
+ +            if i == 0:                                                        
+ +                result.append(lower.capitalize())                             
+ +            else:                                                             
+ +                result.append(lower)                                          
+          else:                                                                 
+              result.append(lower.capitalize())                                 
+      return " ".join(result)                                                   
+                                                                                
+
+Tokens: 2.0k sent, 922 received.
+Applied edit to textkit.py
+.............                                                            [100%]
+13 passed in 0.01s
+Summarization failed for model openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx: cannot schedule new futures after shutdown
+Summarization failed for model openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx: cannot schedule new futures after shutdown
+summarizer unexpectedly failed for all models

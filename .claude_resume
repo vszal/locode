@@ -204,3 +204,40 @@ it directly, do NOT read ~/Code/price-check/.env. Set a non-default User-Agent
 `_FENCE_INSTRUCTIONS` "...and nothing else" carve-out A/B; D8/D9/D10;
 fix_interrupt_echo.py (5.82 item 3); exec-pinpoint never run; the 2 unparsed
 turn-enders; a paired A/B for D2; 5.16 defect 2; 5.12d; 5.13a.
+
+## DONE 2026-09-05 — OSS COMPETITOR COMPARISON (aider) — §5.126, rule 77, NO BUILD
+
+Ran aider-chat 0.86.2 (isolated ~/.aider-venv) against locode's own
+`exec-bugfix` case, same qythos9 weights on the same :8081 mlx_lm.server with
+locode's launch args. 12 aider runs (two 6-run arms) vs locode's b139 baseline
+of 12. Artifacts + full writeup: `evals/results/aider-compare-b139/FINDINGS.md`.
+
+**The tool-failure premise did not reproduce, on either side.** locode
+`edit_file` 48/48 applied; aider search/replace 7/7 applied. Zero stalls, zero
+loops, zero edit failures both harnesses. (Failure regex was validated against
+aider's real source strings first, so the zero is a live null.)
+
+**What differs is round trips: locode 15.2 iterations vs aider 1.17**, at
+comparable wallclock (57.6s vs 34-46s). locode's iterations are disciplined
+(test->read->plan->edit x3, each verified), not flailing. Its 44 "tool errors"
+are the failing pytest runs. Only real inefficiency: ~5 of 16 iterations are
+post-green tail (redundant green re-run + plan-closing), matching the nudge
+histogram.
+
+**Rule 77 coined** from a near-miss: aider silently defaulted to `whole` edit
+format (model unknown to its metadata DB), i.e. whole-file rewrite, which
+deletes the edit-match failure class by construction. Arm 1 was accidentally
+locode-search/replace vs aider-whole-file. Added arm 2 (`--edit-format diff`)
+as the true analogue; also zero failures.
+
+Side note: `write_file` IS in exec-bugfix's allow_tools; across all 12 locode
+runs the model picked `edit_file` 48x and `write_file` 0x. Aider's strategy was
+on locode's menu and never chosen.
+
+**LIMITATION (do not quote this as general):** exec-bugfix is one 83-line file,
+3 bugs visible in one read, green/red oracle every turn. It does not exercise
+stalling/looping and did not elicit them. Establishes equivalence ON AN EASY
+CASE only. Next move if continued: a harder / multi-file case through both
+harnesses — NOT another sweep of this one.
+
+Eighth null in a row.

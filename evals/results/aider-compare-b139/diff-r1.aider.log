@@ -1,0 +1,134 @@
+Warning: Input is not a terminal (fd=0).
+────────────────────────────────────────────────────────────────────────────────
+Warning for openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx: Unknown
+context window size and costs, using sane defaults.
+You can skip this check with --no-show-model-warnings
+
+https://aider.chat/docs/llms/warnings.html
+
+Aider v0.86.2
+Model: openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx with diff 
+edit format
+Git repo: none
+Repo-map: disabled
+Added test_textkit.py to the chat.
+Added textkit.py to the chat.
+
+Looking at the tests, I need to fix three bugs in textkit.py:                   
+
+ 1 truncate: The cut point calculation is off by one. When limit equals the text
+   length, it should return unchanged, but currently it truncates. The formula  
+   should be limit - len(suffix) (not + 1).                                     
+ 2 truncate: When the suffix alone is longer than the limit, the cut point      
+   should be clamped to 0 (return just the suffix), but currently it's clamped  
+   to 1, resulting in an empty string before the suffix.                        
+ 3 title_case: The first word should always be capitalized even if it's a small 
+   word. Currently, "a tale of two cities" becomes "a Tale of Two Cities"       
+   because "a" is in SMALL_WORDS, but it should be "A Tale of Two Cities".      
+
+Here are the fixes:                                                             
+
+textkit.py                                                                      
+
+                                                                                
+ <<<<<<< SEARCH                                                                 
+     cut = limit - len(suffix) + 1                                              
+     if cut < 0:                                                                
+         cut = 0                                                                
+ =======                                                                        
+     cut = limit - len(suffix)                                                  
+     if cut < 0:                                                                
+         cut = 0                                                                
+ >>>>>>> REPLACE                                                                
+                                                                                
+
+textkit.py                                                                      
+
+                                                                                
+ <<<<<<< SEARCH                                                                 
+         else:                                                                  
+             result.append(lower.capitalize())                                  
+     return " ".join(result)                                                    
+ =======                                                                        
+         else:                                                                  
+             result.append(lower.capitalize())                                  
+     if not words:                                                              
+         return ""                                                              
+     return " ".join(result)                                                    
+ >>>>>>> REPLACE                                                                
+                                                                                
+
+Tokens: 3.8k sent, 325 received.
+Applied edit to textkit.py
+F........F...                                                            [100%]
+=================================== FAILURES ===================================
+__________________ test_word_wrap_exact_fit_stays_on_one_line __________________
+
+    def test_word_wrap_exact_fit_stays_on_one_line():
+        # "abcd efgh" is exactly 9 characters -> should NOT wrap at width 9.
+>       assert word_wrap("abcd efgh", 9) == ["abcd efgh"]
+E       AssertionError: assert ['abcd', 'efgh'] == ['abcd efgh']
+E         
+E         At index 0 diff: 'abcd' != 'abcd efgh'
+E         Left contains one more item: 'efgh'
+E         Use -v to get more diff
+
+test_textkit.py:9: AssertionError
+________________ test_title_case_first_word_always_capitalized _________________
+
+    def test_title_case_first_word_always_capitalized():
+>       assert title_case("a tale of two cities") == "A Tale of Two Cities"
+E       AssertionError: assert 'a Tale of Two Cities' == 'A Tale of Two Cities'
+E         
+E         - A Tale of Two Cities
+E         ? ^
+E         + a Tale of Two Cities
+E         ? ^
+
+test_textkit.py:55: AssertionError
+=========================== short test summary info ============================
+FAILED test_textkit.py::test_word_wrap_exact_fit_stays_on_one_line - Assertio...
+FAILED test_textkit.py::test_title_case_first_word_always_capitalized - Asser...
+2 failed, 11 passed in 0.02s
+Added 30 lines of output to the chat.
+textkit.py                                                                      
+
+                                                                                
+ <<<<<<< SEARCH                                                                 
+         elif current_len + 1 + len(word) < width:                              
+             current.append(word)                                               
+             current_len += 1 + len(word)                                       
+ =======                                                                        
+         elif current_len + 1 + len(word) <= width:                             
+             current.append(word)                                               
+             current_len += 1 + len(word)                                       
+ >>>>>>> REPLACE                                                                
+                                                                                
+
+textkit.py                                                                      
+
+                                                                                
+ <<<<<<< SEARCH                                                                 
+     for word in words:                                                         
+         lower = word.lower()                                                   
+         if lower in SMALL_WORDS:                                               
+             result.append(lower)                                               
+         else:                                                                  
+             result.append(lower.capitalize())                                  
+ =======                                                                        
+     for i, word in enumerate(words):                                           
+         lower = word.lower()                                                   
+         if lower in SMALL_WORDS and i != 0:                                    
+             result.append(lower)                                               
+         else:                                                                  
+             result.append(lower.capitalize())                                  
+ >>>>>>> REPLACE                                                                
+                                                                                
+
+Tokens: 4.9k sent, 184 received.
+Applied edit to textkit.py
+.............                                                            [100%]
+13 passed in 0.01s
+Summarization failed for model openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx: cannot schedule new futures after shutdown
+Summarization failed for model openai/sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx: cannot schedule new futures after shutdown
+summarizer unexpectedly failed for all models
