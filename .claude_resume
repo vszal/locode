@@ -1,34 +1,59 @@
 # locode resume
-Last session: 2026-08-26. Build 139, 1337 tests green. OSS prior art now in play:
-read SWE-agent/Aider before designing any message surface (§5.123).
-Archive mining (evals/mine.py) is now the first move on any lever. It has
-retired four candidates and found the current one without spending GPU.
-Two sessions' work below; the 2026-08-15 items are still open where marked.
+Last session: 2026-09-05. Build 139, 1337 tests green. Archive mining
+(evals/mine.py) is the first move on any lever — it has now retired five
+candidates without spending GPU. OSS prior art is in play: read
+SWE-agent/Aider before designing any message surface (§5.123).
 
-## Newest first: the error-path lever is DEAD too (§5.121, rule 75)
-Killed by the ARCHIVE before a line of it was built — no code, no GPU. All
-three premises were wrong:
- 1. The failing branch is not the lethal one: 83% of FAIL-branch runs stop vs
-    90% of ok-branch. No error-vs-success discriminator exists.
- 2. `_nudge_repeat` already works. After it fires, `SAME call again` is **3%**;
-    the modal response (59%) is its own last clause, "give your final answer".
-    The demand I meant to REMOVE is the one the model actually acts on.
- 3. And the raw scores that seemed to justify keeping it (0.57 vs 0.48) were
-    **entirely case mix**. Centred within (case,model) every bucket lands
-    within 0.015 of the case mean: the post-nudge branch carries NO score
-    signal, so no reword of `_nudge_repeat` can pay.
-Rules 9/19 are still breached by `_nudge_repeat` — now logged as known-cosmetic,
-not worth a build.
+## Newest first: the stranded-tail lever is DEAD — the gate said no (§5.124, rule 76)
+`b139-qythos9-exposure` ran and answered its own pre-registered question.
+qythos9 x exec-bugfix, n=12, build 139 — the case that made 217 of the 245
+stranded-tail events. **0 replace_lines calls, 0 syntax-guard rejections.**
+Score 0.958, 12/12 valid, clean finish 11/12.
+Sharper, one layer up: **all 48 edit_file calls SUCCEEDED.** All 44 tool errors
+are bash (a failing pytest — the case working as designed). So
+`_replace_lines_route` (fs.py:591), the steer that hands the model
+replace_lines after an `old`-match failure, fired ZERO times. qythos9 never
+called the escape hatch because it never needed one.
+**NO BUILD** (rule 17). 5.123's design stays pre-registered and free to leave
+there; revive only if the default model changes to one that uses
+replace_lines, or if edit_file's failure rate on the default climbs back.
+The 0/181 branch is qwencoder14's defect, not the product's.
 
-**New standing instrument: `evals/mine.py` (15 tests).** Run it BEFORE scoping
-any lever. `--list-nudges` for the menu; `--nudge REASON` for exposure + the
-centred outcome table. It prints pooled AND centred side by side on purpose —
-a gap between them IS case mix (rule 75), not a tie-break.
+**Rule 76** (coined here): a fallback path's event count is not its exposure —
+it is downstream of the PRIMARY path's failure rate for the model you'd ship.
+The ambiguous-match win (0% -> 88%) drained replace_lines' feeder population
+without leaving a trace in replace_lines' own numbers. Rule 64 = pooled across
+builds; rule 75 = pooled across cases; 76 = pooled across MODELS, and it
+corrupts an absolute n rather than a rate, so 64/75 don't catch it.
 
-**Five straight nulls now**, all in the same direction (my "this defect is real
-and reachable" estimate). bugfix-notest / plan-hijack / repro-only /
-git-url-empty as vehicles, error-path as a lever. Build 136 still rests on
-bugfix-notest alone. Next lever: mine first, argue second.
+**Six straight nulls now**, same direction. Build 136 still rests on
+bugfix-notest alone.
+
+## OPEN QUESTION RAISED 2026-09-05 — reasoning toggle for prose/ideation
+User wants locode for prose + blog ideation, and asks whether reasoning should
+be on, and whether it can be toggled without editing config. Findings:
+ - The `[thinking]` override ALREADY exists (config.py:396) — alias-or-id
+   substring -> on/off/auto, resolved at `ServerManager.start()`
+   (manager.py:306) into `--chat-template-args {"enable_thinking": ...}`.
+   It is a LAUNCH arg, so changing it needs a server restart. No runtime UI.
+ - Reasoning is off for qythos9 for a RENDERING reason, not a quality one
+   (profiles.py:84-92): it streams `reasoning_content` before `content`,
+   locode renders only `content`, so the UI looks hung; and when reasoning ate
+   the token cap `content` came back EMPTY. client.py:259 now falls back to
+   showing the reasoning when content is empty. For prose this risk is WORSE —
+   reasoning and the draft share one max_tokens budget.
+ - Prereq for turning it on: render (or discard) the reasoning stream live.
+   Otherwise turning it on just reproduces the failure the profile avoids.
+ - **Latent bug found**: `/server restart` calls `switch(current_alias)`, but
+   `switch()` short-circuits when the target is already resident
+   (manager.py:543) — so it prints "restarted" WITHOUT restarting. A
+   `/thinking` command would hit the same path; both need an explicit
+   stop()+start().
+ - **Footgun**: `resolve_thinking(profile, "on")` returns True for ANY model,
+   but `Profile.thinking_arg=False` conflates "no thinking mode" with
+   "template REJECTS the kwarg" (Instruct-2507: "must NOT send the kwarg").
+   So `/thinking on` on qwen4i would send a kwarg that fails the request.
+   Needs a third profile state before a one-keystroke toggle ships.
 
 ## Shipped/decided THIS session (2026-08-26)
 **The git-URL lever: NO SHIP.** Built it, built a case for it, measured it,
@@ -41,7 +66,7 @@ lever 0e v2. One line to revive.
   `.git` cannot be committed; a path only knowable at run time). Failure marks
   the run `invalid`, not 0.0. 3 tests in test_harness.py.
 
-## NEXT LEVER — DIAGNOSED AND DESIGNED, GATED ON EXPOSURE (§5.122/§5.123)
+## CLOSED — the gate above killed it. Design kept, not open work (§5.122/§5.123)
 **The syntax guard's stranded-tail branch: 0 successes in 181 attempts.**
 `locode/tools/fs.py:884` — when an edit would introduce a SyntaxError the
 message forks:
@@ -76,15 +101,8 @@ says dropping the snippets makes the agent "re-issue the same command more
 frequently" — our 52%. Aider, opposite architecture (apply-then-repair), still
 renders bounded context with the offending line marked (loi_pad=3, mark_lois).
 
-**GATE — RUNNING 2026-08-26: `b139-qythos9-exposure`** (qythos9, exec-bugfix,
-n=12). Exposure is qwencoder14's: qythos9 makes **0** replace_lines calls in 94
-archived runs, but only **2** of those are exec-bugfix, the case producing 217
-of the 245 events. Zero out of two is no information. If the probe shows qythos9
-does not reach for replace_lines, the lever is moot on the default model (rule
-17, the way the git lever died at 0/12). If it does, build the design above.
-
-CAVEAT for sizing: inside/outside is NOT randomised — outside is genuinely
-harder. Do not size off the 55-point gap; the clean fact is the floor, 0/181.
+**GATE RAN AND FAILED — see the top section (§5.124).** Do not re-scope this
+without first re-checking exposure on the CURRENT default model (rule 76).
 
 ## Ranked b127+ edit failures by RECOVERY (not frequency — that ranking lies)
     `old` ambiguous      n=389   87% land    0% fail again   <- shipped win

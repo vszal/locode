@@ -9847,3 +9847,53 @@ Next action is therefore a cheap exposure probe, not a build: qythos9 on
 exec-bugfix at n=12, counting `replace_lines` calls and stranded-tail
 rejections. If it does not reach for the tool the lever is moot on the default
 model; if it does, the design above is pre-registered and ready.
+
+## 5.124 — the exposure probe answers: qythos9 never reaches the branch
+
+The gate 5.123 pre-registered. `b139-qythos9-exposure`: qythos9 × exec-bugfix,
+n=12, build 139, the case that generated 217 of the 245 stranded-tail events.
+Decision rule, written before the run: *if it does not reach for
+`replace_lines` the lever is moot on the default model; if it does, build the
+design.*
+
+**It does not reach for it. 0 `replace_lines` calls in 12 runs, 0 syntax-guard
+rejections.** 12/12 valid, score 0.958 (11×1.0, one 0.5), clean finish 11/12,
+183 iterations, 143 tool calls: 62 bash, 48 edit_file, 34 update_plan, 14
+read_file. No `replace_lines`, and none of the other write tools either.
+
+The sharper fact is one layer up. **All 48 `edit_file` calls succeeded — zero
+edit failures in the sweep.** Every one of the 44 tool errors is `bash`, and
+every one of those is a failing `pytest`, which is the case working exactly as
+designed. So `_replace_lines_route` (fs.py:591), the steer that hands the model
+`replace_lines` after an `old`-match failure, **fired zero times**. qythos9
+never called the escape hatch because it never needed one.
+
+That is the whole disposition. The stranded-tail branch is real, it is 0/181,
+and it is **qwencoder14's defect, not the product's** — reachable only from a
+tool the shipping default model does not use, down a route only an `edit_file`
+failure opens. Rule 17: a lever that fires zero times has not been tested, and
+this one cannot fire. **NO BUILD.** 5.123's design stays pre-registered and
+costs nothing to leave there; revive it only if the default model changes to
+one that reaches for `replace_lines`, or if edit_file's failure rate on the
+default climbs back far enough to feed the route.
+
+**Rule 76: a fallback path's event count is not its exposure — exposure on a
+fallback is downstream of the primary path's failure rate for the model and
+build you would ship, so an upstream fix drains the fallback's population
+without leaving a trace in the fallback's own numbers; count the upstream
+failures that route into it before scoping a fix to it.** This is the lesson
+5.122 walked past: the 245 events were mined from an archive pooled across
+*models* — the ambiguous-match win (0% → 88%) and edit_file's reliability
+on qythos9 drained the population that feeds `replace_lines`, and drained it
+without leaving one trace in `replace_lines`'s own numbers. Rule 64 says don't
+rank on a rate pooled across your own fixes; rule 75 says a pooled bucket
+comparison is case mix. This is the third costume: **model mix**, and it is the
+one that survives both of those checks, because the count it corrupts is an
+absolute n, not a rate.
+
+**Six straight nulls**, all in the same direction. bugfix-notest /
+plan-hijack / repro-only / git-url-empty as vehicles; error-path and now
+stranded-tail as levers. Build 136 still rests on bugfix-notest alone. The
+archive has now retired five candidates for the price of no GPU at all — and
+this one for the price of a single n=12 probe, which is the cheapest a null
+has ever been.
