@@ -10435,3 +10435,44 @@ population is a fact about the population.
 `e2e` scores 0.800 here against ARM E's 0.692, but the two are graded by
 different versions of `plan_has_tasks` (amendment 4) and run different models.
 Not a comparison.
+
+### §5.133a — the exhibit: `exec-ambig` r1, ARM F
+
+One control trajectory, trimmed to its edits, is worth the whole exposure table:
+
+```
+[45]  edit  x > 100 -> x > 50
+[51]  bash  pytest        ...F...F..FF.
+[72]  edit  x > 100 -> x > 50        (again)
+[77]  edit  x > 23  -> x > 59
+[82]  edit  x > 255 -> x > 15
+[88]  bash  pytest
+[103] edit  x > 15  -> x > 255       <- restores the pre-[82] state
+[108] edit  x > 255 -> x > 15        <- and back
+[113] edit  x > 59  -> x > 23
+[119] bash  pytest        ..........FF.
+[134] edit  x > 23  -> x > 59
+[139] bash  pytest        .........FFF.
+[154] edit  x > 59  -> x > 23
+[159] bash  pytest        ..........FF.
+[187] STOPPED — repeated the same tool call without making progress
+```
+
+Two constants get toggled between two values each, forever, with the suite run
+in between so the model watches the failure count move 2 -> 3 -> 2 and learns
+nothing from it. The numbers are guesses — 100, 50, 23, 59, 255, 15 — and at no
+point does the model read what the failing assertion says it expected. 189
+events, stopped, 0.55.
+
+Under build 142 the note fires at **[103]**, the first return to a tested state,
+roughly halfway through the wasted work. That is the intervention point, and
+the note's body is aimed exactly here: *"work the required value out from those
+two strings, then make an edit that is neither of the two you have already
+tried."*
+
+**How P2 will be graded**, fixed now, before ARM G exists. Sampling differs run
+to run, so this is not a run-for-run comparison. For each ARM G run in which the
+note fires, read the next edit to the same path and classify it: (a) a third,
+novel value, (b) a return to one of the two already tried, or (c) no further
+edit to that path. P2 passes if (a) is the plurality. The matching ARM F
+denominator is every firing above — in this run, all five are (b).
