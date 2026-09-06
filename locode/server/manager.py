@@ -650,20 +650,47 @@ def _snapshot_root(model_id: str) -> Path | None:
 
 
 def _model_disk_bytes(model_id: str) -> int | None:
-    """Sum the *.safetensors weight sizes in the HF cache for `model_id` (a good
-    proxy for the wired memory it will need). None if it isn't cached locally —
-    we can't estimate a model we haven't downloaded, so the guard skips it."""
+    """Weight bytes for the revision of `model_id` that would actually load — a
+    good proxy for the wired memory it needs. None if it isn't cached locally:
+    we can't estimate a model we haven't downloaded, so the guard skips it.
+
+    The HF cache keeps one directory per revision under `snapshots/`, each a
+    tree of symlinks into a shared `blobs/`. Re-pulling a repo after an upstream
+    update leaves several revisions side by side pointing at the SAME blobs, so
+    summing `snapshots/**/*.safetensors` counts every shard once per revision.
+    That is not a rounding error: with two revisions cached, an 11 GB model
+    measured 21.9 GB and the guard refused to load it at all (Qwen3.8-27B,
+    2026-09-06 — it fits with ~3 GB to spare).
+
+    Only one revision is ever loaded, so size each revision on its own and take
+    the largest — conservative, but bounded by a real revision rather than by
+    how many copies happen to be on disk. Within a revision, de-duplicate by
+    (device, inode) so two names for one blob don't double-count either.
+    """
     snap = _snapshot_root(model_id)
     if snap is None:
         return None
-    total, found = 0, False
-    for st in snap.rglob("*.safetensors"):
-        try:
-            total += st.stat().st_size  # follows the symlink into blobs/
+    try:
+        revisions = [d for d in snap.iterdir() if d.is_dir()]
+    except OSError:
+        revisions = []
+    best, found = 0, False
+    for rev in revisions or [snap]:
+        seen: set[tuple[int, int]] = set()
+        total = 0
+        for st in rev.rglob("*.safetensors"):
+            try:
+                info = st.stat()  # follows the symlink into blobs/
+            except OSError:
+                continue
+            key = (info.st_dev, info.st_ino)
+            if key in seen:
+                continue
+            seen.add(key)
+            total += info.st_size
             found = True
-        except OSError:
-            pass
-    return total if found else None
+        best = max(best, total)
+    return best if found else None
 
 
 def _model_config(model_id: str) -> dict[str, Any] | None:

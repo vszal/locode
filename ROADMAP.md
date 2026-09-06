@@ -10720,3 +10720,42 @@ which model finishes first — the same metric that, an hour earlier, told the
 harness to discard these runs entirely (§5.137).
 
 Coined **rule 84**.
+
+## §5.139 — the memory guard refused the new default, and it was the guard that was wrong
+
+Switching the default to `qwen38` (§5.138) immediately failed its own smoke
+test. locode refused to start:
+
+> refusing to load lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly: it needs ~27.7 GB
+> (weights 21.9 GB × 1.15 + 2.5 GB KV cache) but the budget is 18.0 GB
+
+The model is **10.96 GB** on disk. The guard measured it at 21.93 GB — almost
+exactly double — and the doubling is the whole explanation.
+
+`_model_disk_bytes` summed `snapshots/**/*.safetensors`. The HF cache stores one
+directory per *revision* under `snapshots/`, each a tree of symlinks into a
+shared `blobs/`. This model had **two revisions cached** (re-pulled after an
+upstream update), both pointing at the same three shards, so every shard was
+counted twice. `st.stat()` follows the symlink, so each count was the full blob.
+
+Only one revision is ever loaded. The fix sizes each revision independently and
+takes the largest, de-duplicating by `(st_dev, st_ino)` within a revision so two
+names for one blob don't double-count either. qwen38 now measures 10.96 GB and
+fits with ~3 GB to spare. Build 148, 8 tests.
+
+Three things worth keeping:
+
+- **The bug scaled with how often you update a model, not with its size.** Any
+  model re-pulled once was measured at 2x, three times at 4x. The most
+  frequently updated models — the newest ones, the ones most worth trying —
+  were the most likely to be spuriously refused. `qwen38` is exactly that.
+- **It failed closed, which is why it survived this long.** The guard exists to
+  prevent a GPU-driver panic, so its errors show up as "this model won't load",
+  which reads as a hardware limit rather than a bug. Nobody investigates a
+  refusal that names a plausible number. It took making the model a *default* —
+  where refusing is loud — to surface it.
+- Same shape as §5.137 and the rest of the night: **a diagnostic asserting a
+  confident cause it had not established.** The message named a specific
+  footprint, a specific budget, and a specific remedy ("pick a smaller model"),
+  and the remedy was exactly wrong. Rule 84's closing clause generalises here —
+  check the instrument before believing what it reports about the subject.
