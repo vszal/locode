@@ -821,6 +821,25 @@ def _rate_is_trustworthy(summary: dict) -> bool:
     return n > 0 and (chars / n) >= MIN_GEN_CHARS_PER_RUN
 
 
+def _budget_bound(runs) -> bool:
+    """Did any run actually run out of time?
+
+    A low generation rate only threatens a sweep's validity when something hit
+    a time limit because of it. MIN_GEN_RATE was calibrated when every model in
+    the mix cleared it comfortably, so a sub-floor rate implied a sick box. That
+    assumption expired: a 27B 3-bit model decodes at ~22 chars/s on healthy
+    hardware and still finishes well inside budget (qwen38, 2026-09-06: 138s of
+    a 600s budget, nothing timed out). Slowness and invalidity are different
+    claims, and the rate alone cannot tell them apart — so ask the budget."""
+    for r in runs:
+        if getattr(r, "timed_out", False):
+            return True
+        reason = ((getattr(r, "metrics", None) or {}).get("stop_reason") or "")
+        if "wallclock" in reason.lower() or "time limit" in reason.lower():
+            return True
+    return False
+
+
 def _power_state() -> tuple[bool | None, str]:
     """(on_wall_power, human description). None when it can't be determined.
 
@@ -1355,11 +1374,18 @@ def cmd_run(args) -> int:
     # needs no baseline to fire.
     rate = summary.get("gen_rate")
     if rate and rate < MIN_GEN_RATE and _rate_is_trustworthy(summary):
-        print(f"\n!! generated at {rate:.1f} chars/s, below the "
-              f"{MIN_GEN_RATE:.0f} floor — the box was throttled or contended. "
-              "Every budget in the loop is a wallclock budget, so these scores "
-              "measure the machine as much as the agent. Do not use them as a "
-              "baseline.", flush=True)
+        if _budget_bound(runs):
+            print(f"\n!! generated at {rate:.1f} chars/s, below the "
+                  f"{MIN_GEN_RATE:.0f} floor, AND at least one run hit its time "
+                  "limit. Every budget in the loop is a wallclock budget, so "
+                  "these scores measure the machine as much as the agent. Do "
+                  "not use them as a baseline.", flush=True)
+        else:
+            print(f"\n!! generated at {rate:.1f} chars/s, below the "
+                  f"{MIN_GEN_RATE:.0f} floor, but no run hit its time limit — "
+                  "so this is a slow model, not necessarily a sick box. The "
+                  "scores stand; do not compare this sweep's RATE against one "
+                  "from a different model.", flush=True)
     if len(runs) < total:
         print(f"\n!! only {len(runs)} of {total} runs completed — partial sweep.",
               flush=True)

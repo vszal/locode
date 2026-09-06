@@ -10608,3 +10608,55 @@ Two observations worth keeping:
 - aider's failure mode is unchanged and is the structural point: on the two
   cases it loses 1.000–0.500 it applied **zero of six** proposed edits. It
   reasons to the right change and fails to land it on disk.
+
+## §5.137 — the two new models, and a harness warning that misfired on one
+
+Stage 4 smoke-tested the two models Victor added. Both are `qythos9`-comparison
+probes, not sweeps; the n's are small and stated.
+
+**`sushicoder`** (Qwen3.5-9b-Sushi-Coder-RL, 5.6 GB) — clearly weaker than the
+incumbent, and the gap is not close:
+
+| case | sushicoder | qythos9 |
+|---|---|---|
+| exec-bugfix | 0.800 (n=5) | 0.967 (n=30) |
+| exec-ambig | 0.500 (n=4) | 1.000 |
+
+Clean-finish on exec-ambig was 0.25 — three of four runs were stopped by a
+detector. The nudge histogram says why: `repetition loop` 7 and `repeated call`
+5 across the two cases. It is fast (92 chars/s, comfortably above `qythos9`)
+and it loops. Not a candidate to replace the default; no further GPU spent.
+
+**`qwen38`** (Qwen3.8-27B-3bit, 11 GB) — scored 1.000 on exec-bugfix (n=3) in
+**5.0 iterations**, against `qythos9`'s 9. That is *not* a demonstrated win:
+exec-bugfix is a near-ceiling case for `qythos9` at 0.967 over 30 runs, and
+1.000 over 3 runs is not distinguishable from it. The iteration count is the
+only genuinely interesting number here, and n=3 does not carry it either.
+The real test is `repro-only` — per §5.136 the one case left with actual
+dynamic range — and that is what runs next.
+
+The wallclock worry raised before the run did **not** materialise: every run
+finished in ~138s of a 600s budget with `timed_out` false. This is a capability
+measurement, not a throughput one.
+
+### The harness called that sweep untrustworthy, and was wrong
+
+`qwen38` generated at 21.7 chars/s, tripping `MIN_GEN_RATE = 30.0`, and the
+harness printed *"the box was throttled or contended … do not use them as a
+baseline."* Both clauses are false. The floor was calibrated against a mix that
+pooled at ~72.8 chars/s, and its own comment claimed "normal variation and a
+slower model mix never trip it" — an assumption a 27B at 3-bit has now expired.
+
+The deeper flaw is that the warning asserted a **cause** the rate cannot
+establish. A low chars/s is consistent with a sick box *and* with a big model on
+a healthy one; the discriminator is whether anything actually ran out of time.
+`_budget_bound()` now asks exactly that (any `timed_out`, or a wallclock stop
+reason), and the message splits: budget-bound keeps the hard "do not use as a
+baseline", while not-budget-bound says the scores stand and only the *rate* is
+incomparable across models. Build 146, 8 tests, one of which pins the real
+qwen38 numbers as the regression case.
+
+This is the fourth measurement bug of the night and the same shape as the other
+three (§5.130, §5.131, §5.134): a diagnostic that reported a confident cause it
+had not earned. Rule 83's phrasing generalises — a check must measure the thing
+it names.
