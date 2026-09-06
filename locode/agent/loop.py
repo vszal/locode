@@ -1945,16 +1945,39 @@ class AgentLoop:
 
     def _nudge_open_tasks(self) -> None:
         nxt = self.plan.current
+        # "Do the work now" is the right push while the suite is red. Once it is
+        # green it is the wrong one, and measurably so: the plan's tasks are
+        # usually already *done* at that point and merely unchecked, so the
+        # cheapest tool call that looks like "doing the work" is re-running the
+        # tests that just passed. Measured on b139/exec-bugfix (2026-09-05):
+        # runs whose plan happened to carry a verify-shaped task closed at 13
+        # iterations via `verify task credited`; the 7 runs whose tasks were all
+        # "fix X" got this nudge at green, re-ran pytest to the same green, got
+        # nudged again, and only then reconciled the plan — 16 iterations, a
+        # 5-iteration tail that is 31% of the loop.
+        #
+        # So when the suite is green, point at reconciliation first. Deliberately
+        # phrased as a conditional, not an instruction to close the plan: a green
+        # suite does not mean every task is done (docs, cleanup, a task the model
+        # set itself), and the remaining-work branch stays available in the same
+        # breath. Nothing is auto-completed here — the model still decides.
+        if self._saw_green_test:
+            tail = ("The test suite is currently green, so any task here that "
+                    "describes work you have already finished should be checked "
+                    "off with update_plan rather than done again — re-running "
+                    "the passing tests proves nothing new. If a task is genuinely "
+                    "still outstanding, do that work now with a tool call.")
+        else:
+            tail = (f"Continue with: {nxt.text if nxt else 'the next task'}. "
+                    "Do the work now with a tool call — do not reply with a "
+                    "summary. If a task turned out to be unnecessary or "
+                    "impossible, call update_plan to mark it done and say "
+                    "why, then carry on with the rest.")
         self.history.append({
             "role": "user",
             "content": (f"You are not finished — your own plan still has "
                         f"{len(self.plan.open)} task(s) open:\n\n"
-                        f"{self.plan.render()}\n\n"
-                        f"Continue with: {nxt.text if nxt else 'the next task'}. "
-                        "Do the work now with a tool call — do not reply with a "
-                        "summary. If a task turned out to be unnecessary or "
-                        "impossible, call update_plan to mark it done and say "
-                        "why, then carry on with the rest."),
+                        f"{self.plan.render()}\n\n" + tail),
             "kind": "nudge",
         })
         self._on_event({"phase": "nudge", "reason": "open plan tasks",

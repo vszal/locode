@@ -4365,3 +4365,38 @@ def test_mutates_existing_only_counts_content_already_on_disk(tmp_path):
     assert not _mutates_existing(Call("append_file", path="./new.py"), cwd)
     assert not _mutates_existing(Call("bash", cmd="ls"), cwd)
     assert not _mutates_existing(Call("write_file"), cwd)
+
+
+async def test_open_tasks_nudge_points_at_the_plan_once_tests_are_green(tmp_path):
+    # b139/exec-bugfix, 2026-09-05: with the suite already green, the generic
+    # "do the work now" wording sent the model back to re-run the passing tests
+    # (proving nothing) before it thought to check its plan off — a 5-iteration
+    # tail on 7 of 12 runs. Green means the nudge must point at reconciliation.
+    (tmp_path / "t.py").write_text("x = 1\n")
+    loop = make_loop(tmp_path, [
+        native_call("update_plan", tasks=["[ ] fix the bug"]),
+        native_call("bash", cmd="pytest -q"),
+        {"role": "assistant", "content": "Done."},
+    ])
+    loop._saw_green_test = True
+    loop.plan.replace(["[ ] fix the bug"])
+    loop._nudge_open_tasks()
+    msg = loop.history[-1]["content"]
+    assert "green" in msg
+    assert "update_plan" in msg
+    assert "proves nothing new" in msg
+    # It must not tell the model to go do the work as the first move.
+    assert "Do the work now with a tool call" not in msg
+
+
+async def test_open_tasks_nudge_still_demands_work_while_tests_are_red(tmp_path):
+    # The green branch above must not swallow the original push. While the suite
+    # is red the open tasks are real work, and the nudge says so.
+    loop = make_loop(tmp_path, [{"role": "assistant", "content": "ok"}])
+    loop._saw_green_test = False
+    loop.plan.replace(["[ ] fix the bug"])
+    loop._nudge_open_tasks()
+    msg = loop.history[-1]["content"]
+    assert "Do the work now with a tool call" in msg
+    assert "fix the bug" in msg
+    assert "green" not in msg
