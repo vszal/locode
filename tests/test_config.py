@@ -5,7 +5,7 @@ from locode.config import Config
 
 def test_defaults():
     cfg = Config()
-    assert cfg.model.default == "qythos9"
+    assert cfg.model.default == "qwen38"
     assert cfg.server.port == 8081
     assert cfg.permissions.tools["bash"] == "ask"
     assert cfg.permissions.tools["read_file"] == "auto"
@@ -69,14 +69,14 @@ def test_cli_override_wins(tmp_path):
 
 def test_missing_file_is_tolerant(tmp_path):
     cfg = Config.load(tmp_path / "does-not-exist.toml")
-    assert cfg.model.default == "qythos9"
+    assert cfg.model.default == "qwen38"
 
 
 def test_broken_toml_falls_back(tmp_path):
     p = tmp_path / "config.toml"
     p.write_text("this is = = not valid toml [[[")
     cfg = Config.load(p)
-    assert cfg.model.default == "qythos9"
+    assert cfg.model.default == "qwen38"
 
 
 # --- remote / endpoint configuration ------------------------------------------

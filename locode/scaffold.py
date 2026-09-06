@@ -21,10 +21,12 @@ STARTER_CONFIG = """\
 # entirely and pass a full "org/model" id (with -m or /model).
 
 [model]
-default = "qythos9"         # which alias to load at startup (the reliable editor)
+default = "qwen38"          # which alias to load at startup
+# ~11 GB. On a 16 GB machine use qythos9 (~9.6 GB) instead.
 
 [aliases]
 # alias       = "huggingface-org/model-id"
+qwen38      = "lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly"
 qythos9     = "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx"
 gemma12     = "rajaschitnis/gemma-4-12b-it-text-only-4bit-mlx"
 qwen14      = "mlx-community/Qwen3-14B-4bit"

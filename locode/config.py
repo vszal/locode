@@ -66,13 +66,22 @@ class ServerConfig:
 
 @dataclass
 class ModelConfig:
-    # qythos9 is the out-of-box default because it is the reliable editor: across
-    # the eval rounds it landed edits at ~84% vs the alternatives' ~58%, and it
-    # owned none of the no-op edit dead-ends that stall a turn. It is a smaller,
-    # slower 9B and can hit the generation cap on very large single-file writes,
-    # but for an interactive coding tool, edits that actually apply matter more
-    # than raw speed. Override per-run with -m or per-machine in config.toml.
-    default: str = "qythos9"
+    # qwen38 (Qwen3.8-27B, 3-bit, ~11 GB) is the out-of-box default as of
+    # 2026-09-06. It beat the previous default qythos9 on `repro-only` — the one
+    # eval case with dynamic range left — 20/20 perfect runs against 9/20,
+    # Fisher exact p=0.0138 even when qythos9 is granted its single best sweep
+    # (ROADMAP §5.138). The other three cases are at ceiling for both models, so
+    # this is one demonstrated win plus three ties, not a sweep.
+    #
+    # It is also *faster in wallclock despite decoding ~4x slower per character*
+    # (95s vs 116s on repro-only): it needs ~5-6 iterations where qythos9 needs
+    # ~9. Judge a local model by iterations-to-done, not tokens/sec.
+    #
+    # Caveat for smaller machines: at ~11 GB it needs more headroom than the
+    # 9.6 GB qythos9, and server/manager.py:_check_memory_budget will refuse it
+    # under (total RAM - memory_reserve_gb). On a 16 GB box set
+    # default = "qythos9" in config.toml. Override per-run with -m.
+    default: str = "qwen38"
     # Per-turn generation ceiling. A whole write_file/edit_file call — the file
     # body included — must fit in ONE completion, and on a reasoning distill the
     # <think> preamble eats into the same budget, so a tight cap truncates the
