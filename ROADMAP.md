@@ -10759,3 +10759,119 @@ Three things worth keeping:
   footprint, a specific budget, and a specific remedy ("pick a smaller model"),
   and the remedy was exactly wrong. Rule 84's closing clause generalises here —
   check the instrument before believing what it reports about the subject.
+
+## §5.140 — four harder cases, and the discovery that a red test suite is localisation
+
+The suite had run out of headroom. §5.136 recorded `exec-pinpoint` saturated at
+1.000 with zero variance, §5.138 recorded `exec-ambig` at ceiling for both
+models tested, and qwen38 took `repro-only` 20/20. A suite the default model
+never loses on cannot distinguish a harness improvement from noise, so the task
+was to build cases with range.
+
+Four were built, all validated against synthetic answers before any model saw
+them (see rule 85), all with a correct fix scoring exactly 1.000 and every
+cheat path scoring below the untouched seed.
+
+| case | thesis | qwen38, n=6 | iters |
+|---|---|---|---|
+| `cross-module-cause` | depth: cause two modules from the symptom, plus a decoy | **6/6 at 1.000** | 5 |
+| `multi-defect-suite` | breadth: five unrelated defects behind one red suite | **6/6 at 1.000** | 4.7 |
+| `multi-defect-blind` | the same five defects, no test suite | **6/6 at 1.000** | **9.5** |
+| `regression-trap` | the obvious fix breaks a currently-green test | **8/8 at 1.000** | 5.9 |
+
+**Two of the four theses were simply wrong, and that is the finding.** Depth and
+breadth are not what makes work hard for this model. `cross-module-cause` gives
+a symptom in `app.py`, which is correct, a cause in a memoisation key two
+modules away, and a `FIXME` on a line that is right; qwen38 solved it in five
+iterations, six times out of six, with wallclock variance under 15s.
+`multi-defect-suite` asks for five unrelated fixes including one that needs
+real thought (shares that must add back up to the bill), and it went 6/6 in
+four to five iterations.
+
+Reading the trajectory rather than the score column says why, and it is not
+that the model got lucky. On `multi-defect-suite` it read the module, ran
+`pytest -q` once, was handed five tracebacks naming five functions, made five
+correct minimal edits, and re-ran to green. No test edits, no fabrication, the
+grader measuring exactly what it should. **The red test suite had localised
+every defect it covered.** Five failing tests is five pointed-at lines, not
+five units of difficulty — which is rule 86, and which also explains after the
+fact why `repro-only`, the only execute case that held range all night, is the
+one case that ships no tests.
+
+`multi-defect-blind` is the controlled test of that claim: the same module, the
+same five defects, a byte-identical probe (a test pins both), with only the
+suite removed and a prompt that says merely to check each function against its
+docstring. Asserting that localisation was doing the work is cheap; measuring
+it is not much harder.
+
+**The result is a clean split between outcome and cost.** The score did not
+move — 6/6 at 1.000 either way — but iterations went 4.67 → 9.50, a 2.04x
+increase with the two sets not overlapping at all (max 5 with tests, min 6
+without; exact two-sided permutation p = 2/924 = 0.0022). Wallclock went ~115s
+to ~155s. Without a suite the model edited first, got nudged for it, then built
+its own `python3 -c` probe covering all five functions and iterated
+probe → fix → probe three times before it was satisfied.
+
+So localisation was doing substantial real work, and qwen38 is simply capable
+enough to do without it. That is worth having straight: the harness's own
+design note says score is outcome and the metrics are how painfully it got
+there, and this pair is the cleanest instance of that distinction yet measured
+here — a 2x swing in cost at a completely flat outcome. A case that doubles the
+work without moving the score is still useless as a regression gate on score,
+and genuinely useful as one on iterations.
+
+### `regression-trap`, and range that was never there
+
+This was the one case that produced sub-ceiling scores: 0.78, 1.00, 0.78, 0.78,
+1.00, 0.78 — mean 0.853, two of six perfect. `normalize_key` has two callers
+with conflicting needs, `lookup` wanting case-insensitive comparison and
+`labels` needing to list a readable name back, so the fix the bug report invites
+breaks a test that is green in the seed.
+
+All four losses were on `whitespace_still_collapsed`, which is a regression
+GUARD rather than the primary — reason enough to read the code before crediting
+the case with a find. The model's fix was well-reasoned: fold for the key,
+store `(name, value)`, have `labels()` return the stored name. Its only
+divergence was storing the RAW name, so `labels()` stopped collapsing
+whitespace.
+
+**And the seed had licensed exactly that.** The module docstring said the
+normalised form is what gets listed; `labels()` itself said "as it was
+entered". Two docstrings in tension is a puzzle about the case author's prose,
+not about engineering, and it is the same error as the `plan_has_tasks` regex
+that graded formatting instead of the requirement (§5.135). The contract was
+made explicit — normalised form, keeping the entered capitalisation — with no
+test added to pin it, since a test would hand back the localisation
+`multi-defect-blind` exists to remove.
+
+Re-swept at n=8: **8/8 at 1.000, every check green.** The range was the
+ambiguity. That is rule 87, and it is worth stating plainly rather than
+burying: a case that discriminates because its own documentation contradicts
+itself is measuring the reader, and the discrimination evaporates the moment
+the contract is stated once.
+
+### Where this leaves the suite
+
+Twenty-six runs across four new cases, and **every one scored 1.000.** The
+honest summary is that the attempt to build harder cases failed on its own
+terms: breadth, depth, decoys, a regression trap, and a missing test suite are
+each not hard for qwen38 on a one-to-three-file Python task. What was actually
+established is narrower and more useful than the cases themselves:
+
+- **The old suite was not measuring the model's ceiling, and neither is the new
+  one.** Saturation at 1.000 across every axis tried is evidence that the
+  difficulty knob is not "more defects", "further away", or "less signposted".
+- **Cost still moves when outcome does not.** The suite/blind pair is a 2.04x
+  swing in iterations at a flat score, and iterations remain a live instrument
+  after score has died.
+- The next axis to try is therefore not a harder bug but a different shape:
+  scale beyond what fits in one context, requirements that are genuinely
+  underdetermined and need a question asked, or tasks whose correct answer is
+  "this cannot be determined from what is here" — the one thing none of these
+  cases can express, because every one of them has a right answer sitting in
+  the workspace.
+
+Rules coined here: **85** (validate a grader against a synthetic correct answer
+before any model run), **86** (a red suite localises, so it measures fixing
+rather than finding), **87** (read the losing runs before crediting a case with
+range).

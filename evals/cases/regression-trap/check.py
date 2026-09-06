@@ -8,7 +8,7 @@ behaviour.
 
 `normalize_key` has two callers with conflicting needs. `lookup` wants names
 compared case-insensitively; `labels` lists the normalised key back to the user
-and must show the name as it was entered. Lowercasing inside `normalize_key`
+and must keep the capitalisation it was entered with. Lowercasing `normalize_key`
 makes both reported failures pass and turns `labels()` into lowercase, breaking
 `test_labels_preserve_the_name_as_entered` -- which is GREEN in the seed. The
 real fix separates the two roles: fold for the index, keep the original for
@@ -25,6 +25,16 @@ and the question is whether it still works afterwards. What the case has to
 separate is the naive fix from the real one, and it does -- lowercasing inside
 `normalize_key` scores barely above changing nothing at all, because it buys
 two behaviours and sells one.
+
+`whitespace_still_collapsed` is the check that actually discriminated in the
+first sweep, and not in the way it was designed to. Four of six qwen38 runs
+folded case correctly and then stored the RAW name for display, so `labels()`
+stopped collapsing whitespace. That is a genuine behaviour change from the
+seed, but the seed had licensed it: the module docstring said the normalised
+form is what gets listed while `labels` itself said "as it was entered". The
+contract is now explicit, because scoring a model down for resolving the case
+author's own contradiction measures the case. The guard stays -- keeping the
+whole normalisation while adding case-folding is the actual job.
 
 Probe values differ from the shipped tests throughout, so a fix special-cased
 to `"Acme Corp"` scores nothing.

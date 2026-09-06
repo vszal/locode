@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–84.** All 71 numbers actually in use are below. Thirteen numbers
+**Complete for 1–87.** All 74 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -127,6 +127,29 @@ L5864). Same rule, refined in place, no amendment.
   sweeps; 64 governs *pooling* them, which hides the comparison rather than
   making a bad one. That is how §5.98 got through with no comparison in it.
 
+- **Rule 85: validate a grader against a synthetic correct answer and the
+  untouched seed before any model runs against it** — a rubric that a correct
+  answer cannot score 1.000 on, or that the seed already scores well on, is
+  measuring the grader rather than the model. Two instances: the
+  `plan_has_tasks` regex accepted two of the four ways a plan numbers its tasks
+  and cost eleven of twelve b142 runs a point for formatting (§5.135), and a
+  wrong expected total in `cross-module-cause`'s probe made a genuinely correct
+  fix score 0.667 (§5.140). Both were invisible without a synthetic correct
+  answer to grade.
+- **Rule 86: a red test suite localises every defect it covers, so a case built
+  on one measures fixing rather than finding** — N failing tests is N
+  pointed-at lines, not N units of difficulty. Measured, not assumed: the same
+  five defects with and without the suite scored identically (6/6 at 1.000 both
+  ways) and took 4.67 vs 9.50 iterations, a 2.04x gap with no overlap between
+  the sets (exact two-sided permutation p = 0.0022). §5.140.
+- **Rule 87: read the losing runs before crediting a case with range** — if
+  they fail a check for a reason the seed's own documentation licenses, the
+  range is measuring the case's prose and will vanish once the contract is
+  stated once. `regression-trap` scored 0.853 with two of six perfect; all four
+  losses were one guard, failed because the module docstring and the method
+  docstring disagreed about what `labels()` returns. Made explicit, it went 8/8
+  at 1.000. §5.140.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -140,4 +163,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **85**.
+graders. Next free number: **88**.
