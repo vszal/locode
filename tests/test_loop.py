@@ -3353,7 +3353,8 @@ class ScriptedTool:
         return ToolResult(self.payloads[args["which"]], is_error=True)
 
 
-def make_loop_with_tests(tmp_path, scripted, payloads, cfg=None, extra=()):
+def make_loop_with_tests(tmp_path, scripted, payloads, cfg=None, extra=(),
+                         confirm=None):
     reg = Registry()
     for t in fs.all_tools():
         reg.register(t)
@@ -3365,7 +3366,8 @@ def make_loop_with_tests(tmp_path, scripted, payloads, cfg=None, extra=()):
     cfg.agent.max_repeat_calls = 99   # isolate the same-failure path
     cfg.agent.max_error_stall = 99
     return AgentLoop(FakeClient(scripted), FakeManager(), reg,
-                     PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path))
+                     PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path),
+                     confirm=confirm)
 
 
 def _results(loop):
@@ -4400,3 +4402,99 @@ async def test_open_tasks_nudge_still_demands_work_while_tests_are_red(tmp_path)
     assert "Do the work now with a tool call" in msg
     assert "fix the bug" in msg
     assert "green" not in msg
+
+
+async def _yes(name, args, preview):
+    return "yes"
+
+
+# --- [revert] an edit that restores an already-tested version ---------------
+# The pattern, from b141 exec-bugfix r4: the model lands `+1 -> +2`, the tests
+# still fail, and three calls later it lands `+2 -> +1`, putting the file back
+# to the content the suite rejected at the start. Neither `no_change` (which
+# needs old == new inside one call) nor the same-failure note (which reports the
+# test output, not the edit history) says so. ROADMAP 5.128.
+
+def _edit_results(loop):
+    return [r for r in _results(loop) if "[edit_file]" in r]
+
+
+async def test_an_edit_that_restores_a_tested_version_is_annotated(tmp_path):
+    (tmp_path / "t.py").write_text("cut = limit + 1\n")
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         native_call("read_file", path="t.py"),
+         native_call("edit_file", path="t.py",
+                     old="cut = limit + 1", new="cut = limit + 2"),
+         native_call("run_tests", which="red"),
+         native_call("edit_file", path="t.py",
+                     old="cut = limit + 2", new="cut = limit + 1"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED}, confirm=_yes)
+    await loop.run_turn("fix it")
+    edits = _edit_results(loop)
+    assert len(edits) == 2
+    assert "REVERTED" not in edits[0]        # the first edit is novel
+    assert "REVERTED" in edits[1]
+    assert "already tried" in edits[1]
+    assert (tmp_path / "t.py").read_text() == "cut = limit + 1\n"
+
+
+async def test_the_revert_note_stays_quiet_until_a_test_has_failed(tmp_path):
+    # Same two edits, no red run before them. On the construction cases — build
+    # from a spec, no red oracle to oscillate against — a revert is ordinary
+    # editing and scores flat, so it must not be flagged.
+    (tmp_path / "t.py").write_text("cut = limit + 1\n")
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("read_file", path="t.py"),
+         native_call("edit_file", path="t.py",
+                     old="cut = limit + 1", new="cut = limit + 2"),
+         native_call("edit_file", path="t.py",
+                     old="cut = limit + 2", new="cut = limit + 1"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED}, confirm=_yes)
+    await loop.run_turn("fix it")
+    assert len(_edit_results(loop)) == 2
+    assert not any("REVERTED" in r for r in _results(loop))
+
+
+async def test_moving_forward_through_versions_is_not_a_revert(tmp_path):
+    # A -> B -> C never returns to a tested version, so nothing fires even
+    # though the suite is red and the model is editing the same line.
+    (tmp_path / "t.py").write_text("cut = limit + 1\n")
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         native_call("read_file", path="t.py"),
+         native_call("edit_file", path="t.py",
+                     old="cut = limit + 1", new="cut = limit + 2"),
+         native_call("edit_file", path="t.py",
+                     old="cut = limit + 2", new="cut = limit + 3"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED}, confirm=_yes)
+    await loop.run_turn("fix it")
+    assert len(_edit_results(loop)) == 2
+    assert not any("REVERTED" in r for r in _results(loop))
+
+
+async def test_the_revert_note_rides_behind_the_tool_output(tmp_path):
+    # The note is appended after result_sig is computed. If it leaked into the
+    # signature, two identical results would look different and the repeat
+    # guard would silently stop firing on exactly the runs it exists for — so
+    # the tool's own output must still come first, with the note after it.
+    (tmp_path / "t.py").write_text("cut = limit + 1\n")
+    loop = make_loop_with_tests(
+        tmp_path,
+        [native_call("run_tests", which="red"),
+         native_call("read_file", path="t.py"),
+         native_call("edit_file", path="t.py",
+                     old="cut = limit + 1", new="cut = limit + 2"),
+         native_call("edit_file", path="t.py",
+                     old="cut = limit + 2", new="cut = limit + 1"),
+         {"role": "assistant", "content": "ok"}],
+        {"red": RED}, confirm=_yes)
+    await loop.run_turn("fix it")
+    annotated = next(r for r in _results(loop) if "REVERTED" in r)
+    assert annotated.index("[edit_file]") < annotated.index("REVERTED")

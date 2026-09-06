@@ -286,6 +286,11 @@ class AgentLoop:
         # module it had been editing instead, every time. Turn-scoped for the
         # same reason as _last_test_id.
         self._last_edit_file = None
+        # [revert] Every (old, new) pair this turn has actually landed, keyed by
+        # path, so a later edit that puts the file back can be recognised as a
+        # return to content the tests have already rejected. Turn-scoped like
+        # _last_edit_file. See _revert_note for why this is worth tracking.
+        self._edit_pairs: dict[str, list[tuple[str, str]]] = {}
         open_task_nudges = 0
         missing_deliverable_nudges = 0
         # Whether a real tool call has happened since the last missing-
@@ -1343,6 +1348,9 @@ class AgentLoop:
         error_parts: list[str] = []
         self._noop_calls: list = []
         no_change = False
+        # [revert] (result index, filename) for edits that restored a version
+        # already tested. Annotated after result_sig is computed, below.
+        revert_at: list[tuple[int, str]] = []
         ran = errored = noinfo = 0
         for call in calls:
             tool = self._registry.get(call.name)
@@ -1475,6 +1483,26 @@ class AgentLoop:
                 edited = (call.args or {}).get("path")
                 if isinstance(edited, str) and edited.strip():
                     self._last_edit_file = os.path.basename(edited.rstrip("/"))
+                    # [revert] Did this edit undo one of its own predecessors?
+                    _old = (call.args or {}).get("old")
+                    _new = (call.args or {}).get("new")
+                    if (isinstance(_old, str) and isinstance(_new, str)
+                            and _old != _new):
+                        _prior = self._edit_pairs.setdefault(edited, [])
+                        # Gated on a test having FAILED this turn. The archive
+                        # says a revert means opposite things either side of
+                        # that line: on the debugging cases, holding edit count
+                        # fixed, runs containing one score 0.368 against 0.929
+                        # at five edits and 0.408 against 0.875 at six, while on
+                        # e2e-spec-to-code — building from a spec, no red oracle
+                        # to oscillate against — it is flat at every stratum.
+                        # The gate keeps 100% of the reverts on the two
+                        # debugging cases and drops a third of the harmless
+                        # ones. ROADMAP 5.128.
+                        if (_new, _old) in _prior and self._last_test_id is not None:
+                            revert_at.append((len(results) - 1,
+                                              self._last_edit_file))
+                        _prior.append((_old, _new))
             if getattr(res, "no_change", False):
                 # [escalated-stall] Build 116's second, EARLIER trigger. A
                 # byte-identical `old`/`new` edit is the sharpest death marker
@@ -1509,6 +1537,14 @@ class AgentLoop:
         # look novel and silently disable the guard on the exact case it exists
         # for.
         result_sig = "\n".join(f"{name}: {content}" for name, content in results)
+        # [revert] Appended AFTER result_sig for the same reason the same-failure
+        # note is: the repeat guard compares raw result bytes, and an annotation
+        # folded into that signature would make every repeat look novel and
+        # disable the guard on exactly the runs it exists for.
+        for _idx, _fname in revert_at:
+            _n, _c = results[_idx]
+            results[_idx] = (_n, _c + _revert_note(_fname))
+            self._on_event({"phase": "nudge", "reason": "edit reverted to a tested state"})
         # [same-failure] Name a repeat failure in the result the model is about
         # to read, before it reads it. Scoped to the TURN, not the batch: the two
         # runs being compared are usually several iterations apart with edits in
@@ -2493,6 +2529,46 @@ def _split_test_ids(names: list[str]) -> tuple[str, list[str]]:
     if len(files) != 1 or not all("::" in n for n in names):
         return "", names
     return files.pop(), [n.split("::", 1)[1] for n in names]
+
+
+def _revert_note(fname: str | None) -> str:
+    """The note appended to an edit that put a file back to a tested version.
+
+    The pattern this catches is narrow and entirely mechanical: the model lands
+    `old -> new`, the tests still fail, and a few calls later it lands
+    `new -> old`, returning the file to content the suite has already rejected.
+    Neither existing guard sees it. `no_change` fires only on a byte-identical
+    `old`/`new` within one call; the same-failure note fires on the test output
+    and says the failure repeated, which is true but does not say the model
+    undid its own work. The harness knows the edit history and the model, whose
+    context holds a summarised version of it, demonstrably does not.
+
+    Exposure is 32.9% of 2322 archived runs. The cost is real and survives a
+    control for edit count, which matters because a run going badly makes more
+    edits and so has more chances to revert: on `exec-bugfix`, at five landed
+    edits, runs containing a revert score 0.368 against 0.929 without, and at
+    six edits 0.408 against 0.875. `exec-stall-trap` moves the same way. On
+    `e2e-spec-to-code` it is flat at every stratum — building from a spec, a
+    revert is ordinary editing — which is why this is gated on a test having
+    failed rather than fired on every revert.
+
+    The wording follows the lesson of build 108 (see _same_failure_note): name
+    the concrete resource, demand an action, and do not invite narration. The
+    resource here is the assertion pytest already printed above this note — in
+    the trajectory that prompted this, the model cycled a constant `+1 -> +2 ->
+    +1` while `assert 'abc...' == 'ab...'` sat in its context, and never tried
+    the value the assertion implies. So the note rules out both versions it has
+    tried and points at the arithmetic. ROADMAP 5.128."""
+    where = f"`{fname}`" if fname else "that file"
+    return (
+        f"\n\n⟳ REVERTED — this edit put {where} back to content you have "
+        "ALREADY run the tests against, and they failed on it then. Cycling "
+        "between two versions cannot find the answer: both have now been ruled "
+        "out.\n"
+        "Do not send a third variation by guessing. The failing test above "
+        "prints what it expected and what it actually got — work the required "
+        "value out from those two strings, then make an edit that is neither "
+        "of the two you have already tried.")
 
 
 def _same_failure_note(n: int, names: list[str] | None = None,
