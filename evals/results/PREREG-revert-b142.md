@@ -70,3 +70,16 @@ does not touch. The change is a file copy performed after the checker has run
 and the score is fixed; it cannot reach the agent, the events, or any metric.
 Recorded here rather than left implicit, because §5.128's doc-track probe had to
 be rescued from exactly this shape of surprise.
+
+## Amendment 4 — `plan_has_tasks` broadened mid-sweep (checker, e2e only)
+
+The `e2e-spec-to-code` checker's `plan_has_tasks` rule was broadened (§5.131,
+rule 80) while ARM F was still on `exec-bugfix`. Neither arm has reached its
+e2e case yet, so **ARM F and ARM G will both be graded by the new rule** and
+stay comparable to each other.
+
+ARM D and ARM E were graded by the old rule. Their e2e scores are therefore not
+comparable to ARM F/G's on that one check — which costs nothing, since D/E ran
+qythos9 and F/G run qwencoder14 and were never a valid cross-comparison. The
+D-vs-E and F-vs-G contrasts, which are the ones the pre-registration is about,
+are each internally consistent.
