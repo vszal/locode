@@ -29,12 +29,19 @@ _FAILED = re.compile(r"\b\d+ (failed|error)")
 
 
 def firings(path: str) -> int:
-    """How many edits in this run restored an already-tested version."""
+    """How many edits in this run restored an already-tested version.
+
+    An edit counts only if it actually landed. `loop.py` records the pair under
+    `not res.is_error`, so a rejected edit -- a stale `old`, an unread file --
+    never enters the history and cannot be reverted to. Counting attempts
+    instead overstates the rate badly: on qwencoder14, 69 of 111 `edit_file`
+    calls are rejected, which inflated the first ARM F/G numbers by about 30%.
+    """
     pairs: dict[str, list[tuple[str, str]]] = collections.defaultdict(list)
     seen_failure = False
     count = 0
-    for line in open(path):
-        event = json.loads(line)
+    events = [json.loads(line) for line in open(path)]
+    for i, event in enumerate(events):
         phase = event.get("phase")
         if phase == "result":
             content = event.get("content") or ""
@@ -48,10 +55,22 @@ def firings(path: str) -> int:
         if not (isinstance(target, str) and isinstance(old, str)
                 and isinstance(new, str) and old != new):
             continue
+        if _rejected(events, i):
+            continue
         if (new, old) in pairs[target] and seen_failure:
             count += 1
         pairs[target].append((old, new))
     return count
+
+
+def _rejected(events: list[dict], i: int) -> bool:
+    """Did the edit at `events[i]` fail? Its result is the next `result` event."""
+    for event in events[i + 1:]:
+        if event.get("phase") == "result":
+            return bool(event.get("error"))
+        if event.get("phase") == "run":
+            break
+    return True
 
 
 def report(results_dir: str) -> tuple[int, int, int]:

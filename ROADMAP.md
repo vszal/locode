@@ -10476,3 +10476,36 @@ note fires, read the next edit to the same path and classify it: (a) a third,
 novel value, (b) a return to one of the two already tried, or (c) no further
 edit to that path. P2 passes if (a) is the plurality. The matching ARM F
 denominator is every firing above — in this run, all five are (b).
+
+## §5.134 — the detector was counting edits that never landed
+
+`revert_exposure.py` was committed claiming it "reproduces the live note
+exactly", on the strength of matching b142/qythos9 at 2 firings. On ARM G it
+reported 29 where the loop emitted 20. The claim was true of the arm it was
+checked against and false in general — the same shape of error as §5.128 and
+§5.133, for the third time tonight.
+
+Cause: `loop.py` records an edit's `(old, new)` pair only under
+`not res.is_error`. A rejected edit — stale `old`, file not yet read — never
+enters the history, so nothing can revert *to* it. The mirror counted every
+`edit_file` call. On qwencoder14 that matters enormously: **69 of 111
+`edit_file` calls are rejected**, against a handful on qythos9, which is exactly
+why the discrepancy hid on the arm the tool was validated against.
+
+Fixed by pairing each edit with its result event and skipping any with
+`error` set. The mirror is now exact on both arms it can be checked against:
+20 = 20 on ARM G, 2 = 2 on ARM E. Two tests pin the rejected-edit rule.
+
+**Corrections to §5.133's table.** Exposure was overstated by about a third:
+
+| arm / case | published | corrected |
+|---|---|---|
+| ARM F `exec-bugfix` | 20 runs (67%), 24 firings | **13 (43%), 17** |
+| ARM F `exec-ambig` | 18 runs (90%), 49 firings | **11 (55%), 42** |
+| ARM F `e2e` | 2 runs (17%), 6 firings | **2 (17%), 6** |
+| ARM F total | 40 of 62, 79 firings | **26 of 62, 65 firings** |
+
+The qythos9 arms are unchanged — on that model almost every edit lands, so the
+two rules agree. P1′ still clears by a wide margin. The 62%-rejected-edit rate
+on qwencoder14 is a finding in its own right and is not what this build was
+built to address.
