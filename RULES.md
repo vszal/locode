@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–83.** All 70 numbers actually in use are below. Thirteen numbers
+**Complete for 1–84.** All 71 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -89,6 +89,7 @@ anchor is authoritative if one ever drifts.
 | 81 | Checks that never vary set a floor and a dead band inside a case's score, so subtract them before reading a delta — a case with an always-passing check compresses every change by that check's weight. | §5.132 |
 | 82 | A check that has never failed may be inert or may only be untested by the models in the archive; before calling it a fixed floor, confirm a weaker model also cannot trip it. | §5.133 |
 | 83 | Weight substantive checks against scaffolding ones, don't just count them: when "a file exists and contains a keyword" checks outnumber "the work runs and is correct" checks, a model that emits plausible non-working artifacts collects most of the score and the case reports a success it did not earn. | §5.135 |
+| 84 | Two sweeps of an identical configuration can disagree at p<0.05, so test homogeneity before pooling them and treat one sweep's mean on a high-variance case as a draw, not the case's value; when pooling is unsafe, grade the claim on the framing most favourable to the arm you are arguing against. | §5.138 |
 
 ⚠ = **reconstructed.** The number is cited but never stated outright anywhere in
 `ROADMAP.md`; the wording is inferred from its use sites and is **not** a
@@ -139,4 +140,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **84**.
+graders. Next free number: **85**.

@@ -10586,7 +10586,7 @@ numbers were re-measured.
 | exec-bugfix | 0.967 (n=30) | **1.000** | — |
 | exec-ambig | **1.000** | 0.500 | 0/6 |
 | exec-pinpoint | **1.000** (n=12) | 0.500 | 0/6 |
-| repro-only | **0.819** (n=12) | 0.500 | 2 per run |
+| repro-only | **0.717** (n=20) | 0.500 | 2 per run |
 
 Three decisive wins, one narrow loss. **All locode numbers here are `qythos9`.**
 The 0.467–0.550 figures in §5.135 are `qwencoder14`, a deliberately weaker model
@@ -10601,8 +10601,9 @@ Two observations worth keeping:
   opposite reason: it is saturated at the ceiling rather than pinned at a
   scaffolding floor. It can still detect a regression; it cannot show an
   improvement. Keep it as a canary, not as a lever test.
-- **`repro-only` is the one case with genuine spread** — 0.819 at b142 against
-  0.833 at b140 (unchanged), with per-run scores ranging 0.33–1.00 and the
+- **`repro-only` is the one case with genuine spread** — 0.717 at b142 over 20
+  runs (corrected in §5.138 from the 0.819 first published here on n=12)
+  against 0.833 at b140, with per-run scores ranging 0.33–1.00 and the
   nudge mix varying run to run (`repetition loop` 6, `slow progress` 4). It is
   the most informative of the four and the right place to aim the next lever.
 - aider's failure mode is unchanged and is the structural point: on the two
@@ -10660,3 +10661,62 @@ This is the fourth measurement bug of the night and the same shape as the other
 three (§5.130, §5.131, §5.134): a diagnostic that reported a confident cause it
 had not earned. Rule 83's phrasing generalises — a check must measure the thing
 it names.
+
+## §5.138 — qwen38 beats qythos9 on repro-only, and qythos9's variance was worse than 12 runs showed
+
+The pre-registered confirmation ran (`PREREG-qwen38-repro.md`, amended once for
+the agent-root check). Extending both arms to n=20:
+
+| | perfect runs | mean | iters | wallclock |
+|---|---|---|---|---|
+| `qwen38` | **20/20** | **1.000** | 5.5 | 94.9s |
+| `qythos9` | 9/20 | 0.717 | 8.7 | 115.9s |
+
+**Fisher exact two-tailed p = 0.000145.** The pre-registered falsifier — a
+single imperfect `qwen38` run — never occurred: it is 20/20 across two sweeps
+launched forty minutes apart.
+
+### The pooling assumption failed, and the result survives anyway
+
+Before reading the p-value I tested whether the two `qythos9` sweeps could
+legitimately be pooled. **They cannot:** stage 3 gave 8/12 perfect, stage 6 gave
+1/8, and Fisher on those two is **p = 0.0281**. Two sweeps of an identical
+configuration disagreed at the 5% level.
+
+The machine-state explanation is ruled out. Generation rate was **76.5 ch/s in
+stage 3 and 75.7 in stage 6** — flat — and `qwen38` likewise held 22.3 → 21.4
+across the same window. Nothing was throttled; four hours of continuous GPU did
+not degrade the box. What differed is the model's own behaviour: the stage-6
+nudge mix carries `announced intent` 3 and `repeated call` 3, neither of which
+appears in stage 3.
+
+So the honest reading is that `repro-only` has far more per-run variance on
+`qythos9` than n=12 revealed, and the 0.819 published in §5.136 was a **high
+draw**, not the case's value. That table is corrected above to 0.717 (n=20).
+It still beats aider's 0.500, so §5.136's conclusion is unchanged.
+
+Because pooling is unsafe, the claim is graded on the **most conservative**
+framing available — `qythos9`'s *best* sweep against `qwen38`'s full record:
+
+- pooled (as pre-registered): 9/20 vs 20/20, p = 0.000145
+- **conservative, qythos9's best sweep only: 8/12 vs 20/20, p = 0.0138**
+- qythos9's worst sweep only: 1/8 vs 20/20, p = 0.000007
+
+Significant at alpha = 0.05 under every reading, including the one that grants
+`qythos9` its most favourable data. **`qwen38` wins this case.**
+
+### What is and is not claimed
+
+`qwen38` is now 1.000 on exec-bugfix (n=3), exec-ambig (n=8) and repro-only
+(n=20), and has not lost a run. Three of the four cases are at ceiling for both
+models, so this is one demonstrated case win plus three ties, not a general
+capability verdict — the suite has largely run out of headroom to measure it
+(§5.135, §5.136).
+
+The efficiency observation is separate and untested but consistent across every
+case: **~5-6 iterations against ~9**, and *lower wallclock despite decoding four
+times slower* (94.9s vs 115.9s here). The chars/s figure actively misleads about
+which model finishes first — the same metric that, an hour earlier, told the
+harness to discard these runs entirely (§5.137).
+
+Coined **rule 84**.
