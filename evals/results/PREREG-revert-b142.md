@@ -57,3 +57,16 @@ in ARM G against ARM E's ~4.
   exec-bugfix and zero on the other two cases, it can show harm but cannot show
   benefit. Reporting it as evidence the fix works would be rule 78 again, in
   the other direction.
+
+## Amendment 3 — build 143 lands mid-sweep (rig only)
+
+Build 143 (workspace snapshotting in `evals/harness.py`) was committed while
+ARM F was running. The harness is re-invoked per case, so some ARM F/G cases
+will carry a `workspaces/` directory and earlier ones will not.
+
+This does not threaten the comparison. Both arms run their *agent* from frozen
+worktrees (`frozen-b141`, `frozen-b142`) via `--agent-root`, which build 143
+does not touch. The change is a file copy performed after the checker has run
+and the score is fixed; it cannot reach the agent, the events, or any metric.
+Recorded here rather than left implicit, because §5.128's doc-track probe had to
+be rescued from exactly this shape of surprise.
