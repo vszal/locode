@@ -1,0 +1,449 @@
+{
+  "label": "qwen38-ea",
+  "created": "2026-09-06 14:03:24",
+  "git_head": "1d92a33",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 124.9,
+        "model_seconds": 123.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 123.9,
+        "gen_chars": 2598,
+        "gen_chars_per_sec": 21.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 125.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwen38__r1-uaw3x2qn",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 124.8,
+        "model_seconds": 123.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 123.9,
+        "gen_chars": 2598,
+        "gen_chars_per_sec": 21.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 124.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwen38__r2-rxnbux5z",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 125.2,
+        "model_seconds": 124.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 124.2,
+        "gen_chars": 2598,
+        "gen_chars_per_sec": 20.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 125.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwen38__r3-vkdb29yu",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 125.3,
+        "model_seconds": 124.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 124.3,
+        "gen_chars": 2589,
+        "gen_chars_per_sec": 20.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 125.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwen38__r4-8p56ztbf",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 125.4,
+        "model_seconds": 124.5,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 124.4,
+        "gen_chars": 2598,
+        "gen_chars_per_sec": 20.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 125.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwen38__r5-8ew7fecf",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 125.7,
+        "model_seconds": 124.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 124.7,
+        "gen_chars": 2599,
+        "gen_chars_per_sec": 20.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 125.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwen38__r6-vve2n8ov",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 125.8,
+        "model_seconds": 124.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 124.7,
+        "gen_chars": 2598,
+        "gen_chars_per_sec": 20.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 125.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwen38__r7-3idabpi7",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 125.9,
+        "model_seconds": 125.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 124.9,
+        "gen_chars": 2589,
+        "gen_chars_per_sec": 20.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 126.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qwen38__r8-7xpp7p87",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 1.0,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 24,
+    "total_iterations": 40,
+    "nudge_histogram": {
+      "edited before running": 8,
+      "unverified edits": 8,
+      "slow progress": 8
+    },
+    "n_runs": 8,
+    "n_valid": 8,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 20.9,
+    "gen_chars": 20767,
+    "rows": {
+      "exec-ambig::qwen38": {
+        "case": "exec-ambig",
+        "track": "execute",
+        "model": "qwen38",
+        "n": 8,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "iterations_mean": 5,
+        "nudges_mean": 3,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 125.5,
+        "gen_rate_mean": 20.9,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "exec-ambig": 1.0
+    }
+  }
+}

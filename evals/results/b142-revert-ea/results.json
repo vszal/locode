@@ -1,0 +1,990 @@
+{
+  "label": "b142-revert-ea",
+  "created": "2026-09-06 03:45:43",
+  "git_head": "0407b91",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r1-epudu8j9",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r2-detbc6vl",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r3-o9u46pbf",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r4-v6nin_8z",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 5,
+      "score": 0.0,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": false,
+        "did_not_edit_tests": false,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 16,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "bash": 8,
+          "ls": 3,
+          "read_file": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.154,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "repeated call": 2
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 65.0,
+        "model_seconds": 64.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 64.6,
+        "gen_chars": 3446,
+        "gen_chars_per_sec": 53.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 65.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r5-y_57ptxs",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r6-tgsvhcik",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r7-m0vhuz3a",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r8-yhfsb7h2",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 9,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r9-xkl0yima",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 10,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 38.0,
+        "model_seconds": 37.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.9,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r10-0j764ufy",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 11,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r11-4rwqbng3",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 12,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 38.0,
+        "model_seconds": 37.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.9,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r12-ksf4394p",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 13,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r13-em441uix",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 14,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r14-kjl1bvco",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 15,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r15-vrpczsf5",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 16,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r16-9cgga6ks",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 17,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r17-w8p85dhe",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 18,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r18-ja53ep7d",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 19,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 38.0,
+        "model_seconds": 37.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.9,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r19-6x4jxu9y",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-ambig",
+      "track": "execute",
+      "model": "qythos9",
+      "repeat": 20,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 7,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.286,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 37.9,
+        "model_seconds": 36.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 36.8,
+        "gen_chars": 1542,
+        "gen_chars_per_sec": 41.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 38.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-ambig__qythos9__r20-7_dk1z_j",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.95,
+    "clean_finish_rate": 0.95,
+    "total_nudges": 21,
+    "total_iterations": 168,
+    "nudge_histogram": {
+      "edited before running": 19,
+      "repeated call": 2
+    },
+    "n_runs": 20,
+    "n_valid": 20,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 42.9,
+    "gen_chars": 32744,
+    "rows": {
+      "exec-ambig::qythos9": {
+        "case": "exec-ambig",
+        "track": "execute",
+        "model": "qythos9",
+        "n": 20,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.95,
+        "score_min": 0.0,
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          0.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "iterations_mean": 8.4,
+        "nudges_mean": 1.1,
+        "clean_finish_rate": 0.95,
+        "seconds_mean": 39.4,
+        "gen_rate_mean": 42.9,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "exec-ambig": 1.0
+    }
+  }
+}

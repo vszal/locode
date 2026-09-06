@@ -1,0 +1,296 @@
+{
+  "label": "sushi-smoke-eb",
+  "created": "2026-09-06 13:21:07",
+  "git_head": "10acbf7",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "sushicoder",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 5
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.444,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "repetition loop": 1,
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 96.2,
+        "model_seconds": 95.2,
+        "plan_updates": 0,
+        "truncations": 1,
+        "gen_seconds": 57.5,
+        "gen_chars": 5933,
+        "gen_chars_per_sec": 103.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 96.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__sushicoder__r1-4ojcem8i",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "sushicoder",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "bash": 5,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.444,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "repetition loop": 1,
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 51.5,
+        "model_seconds": 50.2,
+        "plan_updates": 0,
+        "truncations": 1,
+        "gen_seconds": 50.2,
+        "gen_chars": 4681,
+        "gen_chars_per_sec": 93.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 51.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__sushicoder__r2-afl71vkz",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "sushicoder",
+      "repeat": 3,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 13,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 1,
+          "edit_file": 5
+        },
+        "tool_errors": 5,
+        "tool_error_rate": 0.556,
+        "nudges": 5,
+        "nudges_by_reason": {
+          "repetition loop": 1,
+          "edited before running": 1,
+          "truncated": 2,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 588.2,
+        "model_seconds": 587.2,
+        "plan_updates": 0,
+        "truncations": 3,
+        "gen_seconds": 587.2,
+        "gen_chars": 49910,
+        "gen_chars_per_sec": 85.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 588.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__sushicoder__r3-v99ad6dj",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "sushicoder",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "bash": 5,
+          "read_file": 1,
+          "edit_file": 3
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.444,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "repetition loop": 1,
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 66.5,
+        "model_seconds": 65.2,
+        "plan_updates": 0,
+        "truncations": 1,
+        "gen_seconds": 65.1,
+        "gen_chars": 7105,
+        "gen_chars_per_sec": 109.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 66.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__sushicoder__r4-2o0s7yll",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "sushicoder",
+      "repeat": 5,
+      "score": 0.5,
+      "checks": {
+        "tests_pass": false,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": false
+      },
+      "metrics": {
+        "iterations": 15,
+        "tool_calls": 12,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 2,
+          "edit_file": 7
+        },
+        "tool_errors": 7,
+        "tool_error_rate": 0.583,
+        "nudges": 5,
+        "nudges_by_reason": {
+          "repetition loop": 3,
+          "edited before running": 1,
+          "unchanged": 1
+        },
+        "stop_reason": "edits kept hitting the same error without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 150.7,
+        "model_seconds": 149.7,
+        "plan_updates": 0,
+        "truncations": 3,
+        "gen_seconds": 149.6,
+        "gen_chars": 15790,
+        "gen_chars_per_sec": 105.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 150.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__sushicoder__r5-qu2nrt6w",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.8,
+    "clean_finish_rate": 0.8,
+    "total_nudges": 16,
+    "total_iterations": 61,
+    "nudge_histogram": {
+      "repetition loop": 7,
+      "edited before running": 5,
+      "truncated": 2,
+      "slow progress": 1,
+      "unchanged": 1
+    },
+    "n_runs": 5,
+    "n_valid": 5,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 91.7,
+    "gen_chars": 83419,
+    "rows": {
+      "exec-bugfix::sushicoder": {
+        "case": "exec-bugfix",
+        "track": "execute",
+        "model": "sushicoder",
+        "n": 5,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.8,
+        "score_min": 0.5,
+        "scores": [
+          1.0,
+          1.0,
+          0.5,
+          1.0,
+          0.5
+        ],
+        "iterations_mean": 12.2,
+        "nudges_mean": 3.2,
+        "clean_finish_rate": 0.8,
+        "seconds_mean": 190.7,
+        "gen_rate_mean": 91.7,
+        "stop_reasons": [
+          "edits kept hitting the same error without making progress"
+        ]
+      }
+    },
+    "_weights": {
+      "exec-bugfix": 1.0
+    }
+  }
+}

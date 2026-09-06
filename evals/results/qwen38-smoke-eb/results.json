@@ -1,0 +1,195 @@
+{
+  "label": "qwen38-smoke-eb",
+  "created": "2026-09-06 13:31:05",
+  "git_head": "10acbf7",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 2,
+          "ls": 1,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 159.4,
+        "model_seconds": 158.4,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 120.6,
+        "gen_chars": 2423,
+        "gen_chars_per_sec": 20.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 159.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwen38__r1-7qoe9jkx",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 128.2,
+        "model_seconds": 127.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 127.1,
+        "gen_chars": 2893,
+        "gen_chars_per_sec": 22.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 128.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwen38__r2-lsmw7bwp",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "exec-bugfix",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "tests_pass": true,
+        "suite_intact": true,
+        "did_not_edit_tests": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 3,
+          "read_file": 2,
+          "edit_file": 3
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.125,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "unverified edits": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 128.1,
+        "model_seconds": 127.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 127.0,
+        "gen_chars": 2815,
+        "gen_chars_per_sec": 22.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 128.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-exec-bugfix__qwen38__r3-ctje22r8",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 1.0,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 7,
+    "total_iterations": 15,
+    "nudge_histogram": {
+      "edited before running": 1,
+      "unverified edits": 3,
+      "slow progress": 3
+    },
+    "n_runs": 3,
+    "n_valid": 3,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 21.7,
+    "gen_chars": 8131,
+    "rows": {
+      "exec-bugfix::qwen38": {
+        "case": "exec-bugfix",
+        "track": "execute",
+        "model": "qwen38",
+        "n": 3,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "iterations_mean": 5,
+        "nudges_mean": 2.3,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 138.7,
+        "gen_rate_mean": 21.7,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "exec-bugfix": 1.0
+    }
+  }
+}

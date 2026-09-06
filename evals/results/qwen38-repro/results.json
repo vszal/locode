@@ -1,0 +1,450 @@
+{
+  "label": "qwen38-repro",
+  "created": "2026-09-06 13:46:37",
+  "git_head": "1d92a33",
+  "git_dirty": false,
+  "runs": [
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "ls": 1,
+          "edit_file": 1,
+          "bash": 2
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 99.0,
+        "model_seconds": 99.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 98.9,
+        "gen_chars": 2286,
+        "gen_chars_per_sec": 23.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 99.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qwen38__r1-vkcgia55",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 2,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "ls": 1,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 87.0,
+        "model_seconds": 86.9,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 86.9,
+        "gen_chars": 1785,
+        "gen_chars_per_sec": 20.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 87.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qwen38__r2-a_y54pgk",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 3,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "ls": 1,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 83.1,
+        "model_seconds": 83.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 83.0,
+        "gen_chars": 1568,
+        "gen_chars_per_sec": 18.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 83.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qwen38__r3-52thshd_",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 4,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "ls": 1,
+          "edit_file": 1,
+          "bash": 2
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 102.0,
+        "model_seconds": 102.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 101.9,
+        "gen_chars": 2548,
+        "gen_chars_per_sec": 25.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 102.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qwen38__r4-3ld6b4g1",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 5,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "ls": 1,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 86.6,
+        "model_seconds": 86.6,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 86.5,
+        "gen_chars": 1783,
+        "gen_chars_per_sec": 20.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 86.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qwen38__r5-od5gb9zc",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 6,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "ls": 1,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 103.1,
+        "model_seconds": 103.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 103.1,
+        "gen_chars": 2434,
+        "gen_chars_per_sec": 23.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 103.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qwen38__r6-aicv008h",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 7,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "ls": 1,
+          "edit_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "edited before running": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 91.9,
+        "model_seconds": 91.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 91.8,
+        "gen_chars": 2016,
+        "gen_chars_per_sec": 22.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 92.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qwen38__r7-zy2kb8t4",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "repro-only",
+      "track": "execute",
+      "model": "qwen38",
+      "repeat": 8,
+      "score": 1.0,
+      "checks": {
+        "runs_clean": true,
+        "fixed_ranking": true,
+        "totals_still_right": true,
+        "did_not_edit_data": true,
+        "report_shows_top_charge": true,
+        "fully_fixed": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "ls": 1,
+          "edit_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 113.3,
+        "model_seconds": 113.2,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 113.2,
+        "gen_chars": 2652,
+        "gen_chars_per_sec": 23.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 113.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-repro-only__qwen38__r8-u15_u_17",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 1.0,
+    "clean_finish_rate": 1.0,
+    "total_nudges": 10,
+    "total_iterations": 46,
+    "nudge_histogram": {
+      "edited before running": 8,
+      "slow progress": 2
+    },
+    "n_runs": 8,
+    "n_valid": 8,
+    "invalid_runs": 0,
+    "invalid_rate": 0.0,
+    "invalid_reasons": {},
+    "gen_rate": 22.3,
+    "gen_chars": 17072,
+    "rows": {
+      "repro-only::qwen38": {
+        "case": "repro-only",
+        "track": "execute",
+        "model": "qwen38",
+        "n": 8,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "iterations_mean": 5.8,
+        "nudges_mean": 1.2,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 95.9,
+        "gen_rate_mean": 22.3,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "repro-only": 1.0
+    }
+  }
+}
