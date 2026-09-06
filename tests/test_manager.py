@@ -179,6 +179,48 @@ async def test_switch_already_served_skips_restart(monkeypatch):
     assert stopped == []  # already resident -> no destructive restart
 
 
+async def test_restart_relaunches_even_when_the_model_is_resident(monkeypatch):
+    # Regression: `/server restart` used to call switch() with the CURRENT alias,
+    # which is always the resident one, so it took switch's skip-if-resident path
+    # and printed "restarted" without restarting. A restart must always stop+start.
+    m = _mgr()
+    calls = []
+
+    async def fake_stop():
+        calls.append("stop")
+
+    async def fake_start(alias):
+        calls.append(("start", alias))
+        return _ALIASES[alias]
+
+    monkeypatch.setattr(m, "_resident_model", lambda: "mlx-community/Qwen3-14B-4bit")
+    monkeypatch.setattr(m, "stop", fake_stop)
+    monkeypatch.setattr(m, "start", fake_start)
+    out = await m.restart("qwen14")
+    assert out == "mlx-community/Qwen3-14B-4bit"
+    assert calls == ["stop", ("start", "qwen14")]
+
+
+async def test_restart_bad_alias_does_not_stop_server(monkeypatch):
+    # Same contract switch() honours: validate before killing anything.
+    m = _mgr()
+    stopped = []
+    monkeypatch.setattr(m, "stop", lambda: stopped.append(True))
+    with pytest.raises(KeyError):
+        await m.restart("qwen14-typo")
+    assert stopped == []
+
+
+async def test_restart_refuses_an_unmanaged_endpoint(monkeypatch):
+    # Never SIGTERM a server locode did not start.
+    m = _mgr(base_url="https://gpu-box:8081", manage="no")
+    stopped = []
+    monkeypatch.setattr(m, "stop", lambda: stopped.append(True))
+    with pytest.raises(RuntimeError, match="remote/unmanaged"):
+        await m.restart("qwen14")
+    assert stopped == []
+
+
 async def test_switch_reloads_when_target_cached_but_not_resident(monkeypatch):
     # Regression: switching to a model that is in the HF cache but NOT resident
     # must stop+start, not skip because it appears in the /v1/models list.

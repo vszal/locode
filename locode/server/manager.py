@@ -545,6 +545,25 @@ class SingleGpuManager:
         await self.stop()
         return await self.start(alias)
 
+    async def restart(self, alias: str) -> str:
+        """Stop and relaunch the server unconditionally. Returns the model id.
+
+        Deliberately NOT `switch()`: switch skips the destructive stop/start
+        when the target model is already resident, which is correct for a model
+        switch and wrong for a restart. `/server restart` used to call switch()
+        with the *current* alias — always the resident one — so it took the skip
+        every time and printed "restarted" without having restarted anything.
+        A restart exists precisely to relaunch the process: new launch args, a
+        wedged generate thread, a cache to clear.
+        """
+        model_id = self.resolve(alias)   # validate before killing anything
+        if not self._managed:
+            raise RuntimeError(
+                f"cannot restart {self._base}: it is a remote/unmanaged "
+                f"endpoint that locode did not start")
+        await self.stop()
+        return await self.start(alias)
+
 
 def memory_fits(model_bytes: int, cache_bytes: int, total_ram: int,
                 reserve_bytes: int, overhead: float = _WEIGHT_OVERHEAD,

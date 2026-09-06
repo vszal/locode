@@ -9897,3 +9897,78 @@ stranded-tail as levers. Build 136 still rests on bugfix-notest alone. The
 archive has now retired five candidates for the price of no GPU at all — and
 this one for the price of a single n=12 probe, which is the cheapest a null
 has ever been.
+
+## 5.125 — reasoning for prose and ideation: measured, and it is a NO
+
+Not a lever this time — a product question. The user wants locode for prose and
+blog ideation and asked whether `enable_thinking` should be on for that, since
+`[thinking]` is currently config-file-only and launch-time. The honest answer
+needed a measurement, not an argument about what reasoning is *for*.
+
+**Rig** (`evals/results/b139-reasoning-prose-ab`). Six prose/ideation prompts
+spanning the kinds reasoning should help unevenly: divergent ideation,
+convergent judgment, prose craft, editing, structure, explanation. One
+`mlx_lm.server` launch per arm with `--chat-template-args` forcing
+`enable_thinking` on or off; `run2.py` mirrors locode's real client — streamed,
+temperature 0.3, no penalties, `max_tokens` 8192, and locode's own
+`repetition.is_runaway_repetition` mid-stream abort.
+
+**Result: thinking OFF wins on every axis that matters.**
+
+    task                  OFF                     ON
+    p1 ideate (divergent) 22.8s  2634ch  stop     321.5s  0ch  LENGTH
+    p2 angle  (convergent)24.1s  2923ch  stop      70.3s  1413ch stop (ttfc 58.9s)
+    p3 open   (craft)      7.0s   984ch  stop      25.3s   202ch stop (ttfc 23.7s)
+    p4 tighten(editing)    1.8s   189ch  stop      14.1s   168ch stop (ttfc 12.9s)
+    p5 outline(structure) 31.9s  4369ch  stop     318.5s  0ch  LENGTH
+    p6 analogy(explain)    5.0s   591ch  stop      31.0s   379ch stop (ttfc 28.2s)
+
+**2/6 produced ZERO content after 5+ minutes each.** Every surviving task cost
+3-8x the wallclock, and every one of them opened with 13-59 seconds of dead
+air before the first visible token — `ttfc` is time to first *content* token,
+and locode renders only content.
+
+On quality, read rather than scored (rule 3): OFF is better on p3 (a clean
+six-sentence paragraph vs 202 characters that contradict the thesis they were
+asked to argue) and p6 (a sustained cake/flour analogy that explains the
+mechanism vs a generic one that restates the premise); p4 is a tie, with ON
+adding stray quotation marks. ON is *slightly* better on p2 — tighter, better
+organised — which is exactly the one convergent-judgment task where theory says
+reasoning should pay, and it still cost 3x the time and a minute of silence.
+
+**THE MECHANISM, and it is not "reasoning ate the budget".** Read the two
+failures' reasoning fields: both degenerate into token-level repetition and run
+to the cap — p1 ends "and dreamers and dreamers and dreamers…", p5 ends
+"(I will also ensure the content is stellar)." repeated to 36,600 characters.
+The reasoning does not *finish* and leave no room; it *loops*.
+
+And locode cannot see it. The runaway-repetition abort in
+`model/client.py:228-234` sits inside `if piece:` — the **content** branch. The
+`reasoning_content` delta right below it is appended with no check at all. The
+one guard built to catch degeneration is blind to the only channel where, with
+thinking on, degeneration actually happens. That is also the diagnosis for the
+note sitting in `config.toml` since 2026-07-17 ("thinking='on' made both models
+return EMPTY content"): not a rendering gap, a loop the guard could not see.
+
+**Disposition: NO BUILD**, and the `[thinking]` defaults stay as they are. The
+planned work — render the reasoning stream, add `/thinking on|off|auto`, give
+`Profile` a third state — was all scaffolding for turning this on, and there is
+nothing worth turning on. Raising `max_tokens` cannot rescue p1/p5 either: the
+config comment already prices 12288 at ~650s, past the turn budget, so the
+budget is not the binding constraint anyway.
+
+**Kept, not built:** if reasoning is ever wanted, the guard must watch
+`reasoning_parts` too. Logged, not fixed — by rule 17 it guards a path nothing
+currently uses.
+
+**A correction on the way there, worth recording.** The pilot
+(`pilot-temp0.7-off.json`) ran at temperature 0.7 and the OFF arm collapsed into
+repetition on 3/6 prompts. I wrote down the expectation that 0.3 "is not
+expected to be kinder". At 0.3 the OFF arm is 6/6 clean. The expectation was
+wrong, and wrong in the direction that would have manufactured a dramatic
+finding about locode's shipped configuration. Rule 46 earned its keep; the
+pilot is archived as a temperature artifact and must not be quoted as a locode
+defect.
+
+Seventh null in a row, and the first one that was a product question rather
+than a lever.

@@ -1,0 +1,25 @@
+[
+ {"id": "p1-ideate",
+  "kind": "divergent",
+  "prompt": "I write a blog for engineering managers at 50-500 person software companies. Give me 6 post ideas about technical debt that are NOT the usual 'pay it down incrementally' advice. For each: a title and one sentence on the specific argument it makes."},
+
+ {"id": "p2-angle",
+  "kind": "convergent",
+  "prompt": "I have three possible angles for a blog post about on-call rotations:\nA) On-call pay should be hourly, not a flat stipend.\nB) The best predictor of on-call pain is not alert volume but how many services one person owns.\nC) Rotations should be staffed by the team that shipped the code, always.\nPick the single strongest one for an audience of engineering managers, and explain what makes it stronger than the other two."},
+
+ {"id": "p3-open",
+  "kind": "prose-craft",
+  "prompt": "Write the opening paragraph (4-6 sentences) of a blog post arguing that most engineering 'process' problems are actually staffing problems in disguise. No preamble, no title. Just the paragraph."},
+
+ {"id": "p4-tighten",
+  "kind": "editing",
+  "prompt": "Tighten this paragraph without losing any of its claims. Return only the rewritten paragraph.\n\n'It is often the case that when teams are attempting to make a decision about whether or not they should adopt a new tool, they will tend to focus the majority of their attention on the specific features that the tool in question happens to offer, but in actual fact what really ends up mattering a great deal more over the long run is the question of how much ongoing maintenance burden that tool is going to impose upon the team that adopts it.'"},
+
+ {"id": "p5-outline",
+  "kind": "structure",
+  "prompt": "Outline a 1200-word blog post titled 'Your Roadmap Is a Forecast, Not a Promise'. Give the section headings and, under each, 2-3 bullets on what it covers. The argument should build, not just list."},
+
+ {"id": "p6-analogy",
+  "kind": "explanation",
+  "prompt": "Explain to a non-technical executive why adding engineers to a late project usually makes it later. Use one concrete analogy, and keep it under 150 words."}
+]

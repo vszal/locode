@@ -488,7 +488,11 @@ class Repl:
         if rest == "restart":
             self._spinner.start("restarting server…")
             try:
-                await self._manager.switch(self._loop.model_alias)
+                await self._manager.restart(self._loop.model_alias)
+            except Exception as e:
+                self._spinner.stop()
+                print(self._format_error(e))
+                return
             finally:
                 self._spinner.stop()
             self._server_up = self._model_up = True
