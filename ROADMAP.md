@@ -10573,3 +10573,38 @@ runs). So it is reachable, not inert — the check is fine, the weighting is not
 regex was broadened, 12/12 after, with no change to any model.
 
 Coined **rule 83**.
+
+## §5.136 — the aider comparison table, completed at build 142
+
+Stage 3 ran the two missing cases against the frozen build-142 worktree on
+`qythos9`, completing the head-to-head. Per rule 79 aider is deterministic on
+these cases, so its column is banked from the b141 sweep and only locode's
+numbers were re-measured.
+
+| case | locode (qythos9, b142) | aider | aider edits applied |
+|---|---|---|---|
+| exec-bugfix | 0.967 (n=30) | **1.000** | — |
+| exec-ambig | **1.000** | 0.500 | 0/6 |
+| exec-pinpoint | **1.000** (n=12) | 0.500 | 0/6 |
+| repro-only | **0.819** (n=12) | 0.500 | 2 per run |
+
+Three decisive wins, one narrow loss. **All locode numbers here are `qythos9`.**
+The 0.467–0.550 figures in §5.135 are `qwencoder14`, a deliberately weaker model
+chosen for revert *exposure*, not for capability; putting those in this table
+would understate locode by ~0.5 and the comparison would be meaningless.
+
+Two observations worth keeping:
+
+- **`exec-pinpoint` is degenerate on qythos9.** All twelve runs scored 1.000 at
+  exactly 9 iterations, 1 nudge, 29.8s — variance essentially zero. Like the
+  e2e case in §5.135 it has no dynamic range left on this model, but for the
+  opposite reason: it is saturated at the ceiling rather than pinned at a
+  scaffolding floor. It can still detect a regression; it cannot show an
+  improvement. Keep it as a canary, not as a lever test.
+- **`repro-only` is the one case with genuine spread** — 0.819 at b142 against
+  0.833 at b140 (unchanged), with per-run scores ranging 0.33–1.00 and the
+  nudge mix varying run to run (`repetition loop` 6, `slow progress` 4). It is
+  the most informative of the four and the right place to aim the next lever.
+- aider's failure mode is unchanged and is the structural point: on the two
+  cases it loses 1.000–0.500 it applied **zero of six** proposed edits. It
+  reasons to the right change and fails to land it on disk.
