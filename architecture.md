@@ -925,7 +925,12 @@ runs green before a task is called done.
   `-p` headless mode, sessions persistence (`session.py`, `/save`+`/resume`),
   `CHANGELOG.md`.
 - **M6 — Concurrency:** `PoolManager` + router, `[serving] mode=concurrent`,
-  `max_resident`/`max_inflight`, multi-backend `/server` status.
+  `max_resident`/`max_inflight`, multi-backend `/server` status. **Planned in
+  detail in [`M6-CONCURRENCY.md`](M6-CONCURRENCY.md)** — which closes §13.6's
+  two open sub-questions (`max_resident`/`max_inflight` default to 1/1 and are
+  never inferred; the router pins for prompt-cache locality), relaxes §1's
+  local-only non-goal to opt-in cloud backends, and gates the whole milestone
+  behind a spike on whether two MLX servers can safely share one Metal GPU.
 - **M7 — Hardening (phase 2):** `bash` sandboxing, context summarization,
   capability-profile tuning per model.
 
