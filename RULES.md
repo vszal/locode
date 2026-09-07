@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–89.** All 76 numbers actually in use are below. Thirteen numbers
+**Complete for 1–90.** All 77 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -175,6 +175,22 @@ L5864). Same rule, refined in place, no amendment.
   code. A time-ranked leaderboard does not merely mis-rank there, it rewards the
   give-up behaviour the nudge machinery exists to suppress. §5.141.
 
+- **Rule 90: score only the checks a model can earn — a check that is already
+  true of the untouched seed is a veto, not a component of the mean.** A
+  grader asserts two different kinds of thing and averaging them flat conflates
+  them. *Outcomes* ("the tests pass", "the ranking is right") are false at the
+  start and true only if the work was done. *Guards* ("the suite is intact",
+  "the fixture data is unedited", "the totals still add up") are true at the
+  start and can only be lost, by cheating or regressing. Flat averaging paid
+  the guards as credit: measured across the four shipped cases, an untouched
+  seed scored **0.500, 0.500, 0.500 and 0.000** for changing nothing at all,
+  and a run that neutered every assert in the suite also scored 0.500. Declare
+  guards (`GUARDS`) and derived aggregates (`DERIVED`) in the grader; the score
+  is the mean of what remains, zeroed outright by any lost guard. The `solved`
+  verdict is invariant under the change — 1.000 still means every outcome true
+  and every guard held — so archived pass/fail carries across the boundary and
+  only sub-1.0 magnitudes are on a new scale. §5.142.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -188,4 +204,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **90**.
+graders. Next free number: **91**.

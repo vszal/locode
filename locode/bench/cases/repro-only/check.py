@@ -51,6 +51,13 @@ FIXTURES = [
 EXPECTED_TOTALS = {"Engineering": 2490.00, "Facilities": 385.25,
                    "Marketing": 1290.49}
 
+# All three hold for the untouched seed -- the seeded bug is a wrong ranking,
+# not a crash, a wrong total, or bad data. They exist to catch a model that
+# "fixes" the ranking by rewriting the CSV, breaking the totals that already
+# worked, or leaving a script that no longer runs. Veto-only, never credit.
+GUARDS = {"runs_clean", "totals_still_right", "did_not_edit_data"}
+DERIVED = {"fully_fixed"}
+
 PROBE = '''\
 import json, sys, pathlib
 sys.path.insert(0, ".")

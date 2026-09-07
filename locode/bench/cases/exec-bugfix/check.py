@@ -10,6 +10,11 @@ import re
 
 EXPECTED_TESTS = 13
 
+# Both are true of the untouched seed: they catch a model that edits or
+# deletes the suite instead of the code. Veto-only, never credit.
+GUARDS = {"suite_intact", "did_not_edit_tests"}
+DERIVED = {"fully_fixed"}
+
 
 def check(ctx):
     proc = ctx.bash("python3 -m pytest -q 2>&1 | tail -15", timeout=180)

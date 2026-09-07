@@ -116,9 +116,17 @@ Keep on Opus **only** what truly needs it:
 - **Report time-to-done to users, iterations to yourself** (rule 88). Wall-clock
   is what the user waits through; iterations is the metric that survives a
   degraded box. They disagree in 26% of archived model-pair comparisons.
-  **Neither one decides anything until correctness has gated it** (rule 89):
-  iterations flatters the one-huge-reply model, wall-clock flatters the model
-  that quits early, and a give-up run is the fastest run on the board.
+- **Neither time nor iterations decides anything until correctness has gated
+  it** (rule 89): iterations flatters the one-huge-reply model, wall-clock
+  flatters the model that quits early, and a give-up run is the fastest run on
+  the board.
+- **Score only what a model can earn** (rule 90). A check that is already true
+  of the *untouched seed* — the suite is intact, the fixture data is unedited —
+  is a guard, not a component of the score: declare it in the grader's `GUARDS`
+  so it vetoes to 0.0 rather than pays. Flat-averaging them paid an untouched
+  seed 0.500 on three of the four shipped cases, and paid the same 0.500 to a
+  run that neutered every assert in the suite. `DERIVED` names aggregates like
+  `fully_fixed`, reported but kept out of the mean.
 - Run `pytest -q` before declaring a task complete; state real results (don't
   claim green without running).
 

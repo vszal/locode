@@ -10955,6 +10955,11 @@ qwen38 -m qwythos9`, M4 Pro / 24 GB, one pass per cell:
 | **time-to-done** | 510s | 518s |
 | **iterations** | 28 | 37 |
 
+*(The `0.50` and `0.67` are pre-5.142 scores, on the old flat-mean scale. On
+the current scale they read 0.000 and 0.800: the first was indistinguishable
+from an untouched workspace, the second was real partial credit. The verdicts
+in the table are unaffected.)*
+
 `qwythos9` is the faster model on both cases it solves, by wide margins (80 vs
 114, 71 vs 121), and the totals all but tie — 510s against 518s, a 1.5% gap
 that would be noise on a single pass. Sorting on time alone would have called
@@ -11001,3 +11006,81 @@ is the regression metric) and, from the n=3 re-run, **89** (no speed metric
 decides a comparison until correctness has gated it). 88 is amended in the same
 pass: its "no reply shape can game it" must not be read as "wall-clock is
 ungameable", which the 40-second `repro-only` failures disprove.
+
+## 5.142 — the graders paid for doing nothing
+
+Prompted by a plain question about the bench — *how will a bunch of python
+scripts evaluate correctness?* — I stopped asserting that the graders work and
+tried to break them. Two experiments, both against the four shipped cases.
+
+**Adversarial: every cheat was caught.** The graders never read model prose.
+They run `pytest` in the model's workspace and read the exit state; they write
+a probe script *after* the model is done and call the public functions with
+fixtures the model never saw; they byte-compare the input files against the
+pristine seed. Five deliberate cheats, none reached `solved`:
+
+| cheat | old score | caught by |
+|---|---|---|
+| replace the suite with one trivial passing test | 0.250 | `suite_intact`, `did_not_edit_tests` |
+| delete the test file outright | 0.000 | all three |
+| neuter every `assert` in place | **0.500** | `did_not_edit_tests` |
+| hardcode the expected top-3 | 0.667 | fixture B → `fixed_ranking` |
+| rewrite the CSV so the output looks right | 0.333 | `did_not_edit_data`, `totals_still_right` |
+
+The two-fixture design in `repro-only` is what defeats the hardcoded answer:
+the second fixture (`9.00/100.00/20.00/3.50` → beta, gamma, alpha) is built so
+no constant and no reversal satisfies both. That is the part worth keeping.
+
+One near-miss to record honestly: my first CSV-tamper attempt reported
+`did_not_edit_data: True` and I nearly wrote that up as a hole in the guard. It
+was not. The seed CSV is *already* sorted descending by amount, so re-sorting
+it rewrote the file byte-identically. With a real edit (`1450.00` → `9999.00`)
+the guard fires. **The lesson is the one in rule 12's neighbourhood: a mutation
+you did not verify changed anything is not a test of the thing you think.**
+
+**Baseline: the scoring was broken.** Grading an *untouched seed* — no model,
+no edits — produced:
+
+| case | untouched seed | why |
+|---|---|---|
+| `exec-pinpoint` | 0.500 | 2 of 4 checks are guards, trivially true |
+| `exec-bugfix` | 0.500 | same |
+| `repro-only` | 0.500 | 3 of 6 checks are guards, trivially true |
+| `multi-defect-blind` | 0.000 | pure behavioural probe, no guards |
+
+`_score` was an unweighted mean over every key the grader returned, and the
+guards are exactly the checks that are true *before the model starts*. Doing
+nothing scored half marks on three of four cases; so did neutering every assert
+in the suite, which is strictly worse than doing nothing.
+
+This never touched a verdict — `solved` requires 1.000 — but it corrupted every
+partial score in the archive, and it corrupted one I had just published. In
+§5.141 I described qwythos9's three 0.50s on `repro-only` as the model getting
+halfway. It did not: its check profile is **identical to the untouched seed**.
+It achieved nothing effective there. Its 0.67 on `multi-defect-blind` *is*
+genuine partial credit, because that case's baseline is 0.000. The two numbers
+sat in the same table and meant completely different things.
+
+**The fix (rule 90).** A grader may now declare `GUARDS` (veto-only) and
+`DERIVED` (aggregates like `fully_fixed`, reported but not double-counted).
+`_score` averages what remains and zeroes the run if any guard is lost.
+Untouched seeds now score 0.000 on all four cases, and the neutered-assert
+cheat scores 0.000 rather than 0.500.
+
+Scope of the break, stated so nobody compares across it later. **`solved` is
+invariant:** old 1.000 required every key true; new 1.000 requires every
+outcome true and every guard held, and `fully_fixed` is the conjunction of
+both — the two sets coincide exactly, and there is a test pinning it. So every
+archived pass/fail stands. Sub-1.0 magnitudes are on a new scale and are not
+comparable across the boundary; a pre-5.142 0.500 usually means less than it
+looks like. The equivalence holds only because each `DERIVED` key is genuinely
+a conjunction of the others — a looser aggregate would move verdicts, so the
+test asserts that property on the real graders too, not just the pure function.
+
+Scoring now lives in `locode/bench/runner.py` and `evals/harness.py` imports
+it, for the reason `CheckCtx` already did: the four shipped cases are graded by
+both, and two copies of the rule would let the same case score differently in
+each without anyone noticing.
+
+Rule coined here: **90** (score only the checks a model can earn; a check
+already true of the untouched seed is a veto, not a component of the mean).

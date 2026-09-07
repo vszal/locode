@@ -220,9 +220,13 @@ it in the first two minutes instead of after the twenty-minute case:
 
 - **`solved`** counts runs that scored a *perfect* 1.000. Each ladder case is
   one a capable model takes all the way, so partial credit means something was
-  left broken, and the cell reads `FAIL`.
-- **`time-to-done`** is what you wait through for one pass of the ladder. It is
-  the headline because it is the one number no reply-shape can game.
+  left broken, and the cell reads `FAIL`. A partial score is the fraction of
+  the required behaviours the model actually got right; a run that cheats —
+  edits the tests, rewrites the fixture data, breaks something that already
+  worked — scores 0.000 outright, however much else it fixed.
+- **`time-to-done`** is what you wait through for one pass of the ladder, and
+  the headline for that reason alone. Read it *after* `solved`, never instead
+  of it: giving up early is the fastest thing a model can do.
 - **`iterations`** is the *explanation*, not the verdict: a model generally
   wins by needing fewer steps, not by typing faster.
 - **`ERROR`** means the run never reached its first turn — server down, alias
@@ -254,10 +258,12 @@ against a clean 12/12. Ranking on time would pick it comfortably and be
 comfortably wrong.
 
 Look at *why* it is fast. Its three `repro-only` runs fail in 40 seconds each,
-quicker than any `qwen38` success on the ladder: it reads the code, changes
-something plausible, and stops without ever running the report. Giving up early
-is cheap, and on a stopwatch it is indistinguishable from being good. That is
-the trap `solved` exists to catch, and it is why time is only ever the tiebreak.
+quicker than any `qwen38` success on the ladder: it reads the code, edits
+something, and stops without ever running the report. Its graded result is
+indistinguishable from the untouched starting workspace — every check that
+holds, held before it started. Giving up early is cheap, and on a stopwatch it
+is indistinguishable from being good. That is the trap `solved` exists to
+catch, and it is why time is only ever the tiebreak.
 
 The `2/3` on `exec-bugfix` is the other thing repeats buy you: the same model,
 the same task, solved twice and missed once. A single pass would have called it

@@ -90,6 +90,11 @@ print("PROBE" + json.dumps(out))
 BEHAVIOURS = ["fixed_thousands_separator", "fixed_running_balance",
               "fixed_category_ranking", "fixed_month_key", "fixed_even_split"]
 
+# No guards here: there is no test suite to protect and no fixture to
+# tamper with, so every check is an outcome. The untouched seed scores 0.000.
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     got = _probe(ctx)
     results = {name: bool(got.get(name)) for name in BEHAVIOURS}

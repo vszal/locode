@@ -331,13 +331,26 @@ class RunResult:
 
 
 def _load_checker(case: Case):
+    """The case's `check` function, or None. See `_load_grader` for the rest."""
+    return _load_grader(case)[0]
+
+
+def _load_grader(case: Case):
+    """`(check_fn, guards, derived)` -- the grader plus its scoring split.
+
+    Same loader the shipped `locode bench` uses, and deliberately the same
+    tuple: a case under `locode/bench/cases/` is graded by both, and a second
+    reading of GUARDS/DERIVED here would let it score differently in each.
+    """
     checker = case.path / "check.py"
     if not checker.is_file():
-        return None
+        return None, frozenset(), frozenset()
     spec = importlib.util.spec_from_file_location(f"check_{case.id}", checker)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    return getattr(mod, "check", None)
+    return (getattr(mod, "check", None),
+            frozenset(getattr(mod, "GUARDS", ())),
+            frozenset(getattr(mod, "DERIVED", ())))
 
 
 # The grader contract lives in the package, not here. The four cases under
@@ -532,14 +545,14 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
 
     checks: dict = {}
     err = ""
-    checker = _load_checker(case)
+    checker, guards, derived = _load_grader(case)
     if checker:
         ctx = CheckCtx(workdir=workdir, events=events, stdout=stdout, case=case)
         try:
             checks = dict(checker(ctx))
         except Exception as e:  # a broken checker must not lose the whole run
             err = f"checker raised: {type(e).__name__}: {e}"
-    score = _score(checks)
+    score = _score(checks, guards, derived)
     invalid = _invalidity(error=err, checks=checks, has_checker=checker is not None,
                           infra_error=metrics.get("infra_error"),
                           launch_error=launch_error)
@@ -614,12 +627,9 @@ def _invalid_kind(reason: str) -> str:
     return reason.split(":", 1)[0].strip() if reason else ""
 
 
-def _score(checks: dict) -> float:
-    if not checks:
-        return 0.0
-    vals = [1.0 if v is True else 0.0 if v is False else float(v)
-            for v in checks.values()]
-    return round(sum(vals) / len(vals), 3)
+# Scoring lives in the package for the same reason CheckCtx does -- one
+# definition, or the four shared cases drift between the two graders.
+from locode.bench.runner import _score  # noqa: E402,F401
 
 
 # --------------------------------------------------------------------------
@@ -1522,7 +1532,8 @@ def cmd_rescore(args) -> int:
         checks, err = raw.get("checks", {}), raw.get("error", "")
         score = old_score
         invalid = raw.get("invalid", "")
-        checker = _load_checker(case) if case is not None else None
+        checker, guards, derived = (_load_grader(case) if case is not None
+                                    else (None, frozenset(), frozenset()))
         if checker is None or not workdir.is_dir():
             why = ("case no longer exists" if case is None
                    else "scratch workspace is gone (run with --clean?)")
@@ -1539,7 +1550,7 @@ def cmd_rescore(args) -> int:
                 checks = dict(checker(ctx))
             except Exception as e:
                 err = f"checker raised: {type(e).__name__}: {e}"
-            score = _score(checks)
+            score = _score(checks, guards, derived)
             # Recomputed, not carried forward: the checker just ran again, and
             # the metrics were re-mined from the event log, so both inputs to
             # the verdict are fresh. This is also how sweeps recorded before the

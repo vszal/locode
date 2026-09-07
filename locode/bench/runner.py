@@ -176,11 +176,16 @@ def parse_events(path: Path) -> list[dict]:
     return out
 
 
-def _grade(case: Case, ctx: CheckCtx) -> dict[str, Any]:
-    """Run the case's `check()`. A case with no grader scores nothing."""
+def load_grader(case: Case):
+    """Import a case's `check.py`. Returns `(check_fn, guards, derived)`.
+
+    `guards` and `derived` come from optional module-level `GUARDS` / `DERIVED`
+    sets; see `_score` for what they mean. A case with no grader yields
+    `(None, (), ())`.
+    """
     checker = case.path / "check.py"
     if not checker.is_file():
-        return {}
+        return None, frozenset(), frozenset()
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(f"_bench_check_{case.id}", checker)
@@ -191,16 +196,55 @@ def _grade(case: Case, ctx: CheckCtx) -> dict[str, Any]:
     sys.modules[spec.name] = mod
     try:
         spec.loader.exec_module(mod)
-        return dict(mod.check(ctx))
+        return (getattr(mod, "check", None),
+                frozenset(getattr(mod, "GUARDS", ())),
+                frozenset(getattr(mod, "DERIVED", ())))
     finally:
         sys.modules.pop(spec.name, None)
 
 
-def _score(checks: dict[str, Any]) -> float:
+def _grade(case: Case, ctx: CheckCtx) -> tuple[dict[str, Any], float]:
+    """Run the case's `check()` and score it. No grader scores nothing."""
+    check, guards, derived = load_grader(case)
+    if check is None:
+        return {}, 0.0
+    checks = dict(check(ctx))
+    return checks, _score(checks, guards, derived)
+
+
+def _score(checks: dict[str, Any], guards=(), derived=()) -> float:
+    """Mean of the OUTCOME checks, vetoed to zero by any failed guard.
+
+    Checks are not all the same kind of claim, and averaging them flat made
+    partial credit meaningless. A grader asserts three things at once:
+
+    * **outcomes** — true only if the model actually did the work. These, and
+      only these, are averaged.
+    * **guards** (module-level `GUARDS`) — true of the *untouched seed*, and
+      false only if the model cheated or regressed something: it edited the
+      tests, rewrote the fixture data, broke a total that already worked. A
+      guard can never earn credit, so it is not in the mean; failing one
+      vetoes the whole run to 0.0.
+    * **derived** (module-level `DERIVED`) — aggregates of the other keys, kept
+      for the report. Scoring them double-weights whatever they summarize.
+
+    Flat averaging let a model that changed NOTHING score 0.500 on three of
+    the four shipped cases, because every guard is trivially true for a model
+    that did nothing (ROADMAP 5.142). Under this split the untouched seed
+    scores 0.000 everywhere, which is what it earned. The `solved` verdict is
+    unaffected either way: 1.0 still requires every outcome true and every
+    guard held, so archived pass/fail stands.
+    """
     if not checks:
         return 0.0
-    return round(statistics.fmean(float(bool(v)) if isinstance(v, bool) else float(v)
-                                  for v in checks.values()), 3)
+    guards, derived = frozenset(guards), frozenset(derived)
+    if any(not checks[g] for g in guards if g in checks):
+        return 0.0
+    vals = [float(bool(v)) if isinstance(v, bool) else float(v)
+            for k, v in checks.items() if k not in guards and k not in derived]
+    if not vals:  # a grader that declared away every outcome is a grader bug
+        return 0.0
+    return round(statistics.fmean(vals), 3)
 
 
 def run_case(case: Case, model: str, repeat: int = 1, keep: bool = False,
@@ -264,13 +308,13 @@ def run_case(case: Case, model: str, repeat: int = 1, keep: bool = False,
 
         ctx = CheckCtx(workdir=workdir, events=events, stdout=stdout, case=case)
         try:
-            checks = _grade(case, ctx)
+            checks, score = _grade(case, ctx)
         except Exception as e:  # a broken grader must not abandon the ladder
             return BenchResult(case.id, case.difficulty, model, repeat, 0.0,
                                seconds, iterations, nudges, timed_out=timed_out,
                                infra_error=f"grader raised: {type(e).__name__}: {e}")
         return BenchResult(case.id, case.difficulty, model, repeat,
-                           _score(checks), seconds, iterations, nudges,
+                           score, seconds, iterations, nudges,
                            checks=checks, timed_out=timed_out)
     finally:
         if keep:

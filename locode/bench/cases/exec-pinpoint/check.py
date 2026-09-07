@@ -29,6 +29,11 @@ import re
 
 EXPECTED_TESTS = 13
 
+# Same split as exec-bugfix, deliberately: the two cases must differ in
+# the shape of the bugs and nothing else.
+GUARDS = {"suite_intact", "did_not_edit_tests"}
+DERIVED = {"fully_fixed"}
+
 
 def check(ctx):
     proc = ctx.bash("python3 -m pytest -q 2>&1 | tail -15", timeout=180)

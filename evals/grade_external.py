@@ -25,7 +25,7 @@ def grade(case_id: str, workdir: Path) -> dict:
     if not cases:
         return {"error": f"no such case: {case_id}"}
     case = cases[0]
-    checker = harness._load_checker(case)
+    checker, guards, derived = harness._load_grader(case)
     if checker is None:
         return {"error": f"case {case_id} ships no check.py"}
     try:
@@ -38,7 +38,8 @@ def grade(case_id: str, workdir: Path) -> dict:
     ctx = harness.CheckCtx(workdir=workdir, events=[], stdout="", case=case)
     results = checker(ctx)
     return {"case": case_id, "workdir": str(workdir),
-            "checks": results, "score": harness._score(results)}
+            "checks": results,
+            "score": harness._score(results, guards, derived)}
 
 
 def main():

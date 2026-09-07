@@ -8,7 +8,11 @@ user off tuning the wrong thing.
 
 from __future__ import annotations
 
+import itertools
+import pathlib
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -59,6 +63,64 @@ def test_score_is_the_unweighted_mean_of_the_checks():
     assert runner._score({"a": True, "b": False}) == 0.5
     assert runner._score({"a": 0.5, "b": 1.0}) == 0.75
     assert runner._score({}) == 0.0
+
+
+def test_a_failed_guard_vetoes_the_whole_score():
+    """Guards are true of the untouched seed, so they can only ever be lost --
+    by cheating or regressing. Losing one is not a deduction, it is a zero."""
+    ck = {"tests_pass": True, "did_not_edit_tests": False}
+    assert runner._score(ck, guards={"did_not_edit_tests"}) == 0.0
+    assert runner._score(ck) == 0.5  # flat, it would have read as half-done
+
+
+def test_guards_that_hold_earn_no_credit():
+    """A model that changes nothing holds every guard and deserves nothing."""
+    assert runner._score({"tests_pass": False, "suite_intact": True},
+                         guards={"suite_intact"}) == 0.0
+    assert runner._score({"tests_pass": True, "suite_intact": True},
+                         guards={"suite_intact"}) == 1.0
+
+
+def test_derived_checks_are_reported_but_not_double_counted():
+    ck = {"a": True, "b": False, "fully_fixed": False}
+    assert runner._score(ck, derived={"fully_fixed"}) == 0.5
+    assert runner._score(ck) == 0.333
+
+
+def test_a_grader_that_declares_away_every_outcome_scores_zero():
+    """Loud, not silently perfect: nothing was measured."""
+    assert runner._score({"guard": True}, guards={"guard"}) == 0.0
+
+
+def test_the_untouched_seed_earns_nothing_on_every_shipped_case():
+    """The regression that motivated guards: flat averaging paid 0.500 on
+    three of four cases for making no change at all (ROADMAP 5.142)."""
+    for case in load_cases():
+        with tempfile.TemporaryDirectory() as td:
+            wd = pathlib.Path(td) / "w"
+            shutil.copytree(case.path / "seed", wd)
+            ctx = runner.CheckCtx(workdir=wd, events=[], stdout="", case=case)
+            checks, score = runner._grade(case, ctx)
+        assert score == 0.0, f"{case.id} pays {score} for doing nothing: {checks}"
+        # And the aggregate really is one -- the premise the test above needs.
+        _, _, derived = runner.load_grader(case)
+        for name in derived:
+            rest = [v for k, v in checks.items() if k not in derived]
+            assert checks[name] == all(rest), f"{case.id}: {name} is not a conjunction"
+
+
+def test_the_split_leaves_the_solved_verdict_unchanged():
+    """Archived pass/fail has to survive the rescale: a run is solved iff every
+    outcome held and no guard was lost, which is exactly the old all-true."""
+    guards, derived = {"g"}, {"d"}
+    for out, g in itertools.product([False, True], repeat=2):
+        # `d` is the conjunction of the rest, which is what DERIVED means and
+        # what all four shipped graders compute. The equivalence is only true
+        # of an aggregate that is genuinely an aggregate: a DERIVED key set to
+        # anything looser would move the verdict, not just the scale.
+        ck = {"out": out, "g": g, "d": out and g}
+        assert (runner._score(ck) == 1.0) == (
+            runner._score(ck, guards, derived) == 1.0), ck
 
 
 def test_only_a_full_score_counts_as_solved():
