@@ -13,12 +13,13 @@ import json
 import os
 import re
 import time
+from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any, Awaitable, Callable
 
 from locode.agent.cancel import (CancelToken, CancelledByUser,
                                  DeadlineExceeded)
-from locode.agent.compact import compact_history, estimate_chars
+from locode.agent.compact import _kind, compact_history, estimate_chars
 from locode.agent.messages import build_system_prompt, tool_results_block
 from locode.context import load_project_instructions
 from locode.agent.plan import Plan
@@ -170,13 +171,62 @@ class AgentLoop:
         self.history = self.history[:1]  # keep the system prompt
         self._forget_seen()
 
-    def _forget_seen(self) -> None:
+    def _forget_seen(self, kept_verbatim: list[dict[str, Any]] | None = None) -> None:
         """Drop the read-before-edit record. Called whenever history is cut
         down: the gate's premise is that the file's text is still IN the
         model's context, and once the read_file result has been dropped that is
         no longer true. Costs one re-read per file the model resumes editing,
-        which is exactly the trade the gate is built on."""
-        self._seen_files.clear()
+        which is exactly the trade the gate is built on.
+
+        `kept_verbatim` is the slice compaction left UNTOUCHED (its trailing
+        `compact_keep_recent` window). A read sitting in that window has not
+        been dropped, so its premise still holds and forgetting it is simply
+        wrong — and the cost of getting this wrong is not one wasted re-read
+        but a livelock. Seen in production (2026-09-07): the model read
+        README.md, an auto-compaction that recovered 1.2% fired on the very
+        next check and cleared the whole set, and the edit it had done the read
+        FOR was refused with "You have NOT read ... yet" — sending it back to
+        re-read, which grew the history, which compacted again. It could not
+        land an edit at all.
+
+        Pass nothing (a full reset, /reset) to forget everything.
+        """
+        if not kept_verbatim:
+            self._seen_files.clear()
+            return
+        # Evidence is intact only if BOTH halves survived: the read_file call
+        # naming the path, and a following tool_result carrying what it read.
+        # Matching on the call alone would keep a path whose content was
+        # dropped, which is the failure the gate exists to prevent.
+        #
+        # Read the call back with toolparse.extract rather than looking for
+        # `tool_calls`: for a fenced (non-native) model — which is most of them
+        # — history holds the model's raw ```tool text and there is no
+        # `tool_calls` key at all, so a hand-rolled scan finds nothing and
+        # quietly forgets everything. Using the same parser the loop itself
+        # used to DISPATCH the call means the two cannot disagree about what
+        # was called.
+        intact: set[str] = set()
+        for i, m in enumerate(kept_verbatim):
+            if m.get("role") != "assistant":
+                continue
+            nxt = kept_verbatim[i + 1] if i + 1 < len(kept_verbatim) else None
+            if nxt is None or _kind(nxt) != "tool_result":
+                continue
+            for call in toolparse.extract(m, self._registry.names()).calls:
+                if call.name != "read_file":
+                    continue
+                path = (call.args or {}).get("path")
+                if path:
+                    # Resolve exactly as tools/fs.py does: the set holds
+                    # str(resolved Path), while the model may well have written
+                    # a relative path. Comparing the raw strings would simply
+                    # never match and silently restore the old wipe-everything
+                    # behaviour.
+                    intact.add(str(_resolve_seen(self._cwd, str(path))))
+        # intersection_update, not rebinding: the set is handed to ToolContext
+        # by reference, so it must stay the same object.
+        self._seen_files.intersection_update(intact)
 
     def set_history(self, history: list[dict[str, Any]]) -> None:
         """Replace the conversation history wholesale (e.g. resuming a saved
@@ -361,6 +411,7 @@ class AgentLoop:
         # Same, for the verify call an open-tasks nudge just demanded.
         forgiven_nudged: dict[tuple, int] = {}
         compact_notices = 0
+        compact_saturated = 0
         # Consecutive iterations whose edit batch changed the file NOTHING (a
         # blind guess — usually at a line the error names but that is actually
         # fine, since tracebacks/compilers misreport the location). The first is
@@ -495,16 +546,57 @@ class AgentLoop:
                 # a weak local model could.
                 if history_chars > (self._cfg.agent.max_history_chars
                                     * self._cfg.agent.auto_compact_ratio):
-                    self.history, report = compact_history(
+                    compacted, report = compact_history(
                         self.history,
                         keep_recent=self._cfg.agent.compact_keep_recent)
-                    new_chars = estimate_chars(self.history)
-                    if new_chars != history_chars:
+                    new_chars = estimate_chars(compacted)
+                    recovered = history_chars - new_chars
+                    ratio = recovered / max(history_chars, 1)
+                    if ratio < self._cfg.agent.min_compact_recovery_ratio:
+                        # SATURATED: everything squeezable has been squeezed, so
+                        # this pass is churn. Accepting it would be actively
+                        # harmful, not merely useless — rewriting the history
+                        # invalidates the server's prompt-cache prefix from the
+                        # first changed message on, and the whole tail has to be
+                        # re-prefilled. Observed in production (2026-09-07):
+                        # `200 -> 199 messages, 77,144 -> 76,492 chars`, 0.8%
+                        # recovered, against a soft threshold of 75,000 that the
+                        # history could no longer get under. Each iteration
+                        # added back about what the pass removed, so it sat just
+                        # above the line and re-compacted forever, paying a full
+                        # ~22k-token re-prefill (130-240s) every iteration while
+                        # _forget_seen() wiped the read-before-edit record and
+                        # sent the model back to re-read files it had just read
+                        # — the exact ratchet the notice below was added to
+                        # break. Three turns in a row died to the wallclock
+                        # having completed ~3 tool calls each.
+                        #
+                        # So DISCARD the pass and keep the original list. That
+                        # makes a failed attempt free (compaction is pure Python
+                        # over a list, no model call), which is why there is no
+                        # need to latch this off and no risk in re-trying every
+                        # iteration: if the model later adds something genuinely
+                        # bulky, the next pass clears the bar and is accepted.
+                        # The hard stop below still backstops a history that now
+                        # only grows.
+                        if compact_saturated < _MAX_COMPACT_NOTICES:
+                            compact_saturated += 1
+                            self._on_event({
+                                "phase": "info",
+                                "text": (f"context is saturated — compaction "
+                                         f"recovered only {recovered:,} of "
+                                         f"{history_chars:,} chars ({ratio:.1%}); "
+                                         f"/reset or start a new session to get "
+                                         f"the speed back")})
+                    elif new_chars != history_chars:
+                        self.history = compacted
                         # Compaction just deleted evidence from the context, so
                         # re-reading it is no longer repetition (_forgive_rereads)
                         # — and by the same token no longer "seen" for the
                         # read-before-edit gate.
-                        self._forget_seen()
+                        self._forget_seen(kept_verbatim=self.history[
+                            -self._cfg.agent.compact_keep_recent:]
+                            if self._cfg.agent.compact_keep_recent > 0 else [])
                         forgiven = _forgive_rereads(repeat_streaks, nudged_repeat,
                                                     forgiven_rereads)
                         self._on_event({"phase": "info",
@@ -525,7 +617,7 @@ class AgentLoop:
                         if compact_notices < _MAX_COMPACT_NOTICES:
                             compact_notices += 1
                             self._notice_compacted()
-                    history_chars = new_chars
+                        history_chars = new_chars
                 if history_chars > self._cfg.agent.max_history_chars:
                     return self._stop(
                         f"budget: conversation too large (~{history_chars:,} chars) "
@@ -2848,6 +2940,17 @@ def _reply_chars(msg) -> int:
 def _call_sig(call) -> tuple:
     """A stable identity for a tool call, for detecting no-progress repetition."""
     return (call.name, json.dumps(call.args, sort_keys=True, ensure_ascii=False))
+
+
+def _resolve_seen(cwd: str, path: str) -> Path:
+    """Mirror of tools/fs.py `_resolve` — kept here rather than imported so the
+    loop does not depend on a tool module's private helper. If the two ever
+    disagree the gate falls back to forgetting the file, which is the safe
+    direction: a needless re-read, never an unread edit."""
+    p = Path(os.path.expanduser(path))
+    if not p.is_absolute():
+        p = Path(cwd) / p
+    return p
 
 
 def _forgive_rereads(repeat_streaks: dict, nudged_repeat: set,

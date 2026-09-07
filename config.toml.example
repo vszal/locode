@@ -217,6 +217,15 @@ max_history_chars = 100000
 # backs the explicit /compact command.
 auto_compact_ratio = 0.75
 compact_keep_recent = 8
+# Minimum fraction of the history an auto-compaction must actually recover
+# for its result to be kept; below this the pass is discarded and the original
+# history stands. Compaction is not free -- rewriting the history invalidates
+# the server's prompt-cache prefix, so the whole tail is re-prefilled. A
+# saturated history (everything squeezable already squeezed) otherwise sits
+# just above the soft threshold recovering ~1% per pass while each iteration
+# adds it back, and compacts forever. A discarded pass costs only a little
+# Python, so it is safe to re-try every iteration. 0 = old always-accept.
+min_compact_recovery_ratio = 0.05
 
 [permissions]
 # tool name -> "auto" (run silently) | "ask" (confirm) | "deny" (never run)

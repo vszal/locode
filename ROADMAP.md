@@ -11387,3 +11387,98 @@ that collapses the two into one constant fails loudly rather than quietly
 re-baselining the benchmark.
 
 Still unverified against a live turn; the machine is in use.
+
+### 5.145 — the compaction ratchet: paying a full re-prefill to recover 1%
+
+Diagnosed from a live qwen38 session (2026-09-07) the user was having to hand-
+feed "continue" through. Three prompts, three continues, and the reason was not
+the model.
+
+**The measurement.** From `mlx-server.log`, the turn that began at the 13:19
+"continue" — seven requests, prompt ~21,900 tokens:
+
+| req | tokens re-prefilled | prefill | cache at request start |
+|-----|--------------------:|--------:|-----------------------:|
+| 95  | 21,789 | 214.5s | 2.24 GB |
+| 96  | 21,726 | 214.1s | 5.93 GB |
+| 97  | 21,329 | 128.9s | 5.92 GB |
+| 98  | 21,335 | 207.8s | 0.41 GB |
+| 99  | 21,780 | 212.7s | 5.84 GB |
+| 100 | 21,908 | 128.8s | 5.93 GB |
+| 101 | 21,914 | 130.8s | 0.41 GB |
+
+~99% of the prompt re-processed every time, whether the cache reported 5.9 GB or
+0.41 GB: 1,238s of prefill for seven model calls, ~87% of the turn's active
+time. At ~180s per iteration a 600s turn buys **three tool calls**. A task list
+needing fifteen needs five continues. That is the whole of the reported symptom.
+
+**Cause one — compaction saturated, and had no way to say so.** The user's own
+terminal supplied it:
+
+```
+auto-compacted context: 200 -> 199 messages, 77,144 -> 76,492 chars
+```
+
+Soft threshold is `max_history_chars × auto_compact_ratio` = 75,000. The history
+was at 77,144 and a pass recovered **652 chars — 0.8%**. It could not get under
+the line, because after 200 messages everything squeezable had been squeezed
+(~385 chars/message). Each iteration added back about what the pass removed, so
+it sat just above the threshold and re-compacted **forever**.
+
+The guard was `if new_chars != history_chars:` — *any* change counted as
+success. So every iteration paid the full price of a compaction for 0.8%: the
+history was rewritten, which invalidates the server's prompt-cache prefix from
+the first changed message on. Measured on a realistic tool-heavy history, one
+pass leaves only **58-61%** of the serialized prefix intact.
+
+**Cause two — the read-before-edit gate wiped on every one of those passes.**
+Also from the user's terminal, and worse than slow:
+
+```
+⚙ read_file .../README.md   ✓ 42 | **Booking window 0-60 days out** ...
+  ⟳ auto-compacted context: 205 -> 205 messages, 78,265 -> 77,341 chars
+⚙ edit_file .../README.md   ✗ You have NOT read .../README.md yet ...
+```
+
+A read, a 1.2% compaction, and the edit that read was *for* refused. `_forget_
+seen()` cleared the entire set on any compaction — but compaction keeps its
+trailing `compact_keep_recent` window **verbatim**, and the read was sitting
+right there in context. The gate's own premise ("the file's text is still IN
+the model's context") was true and it forgot anyway. So the model re-read, which
+grew the history, which compacted again. It could not land an edit at all. This
+is the ratchet the `_notice_compacted` comment was written to break, except the
+bound was on the *notice*, never on the *forgetting*.
+
+**The fixes.** `min_compact_recovery_ratio` (default 0.05): below it the pass is
+**discarded** and the original list stands. Discarding rather than latching is
+the point — a discarded pass costs only some pure-Python work over a list, so
+it is safe to re-try every iteration, and a genuinely bulky new tool result gets
+compacted normally the moment one arrives. The hard `max_history_chars` stop
+still backstops a history that now only grows, and the user is told once, with
+`/reset` named.
+
+`_forget_seen(kept_verbatim=...)` now keeps a file whose read survived intact in
+the verbatim window — requiring **both** halves, the `read_file` call naming the
+path and a following `tool_result`, since keeping a path whose content was
+dropped is precisely the failure the gate exists to prevent. Two details cost a
+debugging pass each and are worth recording: history holds a fenced model's raw
+` ```tool ` text with **no `tool_calls` key at all**, so a hand-rolled scan finds
+nothing and silently forgets everything — it now reads the call back with
+`toolparse.extract`, the same parser the loop used to dispatch it, so the two
+cannot disagree. And the seen-set holds `str(resolved Path)` while the model
+usually writes a relative path, so raw-string comparison would never match and
+would quietly restore the old behaviour.
+
+Seven tests, all three guards mutation-checked. The saturated fixture carries
+one droppable nudge among incompressible user prompts so a pass recovers a small
+but **nonzero** amount — the production shape. Without that it recovers exactly
+zero, which the old code also ignored, and the test would have proved nothing;
+it passed against the unfixed code until this was corrected.
+
+**Not fixed, recorded.** The slow-progress nudge fired in this session
+("⟳ slow progress vs wallclock"). It compares iterations-consumed to
+wallclock-consumed and nudges toward "shorter, more decisive replies" — but the
+wallclock here was going to *prefill*, not generation, and the model was already
+decisive at ~200 tokens per call. The ratio cannot tell "the model is rambling"
+from "the server is re-reading the context", so it scolds the model for
+something it is not doing.

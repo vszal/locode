@@ -367,6 +367,27 @@ class AgentConfig:
     # How many of the most recent messages auto-compact / /compact always
     # leave untouched (the current work in progress).
     compact_keep_recent: int = 8
+    # Minimum fraction of the history an auto-compaction pass must actually
+    # recover for its result to be KEPT. Below this the pass is discarded and
+    # the original list stands.
+    #
+    # A compaction is not free just because it needs no model call: rewriting
+    # the history invalidates the server's prompt-cache prefix from the first
+    # changed message on, so the whole tail is re-prefilled. That is worth
+    # paying for a real reduction and never worth paying for a rounding error.
+    # Once every squeezable message has been squeezed, a saturated history sits
+    # just above the soft threshold and each pass recovers ~1% while each
+    # iteration adds it back — so it compacts forever. Measured in production
+    # (2026-09-07, qwen38): `200 -> 199 messages, 77,144 -> 76,492 chars` on
+    # every iteration, a full ~22k-token re-prefill each time at 130-240s, ~3
+    # tool calls per 600s turn, and the read-before-edit record cleared often
+    # enough that an edit was refused for a file read one call earlier.
+    #
+    # Discarding rather than latching is deliberate: a discarded pass costs
+    # only some pure-Python work over a list, so it is safe to re-try every
+    # iteration, and a genuinely bulky new tool result gets compacted normally
+    # the moment one arrives. 0 restores the old always-accept behaviour.
+    min_compact_recovery_ratio: float = 0.05
 
 
 @dataclass

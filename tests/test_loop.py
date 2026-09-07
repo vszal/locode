@@ -4,6 +4,7 @@ import time
 import pytest
 
 import locode.agent.loop as loop_mod
+from locode.agent.compact import compact_history, estimate_chars
 from locode.agent.loop import AgentLoop
 from locode.config import Config
 from locode.permissions import PermissionPolicy
@@ -4669,3 +4670,191 @@ async def test_no_extension_notice_when_the_budget_never_moved(
         tmp_path, monkeypatch, scripted, grant=0)
     assert not [e for e in events if e.get("phase") == "info"
                 and "extending" in e.get("text", "")]
+
+
+# --- saturated compaction: churn that costs a full re-prefill ----------------
+# Production, 2026-09-07 (qwen38, ~22k-token context). Everything squeezable had
+# been squeezed, so the history sat just above the soft threshold and each pass
+# recovered ~1% while the next iteration added it back:
+#     auto-compacted context: 200 -> 199 messages, 77,144 -> 76,492 chars
+# Rewriting the history invalidates the server's prompt-cache prefix, so every
+# iteration paid a full ~22k-token re-prefill (130-240s) to recover 0.8%. Three
+# turns in a row died to the wallclock having landed ~3 tool calls each.
+
+def _saturated_cfg():
+    cfg = Config()
+    cfg.agent.max_history_chars = 20_000
+    cfg.agent.auto_compact_ratio = 0.5   # soft threshold at 10,000 chars
+    cfg.agent.compact_keep_recent = 2
+    cfg.agent.max_repeat_calls = 1000
+    cfg.agent.max_error_stall = 1000
+    return cfg
+
+
+def _incompressible(n, per=1_200):
+    """A saturated history: mostly messages compaction is forbidden to shrink
+    (real user prompts), plus ONE droppable nudge. That makes a pass recover a
+    small but NONZERO amount — the production shape (`200 -> 199 messages,
+    77,144 -> 76,492 chars`, 0.8%). A pass that recovers exactly zero would be
+    a no-op the old code also ignored, so it would not test this guard at all.
+    """
+    out = [{"role": "user", "kind": "user_prompt", "content": "u" * per}
+           for _ in range(n)]
+    out.insert(1, {"role": "user", "kind": "nudge", "content": "n" * 200})
+    return out
+
+
+async def _run_saturated(tmp_path, ratio):
+    cfg = _saturated_cfg()
+    cfg.agent.min_compact_recovery_ratio = ratio
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    events = []
+    scripted = [{"role": "assistant", "content": "done"}]
+    loop = AgentLoop(FakeClient(scripted), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg,
+                     cwd=str(tmp_path), on_event=events.append)
+    loop.set_history([{"role": "system", "content": "sys"}] + _incompressible(12))
+    before = list(loop.history)
+    await loop.run_turn("carry on")
+    return loop, before, events
+
+
+async def test_a_compaction_that_recovers_almost_nothing_is_discarded(tmp_path):
+    # The history is over the soft threshold but made of messages compaction is
+    # forbidden to touch, so a pass recovers ~0. Keeping that result would cost
+    # the whole prompt-cache prefix for nothing.
+    loop, before, events = await _run_saturated(tmp_path, 0.05)
+    assert loop.history[:len(before)] == before, \
+        "the original history must stand, prefix intact"
+    assert not any("auto-compacted" in e.get("text", "") for e in events)
+    # And the pass really did have something to discard — otherwise this is a
+    # no-op the old code ignored too, and proves nothing.
+    shrunk, _ = compact_history(before, keep_recent=2)
+    assert 0 < estimate_chars(before) - estimate_chars(shrunk) \
+        < estimate_chars(before) * 0.05
+
+
+async def test_the_user_is_told_once_that_the_context_is_saturated(tmp_path):
+    _, _, events = await _run_saturated(tmp_path, 0.05)
+    said = [e for e in events if "saturated" in e.get("text", "")]
+    assert len(said) == 1
+    assert "/reset" in said[0]["text"]
+
+
+async def test_a_zero_ratio_restores_the_old_always_accept_behaviour(tmp_path):
+    # The escape hatch has to actually escape: at 0 every pass is kept, which
+    # is what shipped before this guard.
+    _, _, events = await _run_saturated(tmp_path, 0.0)
+    assert not any("saturated" in e.get("text", "") for e in events)
+
+
+async def test_a_compaction_that_really_helps_is_still_kept(tmp_path):
+    # The guard must not disarm compaction itself: bulky STALE TOOL RESULTS are
+    # exactly what it exists to collapse, and that pass clears the bar.
+    cfg = _saturated_cfg()
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    events = []
+    hist = [{"role": "system", "content": "sys"}]
+    for i in range(12):
+        hist.append({"role": "assistant", "kind": "assistant", "content": "",
+                     "tool_calls": [{"id": f"c{i}", "function": {
+                         "name": "read_file",
+                         "arguments": json.dumps({"path": f"f{i}.py"})}}]})
+        hist.append({"role": "user", "kind": "tool_result",
+                     "content": "Tool results:\n\n[read_file]\n" + "L%d\n" % i * 300})
+    loop = AgentLoop(FakeClient([{"role": "assistant", "content": "done"}]),
+                     FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+                     cwd=str(tmp_path), on_event=events.append)
+    loop.set_history(hist)
+    n_before = estimate_chars(loop.history)
+    await loop.run_turn("carry on")
+    assert estimate_chars(loop.history) < n_before * 0.9
+    assert any("auto-compacted" in e.get("text", "") for e in events)
+
+
+# --- the read -> compact -> "you have NOT read it" livelock ------------------
+# Production, 2026-09-07. The model read README.md, confirmed a line from it,
+# and its very next edit was refused:
+#     ⚙ read_file .../README.md   ✓ 42 | **Booking window 0-60 days out** ...
+#     ⟳ auto-compacted context: 205 -> 205 messages, 78,265 -> 77,341 chars
+#     ⚙ edit_file .../README.md   ✗ You have NOT read .../README.md yet ...
+# _forget_seen() cleared the whole set on any compaction, but compaction keeps
+# its trailing `compact_keep_recent` window VERBATIM -- the read was still right
+# there in context. So the model re-read, which grew the history, which
+# compacted again. It could not land an edit at all.
+
+async def test_a_read_kept_verbatim_by_compaction_still_counts_as_read(tmp_path):
+    async def confirm(name, args, preview):
+        return "yes"
+
+    target = tmp_path / "README.md"
+    target.write_text("alpha\nbeta\ngamma\n")
+    cfg = _saturated_cfg()          # soft threshold at 10,000 chars
+    cfg.agent.compact_keep_recent = 4
+    cfg.agent.require_read_before_edit = True
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    events = []
+    # Seeded just UNDER the threshold, with the bulk still uncompacted, so the
+    # pass that matters fires AFTER the read and has real work to do. Compacting
+    # on iteration 0 instead would prove nothing: the read would not exist yet.
+    hist = [{"role": "system", "content": "sys"}]
+    for i in range(10):
+        hist.append({"role": "user", "kind": "tool_result",
+                     "content": "Tool results:\n\n[read_file]\n" + "L%d\n" % i * 300})
+
+    def call(name, args):
+        return {"role": "assistant", "content": "", "tool_calls": [
+            {"id": name, "function": {"name": name,
+                                      "arguments": json.dumps(args)}}]}
+
+    big = tmp_path / "big.txt"
+    big.write_text("filler line\n" * 700)
+    scripted = [call("read_file", {"path": str(target)}),
+                # tips the history over the threshold with fresh bulk, and
+                # leaves the README read inside the verbatim-kept window
+                call("read_file", {"path": str(big)}),
+                call("edit_file", {"path": str(target),
+                                   "old": "beta", "new": "BETA"}),
+                {"role": "assistant", "content": "done"}]
+    loop = AgentLoop(FakeClient(scripted), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg,
+                     cwd=str(tmp_path), on_event=events.append, confirm=confirm)
+    loop.set_history(hist)
+    await loop.run_turn("fix the readme")
+    compactions = [e for e in events if "auto-compacted" in e.get("text", "")]
+    assert compactions, "the accepted compaction under test never fired"
+    assert not any(e.get("phase") == "denied" for e in events), \
+        "the edit was refused for a file read two calls earlier"
+    assert target.read_text() == "alpha\nBETA\ngamma\n"
+
+
+async def test_a_full_reset_still_forgets_everything(tmp_path):
+    # /reset and friends pass no kept window: nothing survives, so the gate
+    # must go back to demanding a fresh read.
+    cfg = Config()
+    reg = Registry()
+    for t in fs.all_tools():
+        reg.register(t)
+    loop = AgentLoop(FakeClient([]), FakeManager(), reg,
+                     PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path))
+    loop._seen_files.add("/x/y.py")
+    loop._forget_seen()
+    assert loop._seen_files == set()
+
+
+def test_a_relative_read_path_resolves_the_way_the_fs_tools_resolve_it(tmp_path):
+    # The seen-set holds str(resolved Path) but the model usually writes a
+    # relative path. Comparing raw strings would never match and would silently
+    # restore the wipe-everything behaviour this fix removes.
+    from locode.agent.loop import _resolve_seen
+    from locode.tools.fs import _resolve as fs_resolve
+    from locode.tools.base import ToolContext
+    ctx = ToolContext(cwd=str(tmp_path))
+    for p in ("README.md", "./a/b.py", str(tmp_path / "abs.py")):
+        assert str(_resolve_seen(str(tmp_path), p)) == str(fs_resolve(ctx, p))
