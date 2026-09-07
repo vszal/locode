@@ -28,19 +28,26 @@ touch sensitive paths.
 - **Permission layer** — read-only tools run automatically; mutating tools
   prompt; configurable `deny_paths` are hard-blocked even under `--yolo`.
 - **Server lifecycle management** — starts/stops a local model server with
-  per-model memory budgeting for single-GPU setups.
+  per-model memory budgeting for single-GPU setups, or talks to one on
+  [another machine](#using-a-model-server-on-another-machine) and leaves it alone.
 - **Interactive REPL and headless one-shot** modes.
+- **`locode bench`** — four real coding tasks, easy to hard, run against
+  your models on your machine so you can pick one on evidence rather than
+  on a model card. See [Benchmarking](#benchmarking-your-models).
 
 ## Requirements
 
 - Python ≥ 3.10
-- A local OpenAI-compatible model server. On Apple Silicon, that's
+- An OpenAI-compatible model server. On Apple Silicon, that's
   [`mlx-lm`](https://github.com/ml-explore/mlx-lm):
 
   ```bash
   pip install mlx-lm
   mlx_lm.server --model <hf-model-id> --port 8081
   ```
+
+  It does not have to be on this machine — see
+  [Using a model server on another machine](#using-a-model-server-on-another-machine).
 
 ## Install
 
@@ -106,19 +113,124 @@ memory_reserve_gb = 5.0     # refuse a model that would not leave this much free
 the two disagree sharply. On the `repro-only` case (n=20 per model) `qwen38`
 generates at about 22 chars/s against `qwythos9`'s 76 — nearly four times slower
 per character — and still finishes sooner, 95s against 116s, because it gets
-there in 5.5 steps where `qwythos9` needs 8.7.
-On a memory-tight machine (16 GB) prefer `qwythos9`: at ~11 GB, `qwen38` will
-not fit under the memory budget. See [`MODELS.md`](MODELS.md).
+there in 5.5 steps where `qwythos9` needs 8.7. On a memory-tight machine (16 GB)
+prefer `qwythos9`: at ~11 GB, `qwen38` will not fit under the memory budget.
+See [`MODELS.md`](MODELS.md) — and don't take our word for any of it, measure
+your own machine with [`locode bench`](#benchmarking-your-models).
 
-You don't have to take our numbers for it — `locode bench` measures this on
-your machine:
+## Using a model server on another machine
+
+"Local" means *your* hardware, not necessarily *this* box. If you keep a
+dedicated GPU machine on the LAN, point locode at it:
 
 ```bash
-locode bench -m qwen38 -m qwythos9
+locode --base-url http://gpu-box.lan:8081        # full URL
+locode --host 192.168.1.42 --port 8081           # host/port
+LOCODE_BASE_URL=http://gpu-box.lan:8081 locode   # environment
 ```
 
-It runs four real coding tasks, easy to hard, against each model in a throwaway
-workspace and reports what got solved and how long it took:
+or make it the default in `~/.config/locode/config.toml`:
+
+```toml
+[server]
+host = "192.168.1.42"
+port = 8081
+scheme = "http"          # "https" if you front it with TLS
+# base_url = "https://gpu-box.lan"   # full override; wins over scheme/host/port
+manage = "auto"          # own the server process? "auto" = yes iff loopback
+```
+
+**What changes when the endpoint is remote.** locode decides whether it *owns*
+the server process from the endpoint: loopback means it may start, stop and
+switch models; anything else it treats as someone else's server and leaves
+alone. Set `manage` explicitly to override the guess. On a remote endpoint:
+
+- **It will not start a server for you.** If nothing answers, you get
+  `no model server reachable at <url>` rather than a local process appearing
+  on the wrong machine.
+- **It will not switch models.** A remote box serves whatever it was launched
+  with. `-m` still selects *among* the models the endpoint reports serving; ask
+  for one it does not serve and locode says so instead of silently using the
+  wrong model. Two consequences worth knowing: `/server restart` and friends
+  are unavailable, and `locode bench -m a -m b` can only compare two models if
+  the endpoint actually serves both.
+- **The memory guard does not apply.** The RAM budget that refuses an
+  oversized model protects *this* machine; on a remote endpoint the remote box
+  is responsible for what it loads.
+
+Benchmarking takes the same flags, which is usually the point — the dedicated
+box is the one worth measuring:
+
+```bash
+locode bench --base-url http://gpu-box.lan:8081 -m qwen38
+```
+
+**A word on the wire.** Prompts carry your source code, and `http://` on a LAN
+is plaintext to anything on that network. `mlx_lm.server` has no
+authentication, so a server bound to `0.0.0.0` is readable and usable by every
+host that can route to it. Bind it to the interface you mean, keep it behind
+your firewall, and use `scheme = "https"` with a TLS-terminating proxy if the
+traffic leaves a network you control.
+
+## Benchmarking your models
+
+**Why bother.** Nothing on a model card tells you which local model will
+finish your work. Parameter count, quantisation and tokens/sec all describe how
+a model *types*, not whether it arrives at a working fix, and they disagree
+with each other often enough that choosing on paper is close to guessing. The
+numbers in this README came off one M4 Pro; yours will differ with your
+hardware, your quant and your config. `locode bench` gets you your own.
+
+It is also the same measurement this project runs on itself — these four cases
+and their graders are what the default-model choices above rest on, not a
+separate marketing benchmark.
+
+```bash
+locode bench                          # your configured default model
+locode bench -m qwen38 -m qwythos9    # compare two
+```
+
+**What a run actually does.** For each model-and-case pair, `locode bench`:
+
+1. copies the case's seed workspace into a fresh temporary directory;
+2. runs one real headless `locode` turn in it — your server, your config, the
+   real tool set, editing real files on disk;
+3. times it end to end in wall-clock seconds;
+4. grades the workspace the model left behind with the case's `check.py`,
+   which inspects the resulting files and the run's event log;
+5. deletes the workspace (`--keep` keeps it, with the event log inside).
+
+Nothing is mocked and nothing is fetched: the seeds ship inside the wheel and
+the cases run offline. Your model server does have to be up (see
+[Requirements](#requirements)) — if it is not, the run reports `ERROR` rather
+than a bad score.
+
+**The ladder** runs easy to hard, so a model that cannot clear the floor shows
+it in the first two minutes instead of after the twenty-minute case:
+
+| case | | what it asks for |
+|---|---|---|
+| `exec-pinpoint` | warm-up | three one-line bugs that a failing traceback points straight at |
+| `exec-bugfix` | easy | three logic bugs in a string library; fix until `pytest` is green |
+| `repro-only` | medium | *"the top charges list is wrong. fix it"* — no test suite, and the defect (amounts sorted as strings) is near-invisible by reading. The model has to actually run the thing |
+| `multi-defect-blind` | hard | five defects in a module with no tests at all; the model has to build its own reproduction from the docstrings |
+
+**Reading the report.** Every cell is an outcome plus a wall-clock time. At
+`--repeat N` the outcome becomes a hit rate (`2/3`) and the time an average.
+
+- **`solved`** counts runs that scored a *perfect* 1.000. Each ladder case is
+  one a capable model takes all the way, so partial credit means something was
+  left broken, and the cell reads `FAIL`.
+- **`time-to-done`** is what you wait through for one pass of the ladder. It is
+  the headline because it is the one number no reply-shape can game.
+- **`iterations`** is the *explanation*, not the verdict: a model generally
+  wins by needing fewer steps, not by typing faster.
+- **`ERROR`** means the run never reached its first turn — server down, alias
+  unresolved. It suppresses the recommendation and exits non-zero, because a
+  model that never loaded has not been measured.
+
+The recommendation goes on `solved` first and uses time only to break a tie.
+Here is a real run (M4 Pro, 24 GB, one pass per cell):
 
 ```
 case                qwen38            qwythos9
@@ -136,19 +248,26 @@ qwen38 recommended — solves more (4 vs 2).
   (one run per case; local models vary run to run — `--repeat 3` for a firmer answer.)
 ```
 
-That run (M4 Pro, 24 GB, one pass each) is a fair warning about reading any
-single column. `qwythos9` is the *faster* model on both cases it solves — 80s
-and 71s against 114s and 121s — and the two totals all but tie at 510s and
-518s. Time only becomes the tiebreak once the work is actually done, so the
-verdict goes on `solved` first and time second.
+That is a fair warning about reading any single row. `qwythos9` is the *faster*
+model on both cases it solves — 80s and 71s against 114s and 121s — and the two
+totals all but tie at 510s and 518s. Sorting on time alone would call this a
+coin flip between a model that finishes the work and one that does not.
 
-Each run drives a real model against a real workspace, so the full ladder takes
-minutes per model. `--repeat 3` averages over the run-to-run variance that
-local models have plenty of; `-c CASE` runs one case; `--list` shows the ladder
-without running anything; `--keep` leaves each workspace and its event log on
-disk to read afterwards. Iterations are reported as the *explanation* for a
-result — a model wins by needing fewer steps, not by typing faster — but the
-verdict is decided on what got fixed and then on time.
+**Flags.**
+
+| flag | |
+|---|---|
+| `-m ALIAS` | model to measure; repeat it to compare. Defaults to your configured default model |
+| `-c ID` | run one case instead of the whole ladder; repeatable |
+| `--repeat N` | N passes per cell (default 1) — local models vary run to run, and 3 gives a much firmer answer |
+| `--keep` | leave each scratch workspace and its event log on disk to read afterwards |
+| `--list` | print the ladder and exit without running anything |
+| `--base-url` / `--host` / `--port` | measure a server on another machine; see [above](#using-a-model-server-on-another-machine) |
+
+The full ladder drives a real model through real work, so budget minutes per
+model, not seconds. Exit status is `0` when the measurement ran (*including*
+when a model scores badly — that is a valid result) and `2` when something
+stopped it from measuring at all, which makes it safe to gate on in CI.
 
 ## Development setup (from source)
 

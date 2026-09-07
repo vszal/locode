@@ -280,6 +280,14 @@ def _cmd_bench(argv: list[str]) -> int:
                    help="Keep each scratch workspace instead of deleting it.")
     p.add_argument("--list", action="store_true",
                    help="List the cases and exit without running anything.")
+    # Endpoint flags, mirroring the top-level ones: a dedicated GPU box on the
+    # LAN is exactly the machine worth benchmarking, and without these `bench`
+    # could only ever measure a server on localhost.
+    p.add_argument("--host", help="Server host/IP (default 127.0.0.1).")
+    p.add_argument("--port", type=int, help="Server port (default 8081).")
+    p.add_argument("--base-url", dest="base_url",
+                   help="Full server URL (e.g. http://gpu-box.lan:8081); "
+                        "overrides host/port and marks the endpoint remote.")
     args = p.parse_args(argv)
 
     cases = runner.load_cases(args.cases)
@@ -296,9 +304,24 @@ def _cmd_bench(argv: list[str]) -> int:
     if args.repeat < 1:
         p.error("--repeat must be at least 1")
 
+    server_args: list[str] = []
+    if args.base_url:
+        server_args += ["--base-url", args.base_url]
+    if args.host:
+        server_args += ["--host", args.host]
+    if args.port:
+        server_args += ["--port", str(args.port)]
+
     total = len(cases) * len(models) * args.repeat
     print(f"locode bench — {len(cases)} case(s) x {len(models)} model(s) "
           f"x {args.repeat} = {total} run(s)")
+    if server_args:
+        # Say which box the numbers describe. A result copied out of a terminal
+        # is worthless if you can't tell which machine produced it.
+        from locode.config import Config as _C
+        cfg = _C.load().override(host=args.host, port=args.port,
+                                 base_url=args.base_url)
+        print(f"endpoint: {cfg.base_url}")
     print("Each run drives a real model against a real workspace; "
           "this takes minutes, not seconds.\n")
 
@@ -312,7 +335,8 @@ def _cmd_bench(argv: list[str]) -> int:
                 if args.repeat > 1:
                     label += f" · run {rep}"
                 print(f"{label} …", flush=True)
-                r = runner.run_case(case, model, rep, keep=args.keep)
+                r = runner.run_case(case, model, rep, keep=args.keep,
+                                    server_args=server_args)
                 results.append(r)
                 if r.infra_error:
                     print(f"    ERROR  {r.infra_error}", flush=True)

@@ -264,3 +264,92 @@ def test_keep_preserves_the_events_log_inside_the_workspace(monkeypatch, capsys)
     finally:
         import shutil as _sh
         _sh.rmtree(kept["cwd"], ignore_errors=True)
+
+
+def test_totals_are_per_pass_not_summed_over_repeats():
+    """At --repeat 3 a summed time would report three ladders as one. The
+    headline is "how long do I wait", so totals divide by the repeat count."""
+    rows = [_res(case=c, model="a", score=1.0, seconds=100, iterations=5)
+            for c in ("exec-pinpoint", "exec-bugfix") for _ in range(3)]
+    out = _report(rows, ["a"], repeat=3)
+    assert "time-to-done/pass" in out
+    assert "200s" in out and "600s" not in out
+    assert "iterations/pass" in out
+    # solved stays a count of runs: that is the reliability number.
+    assert "6/6" in out
+
+
+def test_a_partly_solved_case_shows_the_hit_rate():
+    """Two of three passes solving is the fact --repeat exists to surface; it
+    must not round to ok or to FAIL."""
+    rows = [_res(case="repro-only", model="a", score=s, seconds=100)
+            for s in (1.0, 1.0, 0.5)]
+    out = _report(rows, ["a"], repeat=3)
+    assert "2/3" in out
+
+
+# --- remote endpoints ------------------------------------------------------
+def test_endpoint_flags_reach_the_child_process(monkeypatch):
+    """A dedicated GPU box on the LAN is the machine most worth benchmarking;
+    without this, bench could only ever measure localhost."""
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 1, "", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    runner.run_case(load_cases(["exec-bugfix"])[0], "m",
+                    server_args=["--base-url", "http://gpu-box.lan:8081"])
+    cmd = seen["cmd"]
+    assert "--base-url" in cmd
+    assert cmd[cmd.index("--base-url") + 1] == "http://gpu-box.lan:8081"
+
+
+def test_endpoint_flags_precede_the_cases_own_args(monkeypatch):
+    """A case's extra_args (iteration/wallclock caps) must stay last so a case
+    can still override what the endpoint flags do not set."""
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 1, "", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    case = load_cases(["multi-defect-blind"])[0]
+    assert case.extra_args, "this test needs a case that carries extra_args"
+    runner.run_case(case, "m", server_args=["--host", "10.0.0.5"])
+    cmd = seen["cmd"]
+    assert cmd.index("--host") < cmd.index(case.extra_args[0])
+
+
+def test_bench_forwards_the_endpoint_and_names_it(monkeypatch, capsys):
+    from locode.cli import main
+
+    calls = []
+
+    def fake_run_case(case, model, rep, keep=False, server_args=None):
+        calls.append(server_args)
+        return BenchResult(case.id, case.difficulty, model, rep, 1.0, 1.0, 1, 0)
+
+    monkeypatch.setattr(runner, "run_case", fake_run_case)
+    rc = main(["bench", "-c", "exec-bugfix", "-m", "m",
+               "--base-url", "http://gpu-box.lan:8081"])
+    assert rc == 0
+    assert calls == [["--base-url", "http://gpu-box.lan:8081"]]
+    # The report must say which box produced it, or a pasted result is unreadable.
+    assert "http://gpu-box.lan:8081" in capsys.readouterr().out
+
+
+def test_bench_without_endpoint_flags_forwards_nothing(monkeypatch):
+    from locode.cli import main
+
+    calls = []
+
+    def fake_run_case(case, model, rep, keep=False, server_args=None):
+        calls.append(server_args)
+        return BenchResult(case.id, case.difficulty, model, rep, 1.0, 1.0, 1, 0)
+
+    monkeypatch.setattr(runner, "run_case", fake_run_case)
+    main(["bench", "-c", "exec-bugfix", "-m", "m"])
+    assert calls == [[]]

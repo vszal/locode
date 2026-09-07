@@ -203,9 +203,14 @@ def _score(checks: dict[str, Any]) -> float:
                                   for v in checks.values()), 3)
 
 
-def run_case(case: Case, model: str, repeat: int = 1,
-             keep: bool = False, on_start=None) -> BenchResult:
-    """Run one case once against one model, in a throwaway workspace."""
+def run_case(case: Case, model: str, repeat: int = 1, keep: bool = False,
+             on_start=None, server_args: list[str] | None = None) -> BenchResult:
+    """Run one case once against one model, in a throwaway workspace.
+
+    `server_args` are endpoint flags (`--base-url`, `--host`, `--port`) passed
+    straight through to the child, so a bench can measure a model served from
+    another machine rather than only a local one.
+    """
     workdir = Path(tempfile.mkdtemp(prefix=f"locode-bench-{case.id}-"))
     log_path = workdir.parent / f"{workdir.name}.events.jsonl"
     if on_start:
@@ -227,7 +232,9 @@ def run_case(case: Case, model: str, repeat: int = 1,
         # measures that venv's build rather than whatever is first on PATH.
         cmd = [sys.executable, "-m", "locode", "-p", case.prompt, "-m", model,
                "--log-events", str(log_path), "--no-markdown", "--no-splash",
-               "--allow-tool", ",".join(case.allow_tools)] + case.extra_args
+               "--allow-tool", ",".join(case.allow_tools)]
+        cmd += list(server_args or [])
+        cmd += case.extra_args
 
         t0 = time.monotonic()
         timed_out = False
@@ -319,21 +326,30 @@ def format_report(results: list[BenchResult], models: list[str],
         lines.append(row.rstrip())
     lines.append(rule)
 
+    # Totals are per PASS through the ladder, not per run: at --repeat 3 a
+    # summed time would report three ladders as one, and the headline number
+    # is meant to be "how long do I wait for this work to get done".
     totals = {}
+    iters = {}
     for m in models:
         rows = [r for r in results if r.model == m]
         errs = [r for r in rows if r.infra_error]
         solved = sum(1 for r in rows if r.solved)
-        secs = sum(r.seconds for r in rows)
+        secs = sum(r.seconds for r in rows) / repeat
         totals[m] = (solved, len(rows), secs, len(errs))
+        iters[m] = sum(r.iterations for r in rows) / repeat
 
+    # `solved` stays a count of RUNS, because at repeat > 1 that count is the
+    # reliability number the repeats were run to get: 11/12 says something
+    # 4/4 cannot.
+    t_label = "time-to-done" if repeat == 1 else "time-to-done/pass"
+    i_label = "iterations" if repeat == 1 else "iterations/pass"
     lines.append(f"{'solved':<{cw}}" + "".join(
         f"{f'{totals[m][0]}/{totals[m][1]}':<{w + 4}}" for m in models).rstrip())
-    lines.append(f"{'time-to-done':<{cw}}" + "".join(
+    lines.append(f"{t_label:<{cw}}" + "".join(
         f"{f'{totals[m][2]:.0f}s':<{w + 4}}" for m in models).rstrip())
-    lines.append(f"{'iterations':<{cw}}" + "".join(
-        f"{sum(r.iterations for r in results if r.model == m):<{w + 4}}"
-        for m in models).rstrip())
+    lines.append(f"{i_label:<{cw}}" + "".join(
+        f"{f'{iters[m]:.0f}':<{w + 4}}" for m in models).rstrip())
     lines.append("")
 
     lines.extend(_verdict(models, totals, repeat))
