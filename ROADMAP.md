@@ -11084,3 +11084,57 @@ each without anyone noticing.
 
 Rule coined here: **90** (score only the checks a model can earn; a check
 already true of the untouched seed is a veto, not a component of the mean).
+
+## 5.143 — running it twice, and what survived
+
+Re-ran §5.141's exact command on the rule-90 build — `locode bench -m qwen38 -m
+qwythos9 --repeat 3`, same machine, 24 runs — to see the new scale in the
+report. The scale behaved exactly as designed: `qwythos9`'s `repro-only`
+failures now print **0.00** where they printed 0.50, and its
+`multi-defect-blind` partial prints **0.80** where it printed 0.67. Nothing
+about that was surprising, and it is not the finding.
+
+**The verdicts moved, and scoring cannot have moved them.** `qwythos9` went
+from 5/12 solved to 9/12. Rule 90's change can only ever *lower* a score — a
+guard vetoes, it never credits — so a FAIL cannot become an `ok` by rescaling.
+Same build, same config, same box: this is run-to-run variance, and it is
+larger than the §5.141 write-up implied.
+
+| | sweep A (§5.141) | sweep B (here) | pooled |
+|---|---|---|---|
+| qwen38 solved | 12/12 | 12/12 | **24/24** |
+| qwythos9 solved | 5/12 | 9/12 | **14/24** |
+| qwen38 time/pass | 544s | 529s | 536s |
+| qwythos9 time/pass | 355s | 405s | 380s |
+| p (Fisher, that sweep) | **0.0046** | 0.2174 | **0.0006** |
+
+Homogeneity first, per rule 84: the two sweeps' `qwythos9` totals differ at
+p=0.21, and no individual case falls below p=0.40, so they are consistent and
+pooling is legitimate. Pooled, `qwen38` wins 24/24 to 14/24 at p=0.0006 — the
+conclusion is safe and stronger than either sweep alone.
+
+**But neither sweep alone was enough, and one of them says so.** Sweep A
+reaches p=0.005; sweep B, on its own, reaches only p=0.22 and would not have
+supported the recommendation it printed. Rule 84 already said this — *treat one
+sweep's mean on a high-variance case as a draw, not the case's value* — and I
+published a single n=3 sweep in the README as "the whole argument". That is the
+error here: not a wrong number, a rule on the books that I did not apply to my
+own documentation. The README now carries both sweeps and the pooled test.
+
+**What replicated and what did not.** The ranking inversion replicated cleanly:
+in both sweeps `qwythos9` finished a ladder pass faster than `qwen38` and
+solved fewer runs, so a time-ranked leaderboard picks the wrong model both
+times. That is rule 89 and it stands. The *mechanism* I used to illustrate it
+did not: sweep A's three `repro-only` failures took 40s each and I described
+give-up-is-cheap as the reason time misleads. In sweep B the same case's
+failures took 349s and 49s — the 349s run is the slowest thing `qwythos9` did
+all sweep. Fast failure is *a* way time misleads, not *the* way. Rule 89's
+citation is amended to rest on the inversion rather than the anecdote.
+
+Per-case pooled (n=6 each), for the record: `qwythos9` takes `exec-pinpoint`
+6/6 and `exec-bugfix` 5/6, and is the weaker model exactly where the case stops
+handing it a failing test to read — `repro-only` 1/6, `multi-defect-blind` 2/6.
+`qwen38` is 6/6 on all four. The ladder is ordered correctly.
+
+No new rule. Rule 84 covers the pooling discipline and covered it already;
+this section is the record of applying it late.

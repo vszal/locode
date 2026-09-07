@@ -174,6 +174,11 @@ L5864). Same rule, refined in place, no amendment.
   success on the ladder — by editing something plausible and never running the
   code. A time-ranked leaderboard does not merely mis-rank there, it rewards the
   give-up behaviour the nudge machinery exists to suppress. §5.141.
+  *Replicated §5.143:* a second n=3 sweep of the identical build put `qwythos9`
+  at 9/12 rather than 5/12, and its `repro-only` failures took 349s and 49s —
+  so **"giving up is fast" is the weaker half of the finding and did not
+  replicate**. The ranking inversion did, both times: faster per pass, fewer
+  solved. The rule rests on that, not on the 40-second anecdote.
 
 - **Rule 90: score only the checks a model can earn — a check that is already
   true of the untouched seed is a veto, not a component of the mean.** A

@@ -240,38 +240,43 @@ Here is a real run — `locode bench -m qwen38 -m qwythos9 --repeat 3`, M4 Pro,
 ```
 case                qwen38            qwythos9
 ------------------  ----------------  ----------------
-exec-pinpoint       ok      118s      ok       63s
-exec-bugfix         ok      120s      2/3     132s
-repro-only          ok      141s      FAIL     40s
-multi-defect-blind  ok      164s      FAIL    120s
+exec-pinpoint       ok      135s      ok       43s
+exec-bugfix         ok      126s      ok       66s
+repro-only          ok       93s      1/3     166s
+multi-defect-blind  ok      175s      2/3     131s
 ------------------  ----------------  ----------------
-solved              12/12             5/12
-time-to-done/pass   544s              355s
-iterations/pass     24                40
+solved              12/12             9/12
+time-to-done/pass   529s              405s
+iterations/pass     27                48
 
-qwen38 recommended — solves more (12 vs 5).
+qwen38 recommended — solves more (12 vs 9).
 ```
 
-**That table is the whole argument for the metric.** `qwythos9` is 35% faster
-per pass — 355s against 544s — and solves fewer than half as many runs, 5/12
-against a clean 12/12. Ranking on time would pick it comfortably and be
-comfortably wrong.
+**That table is the whole argument for the metric.** `qwythos9` is 23% faster
+per pass — 405s against 529s — and solves fewer runs, 9/12 against a clean
+12/12. Ranking on time would pick it and be wrong.
 
-Look at *why* it is fast. Its three `repro-only` runs fail in 40 seconds each,
-quicker than any `qwen38` success on the ladder: it reads the code, edits
-something, and stops without ever running the report. Its graded result is
-indistinguishable from the untouched starting workspace — every check that
-holds, held before it started. Giving up early is cheap, and on a stopwatch it
-is indistinguishable from being good. That is the trap `solved` exists to
-catch, and it is why time is only ever the tiebreak.
+We ran that identical command twice, same build, same machine. The first sweep
+put `qwythos9` at **5/12**, the second at **9/12** — a swing wide enough that
+the first is significant against `qwen38` (p=0.005) and the second, on its own,
+is not (p=0.22). The two are statistically consistent with each other
+(p=0.21), so pooling is fair: **24/24 against 14/24, p=0.0006.** Two things
+follow, and both are the point of this section:
 
-The `2/3` on `exec-bugfix` is the other thing repeats buy you: the same model,
-the same task, solved twice and missed once. A single pass would have called it
-`ok` or `FAIL` with equal confidence and been half a fact either way — the run
-that failed also took 224s and 20 iterations, against ~85s and 12 for the two
-that passed. Note also how steady `qwen38` is by comparison (119/117/117 on
-`exec-pinpoint`); consistency is itself a property worth seeing before you pick
-a daily driver.
+- **Three passes is not many.** `--repeat 3` buys you a hit rate instead of a
+  coin flip, which is a real upgrade over one pass, but it does not buy you a
+  verdict on a model that varies this much. If a comparison matters, run it
+  twice and pool.
+- **The ranking failure replicated even though the margin did not.** In *both*
+  sweeps `qwythos9` finished a pass faster and solved less. That is the claim
+  time-to-done exists to survive, and it survived.
+
+The `1/3` and `2/3` cells are what repeats buy: the same model, the same task,
+solved once and missed twice. A single pass would have called those `ok` or
+`FAIL` with equal confidence and been a coin flip either way. Note how steady
+`qwen38` is by comparison — 123/123/159s on `exec-pinpoint`, 24/24 solved
+across both sweeps; consistency is itself a property worth seeing before you
+pick a daily driver.
 
 **Flags.**
 
