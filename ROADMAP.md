@@ -11575,3 +11575,47 @@ This remains a floor, not a ceiling: mlx enforces the budget *lazily*, trimming
 only after a request lands, and the pool was observed at 5.93 GB against a
 1.5 GB budget — 4× over. The guard's job is to refuse what certainly will not
 fit, and it no longer under-counts by a whole live sequence.
+
+### Does the wipe contaminate the archive? Mostly not — and not where I said
+
+I told the user every archived wallclock number needed re-measuring, on the
+grounds that the cache wipe is model-dependent (a model with a fatter KV cache
+overruns the flat 1.50 GB profile budget sooner) and so biases against exactly
+the model that won §5.138. The reasoning was right; the conclusion was not, and
+checking it took one pass over the archive.
+
+The wipe fires when **one live sequence** exceeds the profile's prompt-cache
+budget, which is a per-model threshold in history chars:
+
+| model | KV/token | wipes past |
+|---|---|---|
+| `qwencoder14` | ~187 KB | **24,576 chars** |
+| `qwen38` | 79.0 KB | 59,703 chars |
+| `qwythos9` | 37.0 KB | 127,422 chars |
+
+Reconstructing peak history for all **2,686** archived runs (summing turn
+prompt, `assistant_end` chars, `result` content and `run` args) and testing each
+against *its own* threshold:
+
+| model | runs | affected |
+|---|---|---|
+| `qwencoder14` | 1,796 | **945 (53%)** |
+| `qwythos9` | 690 | 7 (1%) |
+| `qwen38` | 63 | **0** |
+| `devstral24`, `gemmacoder12`, `sushicoder` | 137 | 0 |
+
+So the §5.138 headline — qwen38 over qwythos9 — is clean: 0% against 1%, and
+neither model's numbers move. The blog's benchmarking section does not need
+re-measurement.
+
+What *is* contaminated is `qwencoder14`, at 53% of its runs, because its
+threshold is a quarter of qwen38's. Every archived comparison of qwencoder14's
+**wallclock** against another model is biased against qwencoder14 by an amount
+proportional to how often it crossed 24.5k chars. Its *iteration* counts are
+unaffected — a re-prefill costs time, not steps — which is rule 88 earning its
+keep: the metric that survives a degraded box survived this too.
+
+Corollary worth keeping: the flat per-model `prompt_cache_bytes` profile figure
+is the thing that made this model-dependent in the first place. Build 157
+replaced it at launch time with the model's real measured shape, so the
+threshold is no longer a lottery on how well a hand-written profile guessed.
