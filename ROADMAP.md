@@ -11482,3 +11482,96 @@ wallclock here was going to *prefill*, not generation, and the model was already
 decisive at ~200 tokens per call. The ratio cannot tell "the model is rambling"
 from "the server is re-reading the context", so it scolds the model for
 something it is not doing.
+
+## §5.146 — the cache diagnosis was wrong twice, and the guard was wrong once
+
+§5.145 blamed the seven-request re-prefill tail (reqs 95–101, ~21,900 tokens
+each, 128–214 s of prefill apiece) on compaction rewriting history. Then, while
+sizing `--prompt-cache-bytes`, I formed a second and much stronger theory and
+started acting on it: that prompt-cache reuse was *architecturally impossible*
+for Qwen3.8, because `fetch_nearest_cache`'s `longer` path needs
+`can_trim_prompt_cache`, `ArraysCache` never defines `is_trimmable`, and the
+hybrid's 48 linear layers therefore make it `False`. The evidence looked
+overwhelming: a three-conversation probe missed the cache **100% of the time**
+at both 1.0× and 1.5×.
+
+Both the theory and the probe were wrong, and it took a test designed to kill
+the theory to find out.
+
+### What actually happens
+
+`prefix_test.py` drives `/v1/completions` with pure string concatenation — no
+chat template, so the second prompt is a guaranteed strict token-prefix
+extension of the first:
+
+| request | wall |
+|---|---|
+| cold | 70.5 s |
+| exact repeat | **0.4 s** |
+| prefix + 40 words | **1.1 s** |
+| prefix + 80 words | **1.1 s** |
+
+175× on exact match, ~65× on prefix extension. Reuse works. The `longer` path
+being dead costs nothing, because a growing conversation only ever needs the
+`shorter` path — a stored cache that is a strict prefix of the new prompt needs
+no trimming at all. I had found a real dead code path and mistaken it for the
+mechanism.
+
+`chat_roundtrip.py` then killed the two fallback explanations. locode stores
+history as *text*, so every generated reply is decoded and re-tokenized on the
+next turn; if that round-trip were not identity, the prefix would break. It is:
+a natural-stop turn reuses at 2% of cold, and a turn truncated mid-token at
+`max_tokens=8` reuses at 1%. Neither the template nor the truncation moves it.
+
+### Why the probe said 100% miss
+
+The probe interleaved **three** conversations round-robin at ~1.84 GB each into
+a 2.53 GB budget. Every conversation's cache was evicted before its own next
+turn arrived. That is a true eviction result and a false generalization: it
+measured concurrency the product does not have. A single conversation — which
+is what a locode session actually is — reuses fine at 1.0×.
+
+So the ranking is the reverse of what §5.145 implied. The dominant cause is the
+compaction ratchet after all (five of the seven requests re-prefilled with no
+cache wipe in sight); the byte-budget clamp is real but secondary (reqs 98 and
+101 show the pool collapsing to 0.41 GB from 5.9). Both fixes shipped, and each
+explains a different subset of the tail.
+
+**Rule 92.** *A negative cache/reuse result from an N-way interleaved probe does
+not transfer to a 1-way workload.* Interleaving is itself an eviction pressure:
+with N live conversations sharing one budget, each is evicted by the other N−1
+before its turn comes around, so the probe measures the budget's concurrency
+headroom, not whether reuse works. Before concluding "reuse is broken," run the
+degenerate N=1 case — and if the claim is about the *mechanism* rather than the
+budget, test the mechanism directly, without the client-side layers (chat
+template, tokenizer round-trip) that can independently break a prefix.
+
+### The guard's two under-counts
+
+Same session, separate bug. For the qwen38 config the memory guard predicted
+15.14 GB; `vmmap -summary` measured **16.6 GB resident, 17.8 GB peak**, against
+an 18.0 GB wired cap. It was clearing configs that were one bad moment from
+panicking the GPU driver. (`ps -o rss` reported 3.5 GB for that same process and
+is worthless for Metal — the watchdog built on it would never have fired.)
+
+Two causes, both now fixed:
+
+1. **`linear_attention` layers were counted as zero**, on the reasoning that a
+   fixed-size recurrent state is "a few MB." Fixed size, yes — *per layer*, and
+   qwen38 has 48 of them. mlx allocates a conv ring buffer `(kernel-1,
+   key_dim*2 + value_dim)` in bf16 plus a recurrent state `(v_heads, v_dim,
+   k_dim)` that `gated_delta_update` allocates in **float32** regardless of the
+   3-bit weights. 3.06 MB × 48 = **0.143 GB** the estimate simply lost.
+2. **Only the stored-cache budget was counted.** mlx spends
+   `--prompt-cache-bytes` on stored caches while the sequence it is *decoding*
+   sits outside that budget, so resident = budget + one live sequence.
+
+Together: per-sequence 2.53 → 2.678 GB, and the 1.0× config now predicts
+**17.96 GB** against the measured 17.8 GB peak. 1.5× and 2.0× are now correctly
+refused on this box — which is the right answer, since 1.0× already peaked
+within 0.2 GB of the cap.
+
+This remains a floor, not a ceiling: mlx enforces the budget *lazily*, trimming
+only after a request lands, and the pool was observed at 5.93 GB against a
+1.5 GB budget — 4× over. The guard's job is to refuse what certainly will not
+fit, and it no longer under-counts by a whole live sequence.

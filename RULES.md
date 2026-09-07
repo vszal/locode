@@ -224,6 +224,19 @@ L5864). Same rule, refined in place, no amendment.
   and every guard held — so archived pass/fail carries across the boundary and
   only sub-1.0 magnitudes are on a new scale. §5.142.
 
+- **Rule 92: a negative cache/reuse result from an N-way interleaved probe does
+  not transfer to a 1-way workload.** Interleaving is itself an eviction
+  pressure: with N conversations sharing one budget, each is evicted by the
+  other N−1 before its own next turn arrives, so the probe measures the
+  budget's concurrency headroom, not whether reuse works. A three-conversation
+  probe reported a **100% cache miss** at both 1.0× and 1.5× and was read as
+  proof that prompt-cache reuse was architecturally impossible for a hybrid
+  model; the degenerate N=1 case reuses at **1–2% of cold** (0.4 s exact,
+  1.1 s prefix-extension, against 70.5 s). Run N=1 before concluding reuse is
+  broken — and when the claim is about the *mechanism* rather than the budget,
+  test the mechanism directly, without the client-side layers (chat template,
+  tokenizer round-trip) that can independently break a prefix. §5.146.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -237,4 +250,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **92**.
+graders. Next free number: **93**.

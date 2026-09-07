@@ -1,0 +1,11 @@
+A cold (7,000 words)
+  cold                                  70.5s
+B identical prompt (exact match)
+  exact repeat                           0.4s
+C strict prefix extension (+40 words)
+  prefix + 40 words                      1.1s
+D second extension (+40 more)
+  prefix + 80 words                      1.1s
+
+verdict: exact=1% of cold, ext1=2%, ext2=2%
+reuse WORKS

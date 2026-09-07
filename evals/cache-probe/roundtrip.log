@@ -1,0 +1,10 @@
+A natural stop (max_tokens=200)
+  turn 1 (cold)                         70.9s  reply=2ch
+  turn 2 (should reuse)                  1.1s  reply=15ch
+  -> turn2 = 2% of cold  HIT (prefix stable)
+
+B truncated  (max_tokens=8)
+  turn 1 (cold)                         70.0s  reply=2ch
+  turn 2 (should reuse)                  1.0s  reply=15ch
+  -> turn2 = 1% of cold  HIT (prefix stable)
+

@@ -947,7 +947,7 @@ def test_the_memory_guard_counts_the_multiplied_budget(monkeypatch):
     # it — otherwise the knob can silently overcommit the box.
     m = _mgr()
     monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
-    monkeypatch.setattr(mod, "_model_disk_bytes", lambda mid: 10 * mod.GB)
+    monkeypatch.setattr(mod, "_model_disk_bytes", lambda mid: 4 * mod.GB)
     monkeypatch.setattr(mod, "_total_ram_bytes", lambda: 24 * mod.GB)
     monkeypatch.setattr(mod, "_wired_limit_bytes", lambda total: None)
     m._cfg.server.prompt_cache_multiple = 1.0
@@ -955,3 +955,65 @@ def test_the_memory_guard_counts_the_multiplied_budget(monkeypatch):
     m._cfg.server.prompt_cache_multiple = 4.0
     with pytest.raises(RuntimeError, match="refusing to load"):
         m._check_memory_budget("x", profile_for("x"))
+
+
+# --- the guard's two under-counts (ROADMAP §5.146) -------------------------
+
+def test_linear_attention_layers_are_not_free():
+    # They were counted as zero on the theory that a fixed-size recurrent state
+    # is negligible. It is flat per LAYER, so a mostly-linear model pays it 48
+    # times: qwen38 carries 0.14 GB the old estimate simply lost.
+    tc = {"num_hidden_layers": 4, "num_key_value_heads": 4, "head_dim": 256,
+          "layer_types": ["full_attention"] + ["linear_attention"] * 3,
+          "linear_num_key_heads": 16, "linear_num_value_heads": 48,
+          "linear_key_head_dim": 128, "linear_value_head_dim": 128,
+          "linear_conv_kernel_dim": 4}
+    per_layer = mod._linear_state_bytes(tc)
+    # conv ring buffer (bf16) + the recurrent state, which gated_delta_update
+    # allocates in float32 — the term a fp16 assumption halves.
+    conv = 3 * (2 * 16 * 128 + 48 * 128) * 2
+    assert per_layer == conv + 48 * 128 * 128 * 4
+    full = 1 * 1000 * (2 * 4 * 256 * 2)
+    assert kv_cache_bytes(tc, 1000) == full + 3 * per_layer
+
+
+def test_the_linear_state_does_not_grow_with_context():
+    tc = {"num_hidden_layers": 2, "num_key_value_heads": 4, "head_dim": 256,
+          "layer_types": ["full_attention", "linear_attention"],
+          "linear_num_key_heads": 16, "linear_num_value_heads": 48,
+          "linear_key_head_dim": 128, "linear_value_head_dim": 128,
+          "linear_conv_kernel_dim": 4}
+    growth = kv_cache_bytes(tc, 2000) - kv_cache_bytes(tc, 1000)
+    assert growth == 1000 * (2 * 4 * 256 * 2)  # only the full-attention layer
+
+
+def test_a_config_without_linear_params_is_unchanged():
+    # The correction must be purely additive: a model with no linear layers,
+    # or one whose config omits the shape, estimates exactly as it used to.
+    assert mod._linear_state_bytes({"linear_num_key_heads": 16}) == 0
+    assert kv_cache_bytes(_DEVSTRAL_CFG, 1000) == 160 * 1024 * 1000
+
+
+def test_the_guard_budgets_the_live_sequence_on_top_of_the_stored_budget(
+        monkeypatch):
+    # mlx spends --prompt-cache-bytes on STORED caches; the sequence it is
+    # decoding sits outside that budget. Counting only the budget is what let
+    # the guard clear a config that peaked at 17.8 GB under an 18.0 GB cap.
+    m = _mgr()
+    m._cfg.server.prompt_cache_multiple = 1.0
+    monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
+    prof = profile_for("x")
+    stored = m._cache_bytes("x", prof)
+    live = m._live_cache_bytes("x", prof)
+    assert m._resident_cache_bytes("x", prof) == stored + live
+    assert live > 0
+
+
+def test_the_launch_flag_stays_the_unpadded_budget(monkeypatch):
+    # The guard counts more than we hand mlx: the extra live sequence is a
+    # residency fact, not something to inflate --prompt-cache-bytes with.
+    m = _mgr()
+    m._cfg.server.prompt_cache_multiple = 1.0
+    monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
+    prof = profile_for("x")
+    assert m._cache_bytes("x", prof) < m._resident_cache_bytes("x", prof)

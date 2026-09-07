@@ -53,6 +53,9 @@ GB = 1024 ** 3
 _WEIGHT_OVERHEAD = 1.15
 # MLX holds the KV cache in fp16 regardless of weight quantization.
 _KV_DTYPE_BYTES = 2
+# ...but gated_delta_update allocates the linear-attention recurrent state in
+# float32 (mamba_ssm_dtype), so that term costs double. See _linear_state_bytes.
+_SSM_DTYPE_BYTES = 4
 # Rough chars-per-token for the history budget. Deliberately low (i.e. yields
 # MORE tokens for a given char budget) so the cache estimate errs large.
 _CHARS_PER_TOKEN = 3.0
@@ -345,6 +348,33 @@ class SingleGpuManager:
         multiple = max(self._cfg.server.prompt_cache_multiple, 1.0)
         return max(profile.prompt_cache_bytes, int(measured * multiple))
 
+    def _resident_cache_bytes(self, model_id: str, profile: Profile) -> int:
+        """Cache bytes the guard must budget for: stored caches PLUS the live one.
+
+        `_cache_bytes` is the number we hand mlx as --prompt-cache-bytes, and
+        mlx spends that budget on *stored* prompt caches while the sequence it
+        is currently decoding sits outside it — so the resident total is the
+        budget plus one live sequence, not the budget alone.
+
+        Counting only the budget is what let the guard predict 15.1 GB for a
+        qwen38 config that measured 16.6 GB resident and peaked at 17.8 GB
+        against an 18.0 GB wired cap (ROADMAP §5.146). It would have cleared a
+        config close enough to the cap to panic the GPU driver.
+
+        This is still a floor, not a ceiling: mlx enforces the budget lazily,
+        trimming only after a request lands, so the pool transiently runs above
+        it. The guard's job is to refuse what certainly won't fit, and this at
+        least stops it from under-counting by a whole live sequence.
+        """
+        return self._cache_bytes(model_id, profile) + self._live_cache_bytes(
+            model_id, profile)
+
+    def _live_cache_bytes(self, model_id: str, profile: Profile) -> int:
+        """Bytes of one live sequence's KV cache at our peak context."""
+        measured = kv_cache_bytes(_model_config(model_id),
+                                  context_tokens_for(self._cfg))
+        return measured or profile.prompt_cache_bytes
+
     def _check_arch_supported(self, model_id: str) -> None:
         """Refuse a model mlx_lm has no loader for, instead of hanging on it.
 
@@ -386,7 +416,7 @@ class SingleGpuManager:
         total = _total_ram_bytes()
         if not model_bytes or not total:
             return
-        cache_bytes = self._cache_bytes(model_id, profile)
+        cache_bytes = self._resident_cache_bytes(model_id, profile)
         wired = _wired_limit_bytes(total)
         ok, need, budget = memory_fits(
             model_bytes, cache_bytes, total, int(reserve_gb * GB),
@@ -410,8 +440,9 @@ class SingleGpuManager:
         raise RuntimeError(
             f"refusing to load {model_id}: it needs ~{need / GB:.1f} GB "
             f"(weights {model_bytes / GB:.1f} GB × {_WEIGHT_OVERHEAD} + "
-            f"{cache_bytes / GB:.1f} GB KV cache at "
-            f"{context_tokens_for(self._cfg):,} tokens) but the budget is "
+            f"{cache_bytes / GB:.1f} GB of KV cache at "
+            f"{context_tokens_for(self._cfg):,} tokens — one live sequence plus "
+            f"the stored prompt-cache budget) but the budget is "
             f"{budget / GB:.1f} GB, set by {ceiling}. Loading it would risk "
             f"taking the machine down — {remedy}."
             + self._suggestion(budget, model_id))
@@ -740,9 +771,11 @@ def kv_cache_bytes(config: dict[str, Any] | None, tokens: int) -> int | None:
         40 of its 48 layers on a 1024-token window, so the flat estimate came
         out ~5x high.
       - `linear_attention` (gated delta-net / Mamba-style, as in the Qwythos and
-        Bonsai hybrids) keeps a fixed-size recurrent state that does not scale
-        with context at all. Counted as zero here; it's a few MB, well inside
-        the weight overhead.
+        Bonsai hybrids) keeps a recurrent state that does not scale with context
+        at all — but it is NOT negligible, as this once assumed. It is a flat
+        per-layer cost, so a model that is mostly linear pays it 48 times over:
+        Qwen3.8-27B carries 0.14 GB of it, which the old "counted as zero"
+        estimate simply lost. See _linear_state_bytes.
 
     Vision-tower repos nest the language model's shape under `text_config`;
     prefer that so a VL-derived text model isn't measured against the wrapper.
@@ -776,6 +809,7 @@ def kv_cache_bytes(config: dict[str, Any] | None, tokens: int) -> int | None:
         total = 0
         for kind in types:
             if kind == "linear_attention":
+                total += _linear_state_bytes(tc)
                 continue
             span = tokens
             if kind == "sliding_attention" and window:
@@ -785,6 +819,38 @@ def kv_cache_bytes(config: dict[str, Any] | None, tokens: int) -> int | None:
     # No per-layer map: uniform attention, with a global window if one applies.
     span = min(tokens, window) if window else tokens
     return layers * span * per_layer_token
+
+
+def _linear_state_bytes(tc: dict[str, Any]) -> int:
+    """Bytes ONE gated-delta-net (linear-attention) layer holds, context-free.
+
+    mlx gives these layers an ArraysCache of two arrays (mlx_lm/models/qwen3_5):
+      - a causal-conv ring buffer, `(kernel-1, key_dim*2 + value_dim)`, in the
+        activation dtype (fp16/bf16);
+      - the recurrent state, `(v_heads, v_head_dim, k_head_dim)`, which
+        gated_delta_update allocates in **float32** regardless of the weights'
+        precision — so it costs twice what a fp16 assumption would predict.
+
+    Neither grows with context; both are paid per layer, per cached sequence.
+    Returns 0 when the config doesn't describe a linear layer, which keeps this
+    a purely additive correction to the attention estimate.
+    """
+    try:
+        k_heads = int(tc["linear_num_key_heads"])
+        v_heads = int(tc["linear_num_value_heads"])
+        k_dim = int(tc["linear_key_head_dim"])
+        v_dim = int(tc["linear_value_head_dim"])
+    except (KeyError, TypeError, ValueError):
+        return 0
+    if min(k_heads, v_heads, k_dim, v_dim) <= 0:
+        return 0
+    try:
+        kernel = int(tc.get("linear_conv_kernel_dim") or 0)
+    except (TypeError, ValueError):
+        kernel = 0
+    conv_dim = 2 * k_heads * k_dim + v_heads * v_dim
+    conv = max(kernel - 1, 0) * conv_dim * _KV_DTYPE_BYTES
+    return conv + v_heads * v_dim * k_dim * _SSM_DTYPE_BYTES
 
 
 def _sliding_window(tc: dict[str, Any]) -> int | None:
