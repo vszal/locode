@@ -47,6 +47,15 @@ class ServerConfig:
     # macOS GPU wired-memory cap, so a too-big model can't take the machine
     # down. 0 disables the guard. See server/manager.py:_check_memory_budget.
     memory_reserve_gb: float = 5.0
+    # Multiple of one live sequence's KV cache to hand mlx as
+    # --prompt-cache-bytes. mlx spends that budget on STORED prompt caches *plus*
+    # the live KV, and evicts with trim_to(max(0, total - active)) — so a budget
+    # smaller than a single live sequence clamps to zero and wipes every stored
+    # cache, forcing a full re-prefill each request. 1.0 is the floor that stops
+    # the wipe; above 1.0 is what actually buys reuse across turns, at the cost
+    # of that much more resident memory (the memory guard counts it, so raising
+    # this can make a model refuse to load). See ROADMAP §5.144.
+    prompt_cache_multiple: float = 1.0
 
     def endpoint(self) -> str:
         """Resolved base URL: an explicit base_url wins, else scheme://host:port."""

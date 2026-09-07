@@ -141,7 +141,8 @@ _USE_PROFILE = object()  # sentinel: derive enable_thinking from the profile
 
 def build_launch_argv(mlx_bin: str, model_id: str, host: str, port: int,
                       profile: Profile, thinking: Any = _USE_PROFILE,
-                      max_tokens: int = 32768) -> list[str]:
+                      max_tokens: int = 32768,
+                      cache_bytes: int | None = None) -> list[str]:
     """Pure: the argv to launch mlx_lm.server for this model (testable).
 
     `thinking` is the resolved enable_thinking decision: True/False force the
@@ -151,6 +152,13 @@ def build_launch_argv(mlx_bin: str, model_id: str, host: str, port: int,
     `--max-tokens` is only the server's FALLBACK when a request omits the field;
     locode always sends config.model.max_tokens per request, so this just keeps
     the fallback from being a misleadingly-low cap. Pass the same config value.
+
+    `cache_bytes` is the --prompt-cache-bytes budget; None falls back to the
+    profile's flat figure (the pre-2026-09-07 behavior, kept for callers with no
+    manager to measure with). Prefer passing `_cache_bytes()`: the profile figure
+    is a *stored*-cache budget, but mlx spends it on stored caches PLUS the live
+    KV, so a flat 1.5 GB against a 1.84 GB live sequence clamps the eviction
+    target to zero and wipes the cache on every request.
     """
     if thinking is _USE_PROFILE:
         thinking = False if profile.thinking_arg else None
@@ -161,7 +169,8 @@ def build_launch_argv(mlx_bin: str, model_id: str, host: str, port: int,
     argv += [
         "--max-tokens", str(max_tokens),
         "--prompt-cache-size", "4",
-        "--prompt-cache-bytes", str(profile.prompt_cache_bytes),
+        "--prompt-cache-bytes", str(profile.prompt_cache_bytes
+                                    if cache_bytes is None else cache_bytes),
     ]
     return argv
 
@@ -306,7 +315,8 @@ class SingleGpuManager:
         override = lookup_thinking_override(self._cfg.thinking, model_id, alias)
         thinking = resolve_thinking(profile, override)
         argv = build_launch_argv(self._mlx_bin, model_id, self._host, self._port,
-                                 profile, thinking, self._cfg.model.max_tokens)
+                                 profile, thinking, self._cfg.model.max_tokens,
+                                 cache_bytes=self._cache_bytes(model_id, profile))
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         log = open(STATE_DIR / "mlx-server.log", "ab")
         self._proc = subprocess.Popen(
@@ -321,13 +331,19 @@ class SingleGpuManager:
         which is a per-model *prompt-cache* budget and badly understates a big
         model's live cache: a 40-layer/8-KV-head/128-dim 24B costs 160 KB per
         token, so a 41k-token context is ~6 GB against a 1.5 GB profile figure.
-        Never returns less than the profile figure.
+
+        Scaled by [server].prompt_cache_multiple, because this same figure is
+        what we hand mlx as --prompt-cache-bytes, and mlx spends that on stored
+        caches PLUS the live KV: 1.0x holds exactly one live sequence and stops
+        the evict-everything clamp, above 1.0 is what leaves room for reuse
+        across turns. Never returns less than the profile figure.
         """
         measured = kv_cache_bytes(_model_config(model_id),
                                   context_tokens_for(self._cfg))
         if not measured:
             return profile.prompt_cache_bytes
-        return max(profile.prompt_cache_bytes, measured)
+        multiple = max(self._cfg.server.prompt_cache_multiple, 1.0)
+        return max(profile.prompt_cache_bytes, int(measured * multiple))
 
     def _check_arch_supported(self, model_id: str) -> None:
         """Refuse a model mlx_lm has no loader for, instead of hanging on it.

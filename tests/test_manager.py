@@ -887,3 +887,71 @@ def test_an_uncached_model_is_not_judged(monkeypatch):
     m = _mgr()
     monkeypatch.setattr(mod, "_model_config", lambda mid: None)
     m._check_arch_supported("org/not-downloaded-yet")
+
+
+# ---- --prompt-cache-bytes gets the MEASURED figure, not the flat profile one --
+# The profile figure is a *stored*-cache budget, but mlx spends
+# --prompt-cache-bytes on stored caches plus the live KV and evicts with
+# trim_to(max(0, total - active)). A budget under one live sequence clamps to
+# zero and wipes everything, which is what made a live qwen38 session re-prefill
+# ~99% of a 21,900-token prompt on every request. ROADMAP §5.144.
+
+def _argv_cache_bytes(argv: list[str]) -> int:
+    return int(argv[argv.index("--prompt-cache-bytes") + 1])
+
+
+def test_launch_passes_the_measured_cache_budget_not_the_profile_figure(monkeypatch):
+    m = _mgr()
+    monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
+    mid = "mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit"
+    p = profile_for(mid)
+    measured = m._cache_bytes(mid, p)
+    assert measured > p.prompt_cache_bytes, "fixture must have real headroom"
+    argv = build_launch_argv("/bin/mlx", mid, "127.0.0.1", 8081, p,
+                             cache_bytes=measured)
+    assert _argv_cache_bytes(argv) == measured
+
+
+def test_launch_falls_back_to_the_profile_figure_without_a_measurement():
+    # Callers with no manager to measure with keep the old behavior.
+    mid = "mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit"
+    p = profile_for(mid)
+    argv = build_launch_argv("/bin/mlx", mid, "127.0.0.1", 8081, p)
+    assert _argv_cache_bytes(argv) == p.prompt_cache_bytes
+
+
+def test_the_cache_multiple_scales_the_budget(monkeypatch):
+    m = _mgr()
+    monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
+    p = profile_for("mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit")
+    m._cfg.server.prompt_cache_multiple = 1.0
+    one = m._cache_bytes("x", p)
+    m._cfg.server.prompt_cache_multiple = 2.0
+    assert m._cache_bytes("x", p) == 2 * one
+
+
+def test_the_cache_multiple_is_clamped_up_to_one(monkeypatch):
+    # Below 1.0 is the eviction cliff this whole mechanism exists to avoid, so
+    # a misconfigured value must not be able to re-open it.
+    m = _mgr()
+    monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
+    p = profile_for("mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit")
+    m._cfg.server.prompt_cache_multiple = 1.0
+    one = m._cache_bytes("x", p)
+    m._cfg.server.prompt_cache_multiple = 0.25
+    assert m._cache_bytes("x", p) == one
+
+
+def test_the_memory_guard_counts_the_multiplied_budget(monkeypatch):
+    # Raising the multiple raises real resident memory, so the guard must see
+    # it — otherwise the knob can silently overcommit the box.
+    m = _mgr()
+    monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
+    monkeypatch.setattr(mod, "_model_disk_bytes", lambda mid: 10 * mod.GB)
+    monkeypatch.setattr(mod, "_total_ram_bytes", lambda: 24 * mod.GB)
+    monkeypatch.setattr(mod, "_wired_limit_bytes", lambda total: None)
+    m._cfg.server.prompt_cache_multiple = 1.0
+    m._check_memory_budget("x", profile_for("x"))  # fits
+    m._cfg.server.prompt_cache_multiple = 4.0
+    with pytest.raises(RuntimeError, match="refusing to load"):
+        m._check_memory_budget("x", profile_for("x"))

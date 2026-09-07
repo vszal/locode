@@ -33,6 +33,20 @@ mlx_bin = ""            # path to mlx_lm.server; auto-detected if empty
 #     merely swapping, so raising it to fit a bigger model is not a safe trade.
 memory_reserve_gb = 5.0
 
+# How much prompt-cache budget to hand mlx, as a multiple of ONE live sequence's
+# KV cache at the peak context above. mlx spends --prompt-cache-bytes on stored
+# prompt caches *plus* the live KV, and evicts with trim_to(max(0, total -
+# active)): a budget smaller than one live sequence clamps to zero and wipes
+# every stored cache, so each request re-prefills the whole prompt from scratch
+# (measured: ~99% of a 21,900-token prompt, 214s, seven requests running).
+#   1.0 is the floor that stops the wipe and holds the live sequence.
+#   >1.0 is what buys reuse ACROSS turns -- and costs that much more resident
+#     memory, which the guard above counts, so raising this can make a model
+#     that used to load refuse to.
+# Values below 1.0 are clamped up to 1.0; the model profile's own figure is a
+# floor, so this never lowers a model's budget.
+prompt_cache_multiple = 1.0
+
 [model]
 default = "qwen38"     # alias (or full "org/model" id) to load at startup
 #   Qwen3.8-27B 3-bit, ~11 GB. Beat qwythos9 on the one eval case with
