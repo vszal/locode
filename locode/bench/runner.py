@@ -279,6 +279,13 @@ def run_case(case: Case, model: str, repeat: int = 1, keep: bool = False,
                "--allow-tool", ",".join(case.allow_tools)]
         cmd += list(server_args or [])
         cmd += case.extra_args
+        # [rule 91] LAST, so it beats anything a case put in extra_args. A
+        # graded run gets a flat, non-extendable wallclock: an extendable one
+        # makes time-to-done incomparable with every archived sweep and removes
+        # the bound that stops one degenerate model running a sweep overnight.
+        # Headless already defaults to this; appending it makes the invariant
+        # unoverridable rather than merely documented. See ROADMAP 5.144.
+        cmd += ["--progress-grant", "0"]
 
         t0 = time.monotonic()
         timed_out = False

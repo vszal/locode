@@ -11277,3 +11277,59 @@ so both inherit it. `--progress-grant` overrides in either direction. Coined as
 other: twenty *distinct* `ls` calls earn twenty grants and run past the starting
 budget; twenty *identical* ones earn exactly one (the first is genuinely new)
 and die ~1,000s earlier. Removing the signature dedup fails both.
+
+### 5.144.1 — reviewing the gate, and what the review found
+
+Three findings from reading 5.144 back as a risk assessment rather than as a
+design. Two were mine to fix; the third is a standing decision.
+
+**The ceiling did not go away — it moved to a worse knob.** `max_iterations`
+(50) is now the only bound on a turn, and its own comment described it as a
+backstop *alongside* the wallclock I had just made extendable. That comment was
+left standing and was therefore false. Worse, 50 is calibrated for the wrong
+job: it is ~one tool call per iteration for a non-native caller, the killed turn
+used 14, and a genuine long-running agentic loop wants hundreds. So the change
+as first shipped traded a time ceiling for a *tighter* iteration ceiling, and
+`budget: max iterations reached` (loop.py) became the likely terminator — fired
+with no warning, because the slow-progress nudge was the only "you are running
+out" signal and it keys off wallclock.
+
+This also reframes gaming. Trigger 1 is trivially gameable in principle: `bash
+echo 1`, `echo 2`, … are fresh signatures that also exit 0, firing both triggers
+at once. It does not matter *only because* `max_iterations` caps it at 50
+grants. The entire containment story now rests on that one number, so raising it
+buys longer agentic loops and lengthens the leash on a determined waster in
+exactly equal measure. The comment now says so, at both `config.py` and
+`config.toml.example`. The number stays 50 pending a live run.
+
+**Rule 91 was documented where a config file could override it.** `extra_args`
+from a case's YAML lands in the child argv (`bench/runner.py`, `harness.py`) with
+nothing after it, so `extra_args: ["--progress-grant", "600"]` silently won.
+Both runners now append `--progress-grant 0` *last*; argparse takes the final
+occurrence, so a case cannot reach the interactive budget. Mitigating context
+found while checking: bench's `subprocess.run(timeout=case.timeout)` (900s
+default) meant the blast radius was a corrupted timeout result rather than an
+overnight run — bad data, not a runaway. Enforced anyway.
+
+**The extension was invisible.** Shipped as "no noise"; on review that is the
+wrong trade. A turn could run far past a budget the user configured at 600s with
+no signal until the stop message, losing the predictability the flat budget gave
+and returning nothing for it. One `info` line now fires the first time a turn
+crosses its original `max_wallclock_seconds`, and only then — a grant fires on
+most tool calls and narrating each would bury the run.
+
+**What got safer, for the record.** After the first grant a single generation is
+capped at one grant's worth (300s), because the streaming deadline is
+`last_progress + grant`. The pre-154 leash was the full 600s. Runaway replies
+are cut sooner than before, not later.
+
+**Method note.** The mutation checks were run by editing the source, running the
+tests, and `cp`-ing a backup over it. `cp` rewinds mtime, so Python reused the
+mutant's cached bytecode after the restore and a passing test appeared to fail.
+The direction is benign here — the mutants failed as intended, and only the
+restore was fooled — but the same mechanism would let a stale `.pyc` make a
+mutant look *caught* when it was not. Clear `__pycache__` after restoring.
+
+Nothing here is verified against a live turn. Every budget test drives a fake
+clock; whether qwen38 earns grants at a sane rate, and whether the turn that
+started this would now finish, is unmeasured.

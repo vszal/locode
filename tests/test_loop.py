@@ -4645,3 +4645,27 @@ async def test_completing_a_plan_task_is_progress_but_restating_it_is_not(
     assert len(loop.plan.done) == before  # restated -> would not
     done_count(1)
     assert len(loop.plan.done) < before   # reverted -> would not
+
+
+async def test_the_user_is_told_once_when_the_turn_outlives_its_budget(
+        tmp_path, monkeypatch):
+    # Predictability: a turn that runs far past the budget the user configured
+    # must say so, or the extension is invisible until the stop message.
+    scripted = [native_call("ls", path=f"d{i}") for i in range(20)]
+    _, events, _, _ = await _run_budget_turn(
+        tmp_path, monkeypatch, scripted, grant=300)
+    notices = [e for e in events if e.get("phase") == "info"
+               and "extending while progress continues" in e.get("text", "")]
+    assert len(notices) == 1, "expected exactly one extension notice"
+    assert "200s turn budget" in notices[0]["text"]
+
+
+async def test_no_extension_notice_when_the_budget_never_moved(
+        tmp_path, monkeypatch):
+    # A flat-wallclock turn (bench, headless) must be silent about a budget it
+    # never extended.
+    scripted = [native_call("ls", path=f"d{i}") for i in range(20)]
+    _, events, _, _ = await _run_budget_turn(
+        tmp_path, monkeypatch, scripted, grant=0)
+    assert not [e for e in events if e.get("phase") == "info"
+                and "extending" in e.get("text", "")]

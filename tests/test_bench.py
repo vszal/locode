@@ -415,3 +415,52 @@ def test_bench_without_endpoint_flags_forwards_nothing(monkeypatch):
     monkeypatch.setattr(runner, "run_case", fake_run_case)
     main(["bench", "-c", "exec-bugfix", "-m", "m"])
     assert calls == [[]]
+
+
+# --- rule 91: a graded run gets a flat wallclock, unoverridably -------------
+
+def _capture_bench_argv(monkeypatch, tmp_path, extra_args):
+    """Run one bench case with the child process stubbed, and return its argv."""
+    seen: dict = {}
+    real_run = runner.subprocess.run
+
+    def fake_run(cmd, *a, **kw):
+        # setup.sh (a list starting with "bash") still runs for real; the locode
+        # invocation is the one under test.
+        if cmd and cmd[0] == "bash":
+            return real_run(cmd, *a, **kw)
+        seen["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    case = runner.Case(
+        id="t", difficulty="easy", description="", path=tmp_path,
+        prompt="do it", allow_tools=["bash"], timeout=60,
+        extra_args=list(extra_args))
+    runner.run_case(case, "m")
+    return seen["cmd"]
+
+
+def test_a_graded_run_always_gets_a_flat_wallclock(monkeypatch, tmp_path):
+    cmd = _capture_bench_argv(monkeypatch, tmp_path, [])
+    assert "--progress-grant" in cmd
+    assert cmd[cmd.index("--progress-grant") + 1] == "0"
+
+
+def test_a_case_cannot_buy_itself_an_extendable_budget(monkeypatch, tmp_path):
+    # The whole point of appending it last. A case that tries to opt into the
+    # interactive budget would make its time-to-done incomparable with the
+    # archive; extra_args must not be able to reach that.
+    cmd = _capture_bench_argv(
+        monkeypatch, tmp_path, ["--progress-grant", "600"])
+    # argparse takes the LAST occurrence, so ours must come after theirs.
+    last = len(cmd) - 1 - cmd[::-1].index("--progress-grant")
+    assert cmd[last + 1] == "0"
+
+
+def test_the_harness_pins_it_too():
+    # evals/harness.py builds its own argv and must carry the same invariant;
+    # the two runners drifting is exactly how a sweep silently changes meaning.
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "evals" / "harness.py").read_text()
+    assert '"--progress-grant", "0"' in src

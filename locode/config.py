@@ -130,9 +130,18 @@ class AgentConfig:
     # ```tool) callers — see loop.py's `trimmed` grounding logic — so this is
     # ~one iteration per file read/edit/test-run, not per logical step. A
     # genuinely multi-file refactor can easily need 30-40 calls; the real stuck
-    # loops are already bounded by max_repeat_calls/max_error_stall/wallclock,
-    # so this ceiling only needs to catch a model that's truly never going to
-    # finish, not cut off one that's still making progress.
+    # loops are bounded by max_repeat_calls/max_error_stall too, so this ceiling
+    # only needs to catch a model that's truly never going to finish, not cut
+    # off one that's still making progress.
+    #
+    # READ THIS BEFORE RAISING IT. From build 154 this is the PRIMARY bound on a
+    # turn, not a backstop. The wallclock it used to share the job with is now
+    # extendable (progress_grant_seconds below) and does not cap a turn that
+    # keeps working, so 50 iterations is what actually ends a healthy long turn
+    # — and it is what contains a model manufacturing fake progress, since a
+    # fresh `bash echo N` is a new tool signature every time. Raising it buys
+    # longer agentic loops and lengthens the leash on a determined waster in
+    # exactly equal measure. 50 is a starting point, not a measured optimum.
     max_iterations: int = 50
     max_wallclock_seconds: int = 600
     # A turn's wallclock budget is a FLOOR, not a ceiling. Every time the model

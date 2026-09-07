@@ -237,6 +237,7 @@ class AgentLoop:
         nudged_stall: set = set()
         seen_prose: list = []
         nudged_slow = False
+        noticed_extended = False
         nudged_intent = False
         nudged_unverified_tests = False
         nudged_unverified_verify = False
@@ -428,6 +429,21 @@ class AgentLoop:
                 elapsed = now - start - self._wallclock_pause
                 if elapsed > self._budget_seconds:
                     return self._stop(self._budget_stop_reason(elapsed))
+                # Say ONCE that the turn has outlived the budget the user
+                # configured. Silence here would cost the predictability the
+                # flat budget used to give: without it a turn can run far past
+                # max_wallclock_seconds with no signal at all until it stops.
+                # One line, not one per grant — a grant fires on most tool
+                # calls, and narrating each would bury the run.
+                if (not noticed_extended and self._budget_grants
+                        and elapsed > self._cfg.agent.max_wallclock_seconds):
+                    noticed_extended = True
+                    self._on_event({
+                        "phase": "info",
+                        "text": (f"past the "
+                                 f"{self._cfg.agent.max_wallclock_seconds}s turn "
+                                 f"budget — extending while progress continues "
+                                 f"(Esc to stop)")})
                 # [escalated-stall] Checked here, at the top of the iteration
                 # the budget would be spent on, so the count in the message is
                 # the number of iterations that actually went by after the

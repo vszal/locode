@@ -497,6 +497,10 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
     cmd = launch + ["-p", case.prompt, "-m", model,
                     "--log-events", str(log_path), "--no-markdown",
                     "--allow-tool", ",".join(case.allow_tools)] + case.extra_args
+    # [rule 91] Appended last so it beats a case's extra_args: a graded run gets
+    # a flat wallclock, never the interactive progress-extended budget, or its
+    # time-to-done cannot be compared with the archive. See ROADMAP 5.144.
+    cmd += ["--progress-grant", "0"]
 
     env = dict(os.environ)
     env["NO_COLOR"] = "1"

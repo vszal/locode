@@ -64,6 +64,10 @@ stop = []                        # extra stop strings, on top of the chat templa
 # The loop executes ONE tool call per iteration for non-native (fenced
 # ```tool) callers, so this is ~one iteration per file read/edit/test-run,
 # not per logical step. A multi-file refactor can easily need 30-40 calls.
+# Since build 154 this is the PRIMARY bound on a turn: the wallclock below is
+# extendable and no longer caps a turn that keeps making progress, so this is
+# what ends a healthy long turn AND what contains a model faking progress.
+# Raise it for longer agentic loops -- both effects scale together.
 max_iterations = 50
 max_wallclock_seconds = 600     # per-turn time budget a turn STARTS with
 # The budget above is a floor, not a ceiling: each time the model makes real

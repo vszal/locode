@@ -115,7 +115,11 @@ Rule 7's two citations (L2206, L6050) may not even be the same idea.
   `progress_grant_seconds` to 0, which is exactly the pre-154 behaviour, and
   `locode bench` and `evals/harness.py` both drive locode through `-p`. **A new
   case — ours or contributed — must run under a fixed ceiling.** A case that
-  sets `--progress-grant` to anything but 0 is not a benchmark. §5.144.
+  sets `--progress-grant` to anything but 0 is not a benchmark. *Enforced, not
+  merely documented (build 155):* both runners append `--progress-grant 0`
+  **after** `case.extra_args`, so a case cannot buy itself an extendable budget
+  — argparse takes the last occurrence. A rule a config file can override is
+  not a rule. §5.144.
 
 ## Superseded
 
