@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–88.** All 75 numbers actually in use are below. Thirteen numbers
+**Complete for 1–89.** All 76 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -156,6 +156,24 @@ L5864). Same rule, refined in place, no amendment.
   degraded box but is inflated by exactly the single-huge-reply failure mode the
   harness exists to suppress. 13 of 50 archived model-pair comparisons rank the
   two models differently depending on which is used. §5.141.
+  *Amended §5.141 (n=3 re-run):* the clause "no reply shape can game it" stands
+  as written about reply shape, but must not be read as "wall-clock is
+  ungameable" — a model that gives up early is fast for the worst possible
+  reason. The rule now governs only the choice *between* time and iterations;
+  whether either may decide a comparison at all is rule 89. Original text
+  retained above, unamended, per the note on rule 52.
+
+- **Rule 89: no speed metric decides a comparison until correctness has gated
+  it — rank on what was solved, and use time or iterations only to break a tie
+  among equals.** Both speed metrics are biased, in opposite directions, toward
+  a distinct failure mode: iterations flatters the model that dumps one enormous
+  reply, and wall-clock flatters the model that quits early. Measured directly
+  (§5.141, `--repeat 3`, 24 runs): `qwythos9` finished a ladder pass 35% faster
+  than `qwen38` (355s vs 544s) while solving 5/12 runs against 12/12, because
+  its three `repro-only` failures took 40s each — quicker than any `qwen38`
+  success on the ladder — by editing something plausible and never running the
+  code. A time-ranked leaderboard does not merely mis-rank there, it rewards the
+  give-up behaviour the nudge machinery exists to suppress. §5.141.
 
 ## Not a rule
 
@@ -170,4 +188,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **89**.
+graders. Next free number: **90**.

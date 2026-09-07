@@ -10964,5 +10964,40 @@ tiebreak, and it is why the report prints both rows rather than a single score.
 It also re-confirms §5.138 from the shipped path: `repro-only` remains the one
 case with headroom, and it is where `qwythos9` fails.
 
-Rule coined here: **88** (time-to-done is the user-facing verdict; iterations is
-the regression metric).
+**At n=3 the tie resolves the wrong way, which is the stronger result.**
+Re-run as `--repeat 3` (24 runs, same box, build 152):
+
+| case | qwen38 | qwythos9 |
+|---|---|---|
+| `exec-pinpoint` | ok 118s | ok 63s |
+| `exec-bugfix` | ok 120s | **2/3** 132s |
+| `repro-only` | ok 141s | **FAIL** 40s |
+| `multi-defect-blind` | ok 164s | **FAIL** 120s |
+| **solved** | **12/12** | 5/12 |
+| **time-to-done/pass** | 544s | **355s** |
+| **iterations/pass** | 24 | 40 |
+
+The n=1 near-tie on time was not noise averaging out — it was hiding a 35% win
+for the *worse* model. `qwythos9` is faster per pass (355s vs 544s) and solves
+5/12 against 12/12. The mechanism is visible in the raw runs: its three
+`repro-only` failures take 40s each, faster than any `qwen38` success anywhere
+on the ladder, because it edits something plausible and stops without ever
+running the report. **Failing fast is cheap, and on a stopwatch it is
+indistinguishable from being good.** A time-ranked leaderboard does not merely
+mis-rank here, it actively rewards the give-up behaviour the nudge machinery
+exists to suppress — the same structural bias rule 88 identifies in iteration
+counting, pointing the other way. Neither metric is safe as a sole verdict;
+`solved` has to gate both.
+
+Two secondary observations. `exec-bugfix` at 2/3 is the hit rate repeats are
+for: one pass would have reported `ok` or `FAIL` with equal confidence, and the
+failing run cost 224s/20 iterations against ~85s/12 for the two that passed.
+And `qwen38`'s per-case spread is remarkably tight (119/117/117, 120/122/120,
+138/145/140, 158/170/165) where `qwythos9`'s is not (89/46/54 on the same warm-
+up case) — consistency is a property worth surfacing, and n=1 cannot see it.
+
+Rules coined here: **88** (time-to-done is the user-facing verdict; iterations
+is the regression metric) and, from the n=3 re-run, **89** (no speed metric
+decides a comparison until correctness has gated it). 88 is amended in the same
+pass: its "no reply shape can game it" must not be read as "wall-clock is
+ungameable", which the 40-second `repro-only` failures disprove.

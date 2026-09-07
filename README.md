@@ -230,28 +230,42 @@ it in the first two minutes instead of after the twenty-minute case:
   model that never loaded has not been measured.
 
 The recommendation goes on `solved` first and uses time only to break a tie.
-Here is a real run (M4 Pro, 24 GB, one pass per cell):
+Here is a real run — `locode bench -m qwen38 -m qwythos9 --repeat 3`, M4 Pro,
+24 GB, three passes per cell:
 
 ```
 case                qwen38            qwythos9
 ------------------  ----------------  ----------------
-exec-pinpoint       ok      114s      ok       80s
-exec-bugfix         ok      121s      ok       71s
-repro-only          ok      109s      FAIL    220s
-multi-defect-blind  ok      165s      FAIL    147s
+exec-pinpoint       ok      118s      ok       63s
+exec-bugfix         ok      120s      2/3     132s
+repro-only          ok      141s      FAIL     40s
+multi-defect-blind  ok      164s      FAIL    120s
 ------------------  ----------------  ----------------
-solved              4/4               2/4
-time-to-done        510s              518s
-iterations          28                37
+solved              12/12             5/12
+time-to-done/pass   544s              355s
+iterations/pass     24                40
 
-qwen38 recommended — solves more (4 vs 2).
-  (one run per case; local models vary run to run — `--repeat 3` for a firmer answer.)
+qwen38 recommended — solves more (12 vs 5).
 ```
 
-That is a fair warning about reading any single row. `qwythos9` is the *faster*
-model on both cases it solves — 80s and 71s against 114s and 121s — and the two
-totals all but tie at 510s and 518s. Sorting on time alone would call this a
-coin flip between a model that finishes the work and one that does not.
+**That table is the whole argument for the metric.** `qwythos9` is 35% faster
+per pass — 355s against 544s — and solves fewer than half as many runs, 5/12
+against a clean 12/12. Ranking on time would pick it comfortably and be
+comfortably wrong.
+
+Look at *why* it is fast. Its three `repro-only` runs fail in 40 seconds each,
+quicker than any `qwen38` success on the ladder: it reads the code, changes
+something plausible, and stops without ever running the report. Giving up early
+is cheap, and on a stopwatch it is indistinguishable from being good. That is
+the trap `solved` exists to catch, and it is why time is only ever the tiebreak.
+
+The `2/3` on `exec-bugfix` is the other thing repeats buy you: the same model,
+the same task, solved twice and missed once. A single pass would have called it
+`ok` or `FAIL` with equal confidence and been half a fact either way — the run
+that failed also took 224s and 20 iterations, against ~85s and 12 for the two
+that passed. Note also how steady `qwen38` is by comparison (119/117/117 on
+`exec-pinpoint`); consistency is itself a property worth seeing before you pick
+a daily driver.
 
 **Flags.**
 

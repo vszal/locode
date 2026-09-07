@@ -116,6 +116,9 @@ Keep on Opus **only** what truly needs it:
 - **Report time-to-done to users, iterations to yourself** (rule 88). Wall-clock
   is what the user waits through; iterations is the metric that survives a
   degraded box. They disagree in 26% of archived model-pair comparisons.
+  **Neither one decides anything until correctness has gated it** (rule 89):
+  iterations flatters the one-huge-reply model, wall-clock flatters the model
+  that quits early, and a give-up run is the fastest run on the board.
 - Run `pytest -q` before declaring a task complete; state real results (don't
   claim green without running).
 
