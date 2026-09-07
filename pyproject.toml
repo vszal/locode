@@ -24,6 +24,22 @@ locode = "locode.cli:main"
 [tool.setuptools.packages.find]
 include = ["locode*"]
 
+# The bench cases are data, not modules: seeds, prompts, graders. Without this
+# they are silently dropped from the wheel and `locode bench` ships with an
+# empty ladder -- which is exactly the failure the whole feature exists to fix.
+[tool.setuptools.package-data]
+"locode.bench" = ["cases/**/*"]
+
+# ...but not the caches. Running a grader (or pytest over the seeds) leaves
+# __pycache__ and .pytest_cache inside the case dirs, and the glob above would
+# ship whatever happened to be on the build machine's disk.
+[tool.setuptools.exclude-package-data]
+"locode.bench" = [
+    "cases/**/__pycache__/*",
+    "cases/**/.pytest_cache/*",
+    "cases/**/*.pyc",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

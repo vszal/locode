@@ -76,6 +76,14 @@ EVALS_DIR = Path(__file__).resolve().parent
 CASES_DIR = EVALS_DIR / "cases"
 RESULTS_DIR = EVALS_DIR / "results"
 REPO_ROOT = EVALS_DIR.parent
+# Cases live in two places and the harness runs both as one suite. The four
+# under `locode/bench/cases/` ship inside the wheel so `locode bench` works for
+# someone who pip-installed and never cloned this repo; the rest are research
+# fixtures that would be noise in a user-facing diagnostic. The split is about
+# who the case is FOR, not what it measures -- ids stay unique across both
+# roots, so every historical result keyed by case id still lines up.
+BENCH_CASES_DIR = REPO_ROOT / "locode" / "bench" / "cases"
+CASE_ROOTS = [CASES_DIR, BENCH_CASES_DIR]
 # Run the installed-in-place locode from the repo venv so we always measure the
 # working tree, never a stale site-packages copy.
 LOCODE_BIN = REPO_ROOT / ".venv" / "bin" / "locode"
@@ -124,11 +132,16 @@ class Case:
 
 def discover_cases(only: list[str] | None = None) -> list[Case]:
     cases = []
-    for d in sorted(CASES_DIR.iterdir()):
+    seen: set[str] = set()
+    dirs = [d for root in CASE_ROOTS if root.is_dir() for d in root.iterdir()]
+    for d in sorted(dirs, key=lambda p: p.name):
         if not (d / "case.json").is_file():
             continue
         if only and d.name not in only:
             continue
+        if d.name in seen:
+            raise SystemExit(f"duplicate case id across case roots: {d.name}")
+        seen.add(d.name)
         cases.append(Case.load(d))
     if only:
         missing = set(only) - {c.id for c in cases}
@@ -327,34 +340,11 @@ def _load_checker(case: Case):
     return getattr(mod, "check", None)
 
 
-@dataclass
-class CheckCtx:
-    """Handed to a case's check() function."""
-    workdir: Path
-    events: list[dict]
-    stdout: str
-    case: Case
-
-    def read(self, name: str) -> str:
-        """Case-insensitive read of a file the model was asked to produce.
-        Models routinely write DESIGN.md when told design.md (and vice versa),
-        which is a naming nit, not a failure — resolve it here so checks test
-        content, not casing."""
-        p = self.workdir / name
-        if p.is_file():
-            return p.read_text(errors="replace")
-        want = name.lower()
-        for cand in self.workdir.rglob("*"):
-            if cand.is_file() and cand.name.lower() == want:
-                return cand.read_text(errors="replace")
-        return ""
-
-    def exists(self, name: str) -> bool:
-        return bool(self.read(name).strip())
-
-    def bash(self, cmd: str, timeout: int = 120) -> subprocess.CompletedProcess:
-        return subprocess.run(cmd, shell=True, cwd=self.workdir, timeout=timeout,
-                              capture_output=True, text=True)
+# The grader contract lives in the package, not here. The four cases under
+# `locode/bench/cases/` are graded by BOTH this harness and `locode bench` on a
+# user's machine; two definitions of CheckCtx would let the same case grade
+# differently in each, silently. One definition, imported.
+from locode.bench.runner import CheckCtx  # noqa: E402
 
 
 def run_names(case_id: str, model: str, repeat: int, arm: str = "") -> tuple[str, str]:

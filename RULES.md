@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–87.** All 74 numbers actually in use are below. Thirteen numbers
+**Complete for 1–88.** All 75 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -150,6 +150,13 @@ L5864). Same rule, refined in place, no amendment.
   docstring disagreed about what `labels()` returns. Made explicit, it went 8/8
   at 1.000. §5.140.
 
+- **Rule 88: report time-to-done as the user-facing verdict and iterations as
+  the cross-session regression metric, never the reverse.** Wall-clock is what
+  the user waits through and no reply shape can game it; iterations survives a
+  degraded box but is inflated by exactly the single-huge-reply failure mode the
+  harness exists to suppress. 13 of 50 archived model-pair comparisons rank the
+  two models differently depending on which is used. §5.141.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -163,4 +170,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **88**.
+graders. Next free number: **89**.

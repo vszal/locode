@@ -34,7 +34,8 @@ The **primary executor.** Drive it headless: `locode -p "<spec>" -m <alias>
   even granting qwythos9 its best sweep; ROADMAP §5.138). Ties at ceiling on the
   other three cases. Needs ~5-6 iterations where qwythos9 needs ~9, which makes
   it **faster in wallclock despite decoding ~4x slower per character** — judge a
-  local model by iterations-to-done, not tokens/sec.
+  local model by time-to-done, not tokens/sec (rule 88); the step count is why
+  it wins, not the verdict itself.
 - **`qwythos9`** (Qwen3.5-9B Claude-distill, ~9.6 GB, the previous default) —
   still the reliable editor and the right pick on a memory-tight machine, where
   qwen38's ~11 GB will not fit. Clean fenced tool JSON, correct arg keys,
@@ -104,6 +105,17 @@ Keep on Opus **only** what truly needs it:
 - Eval work is governed by numbered methodology rules indexed in **`RULES.md`**
   (`ROADMAP.md` holds the reasoning). Read it before designing or grading a
   sweep, and coin any new rule there, stated in full.
+- **Cases live in two roots and both are one suite.** `evals/cases/` holds the
+  research fixtures; `locode/bench/cases/` holds the four that ship in the wheel
+  for `locode bench`. `discover_cases` reads both and refuses duplicate ids, so
+  a sweep sees all of them and every historical result keyed by case id still
+  lines up. The grader contract (`CheckCtx`) is defined once, in
+  `locode/bench/runner.py`, and the harness imports it — those four cases are
+  graded by both, and two copies would drift silently. When adding a case, ask
+  who it is for: a user picking a model, or a lever you are measuring.
+- **Report time-to-done to users, iterations to yourself** (rule 88). Wall-clock
+  is what the user waits through; iterations is the metric that survives a
+  degraded box. They disagree in 26% of archived model-pair comparisons.
 - Run `pytest -q` before declaring a task complete; state real results (don't
   claim green without running).
 

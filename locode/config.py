@@ -75,7 +75,9 @@ class ModelConfig:
     #
     # It is also *faster in wallclock despite decoding ~4x slower per character*
     # (95s vs 116s on repro-only): it needs ~5-6 iterations where qwythos9 needs
-    # ~9. Judge a local model by iterations-to-done, not tokens/sec.
+    # ~9. Judge a local model by time-to-done, not tokens/sec (rule 88);
+    # the step count explains the win, it is not the verdict. `locode bench`
+    # measures this on the user's own machine.
     #
     # Caveat for smaller machines: at ~11 GB it needs more headroom than the
     # 9.6 GB qwythos9, and server/manager.py:_check_memory_budget will refuse it

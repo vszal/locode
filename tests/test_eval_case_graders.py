@@ -30,7 +30,28 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-CASES = REPO / "evals" / "cases"
+# Cases live in two roots: research fixtures under `evals/cases/`, and the four
+# that ship inside the wheel for `locode bench` under `locode/bench/cases/`.
+# Both are graded by the same `check.py` contract, so both are tested here.
+CASE_ROOTS = [REPO / "evals" / "cases", REPO / "locode" / "bench" / "cases"]
+
+
+class _Cases:
+    """`CASES / "some-case"` resolves across both roots."""
+
+    def __truediv__(self, case_id: str) -> Path:
+        for root in CASE_ROOTS:
+            if (root / case_id).is_dir():
+                return root / case_id
+        return CASE_ROOTS[0] / case_id  # nonexistent: let the caller's error say so
+
+    def iterdir(self):
+        for root in CASE_ROOTS:
+            if root.is_dir():
+                yield from root.iterdir()
+
+
+CASES = _Cases()
 HARNESS = REPO / "evals" / "harness.py"
 
 

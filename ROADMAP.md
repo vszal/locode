@@ -10875,3 +10875,94 @@ Rules coined here: **85** (validate a grader against a synthetic correct answer
 before any model run), **86** (a red suite localises, so it measures fixing
 rather than finding), **87** (read the losing runs before crediting a case with
 range).
+
+
+## §5.141 — the eval suite grows a user-facing half: `locode bench`
+
+The README told users to judge a local model by *iterations-to-done*, and the
+repo shipped no way to measure it. `pyproject.toml` packaged `locode*` only, so
+every case, the harness and the stats tooling stopped at the wheel boundary.
+The advice was unbacked and the reader had no recourse but to trust it.
+
+**The metric was also wrong.** Before building anything I checked whether the
+choice of metric changes any answer. Grouping every archived sweep by
+(label, case) and comparing each pair of models measured under identical
+conditions — keeping only arms with at least two runs, so a mean means
+something — gives 50 comparisons. **37 rank the two models the same way by
+iterations and by wall-clock. 13 rank them differently** — 26%, and the
+disagreement is structural rather than noisy. The share is insensitive to that
+filter: admitting single-run arms gives 17 of 65, also 26%.
+
+| case | qwencoder14 | qwythos9 | iterations says | time says |
+|---|---|---|---|---|
+| `design-doc` | 15.3 it / 274s | 6.0 it / 591s | qwythos9, by 2.5x | qwencoder14, by 2.2x |
+| `e2e-spec-to-code` | 21.3 it / 193s | 20.0 it / 1200s | qwythos9 | qwencoder14, by 6x |
+| `exec-bugfix` | 11.3 it / 86s | 15.7 it / 69s | qwencoder14 | qwythos9 |
+
+(All three rows are the `r6-baseline` sweep, so the two arms ran under one
+configuration on one box; the disagreement is not a cross-sweep artefact.)
+
+The mechanism is the one the harness spent Rounds 6-12 fighting. An iteration is
+a turn, not a unit of work, so a model that emits one 20,000-character document
+in a single reply spends **one** iteration doing it. Counting steps therefore
+rewards exactly the long-single-reply behaviour that `_strip_structural_tail`,
+the write-size nudges and the truncation salvage all exist to contain. On the
+execution cases it inverts: many small fast turns beat few slow ones.
+
+Iterations is not worthless — it is the *stable* metric, because wall-clock
+moves with box load across sessions and the harness already refuses to compare
+rates between sweeps. So the split is by audience, and that is rule 88:
+
+- **Rule 88: report time-to-done as the user-facing verdict and iterations as
+  the cross-session regression metric, never the reverse.** Wall-clock is what
+  the user waits through and no reply shape can game it; iterations survives a
+  degraded box but is inflated by exactly the single-huge-reply failure mode the
+  harness exists to suppress. 13 of 50 archived model-pair comparisons rank the
+  two models differently depending on which is used. §5.141.
+
+**What shipped.** `locode bench`, plus four cases moved from `evals/cases/` into
+`locode/bench/cases/` so they land in the wheel: `exec-pinpoint` (warm-up),
+`exec-bugfix` (easy), `repro-only` (medium — the one case with real headroom,
+§5.138), `multi-defect-blind` (hard — find five defects with no test suite,
+§5.140). Ordered easy to hard so a model that cannot clear the floor shows it in
+the first two minutes.
+
+Three things were worth getting right rather than fast:
+
+- **A dead server is not a bad model.** A run that logs zero events never
+  reached its first turn. Reporting that as `0/4 solved` would send a user off
+  tuning a model that never loaded, so it is an `ERROR` cell, it suppresses the
+  recommendation entirely, and it exits non-zero.
+- **Only a full score counts as solved.** Every ladder case is one a capable
+  model takes to 1.000, so partial credit means something was left broken.
+- **One grader contract, not two.** These four cases are now graded by both
+  `locode bench` and `evals/harness.py`. Two `CheckCtx` definitions would let
+  the same case score differently in each, silently, so the class moved into
+  `locode/bench/runner.py` and the harness imports it. `discover_cases` gained a
+  second root and refuses duplicate ids across the two; all 18 cases still
+  enumerate and every historical result keyed by case id still lines up.
+
+**The first real run makes the ordering's case for us.** `locode bench -m
+qwen38 -m qwythos9`, M4 Pro / 24 GB, one pass per cell:
+
+| case | qwen38 | qwythos9 |
+|---|---|---|
+| `exec-pinpoint` | ok 114s | ok 80s |
+| `exec-bugfix` | ok 121s | ok 71s |
+| `repro-only` | ok 109s | **0.50** 220s |
+| `multi-defect-blind` | ok 165s | **0.67** 147s |
+| **solved** | **4/4** | 2/4 |
+| **time-to-done** | 510s | 518s |
+| **iterations** | 28 | 37 |
+
+`qwythos9` is the faster model on both cases it solves, by wide margins (80 vs
+114, 71 vs 121), and the totals all but tie — 510s against 518s, a 1.5% gap
+that would be noise on a single pass. Sorting on time alone would have called
+this a coin flip between a model that finishes the work and one that does not.
+That is the argument for deciding on `solved` first and using time only as the
+tiebreak, and it is why the report prints both rows rather than a single score.
+It also re-confirms §5.138 from the shipped path: `repro-only` remains the one
+case with headroom, and it is where `qwythos9` fails.
+
+Rule coined here: **88** (time-to-done is the user-facing verdict; iterations is
+the regression metric).

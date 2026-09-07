@@ -18,8 +18,19 @@ from locode.tools import build_registry
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="locode",
-                                description="Agentic CLI for local LLMs (mlx).")
+    # `upgrade`, `uninstall` and `bench` are dispatched in main() before this
+    # parser ever runs, so argparse cannot list them. Spell them out here or
+    # they are undiscoverable from --help.
+    p = argparse.ArgumentParser(
+        prog="locode",
+        description="Agentic CLI for local LLMs (mlx).",
+        epilog=(
+            "commands:\n"
+            "  locode bench        measure how your models do on real tasks\n"
+            "  locode upgrade      update locode in place\n"
+            "  locode uninstall    remove locode\n"
+            "\nRun a command with --help for its own options."),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("prompt", nargs="*", help="Run one headless turn and exit.")
     p.add_argument("-p", "--print", action="store_true",
                    help="Headless: run a single turn from the prompt/stdin.")
@@ -244,12 +255,86 @@ def _cmd_uninstall(argv: list[str]) -> int:
     return rc
 
 
+def _cmd_bench(argv: list[str]) -> int:
+    """`locode bench [-m ALIAS]...`: run the shipped cases against one or more
+    models and report which one gets the work done, and how long it takes.
+
+    The report leads with time-to-done rather than tokens/sec because
+    generation rate does not predict it -- see locode/bench/runner.py.
+    """
+    from locode.bench import runner
+
+    p = argparse.ArgumentParser(
+        prog="locode bench",
+        description="Measure how local models do on real coding tasks.")
+    p.add_argument("-m", "--model", action="append", dest="models", metavar="ALIAS",
+                   help="Model alias to measure (repeatable). "
+                        "Default: the configured default model.")
+    p.add_argument("-c", "--case", action="append", dest="cases", metavar="ID",
+                   help="Run only this case (repeatable). "
+                        "Default: the whole ladder, easy to hard.")
+    p.add_argument("--repeat", type=int, default=1, metavar="N",
+                   help="Runs per case per model (default 1). Local models "
+                        "vary run to run; 3 gives a firmer answer.")
+    p.add_argument("--keep", action="store_true",
+                   help="Keep each scratch workspace instead of deleting it.")
+    p.add_argument("--list", action="store_true",
+                   help="List the cases and exit without running anything.")
+    args = p.parse_args(argv)
+
+    cases = runner.load_cases(args.cases)
+    if args.list:
+        for c in cases:
+            print(f"{c.id:<20} [{c.difficulty:<7}] {c.description}")
+        return 0
+
+    models = args.models
+    if not models:
+        from locode.config import Config
+        models = [Config.load().model.default]
+
+    if args.repeat < 1:
+        p.error("--repeat must be at least 1")
+
+    total = len(cases) * len(models) * args.repeat
+    print(f"locode bench — {len(cases)} case(s) x {len(models)} model(s) "
+          f"x {args.repeat} = {total} run(s)")
+    print("Each run drives a real model against a real workspace; "
+          "this takes minutes, not seconds.\n")
+
+    results = []
+    n = 0
+    for model in models:
+        for case in cases:
+            for rep in range(1, args.repeat + 1):
+                n += 1
+                label = f"[{n}/{total}] {case.id} · {model}"
+                if args.repeat > 1:
+                    label += f" · run {rep}"
+                print(f"{label} …", flush=True)
+                r = runner.run_case(case, model, rep, keep=args.keep)
+                results.append(r)
+                if r.infra_error:
+                    print(f"    ERROR  {r.infra_error}", flush=True)
+                else:
+                    mark = "ok" if r.solved else f"score {r.score:.2f}"
+                    print(f"    {mark}  {r.seconds:.0f}s  "
+                          f"{r.iterations} iterations", flush=True)
+
+    print(runner.format_report(results, models, cases, args.repeat))
+    # Exit non-zero only when something stopped us from measuring at all. A
+    # model scoring badly is a valid, useful result -- not a command failure.
+    return 2 if any(r.infra_error for r in results) else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     raw = sys.argv[1:] if argv is None else argv
     if raw and raw[0] == "upgrade":
         return _cmd_upgrade(raw[1:])
     if raw and raw[0] == "uninstall":
         return _cmd_uninstall(raw[1:])
+    if raw and raw[0] == "bench":
+        return _cmd_bench(raw[1:])
     args = build_parser().parse_args(raw)
     if args.logo:
         from locode.ui import banner, render

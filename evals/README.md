@@ -227,8 +227,21 @@ not a general improvement.
 
 ## Adding a case
 
+Cases live in **two roots** and the harness runs both as one suite:
+
+- `evals/cases/` — research fixtures, for measuring a lever. Most cases.
+- `locode/bench/cases/` — the four that ship inside the wheel and back
+  `locode bench`, the user-facing model diagnostic. Put a case here only if it
+  helps someone *pick a model*; a fixture built to isolate a harness lever is
+  noise in that report.
+
+Ids must be unique across both roots — `discover_cases` refuses a duplicate
+rather than silently preferring one. The grader contract (`CheckCtx`) is defined
+in `locode/bench/runner.py` and imported here, because the shipped cases are
+graded by both this harness and `locode bench`; two copies would drift.
+
 ```
-evals/cases/<id>/
+evals/cases/<id>/          (or locode/bench/cases/<id>/)
     case.json    id, track, description, allow_tools, timeout, weight,
                  optional extra_args (extra locode flags)
     prompt.md    the user turn

@@ -102,12 +102,53 @@ port = 8081
 memory_reserve_gb = 5.0     # refuse a model that would not leave this much free
 ```
 
-**Picking a default.** Judge a local model by *iterations-to-done*, not
-tokens/sec — the two can disagree sharply. In our evals `qwen38` decodes about
-four times slower per character than `qwythos9` and still finishes tasks in less
-wall-clock time, because it needs roughly half as many steps. On a memory-tight
-machine (16 GB) prefer `qwythos9`: at ~11 GB, `qwen38` will not fit under the
-memory budget. See [`MODELS.md`](MODELS.md).
+**Picking a default.** Judge a local model by *time-to-done*, not tokens/sec —
+the two disagree sharply. On the `repro-only` case (n=20 per model) `qwen38`
+generates at about 22 chars/s against `qwythos9`'s 76 — nearly four times slower
+per character — and still finishes sooner, 95s against 116s, because it gets
+there in 5.5 steps where `qwythos9` needs 8.7.
+On a memory-tight machine (16 GB) prefer `qwythos9`: at ~11 GB, `qwen38` will
+not fit under the memory budget. See [`MODELS.md`](MODELS.md).
+
+You don't have to take our numbers for it — `locode bench` measures this on
+your machine:
+
+```bash
+locode bench -m qwen38 -m qwythos9
+```
+
+It runs four real coding tasks, easy to hard, against each model in a throwaway
+workspace and reports what got solved and how long it took:
+
+```
+case                qwen38            qwythos9
+------------------  ----------------  ----------------
+exec-pinpoint       ok      114s      ok       80s
+exec-bugfix         ok      121s      ok       71s
+repro-only          ok      109s      FAIL    220s
+multi-defect-blind  ok      165s      FAIL    147s
+------------------  ----------------  ----------------
+solved              4/4               2/4
+time-to-done        510s              518s
+iterations          28                37
+
+qwen38 recommended — solves more (4 vs 2).
+  (one run per case; local models vary run to run — `--repeat 3` for a firmer answer.)
+```
+
+That run (M4 Pro, 24 GB, one pass each) is a fair warning about reading any
+single column. `qwythos9` is the *faster* model on both cases it solves — 80s
+and 71s against 114s and 121s — and the two totals all but tie at 510s and
+518s. Time only becomes the tiebreak once the work is actually done, so the
+verdict goes on `solved` first and time second.
+
+Each run drives a real model against a real workspace, so the full ladder takes
+minutes per model. `--repeat 3` averages over the run-to-run variance that
+local models have plenty of; `-c CASE` runs one case; `--list` shows the ladder
+without running anything; `--keep` leaves each workspace and its event log on
+disk to read afterwards. Iterations are reported as the *explanation* for a
+result — a model wins by needing fewer steps, not by typing faster — but the
+verdict is decided on what got fixed and then on time.
 
 ## Development setup (from source)
 
