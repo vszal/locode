@@ -1,4 +1,5 @@
 import json
+import time
 
 import pytest
 
@@ -1151,6 +1152,11 @@ async def test_slow_progress_nudges_once_past_grace(tmp_path, monkeypatch):
     cfg.agent.slow_progress_ratio = 0.5
     cfg.agent.slow_progress_grace_seconds = 10
     cfg.agent.slow_progress_grace_iterations = 1
+    # Flat wallclock: this test predates the progress grant and is about the
+    # ratio nudge, so it pins the budget rather than measuring an extendable
+    # one. (With the default 300s grant these 20 distinct ls calls each buy
+    # time and the turn runs 1350s — covered by the budget tests below.)
+    cfg.agent.progress_grant_seconds = 0
     # The dirs must EXIST and must not be EMPTY. This test is about wallclock
     # and nothing else, so its calls have to sail past every other guard: 20
     # failing ls calls trip the consecutive-error guard, and 20 ls calls on
@@ -4498,3 +4504,144 @@ async def test_the_revert_note_rides_behind_the_tool_output(tmp_path):
     await loop.run_turn("fix it")
     annotated = next(r for r in _results(loop) if "REVERTED" in r)
     assert annotated.index("[edit_file]") < annotated.index("REVERTED")
+
+
+# --- the progress-extended turn budget (ROADMAP 5.144) ---------------------
+
+def _budget_cfg(grant: float) -> Config:
+    """A turn that will run long enough for the budget to be what stops it.
+
+    200s of starting budget against 50s completions, with the repeat/error
+    stalls lifted so the wallclock is the only net left in the water.
+    """
+    cfg = Config()
+    cfg.agent.max_iterations = 50
+    cfg.agent.max_wallclock_seconds = 200
+    cfg.agent.max_repeat_calls = 1000
+    cfg.agent.max_error_stall = 1000
+    cfg.agent.progress_grant_seconds = grant
+    return cfg
+
+
+def _budget_dirs(tmp_path, n=20):
+    # Non-empty, so `ls` returns information and the no-info guard stays quiet.
+    for i in range(n):
+        (tmp_path / f"d{i}").mkdir()
+        (tmp_path / f"d{i}" / "keep.txt").write_text("x\n")
+
+
+def _grants(loop_events):
+    return [e for e in loop_events if e.get("phase") == "budget_grant"]
+
+
+async def _run_budget_turn(tmp_path, monkeypatch, scripted, grant):
+    clock = FakeClock()
+    monkeypatch.setattr(loop_mod.time, "monotonic", clock.now)
+    _budget_dirs(tmp_path)
+    events: list = []
+    cfg = _budget_cfg(grant)
+    client = SlowFakeClient(scripted, clock, seconds_per_call=50)
+    loop = make_loop_with_client(tmp_path, client, cfg=cfg)
+    loop._on_event = events.append
+    out = await loop.run_turn("do it")
+    return out, events, loop, clock
+
+
+async def test_progress_extends_a_turn_past_its_starting_wallclock(
+        tmp_path, monkeypatch):
+    # Twenty DISTINCT ls calls at 50s each. Each is a tool-call signature this
+    # turn has not issued, so each buys a fresh 300s — the turn should run far
+    # past the 200s it started with, which is the whole point: a model that is
+    # still working should not be killed for taking a while.
+    scripted = [native_call("ls", path=f"d{i}") for i in range(20)]
+    out, events, loop, clock = await _run_budget_turn(
+        tmp_path, monkeypatch, scripted, grant=300)
+    assert clock.now() > 200, "the turn died at its starting budget"
+    assert len(_grants(events)) == 20
+    # ...and it still terminates. An extendable budget that cannot end is not a
+    # budget; this one ends when the model stops producing new work.
+    assert "stopped" in out
+
+
+async def test_a_repeated_call_buys_no_more_time(tmp_path, monkeypatch):
+    # The same ls, twenty times. The FIRST is genuinely new and earns its grant;
+    # every repeat after it is the exact failure mode the budget exists to
+    # catch, so none of them may extend it. Contrast with the test above: same
+    # call count, same per-call cost, ~1000s less runway.
+    scripted = [native_call("ls", path="d0") for _ in range(20)]
+    out, events, loop, clock = await _run_budget_turn(
+        tmp_path, monkeypatch, scripted, grant=300)
+    assert len(_grants(events)) == 1
+    assert clock.now() < 600, "repeats extended the budget"
+
+
+async def test_a_zero_grant_is_exactly_the_old_flat_wallclock(
+        tmp_path, monkeypatch):
+    # The mode `locode bench` and headless -p run in (rule 91): no extension,
+    # no new stop wording, nothing for an archived sweep to notice.
+    scripted = [native_call("ls", path=f"d{i}") for i in range(20)]
+    out, events, loop, clock = await _run_budget_turn(
+        tmp_path, monkeypatch, scripted, grant=0)
+    assert _grants(events) == []
+    assert "wallclock exceeded" in out
+    assert clock.now() < 300
+
+
+async def test_the_stop_names_idle_time_once_the_budget_was_extended(
+        tmp_path, monkeypatch):
+    # A turn that earned grants did not die of taking too long — it died of
+    # going quiet, and the actionable number is how long it was quiet for.
+    scripted = [native_call("ls", path=f"d{i}") for i in range(20)]
+    out, _, _, _ = await _run_budget_turn(
+        tmp_path, monkeypatch, scripted, grant=300)
+    assert "no progress for" in out
+    assert "wallclock exceeded" not in out
+
+
+async def test_a_grant_extends_but_never_shortens_the_budget(tmp_path):
+    # Progress arriving while there is still more runway than the grant would
+    # buy must leave the larger budget alone.
+    cfg = _budget_cfg(grant=10)
+    loop = make_loop_with_client(tmp_path, FakeClient([]), cfg=cfg)
+    loop._turn_start = time.monotonic()
+    loop._budget_seconds = 500.0
+    loop._grant_budget("test")
+    assert loop._budget_seconds == 500.0
+    assert loop._budget_grants == 0
+
+
+async def test_a_zero_grant_still_records_progress_for_the_message(tmp_path):
+    # With grants off the budget must not move, but _last_progress still has to
+    # track, or a turn switched to flat wallclock would report nonsense if the
+    # message path were ever reached.
+    cfg = _budget_cfg(grant=0)
+    loop = make_loop_with_client(tmp_path, FakeClient([]), cfg=cfg)
+    loop._turn_start = time.monotonic() - 30
+    loop._budget_seconds = 200.0
+    loop._grant_budget("test")
+    assert loop._budget_seconds == 200.0
+    assert loop._last_progress >= 29
+
+
+async def test_completing_a_plan_task_is_progress_but_restating_it_is_not(
+        tmp_path):
+    # The plan grant is forward-only: more tasks done buys time, re-stating the
+    # same plan (or reverting a task to open) does not.
+    cfg = _budget_cfg(grant=300)
+    loop = make_loop_with_client(tmp_path, FakeClient([]), cfg=cfg)
+    loop._turn_start = time.monotonic()
+    loop._budget_seconds = 0.0
+
+    def done_count(n_done, n_total=3):
+        loop.plan.replace(["[x] a" if i < n_done else "[ ] a"
+                           for i in range(n_total)])
+
+    done_count(1)
+    before = len(loop.plan.done)
+    done_count(2)
+    assert len(loop.plan.done) > before  # forward -> would grant
+    before = len(loop.plan.done)
+    done_count(2)
+    assert len(loop.plan.done) == before  # restated -> would not
+    done_count(1)
+    assert len(loop.plan.done) < before   # reverted -> would not

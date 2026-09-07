@@ -6,7 +6,7 @@ due on 2026-08-11: I wrote §5.93 declaring a sweep-level effect absent while
 §4.4 and §5.47 — both mine — had already measured it. An index would have caught
 it in a grep.
 
-**Complete for 1–90.** All 77 numbers actually in use are below. Thirteen numbers
+**Complete for 1–91.** All 78 numbers actually in use are below. Thirteen numbers
 were never coined at all: **1, 4, 5, 6, 10, 11, 18, 32, 33, 34, 39, 44, 45** —
 verified absent under both `rule N` and `methodology N`, single-line and
 line-wrapped. The scheme has gaps; it is not a corrupted sequence.
@@ -98,6 +98,24 @@ Do not quote them as canon. Two need care beyond that: rule 31 is cited at L4424
 as "Rule 31, **sharper**", implying an earlier formulation that is not in the
 file; rule 52 is cited "as amended" (L6588) with no pre-amendment text on record.
 Rule 7's two citations (L2206, L6050) may not even be the same idea.
+
+- **Rule 91: a graded run gets a flat, non-extendable wallclock — the
+  progress-extended turn budget is an interactive feature and must never reach
+  a bench case.** From build 154 a turn's `max_wallclock_seconds` is a floor,
+  not a ceiling: real progress (a tool-call batch new to the turn, a bash that
+  exited 0, a plan task completed) pushes the deadline out by
+  `progress_grant_seconds`, with **no absolute time ceiling** — a ceiling would
+  cap how long an agentic loop may run no matter how well it is going, which
+  forecloses the long-running-agent use case. That is the right trade for a
+  human at a terminal who can watch and interrupt; it is the wrong one for a
+  sweep, twice over. It makes time-to-done incomparable with every archived
+  result (the same break rule 90 made to scores, now to the metric rules 88 and
+  89 are built on), and it removes the bound that stops one degenerate model
+  from running a sweep overnight. Headless `-p` therefore defaults
+  `progress_grant_seconds` to 0, which is exactly the pre-154 behaviour, and
+  `locode bench` and `evals/harness.py` both drive locode through `-p`. **A new
+  case — ours or contributed — must run under a fixed ceiling.** A case that
+  sets `--progress-grant` to anything but 0 is not a benchmark. §5.144.
 
 ## Superseded
 
@@ -209,4 +227,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **91**.
+graders. Next free number: **92**.

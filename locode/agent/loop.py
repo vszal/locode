@@ -109,6 +109,14 @@ class AgentLoop:
         self._policy = policy
         self._cfg = config
         self._cwd = cwd
+        # Turn budget state; re-initialised per turn at the top of run_turn.
+        # _turn_start is seeded to NOW rather than 0.0: _grant_budget subtracts
+        # it from time.monotonic(), and a 0.0 seed would read as "this turn has
+        # been running since boot" if a helper ever ran outside a turn.
+        self._turn_start = time.monotonic()
+        self._budget_seconds = float(config.agent.max_wallclock_seconds)
+        self._budget_grants = 0
+        self._last_progress = 0.0
         self._on_delta = on_delta
         self._on_event = on_event or (lambda e: None)
         self._confirm = confirm
@@ -210,6 +218,14 @@ class AgentLoop:
 
         start = time.monotonic()
         self._wallclock_pause = 0.0
+        self._turn_start = start
+        # The turn's budget in CHARGED-elapsed seconds (i.e. excluding
+        # _wallclock_pause). Starts at max_wallclock_seconds and only ever grows,
+        # via _grant_budget below. Kept in charged terms rather than as an
+        # absolute deadline so the pause accounting stays in exactly one place.
+        self._budget_seconds = float(self._cfg.agent.max_wallclock_seconds)
+        self._budget_grants = 0
+        self._last_progress = 0.0  # charged elapsed at the last progress event
         nudged_empty = False
         truncated_nudges = 0
         harness_echo_nudges = 0
@@ -410,8 +426,8 @@ class AgentLoop:
                 # Time spent inside confirm() (waiting on the human, not the
                 # model) doesn't count against the turn's wallclock budget.
                 elapsed = now - start - self._wallclock_pause
-                if elapsed > self._cfg.agent.max_wallclock_seconds:
-                    return self._stop("budget: wallclock exceeded")
+                if elapsed > self._budget_seconds:
+                    return self._stop(self._budget_stop_reason(elapsed))
                 # [escalated-stall] Checked here, at the top of the iteration
                 # the budget would be spent on, so the count in the message is
                 # the number of iterations that actually went by after the
@@ -510,7 +526,11 @@ class AgentLoop:
                 if (not nudged_slow
                         and elapsed >= self._cfg.agent.slow_progress_grace_seconds
                         and i >= self._cfg.agent.slow_progress_grace_iterations):
-                    wallclock_frac = elapsed / self._cfg.agent.max_wallclock_seconds
+                    # Against the live budget, not the starting one: on an
+                    # extended turn the starting value is no longer the
+                    # denominator the model is racing, and using it would make
+                    # the nudge fire harder the better the model was doing.
+                    wallclock_frac = elapsed / max(self._budget_seconds, 1e-9)
                     iter_frac = i / self._cfg.agent.max_iterations
                     if iter_frac < wallclock_frac * self._cfg.agent.slow_progress_ratio:
                         nudged_slow = True
@@ -546,7 +566,7 @@ class AgentLoop:
                             # over (httpx's timeout is per-read, and a model
                             # emitting tokens never trips it).
                             deadline=(start + self._wallclock_pause
-                                      + self._cfg.agent.max_wallclock_seconds),
+                                      + self._budget_seconds),
                         )
                     gen_chars = _reply_chars(msg)
                 except DeadlineExceeded as e:
@@ -963,6 +983,14 @@ class AgentLoop:
                 # call is already known to be futile, so re-running it is pure
                 # waste.
                 batch_sig = tuple(_call_sig(c) for c in calls)
+                # [progress] A batch this turn has never issued before is
+                # genuine forward motion, including pure reads: surveying an
+                # unfamiliar codebase IS the work, and it is what the killed
+                # qwen38 turn was doing. Re-issuing a seen signature buys
+                # nothing, so a model looping on one file cannot hold the clock
+                # open. Checked before the streak bookkeeping below mutates it.
+                if batch_sig not in repeat_streaks:
+                    self._grant_budget("new tool call")
                 seen_result, seen_streak = repeat_streaks.get(batch_sig, (None, 0))
                 # [verify-after-change] A repeat is only a repeat if the
                 # workspace stood still. If an edit LANDED since this signature
@@ -1140,8 +1168,21 @@ class AgentLoop:
                               and any(_mutates_existing(c, self._cwd)
                                       for c in calls)
                               and _names_a_symptom(user_text))
+                plan_done_before = len(self.plan.done)
                 error_sig, result_sig, no_change, all_errored, all_noinfo = \
                     await self._run_calls(calls)
+                # [progress] Tasks COMPLETED, in the spirit of
+                # Plan.signature() — which counts statuses only, so re-wording a
+                # task or appending more work cannot move it. Strictly forward:
+                # comparing signatures for inequality would also credit a model
+                # that reverted a task to open, which is not progress. Mostly
+                # redundant with the new-signature grant above (a plan that
+                # advances is a new update_plan batch), but it is the one signal
+                # that cannot be gamed at all, and it also catches the plan
+                # advancing without a tool call — complete_current() credits a
+                # verify task off a green test run.
+                if len(self.plan.done) > plan_done_before:
+                    self._grant_budget("plan progress")
                 if blind_edit:
                     nudged_run_before_edit = True
                     self._nudge_run_before_edit()
@@ -1443,6 +1484,10 @@ class AgentLoop:
                 # false negative, which is the direction this codebase errs in
                 # (see _asks_for_a_change).
                 self._ran_bash_ok = True
+                # [progress] Executing something that ran to completion is work
+                # even when it printed the wrong answer. Same signal, same
+                # breadth, one more consumer.
+                self._grant_budget("bash exited 0")
             if (call.name == "bash" and not res.is_error
                     and _is_verify_bash(call.args.get("cmd", ""))):
                 # A code-CHECKING command (py_compile / python / ruff / ...) ran
@@ -2136,6 +2181,59 @@ class AgentLoop:
         self._on_event({"phase": "stall_budget", "event": "armed",
                         "trigger": trigger, "k": k, "iter": self._iter,
                         "test": test})
+
+    # --- turn budget ------------------------------------------------------
+    def _charged_elapsed(self) -> float:
+        """Seconds this turn has spent that count against its budget.
+
+        Excludes `_wallclock_pause` — time blocked on a human at a confirm()
+        prompt is the user's, not the model's.
+        """
+        return time.monotonic() - self._turn_start - self._wallclock_pause
+
+    def _grant_budget(self, reason: str) -> None:
+        """Push the turn's deadline out because real progress just happened.
+
+        The budget is a floor: a grant sets it to at least `now + grant`, never
+        shortens it, and never expires on its own. With `progress_grant_seconds`
+        at 0 this records the progress (for the stop message) but grants nothing,
+        which is exactly the old flat-wallclock behaviour — that is the mode
+        `locode bench` and headless `-p` run in, so sweeps stay bounded and
+        comparable across the archive (rule 91).
+
+        Deliberately no absolute ceiling: a ceiling caps how long an agentic
+        loop may run no matter how well it is going, and that forecloses the
+        long-running-agent use case entirely.
+        """
+        charged = self._charged_elapsed()
+        self._last_progress = charged
+        grant = float(self._cfg.agent.progress_grant_seconds)
+        if grant <= 0:
+            return
+        target = charged + grant
+        if target <= self._budget_seconds:
+            return  # already covered; a grant may extend but never shorten
+        self._budget_seconds = target
+        self._budget_grants += 1
+        self._on_event({"phase": "budget_grant", "reason": reason,
+                        "budget": round(self._budget_seconds, 1),
+                        "elapsed": round(charged, 1),
+                        "grants": self._budget_grants})
+
+    def _budget_stop_reason(self, elapsed: float) -> str:
+        """Why the turn ran out — named for the budget that actually bound it.
+
+        A turn that never earned a grant hit a flat wallclock and says so. A
+        turn that DID earn grants died of going quiet, not of taking too long,
+        and reporting "wallclock exceeded" for it would point at the wrong
+        thing: the actionable number is how long it went without progress.
+        """
+        if self._budget_grants == 0:
+            return "budget: wallclock exceeded"
+        idle = max(0.0, elapsed - self._last_progress)
+        return (f"budget: no progress for {idle:.0f}s "
+                f"(turn ran {elapsed:.0f}s, extended {self._budget_grants}x "
+                f"on progress)")
 
     def _stop(self, why: str) -> str:
         self._on_event({"phase": "stopped", "reason": why})

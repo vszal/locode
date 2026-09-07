@@ -11138,3 +11138,142 @@ handing it a failing test to read — `repro-only` 1/6, `multi-defect-blind` 2/6
 
 No new rule. Rule 84 covers the pooling discipline and covered it already;
 this section is the record of applying it late.
+
+## 5.144 — the turn that was killed for taking a while
+
+A live `qwen38` session, reported from use rather than from a sweep:
+
+```
+⏹ stopped (budget: the turn's wallclock ran out while generating (~108 chars into this reply))
+  ↳ 14 iterations · 18 tool calls · 3 nudges · ~744 tok · 600.0s · 1 tok/s
+```
+
+The turn was surveying an unfamiliar codebase and posting periodic plan updates
+as it went — `▤ plan 3/5 done` a few iterations before it died. It was working,
+and the budget killed it anyway.
+
+### The reported cause was not the real one
+
+The obvious reading is "a 27B model is slow, 600s isn't enough." The server log
+says otherwise. Parsing `~/.local/state/locode/mlx-server.log` for the last 18
+requests of that session:
+
+| time | prompt tok | prefill s | gen s | prefill % | cache GB |
+|---|---|---|---|---|---|
+| 09:33:55 | 3,610 | 16.4 | 11.6 | 59% | 2.36 |
+| 09:36:57 | 15,346 | 148.6 | 8.1 | **95%** | 5.61 |
+| 09:37:22 | 1,571 | 0.2 | 8.7 | 2% | 1.96 |
+| 09:38:23 | 2,390 | 4.1 | 9.7 | 29% | 2.78 |
+| 09:40:11 | 2,589 | 6.1 | 13.0 | 32% | 3.94 |
+| 09:41:18 | 1,261 | 0.2 | 21.3 | 1% | 4.31 |
+
+Across those 18 requests: **183s of prefill against 163s of generation** — over
+half the server time went to re-reading the conversation, not to producing it.
+(Both are lower bounds; mlx logs the first progress line only after the opening
+2048-token chunk completes.) One single call spent **148.6 seconds** on a
+15,346-token prefill to yield 8 seconds of actual thinking — **a quarter of the
+whole 600s budget**, on latency the model did not cause and could not avoid.
+
+Note the shape: prefill is **bimodal**, 0.2s or 148s, with nothing between. That
+is a cache hit versus a cache miss, and it is the second finding.
+
+### Why the cache misses: a negative clamp
+
+`server/manager.py` launches mlx with `--prompt-cache-bytes 1610612736` (1.5 GB).
+That flag is not a cap on stored caches. `mlx_lm/server.py:795`:
+
+```python
+total  = cli_args.prompt_cache_bytes          # 1.5 GB
+active = batch_generator.prompt_cache_nbytes  # the in-flight request's KV
+self.prompt_cache.trim_to(n_bytes=total - active)
+```
+
+and `trim_to` clamps with `max(0, n_bytes)`. So the budget covers stored caches
+**plus the live request's KV**, and once a single prompt's KV exceeds 1.5 GB —
+routine for qwen38 at 15k tokens — the argument goes negative, clamps to zero,
+and **the entire reusable cache is evicted**. The log shows exactly that
+sawtooth: 5.61 GB → 1.96 GB, 4.65 GB → 3.74 GB, sequences dropping 4 → 3.
+
+The failure is self-reinforcing: *the longer a turn runs, the larger its prompt,
+and the more completely locode wipes the cache that turn was about to reuse.*
+Compounding it, `prompt_cache_bytes` is documented as a per-model budget
+(`model/profiles.py:25`) but **every profile in the file is `GB_1_5`** — a 27B
+model with 100k chars of history is given the same allowance as `qwen06`.
+
+This is recorded, not yet fixed. It is a mitigation for the symptom rather than
+the mechanism asked for, and a long enough agentic loop overflows any cache.
+
+### And the number that raised the alarm is wrong
+
+`· 1 tok/s` in that trailer is not a decode rate. `ui/render.py:486` computes
+approximated-tokens ÷ **whole-turn elapsed**, so prefill and tool execution sit
+in the denominator. Measured decode for that session was ~7 tok/s. The metric
+that told the user "slow" was off by roughly 7×, and it pointed at the model
+when the cost was in the server.
+
+### The mechanism: a budget that is a floor, not a ceiling
+
+`max_wallclock_seconds` becomes the budget a turn *starts* with. Real progress
+pushes the deadline out to `now + progress_grant_seconds` (default 300s). The
+budget only ever grows; a grant never shortens it.
+
+**No absolute ceiling.** This was the design's live question and it was settled
+against a cap: an unconditional ceiling bounds how long an agentic loop may run
+no matter how well it is going, which forecloses long-running agents as a
+product. The consequence is worth stating plainly — with no ceiling, "grant per
+progress event" *is* an idle timer, the grant size *is* the idle timeout, and
+`max_iterations` (50) becomes the only hard bound left. That is the intended
+trade, not an oversight.
+
+Progress is deliberately narrow, because **whatever resets the clock is what a
+stuck model gets to do forever**:
+
+- **A tool-call batch not already issued this turn.** Reads included: surveying
+  an unfamiliar codebase *is* the work, and it is what the killed turn was
+  doing. Re-issuing a seen signature buys nothing, so a model looping on one
+  file cannot hold the clock open. Reuses the `repeat_streaks` signature the
+  repeat-stop already maintains.
+- **A bash that exited 0.** Same breadth as the `_ran_bash_ok` flag that gates
+  the run-before-edit advisory: a script that runs to completion and prints the
+  wrong numbers is still work.
+- **A plan task completed.** Forward-only — `len(plan.done)` increasing, not
+  `Plan.signature()` merely *differing*, since inequality would also credit a
+  model that reverted a task to open.
+
+Prose does not qualify. It was the most literal reading of the report (the
+turn's plan summaries were the visible heartbeat) and it is the one signal a
+degenerate model produces most freely — `repetition.py` exists because of that.
+The plan updates still buy time; they do it by being new tool calls, not by
+being text.
+
+`Plan.signature()` deserves a note. It already existed, and its docstring
+already said *"What 'progress happened' means for a plan. Only the statuses
+count. Re-wording a task, or appending more work, is not progress — otherwise a
+model could keep a stall detector quiet forever by editing its own plan."* The
+anti-gaming property this feature needed had been solved and left with a single
+consumer that only used it to scold.
+
+### The stop message names what actually bound the turn
+
+A turn that never earned a grant hit a flat wallclock and still says
+`budget: wallclock exceeded`. A turn that earned grants did not die of taking
+too long — it died of going quiet — so it reports the idle interval instead:
+`budget: no progress for 312s (turn ran 1350s, extended 20x on progress)`.
+
+### Graded runs keep the flat clock (rule 91)
+
+Making bench progress-aware would break time-to-done's comparability with every
+archived sweep — the same discontinuity rule 90 introduced for scores, now
+applied to the metric rules 88 and 89 rest on — and would remove the bound that
+keeps one degenerate model from running a sweep overnight. Headless `-p`
+therefore defaults `progress_grant_seconds` to 0, reproducing pre-154 behaviour
+exactly; `locode bench` and `evals/harness.py` both drive locode through `-p`,
+so both inherit it. `--progress-grant` overrides in either direction. Coined as
+**rule 91** so contributed cases inherit the constraint.
+
+### Verification
+
+1,453 tests pass. The two load-bearing tests are a mutation check on each
+other: twenty *distinct* `ls` calls earn twenty grants and run past the starting
+budget; twenty *identical* ones earn exactly one (the first is genuinely new)
+and die ~1,000s earlier. Removing the signature dedup fails both.

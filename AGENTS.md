@@ -68,7 +68,7 @@ afterward, since they sometimes touch files you told them to leave alone, and
 the loop can silently drop a trailing tool call (file shown in the log but never
 written). See the `locode-delegation-workflow` note for the full playbook.
 
-### Tier 2 — Haiku subagent (cheap; reliable for mechanical work)
+### Tier 2 — Sonnet or Haiku subagent (cheap; reliable for mechanical work)
 Route **mechanical-but-broader** work here when it needs more reliability than a
 14B local model or spans multiple files: scaffolding test fixtures, bulk
 multi-file edits with a stated pattern, collating/extracting across files,
@@ -89,7 +89,7 @@ Keep on Opus **only** what truly needs it:
 - Treat **all** Tier-1/Tier-2 output as a draft. Opus reviews and the tests
   pass before anything is considered done.
 - Fall **up** a tier on doubt: if a local model's output is wrong twice, or the
-  `:8081` server is down, escalate to Haiku, then Opus. Never ship unverified
+  `:8081` server is down, escalate to Sonnet or Haiku, then Opus. Never ship unverified
   delegated code.
 - Never let delegation silently swallow a task — if a tier can't do it, say so
   and escalate, don't paper over it.
@@ -127,6 +127,15 @@ Keep on Opus **only** what truly needs it:
   seed 0.500 on three of the four shipped cases, and paid the same 0.500 to a
   run that neutered every assert in the suite. `DERIVED` names aggregates like
   `fully_fixed`, reported but kept out of the mean.
+- **A graded run gets a flat wallclock** (rule 91). Interactively a turn's
+  `max_wallclock_seconds` is a *floor*: real progress — a tool-call batch new to
+  the turn, a bash that exited 0, a plan task completed — extends it by
+  `progress_grant_seconds`, with no absolute ceiling, so a long-running agentic
+  loop is not cut off for taking a while. A sweep must not work that way: it
+  would make time-to-done incomparable with the archive and would let one
+  degenerate model run overnight. Headless `-p` defaults the grant to 0 and both
+  `locode bench` and `evals/harness.py` go through `-p`, so this is the default
+  you get — **a new case must keep it that way.**
 - Run `pytest -q` before declaring a task complete; state real results (don't
   claim green without running).
 

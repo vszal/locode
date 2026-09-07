@@ -47,6 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-iterations", dest="max_iterations", type=int,
                    metavar="N",
                    help="Override the agent's per-turn iteration budget.")
+    p.add_argument("--progress-grant", dest="progress_grant", type=float,
+                   metavar="SECONDS",
+                   help="Seconds a turn is granted from each progress event "
+                        "(0 = flat wallclock). Headless defaults to 0; "
+                        "interactive uses agent.progress_grant_seconds.")
     p.add_argument("--max-wallclock", dest="max_wallclock", type=int,
                    metavar="SECONDS",
                    help="Override the agent's per-turn wallclock budget.")
@@ -72,6 +77,25 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _is_headless(args) -> bool:
+    """One-shot `-p` mode (explicit flag, or a prompt piped in)."""
+    return bool(getattr(args, "print", False)
+                or (getattr(args, "prompt", None) and not sys.stdin.isatty()))
+
+
+def _progress_grant(args):
+    """Resolve the per-turn progress grant, or None to leave the config alone.
+
+    Headless (-p) defaults to 0 — a flat, non-extendable wallclock — so that
+    `locode bench` and the eval harness, which both drive locode through `-p`,
+    stay bounded and stay comparable with every archived sweep (rule 91). An
+    explicit --progress-grant wins in either mode.
+    """
+    if getattr(args, "progress_grant", None) is not None:
+        return args.progress_grant
+    return 0.0 if _is_headless(args) else None
+
+
 def _assemble(args):
     # First run: scaffold a starter config from the template, then load it so the
     # example aliases are immediately resolvable. Notice goes to stderr so it
@@ -81,7 +105,8 @@ def _assemble(args):
     cfg = Config.load().override(model=args.model, port=args.port,
                                  host=args.host, base_url=args.base_url,
                                  max_iterations=args.max_iterations,
-                                 max_wallclock=args.max_wallclock)
+                                 max_wallclock=args.max_wallclock,
+                                 progress_grant=_progress_grant(args))
     if args.no_markdown:
         cfg.ui.markdown = False
     manager = SingleGpuManager(cfg)
@@ -365,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
         print(banner.render(args.model or "qwen14", False, str(Path.cwd()),
                             __full_version__, color=render.should_color()))
         return 0
-    headless = args.print or (args.prompt and not sys.stdin.isatty())
+    headless = _is_headless(args)
     try:
         if headless:
             return asyncio.run(_headless(args))

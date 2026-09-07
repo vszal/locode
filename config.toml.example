@@ -65,7 +65,19 @@ stop = []                        # extra stop strings, on top of the chat templa
 # ```tool) callers, so this is ~one iteration per file read/edit/test-run,
 # not per logical step. A multi-file refactor can easily need 30-40 calls.
 max_iterations = 50
-max_wallclock_seconds = 600     # hard per-turn time budget
+max_wallclock_seconds = 600     # per-turn time budget a turn STARTS with
+# The budget above is a floor, not a ceiling: each time the model makes real
+# progress the deadline is pushed out to now + progress_grant_seconds, so a
+# turn that keeps working keeps running and only a turn that goes quiet dies.
+# Progress is narrow on purpose -- a tool-call batch not already issued this
+# turn, a bash that exited 0, or a plan task COMPLETED (forward only) --
+# because whatever resets the clock is what a stuck model gets to do forever.
+# Prose does not count.
+# There is no absolute time ceiling; max_iterations remains the hard bound.
+# Set 0 for a flat, non-extendable max_wallclock_seconds. Headless (-p) runs
+# default to 0 so benchmarks stay bounded and comparable; --progress-grant
+# overrides in either mode.
+progress_grant_seconds = 300.0
 max_malformed_retries = 3       # bail if the model keeps emitting bad tool JSON
 # How many times a reply cut off at model.max_tokens may be re-nudged. >1
 # because a long deliverable can legitimately need two passes to fit.

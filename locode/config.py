@@ -135,6 +135,24 @@ class AgentConfig:
     # finish, not cut off one that's still making progress.
     max_iterations: int = 50
     max_wallclock_seconds: int = 600
+    # A turn's wallclock budget is a FLOOR, not a ceiling. Every time the model
+    # makes real progress the deadline is pushed out to `now + this`, so a turn
+    # that keeps working keeps running and only a turn that goes quiet dies.
+    # Motivated by a live qwen38 session (ROADMAP 5.144) killed at 600s mid-
+    # survey while it was still posting plan updates: over half the turn's
+    # server time went to prompt-cache-miss PREFILL, which is latency the model
+    # did not cause and cannot avoid, yet the flat budget charged it anyway.
+    # What counts as progress is deliberately narrow -- a tool-call batch not yet
+    # issued this turn, a bash that exited 0, or a plan task COMPLETED (forward
+    # only; re-stating or reverting a plan buys nothing) -- because whatever
+    # resets the clock is what a stuck model gets to do forever. Prose, the most
+    # freely produced output of a degenerate model, does not qualify.
+    # 0 disables the extension and restores a flat `max_wallclock_seconds`;
+    # headless (-p) runs default to 0 so benchmarks stay bounded and comparable
+    # (rule 91). There is deliberately NO absolute ceiling in interactive use:
+    # a ceiling forecloses long-running agentic loops, which is a non-starter
+    # for the product.
+    progress_grant_seconds: float = 300.0
     max_malformed_retries: int = 3  # bail if the model keeps emitting bad tool JSON
     # How many times a reply cut off at the token limit may be re-nudged. More
     # than one because a genuinely long deliverable (a full design document) can
@@ -492,6 +510,10 @@ class Config:
             achanges["max_iterations"] = kw["max_iterations"]
         if kw.get("max_wallclock"):
             achanges["max_wallclock_seconds"] = kw["max_wallclock"]
+        # `is not None`, not truthiness: 0 is a meaningful value here (it turns
+        # the progress extension off) and must not be swallowed as "unset".
+        if kw.get("progress_grant") is not None:
+            achanges["progress_grant_seconds"] = kw["progress_grant"]
         agent = replace(self.agent, **achanges) if achanges else self.agent
         return replace(self, model=model, server=server, agent=agent)
 
