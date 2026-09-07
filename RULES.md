@@ -119,7 +119,13 @@ Rule 7's two citations (L2206, L6050) may not even be the same idea.
   merely documented (build 155):* both runners append `--progress-grant 0`
   **after** `case.extra_args`, so a case cannot buy itself an extendable budget
   — argparse takes the last occurrence. A rule a config file can override is
-  not a rule. §5.144.
+  not a rule. The same reasoning pins the iteration ceiling
+  (`GRADED_MAX_ITERATIONS = 50`, imported by both runners): a graded run must
+  not inherit an interactive default that is expected to move, or a re-run
+  stops measuring what the archive measured. That pin sits *before*
+  `extra_args`, so a harder case may still raise it — a ceiling the case fixes
+  is fixed for every model that runs it, which is all comparability requires.
+  §5.144, §5.144.1.
 
 ## Superseded
 

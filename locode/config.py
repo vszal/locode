@@ -134,15 +134,38 @@ class AgentConfig:
     # only needs to catch a model that's truly never going to finish, not cut
     # off one that's still making progress.
     #
-    # READ THIS BEFORE RAISING IT. From build 154 this is the PRIMARY bound on a
-    # turn, not a backstop. The wallclock it used to share the job with is now
+    # READ THIS BEFORE CHANGING IT. From build 154 this is the PRIMARY bound on
+    # a turn, not a backstop. The wallclock it used to share the job with is now
     # extendable (progress_grant_seconds below) and does not cap a turn that
-    # keeps working, so 50 iterations is what actually ends a healthy long turn
-    # — and it is what contains a model manufacturing fake progress, since a
-    # fresh `bash echo N` is a new tool signature every time. Raising it buys
-    # longer agentic loops and lengthens the leash on a determined waster in
-    # exactly equal measure. 50 is a starting point, not a measured optimum.
-    max_iterations: int = 50
+    # keeps working, so this is what ends a healthy long turn — and it is what
+    # contains a model manufacturing fake progress, since a fresh `bash echo N`
+    # is a new tool signature every time and clears both grant triggers. Those
+    # two effects scale together: any number that buys a longer agentic loop
+    # lengthens the leash on a determined waster by exactly as much.
+    #
+    # 150 (build 155) is sized off observed trajectories, not theory. Real work
+    # measured on the bench cases runs 5-16 iterations, and the live qwen38 turn
+    # that motivated the extendable budget used 14; the documented worst case for
+    # a hand-written task is the 30-40 calls of a multi-file refactor. 150 is
+    # ~4x that, which is the headroom for the retries and re-reads a real run
+    # spends on top of its nominal plan. The old 50 left almost none — it was
+    # inherited from when the wallclock was the real ceiling and 50 only had to
+    # catch a model that would never finish.
+    #
+    # The cost side stays bounded: at the 16-23s/iteration observed against
+    # local models, a turn that runs this out costs ~40-60 minutes, and the
+    # genuinely stuck loops are caught far earlier by max_repeat_calls (3) and
+    # max_error_stall (3). It is the model making *distinct* useless calls that
+    # this number, and only this number, stops.
+    #
+    # RAISE IT for a deliberate agentic loop — a long autonomous session, a
+    # sweep over many files, anything you would leave running — where 150 will
+    # cut off real work. Several hundred to ~1000 is reasonable *if you are
+    # supervising it or the task is genuinely that long*; Esc is always the
+    # real backstop. What you give up is the bound on wasted local-model time
+    # if the model turns out to be spinning, so raise it for the run, not for
+    # the config file.
+    max_iterations: int = 150
     max_wallclock_seconds: int = 600
     # A turn's wallclock budget is a FLOOR, not a ceiling. Every time the model
     # makes real progress the deadline is pushed out to `now + this`, so a turn

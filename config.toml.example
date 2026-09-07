@@ -66,9 +66,20 @@ stop = []                        # extra stop strings, on top of the chat templa
 # not per logical step. A multi-file refactor can easily need 30-40 calls.
 # Since build 154 this is the PRIMARY bound on a turn: the wallclock below is
 # extendable and no longer caps a turn that keeps making progress, so this is
-# what ends a healthy long turn AND what contains a model faking progress.
-# Raise it for longer agentic loops -- both effects scale together.
-max_iterations = 50
+# what ends a healthy long turn AND what contains a model faking progress --
+# both effects scale together, so any number that buys a longer loop lengthens
+# the leash on a model spinning its wheels by exactly as much.
+# 150 is ~4x the largest real trajectory measured (bench cases run 5-16
+# iterations; a multi-file refactor, 30-40), leaving headroom for the retries
+# and re-reads a real run spends on top of its plan. At the 16-23s/iteration
+# seen against local models, running it out costs ~40-60 min; truly stuck
+# loops are caught much earlier by max_repeat_calls / max_error_stall.
+# RAISE IT for a deliberate agentic loop -- a long autonomous session, a sweep
+# over many files, anything you would leave running -- where 150 would cut off
+# real work. Several hundred to ~1000 is reasonable if you are supervising it
+# or the task is genuinely that long (Esc is always the real backstop). Prefer
+# --max-iterations for that run over raising it here for every turn.
+max_iterations = 150
 max_wallclock_seconds = 600     # per-turn time budget a turn STARTS with
 # The budget above is a floor, not a ceiling: each time the model makes real
 # progress the deadline is pushed out to now + progress_grant_seconds, so a

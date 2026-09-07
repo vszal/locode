@@ -35,7 +35,7 @@ def test_locode_loads_the_example(tmp_path, example_block):
     # every value the example states explicitly must survive the round trip
     assert cfg.model.default == "qwen38"
     assert cfg.model.default in cfg.aliases, "the default alias must be defined"
-    assert cfg.agent.max_iterations == 50
+    assert cfg.agent.max_iterations == 150
     assert cfg.server.port == 8081
     assert cfg.server.memory_reserve_gb == 5.0
     assert cfg.permissions.deny_paths == ["~/.ssh", "~/.aws", "~/.config/gh"]

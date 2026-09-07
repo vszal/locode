@@ -357,7 +357,7 @@ def _load_grader(case: Case):
 # `locode/bench/cases/` are graded by BOTH this harness and `locode bench` on a
 # user's machine; two definitions of CheckCtx would let the same case grade
 # differently in each, silently. One definition, imported.
-from locode.bench.runner import CheckCtx  # noqa: E402
+from locode.bench.runner import CheckCtx, GRADED_MAX_ITERATIONS  # noqa: E402
 
 
 def run_names(case_id: str, model: str, repeat: int, arm: str = "") -> tuple[str, str]:
@@ -496,7 +496,13 @@ def run_case(case: Case, model: str, repeat: int, results_dir: Path,
               [sys.executable, str(AGENT_LAUNCHER), str(Path(agent_root).resolve())])
     cmd = launch + ["-p", case.prompt, "-m", model,
                     "--log-events", str(log_path), "--no-markdown",
-                    "--allow-tool", ",".join(case.allow_tools)] + case.extra_args
+                    "--allow-tool", ",".join(case.allow_tools),
+                    # [rule 91] Before extra_args so a case may still raise it:
+                    # what must not move is the graded DEFAULT, which would
+                    # otherwise track the interactive one (50 -> 150 in build
+                    # 155) and desync a re-run from the archive.
+                    "--max-iterations", str(GRADED_MAX_ITERATIONS),
+                    ] + case.extra_args
     # [rule 91] Appended last so it beats a case's extra_args: a graded run gets
     # a flat wallclock, never the interactive progress-extended budget, or its
     # time-to-done cannot be compared with the archive. See ROADMAP 5.144.

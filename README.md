@@ -99,7 +99,7 @@ qwen4i      = "mlx-community/Qwen3-4B-Instruct-2507-4bit"   # fast, trivial edit
 qwythos9 = "off"
 
 [agent]
-max_iterations = 50         # a multi-file task can need dozens
+max_iterations = 150        # a multi-file task can need dozens
 
 [permissions]
 deny_paths = ["~/.ssh", "~/.aws", "~/.config/gh"]   # hard-denied even under --yolo
@@ -337,8 +337,17 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
   so raising this only extends a turn that's still making progress:
   ```toml
   [agent]
-  max_iterations = 50   # default; bump for large multi-file tasks
+  max_iterations = 150   # default; raise it for agentic loops
   ```
+  Since the wallclock below became extendable, this is the *primary* bound on
+  a turn — nothing else stops a model that keeps taking distinct, useless
+  actions. The default is sized for interactive work: ~4x the largest real
+  trajectory measured, which is roughly 40-60 minutes against a local model.
+  **For a deliberate agentic loop** — a long autonomous session, a sweep over
+  many files, anything you'd leave running — 150 will cut off real work; several
+  hundred to ~1000 is reasonable when you're supervising it or the task is
+  genuinely that long. Prefer `--max-iterations N` for that run over raising
+  the default for every turn, and remember Esc is the real backstop.
   A model can also stay "on track" by iteration count while quietly burning
   wallclock on slow, rambling completions. locode watches the ratio of
   iterations-consumed to wallclock-consumed and nudges (once, not a hard stop)

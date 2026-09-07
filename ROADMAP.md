@@ -11333,3 +11333,57 @@ mutant look *caught* when it was not. Clear `__pycache__` after restoring.
 Nothing here is verified against a live turn. Every budget test drives a fake
 clock; whether qwen38 earns grants at a sane rate, and whether the turn that
 started this would now finish, is unmeasured.
+
+### 5.144.2 — sizing the iteration ceiling, and pinning the graded one
+
+5.144.1 left `max_iterations = 50` standing as the sole ceiling on a turn with
+a note that it was "a starting point, not a measured optimum." Resolved: the
+interactive default is now **150**, and the graded one is pinned separately at
+50.
+
+**Why 50 was wrong for the job it inherited.** It was calibrated when the
+wallclock was the real ceiling and 50 only had to catch a model that would
+never finish. Now it is the *only* thing that ends a turn. Against that job the
+number is too tight at the top end: the loop grounds one tool call per
+iteration for non-native callers, and this file's own comment puts a multi-file
+refactor at 30-40 calls — so a legitimate large task starts within 20% of the
+ceiling, before any of the retries, re-reads and dead ends a real run spends.
+
+**Why 150.** Sized off trajectories rather than argument. Bench cases run 5-16
+iterations; the live qwen38 turn that started this whole thread used 14; the
+documented worst case is 30-40. 150 is ~4x that worst case, which is headroom
+for the overhead a plan does not predict. The cost side stays bounded and
+checkable: at the 16-23s/iteration observed against local models, a turn that
+actually runs 150 out costs ~40-60 minutes, and the genuinely stuck loops never
+get near it — `max_repeat_calls` (3) and `max_error_stall` (3) fire far
+earlier. What 150 is really bounding is the narrow residual case: a model
+making *distinct*, useless, non-erroring calls. That is also exactly the shape
+of a model gaming the grant triggers (`echo 1`, `echo 2`, …), so the two costs
+are the same cost, and the tradeoff is honest in both directions: any number
+that buys a longer agentic loop lengthens that leash by exactly as much.
+Documented as such at `config.py`, `config.toml.example` and README, with the
+recommendation to raise it *for the run* (`--max-iterations`) rather than for
+every turn, and several hundred to ~1000 named as reasonable for a supervised
+agentic loop.
+
+**The consequence that mattered more than the number.** Neither runner pinned
+`max_iterations`, so moving the interactive default would have silently moved
+what a graded run measures — the same failure rule 91 exists to prevent, via a
+different knob. No archived result is affected in fact (nothing in the archive
+came within 3x of 50), but a re-run of any archived sweep under build 155 would
+have been a different experiment wearing the same case ids. Both runners now
+pass `--max-iterations GRADED_MAX_ITERATIONS`, a constant defined once in
+`locode/bench/runner.py` and imported by `evals/harness.py`, held at 50 so the
+archive stays the archive.
+
+Note the deliberate asymmetry with the grant pin: **the grant pin goes after
+`extra_args`, this one before.** A case must never reach the extendable
+wallclock, because that makes time-to-done incomparable and unbounded. But a
+case raising its own iteration ceiling is harmless — a ceiling the case fixes
+is fixed for every model that runs it, which is the whole of what comparability
+asks. A test asserts each side of that asymmetry, and a third asserts
+`GRADED_MAX_ITERATIONS != AgentConfig().max_iterations`, so a future tidy-up
+that collapses the two into one constant fails loudly rather than quietly
+re-baselining the benchmark.
+
+Still unverified against a live turn; the machine is in use.

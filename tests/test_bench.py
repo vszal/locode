@@ -464,3 +464,37 @@ def test_the_harness_pins_it_too():
     src = (pathlib.Path(__file__).resolve().parents[1]
            / "evals" / "harness.py").read_text()
     assert '"--progress-grant", "0"' in src
+
+
+def test_a_graded_run_pins_the_iteration_ceiling(monkeypatch, tmp_path):
+    # The interactive default moved 50 -> 150 in build 155 for agentic loops.
+    # A graded run must not follow it, or a re-run of an archived sweep is
+    # measuring a different agent than the archive did.
+    cmd = _capture_bench_argv(monkeypatch, tmp_path, [])
+    assert "--max-iterations" in cmd
+    pinned = int(cmd[cmd.index("--max-iterations") + 1])
+    assert pinned == runner.GRADED_MAX_ITERATIONS
+
+
+def test_the_graded_ceiling_does_not_track_the_interactive_default():
+    # If someone "tidies" GRADED_MAX_ITERATIONS into AgentConfig.max_iterations,
+    # every future default bump silently rewrites what the benchmark measures.
+    from locode.config import AgentConfig
+    assert runner.GRADED_MAX_ITERATIONS == 50
+    assert AgentConfig().max_iterations != runner.GRADED_MAX_ITERATIONS
+
+
+def test_a_case_may_still_raise_its_own_iteration_ceiling(monkeypatch, tmp_path):
+    # Unlike the wallclock grant, this pin sits BEFORE extra_args on purpose: a
+    # ceiling a case fixes is fixed for every model that runs it, which is all
+    # comparability needs. A harder case is allowed to need more room.
+    cmd = _capture_bench_argv(
+        monkeypatch, tmp_path, ["--max-iterations", "400"])
+    last = len(cmd) - 1 - cmd[::-1].index("--max-iterations")
+    assert cmd[last + 1] == "400"
+
+
+def test_the_harness_pins_the_ceiling_too():
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "evals" / "harness.py").read_text()
+    assert "GRADED_MAX_ITERATIONS" in src

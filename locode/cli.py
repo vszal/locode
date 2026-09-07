@@ -46,7 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Flip ASK tools to AUTO (deny_paths still enforced).")
     p.add_argument("--max-iterations", dest="max_iterations", type=int,
                    metavar="N",
-                   help="Override the agent's per-turn iteration budget.")
+                   help="Override the agent's per-turn iteration budget. This "
+                        "is the primary bound on a turn; raise it (several "
+                        "hundred+) for a deliberate agentic loop.")
     p.add_argument("--progress-grant", dest="progress_grant", type=float,
                    metavar="SECONDS",
                    help="Seconds a turn is granted from each progress event "

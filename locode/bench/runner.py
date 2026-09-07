@@ -51,6 +51,15 @@ LADDER: list[tuple[str, str]] = [
 # left broken -- reporting that as a pass would be the diagnostic lying.
 SOLVED = 0.999
 
+# The iteration ceiling every graded run is pinned to [rule 91]. Deliberately
+# NOT AgentConfig.max_iterations: that default is tuned for interactive and
+# agentic-loop use and is expected to move (50 -> 150 in build 155), while a
+# graded run must stay comparable with every result archived under the old
+# value. Changing this number invalidates cross-run comparison and deserves the
+# same care as changing a case. `evals/harness.py` imports it, so the research
+# harness and the shipped bench cannot drift apart.
+GRADED_MAX_ITERATIONS = 50
+
 
 @dataclass
 class Case:
@@ -278,6 +287,13 @@ def run_case(case: Case, model: str, repeat: int = 1, keep: bool = False,
                "--log-events", str(log_path), "--no-markdown", "--no-splash",
                "--allow-tool", ",".join(case.allow_tools)]
         cmd += list(server_args or [])
+        # [rule 91] BEFORE extra_args, unlike the grant pin below: the graded
+        # iteration ceiling must not float with the interactive default (which
+        # moved 50 -> 150 in build 155 for agentic loops), or a re-run stops
+        # being comparable with the archive. A case MAY still raise it in
+        # extra_args — a ceiling fixed by the case is fixed for every model
+        # that runs it, which is all comparability requires.
+        cmd += ["--max-iterations", str(GRADED_MAX_ITERATIONS)]
         cmd += case.extra_args
         # [rule 91] LAST, so it beats anything a case put in extra_args. A
         # graded run gets a flat, non-extendable wallclock: an extendable one
