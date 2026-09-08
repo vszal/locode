@@ -217,7 +217,6 @@ def test_every_terminal_is_either_writable_or_documented():
 # --- REPL wiring -------------------------------------------------------------
 def _repl(monkeypatch, home, term="zed"):
     from locode.config import Config
-    from locode.model.client import ModelClient
     from locode.server.manager import SingleGpuManager
     from locode.tools import build_registry
     from locode.ui.repl import Repl
@@ -228,7 +227,7 @@ def _repl(monkeypatch, home, term="zed"):
         monkeypatch.delenv(var, raising=False)   # the test host is a terminal too
     monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
     cfg = Config()
-    return Repl(cfg, ModelClient(cfg.base_url), SingleGpuManager(cfg),
+    return Repl(cfg, SingleGpuManager(cfg),
                 build_registry(cfg))
 
 

@@ -152,7 +152,7 @@ def _loop_at(tmp_path, cfg=None):
     for t in fs.all_tools():
         reg.register(t)
     cfg = cfg or Config()
-    return AgentLoop(object(), object(), reg, PermissionPolicy(cfg.permissions),
+    return AgentLoop(object(), reg, PermissionPolicy(cfg.permissions),
                      cfg, cwd=str(tmp_path))
 
 

@@ -51,11 +51,10 @@ class _SlashCompleter(Completer):
 
 
 class Repl:
-    def __init__(self, config, client, manager, registry, *, yolo=False,
+    def __init__(self, config, manager, registry, *, yolo=False,
                  event_log=None):
         self._cfg = config
         self._event_log = event_log
-        self._client = client
         self._manager = manager
         self._registry = registry
         self._policy = PermissionPolicy(config.permissions, yolo=yolo)
@@ -80,7 +79,7 @@ class Repl:
         self._pending_diff: str | None = None
         self._diff_shown = False
         self._loop = AgentLoop(
-            client, manager, registry, self._policy, config,
+            manager, registry, self._policy, config,
             cwd=str(Path.cwd()),
             on_delta=self._on_delta,
             on_event=tee(event_log, self._on_event),

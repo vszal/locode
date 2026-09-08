@@ -47,11 +47,15 @@ class CyclingClient(FakeClient):
 
 
 class FakeManager:
-    def __init__(self, model_id="mlx-community/Qwen3-14B-4bit"):
+    def __init__(self, client=None, model_id="mlx-community/Qwen3-14B-4bit"):
         self.model_id = model_id
+        self._client = client
 
     async def ensure_up(self, alias):
         return self.model_id
+
+    def client_for(self, alias=None):
+        return self._client
 
 
 def native_call(name, **args):
@@ -81,7 +85,7 @@ def make_loop(tmp_path, scripted, confirm=None, cfg=None):
         reg.register(t)
     reg.register(UpdatePlan())
     cfg = cfg or Config()
-    return AgentLoop(FakeClient(scripted), FakeManager(), reg,
+    return AgentLoop(FakeManager(FakeClient(scripted)), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), confirm=confirm)
 
@@ -93,9 +97,35 @@ def make_loop_with_client(tmp_path, client, confirm=None, cfg=None):
     for t in fs.all_tools():
         reg.register(t)
     cfg = cfg or Config()
-    return AgentLoop(client, FakeManager(), reg,
+    return AgentLoop(FakeManager(client), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), confirm=confirm)
+
+
+async def test_the_loop_asks_for_a_client_at_every_model_call(tmp_path):
+    """The backend seam's behavioural claim (M6.1, locode/server/base.py).
+
+    The loop used to be handed one client at construction and hold it for the
+    session. It now asks `manager.client_for(alias)` at each model call, because
+    in a pool the backend serving an alias is not known until the turn runs. A
+    loop that resolved the endpoint once would never notice it changed — so the
+    count here matters, not just that it works: one lookup per model call.
+    """
+    loop = make_loop(tmp_path, [native_call("ls"),
+                                {"role": "assistant", "content": "done"}])
+    asked = []
+    inner = loop._manager.client_for
+
+    def counting(alias=None):
+        asked.append(alias)
+        return inner(alias)
+
+    loop._manager.client_for = counting
+    out = await loop.run_turn("list things")
+
+    assert out == "done"
+    assert len(asked) == 2, asked          # two model calls -> two lookups
+    assert set(asked) == {loop.model_alias}  # asked for the alias in play
 
 
 class FakeClock:
@@ -226,9 +256,9 @@ async def test_confirm_runs_outside_interrupt_scope(tmp_path):
         reg.register(t)
     cfg = Config()
     loop = AgentLoop(
-        FakeClient([native_call("write_file", path="x.txt", content="hi"),
-                    {"role": "assistant", "content": "Done."}]),
-        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        FakeManager(FakeClient([native_call("write_file", path="x.txt", content="hi"),
+                                {"role": "assistant", "content": "Done."}])),
+        reg, PermissionPolicy(cfg.permissions), cfg,
         cwd=str(tmp_path), confirm=confirm, interrupt=scope)
     out = await loop.run_turn("write x")
     assert out == "Done."
@@ -466,7 +496,7 @@ async def test_assistant_end_fires_on_cancel(tmp_path):
     for t in fs.all_tools():
         reg.register(t)
     cfg = Config()
-    loop = AgentLoop(CancellingClient(), FakeManager(), reg,
+    loop = AgentLoop(FakeManager(CancellingClient()), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), on_event=events.append)
     out = await loop.run_turn("hi")
@@ -487,13 +517,13 @@ async def test_speculative_fenced_batch_runs_only_first(tmp_path):
         reg.register(t)
     cfg = Config()
     loop = AgentLoop(
-        FakeClient([
+        FakeManager(FakeClient([
             fenced_multi(("ls", {}),
                          ("read_file", {"path": "a.txt"}),
                          ("edit_file", {"path": "a.txt",
                                         "old": "GUESSED LINE", "new": "x"})),
             {"role": "assistant", "content": "done"},
-        ]), FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        ])), reg, PermissionPolicy(cfg.permissions), cfg,
         cwd=str(tmp_path), on_event=events.append)
     out = await loop.run_turn("update a.txt")
     assert out == "done"
@@ -1267,7 +1297,7 @@ async def test_auto_compact_fires_before_hard_stop(tmp_path):
         reg.register(t)
 
     scripted = [big_call(i) for i in range(30)]
-    loop = AgentLoop(FakeClient(scripted), FakeManager(), reg,
+    loop = AgentLoop(FakeManager(FakeClient(scripted)), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), on_event=events.append)
     await loop.run_turn("list a bunch of directories")
@@ -1539,7 +1569,7 @@ async def test_assistant_end_reports_generated_chars(tmp_path):
     for t in fs.all_tools():
         reg.register(t)
     cfg = Config()
-    loop = AgentLoop(OneShotClient(), FakeManager(), reg,
+    loop = AgentLoop(FakeManager(OneShotClient()), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), on_event=events.append)
     await loop.run_turn("hi")
@@ -1781,9 +1811,9 @@ async def test_denial_events_carry_a_reason(tmp_path):
     cfg = Config()
     cfg.permissions.tools["write_file"] = "deny"
     loop = AgentLoop(
-        FakeClient([native_call("write_file", path="out.txt", content="x"),
-                    {"role": "assistant", "content": "Okay."}]),
-        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        FakeManager(FakeClient([native_call("write_file", path="out.txt", content="x"),
+                                {"role": "assistant", "content": "Okay."}])),
+        reg, PermissionPolicy(cfg.permissions), cfg,
         cwd=str(tmp_path), on_event=events.append)
     await loop.run_turn("write out.txt")
     denied = [e for e in events if e["phase"] == "denied"]
@@ -1806,10 +1836,10 @@ async def test_a_remembered_no_always_is_permanent_for_the_model_too(tmp_path):
         reg.register(t)
     cfg = Config()
     loop = AgentLoop(
-        FakeClient([native_call("write_file", path="a.txt", content="1"),
-                    native_call("write_file", path="b.txt", content="2"),
-                    {"role": "assistant", "content": "Stopped."}]),
-        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        FakeManager(FakeClient([native_call("write_file", path="a.txt", content="1"),
+                                native_call("write_file", path="b.txt", content="2"),
+                                {"role": "assistant", "content": "Stopped."}])),
+        reg, PermissionPolicy(cfg.permissions), cfg,
         cwd=str(tmp_path), confirm=confirm, on_event=events.append)
     await loop.run_turn("write two files")
     assert asked == ["a.txt"]                    # the second never prompted
@@ -1845,10 +1875,10 @@ async def test_a_tool_that_prompts_runs_outside_the_interrupt_scope(tmp_path):
     reg.register(AskUser())
     cfg = Config()
     loop = AgentLoop(
-        FakeClient([native_call("ask_user", question="which?",
-                                options=["a", "b"]),
-                    {"role": "assistant", "content": "Got it."}]),
-        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        FakeManager(FakeClient([native_call("ask_user", question="which?",
+                                            options=["a", "b"]),
+                                {"role": "assistant", "content": "Got it."}])),
+        reg, PermissionPolicy(cfg.permissions), cfg,
         cwd=str(tmp_path), select=select, interrupt=scope)
     await loop.run_turn("ask me")
     assert state["saw_active"] is False
@@ -1872,9 +1902,9 @@ async def test_a_tool_raising_does_not_end_the_turn(tmp_path):
     reg.register(Exploding())
     cfg = Config()
     loop = AgentLoop(
-        FakeClient([native_call("boom"),
-                    {"role": "assistant", "content": "Recovered."}]),
-        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        FakeManager(FakeClient([native_call("boom"),
+                                {"role": "assistant", "content": "Recovered."}])),
+        reg, PermissionPolicy(cfg.permissions), cfg,
         cwd=str(tmp_path))
     out = await loop.run_turn("go")
     assert out == "Recovered."
@@ -1902,9 +1932,9 @@ async def test_cancellation_still_propagates_through_a_tool(tmp_path):
     reg.register(Cancelling())
     cfg = Config()
     loop = AgentLoop(
-        FakeClient([native_call("boom"),
-                    {"role": "assistant", "content": "should not get here"}]),
-        FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+        FakeManager(FakeClient([native_call("boom"),
+                                {"role": "assistant", "content": "should not get here"}])),
+        reg, PermissionPolicy(cfg.permissions), cfg,
         cwd=str(tmp_path))
     # _run_turn already turns it into the interrupted result, which is the
     # point: it must reach that handler rather than be reported to the model as
@@ -1940,7 +1970,7 @@ def make_loop_with_bash(tmp_path, scripted, bash: FakeBash, cfg=None):
     reg.register(bash)
     cfg = cfg or Config()
     cfg.permissions.tools["bash"] = "auto"  # run it headless without an approver
-    return AgentLoop(FakeClient(scripted), FakeManager(), reg,
+    return AgentLoop(FakeManager(FakeClient(scripted)), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path))
 
@@ -2260,7 +2290,7 @@ async def test_repeated_mutating_edit_stops_despite_varying_echo(tmp_path):
     cfg.permissions.tools["replace_lines"] = "auto"  # run headless, no approver
     call = native_call("replace_lines", path="./f.py", start=136, end=137,
                        new="    with tempfile.TemporaryDirectory() as tmp:")
-    loop = AgentLoop(CyclingClient([call]), FakeManager(), reg,
+    loop = AgentLoop(FakeManager(CyclingClient([call])), reg,
                      PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path))
     out = await loop.run_turn("fix the empty with-block")
 
@@ -3135,7 +3165,7 @@ def make_cycling_loop_with_bash(tmp_path, scripted, bash, cfg=None):
     cfg = cfg or Config()
     cfg.permissions.tools["bash"] = "auto"
     cfg.permissions.tools["append_file"] = "auto"
-    return AgentLoop(CyclingClient(scripted), FakeManager(), reg,
+    return AgentLoop(FakeManager(CyclingClient(scripted)), reg,
                      PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path))
 
 
@@ -3372,7 +3402,7 @@ def make_loop_with_tests(tmp_path, scripted, payloads, cfg=None, extra=(),
     cfg = cfg or Config()
     cfg.agent.max_repeat_calls = 99   # isolate the same-failure path
     cfg.agent.max_error_stall = 99
-    return AgentLoop(FakeClient(scripted), FakeManager(), reg,
+    return AgentLoop(FakeManager(FakeClient(scripted)), reg,
                      PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path),
                      confirm=confirm)
 
@@ -3752,7 +3782,7 @@ async def test_the_identity_does_not_survive_into_the_next_turn(tmp_path):
          {"role": "assistant", "content": "ok"}],
         {"red": RED})
     await loop.run_turn("fix it")
-    loop._client.n = 0
+    loop._manager.client_for().n = 0
     await loop.run_turn("now try again")
     assert not any("SAME FAILURE" in r for r in _results(loop))
 
@@ -4712,7 +4742,7 @@ async def _run_saturated(tmp_path, ratio):
         reg.register(t)
     events = []
     scripted = [{"role": "assistant", "content": "done"}]
-    loop = AgentLoop(FakeClient(scripted), FakeManager(), reg,
+    loop = AgentLoop(FakeManager(FakeClient(scripted)), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), on_event=events.append)
     loop.set_history([{"role": "system", "content": "sys"}] + _incompressible(12))
@@ -4766,8 +4796,8 @@ async def test_a_compaction_that_really_helps_is_still_kept(tmp_path):
                          "arguments": json.dumps({"path": f"f{i}.py"})}}]})
         hist.append({"role": "user", "kind": "tool_result",
                      "content": "Tool results:\n\n[read_file]\n" + "L%d\n" % i * 300})
-    loop = AgentLoop(FakeClient([{"role": "assistant", "content": "done"}]),
-                     FakeManager(), reg, PermissionPolicy(cfg.permissions), cfg,
+    loop = AgentLoop(FakeManager(FakeClient([{"role": "assistant", "content": "done"}])),
+                     reg, PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), on_event=events.append)
     loop.set_history(hist)
     n_before = estimate_chars(loop.history)
@@ -4822,7 +4852,7 @@ async def test_a_read_kept_verbatim_by_compaction_still_counts_as_read(tmp_path)
                 call("edit_file", {"path": str(target),
                                    "old": "beta", "new": "BETA"}),
                 {"role": "assistant", "content": "done"}]
-    loop = AgentLoop(FakeClient(scripted), FakeManager(), reg,
+    loop = AgentLoop(FakeManager(FakeClient(scripted)), reg,
                      PermissionPolicy(cfg.permissions), cfg,
                      cwd=str(tmp_path), on_event=events.append, confirm=confirm)
     loop.set_history(hist)
@@ -4841,7 +4871,7 @@ async def test_a_full_reset_still_forgets_everything(tmp_path):
     reg = Registry()
     for t in fs.all_tools():
         reg.register(t)
-    loop = AgentLoop(FakeClient([]), FakeManager(), reg,
+    loop = AgentLoop(FakeManager(FakeClient([])), reg,
                      PermissionPolicy(cfg.permissions), cfg, cwd=str(tmp_path))
     loop._seen_files.add("/x/y.py")
     loop._forget_seen()

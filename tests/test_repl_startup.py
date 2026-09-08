@@ -9,7 +9,6 @@ silently on the first turn.
 import pytest
 
 from locode.config import Config
-from locode.model.client import ModelClient
 from locode.server.manager import SingleGpuManager
 from locode.tools import build_registry
 from locode.ui import banner
@@ -28,7 +27,7 @@ def _repl(monkeypatch, *, model="qwen14", **over):
     cfg.model.default = model
     for k, v in over.items():
         setattr(cfg.server, k, v)
-    r = Repl(cfg, ModelClient(cfg.base_url), SingleGpuManager(cfg),
+    r = Repl(cfg, SingleGpuManager(cfg),
              build_registry(cfg))
     r._color = False  # deterministic output regardless of the test terminal
     return r

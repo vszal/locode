@@ -18,6 +18,8 @@ _terminate_servers scales its grace period with model size: hard-killing a
 process that still holds tens of GB of live Metal buffers is its own hazard.
 
 The PoolManager (concurrent mode) is a later milestone; this is the default.
+Both satisfy `base.ModelBackendManager` — see that module for why the loop
+asks for a client per turn rather than being handed one at startup.
 """
 
 from __future__ import annotations
@@ -30,13 +32,13 @@ import shutil
 import signal
 import subprocess
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 from locode.config import Config, CONFIG_PATH, STATE_DIR
+from locode.model.client import ModelClient
 from locode.model.profiles import (
     Profile,
     lookup_thinking_override,
@@ -44,6 +46,7 @@ from locode.model.profiles import (
     resolve_thinking,
 )
 from locode.server import aliases
+from locode.server.base import Status
 
 GB = 1024 ** 3
 # MLX's wired working set runs somewhat above the raw on-disk weight size
@@ -65,13 +68,6 @@ _DEFAULT_WIRED_FRACTION = 0.75
 # Extra SIGTERM grace per GB of resident weights, and the overall cap.
 _TERM_SECS_PER_GB = 2.0
 _TERM_WAIT_MAX = 60.0
-
-
-@dataclass
-class Status:
-    up: bool
-    model_id: str | None = None
-    base_url: str = ""
 
 
 def find_mlx_bin(configured: str = "") -> str:
@@ -187,6 +183,7 @@ class SingleGpuManager:
         self._mlx_bin = find_mlx_bin(config.server.mlx_bin)
         self._overrides = alias_overrides or config.aliases
         self._proc: subprocess.Popen | None = None
+        self._client: ModelClient | None = None
 
     @property
     def _managed(self) -> bool:
@@ -210,6 +207,20 @@ class SingleGpuManager:
     def known_aliases(self) -> list[str]:
         """Aliases available now: the user's config [aliases] plus any built-ins."""
         return sorted(set(self._overrides) | set(aliases.known_aliases()))
+
+    # --- the backend seam -------------------------------------------------
+    def client_for(self, alias: str | None = None) -> ModelClient:
+        """The client for whoever serves `alias` — here, always the one server.
+
+        Single mode has exactly one endpoint, so the alias is irrelevant and the
+        answer never changes; the argument exists for the pool, which resolves
+        it per turn. Cached because the loop calls this on every model call:
+        `ModelClient` opens its `httpx.AsyncClient` per request, so this is a
+        value object, not a connection.
+        """
+        if self._client is None:
+            self._client = ModelClient(self._base)
+        return self._client
 
     # --- status ----------------------------------------------------------
     async def is_up(self, alias: str | None = None) -> bool:

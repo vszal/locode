@@ -112,8 +112,19 @@ turn. `SingleGpuManager.client_for` returns the same client always, so single
 mode is behaviourally identical.
 
 **Exit:** `AgentLoop` no longer takes a `client` argument, `pytest -q` green,
-and a single-mode `locode bench` matches the archived n=6 baseline (24/24 for
-qwen38) — the refactor must be invisible to the ladder.
+and a single-mode `locode bench` matches the archived baseline — the refactor
+must be invisible to the ladder.
+
+> **Correction (2026-09-08):** "the archived n=6 baseline (24/24 for qwen38)"
+> misread the archive. `evals/results/bench-r3-rule90.log` is *4 cases x 2
+> models x **3** repeats = 24 **runs total**;* 24 was never a score. qwen38's
+> result there was **12/12 solved**, per case: exec-pinpoint 5/5/5 iterations,
+> exec-bugfix 5/5/9, repro-only 5/5/5, multi-defect-blind 11/10/10.
+> So the exit run is `locode bench -m qwen38 --repeat 3`, and it must return
+> **12/12** with iteration counts in that neighbourhood. Judge it on
+> **iterations, not wallclock** (rule 88): the archived 529s time-to-done was
+> measured on an otherwise-idle box, and rule 89 still applies — correctness
+> gates before either number means anything.
 
 ### M6.2 — Config and the memory gate
 

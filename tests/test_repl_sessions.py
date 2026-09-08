@@ -2,7 +2,6 @@
 
 import locode.session as session
 from locode.config import Config
-from locode.model.client import ModelClient
 from locode.server.manager import SingleGpuManager
 from locode.tools import build_registry
 from locode.ui.repl import Repl
@@ -12,7 +11,7 @@ def _repl(tmp_path, monkeypatch):
     # Redirect session storage into tmp so tests never touch the real state dir.
     monkeypatch.setattr(session, "SESSIONS_DIR", tmp_path / "sessions")
     cfg = Config()
-    return Repl(cfg, ModelClient(cfg.base_url), SingleGpuManager(cfg),
+    return Repl(cfg, SingleGpuManager(cfg),
                 build_registry(cfg))
 
 

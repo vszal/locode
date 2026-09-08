@@ -100,11 +100,14 @@ async def _null_scope():
 
 
 class AgentLoop:
-    def __init__(self, client, manager, registry: Registry,
+    def __init__(self, manager, registry: Registry,
                  policy: PermissionPolicy, config, *, cwd: str,
                  on_delta=None, on_event: OnEvent | None = None,
                  confirm: Confirm | None = None, select=None, interrupt=None):
-        self._client = client
+        # No client argument: the loop asks `manager.client_for(alias)` at each
+        # model call instead. Which endpoint serves an alias is the manager's
+        # business and, in a pool, is not known until the turn runs — see
+        # locode/server/base.py. In single mode the answer never changes.
         self._manager = manager
         self._registry = registry
         self._policy = policy
@@ -658,7 +661,8 @@ class AgentLoop:
                 gen_chars = 0
                 try:
                     async with self._interrupt():
-                        msg = await self._client.complete(
+                        client = self._manager.client_for(self.model_alias)
+                        msg = await client.complete(
                             _wire(self.history, profile.strict_alternation),
                             model_id, tools=tools,
                             temperature=self._cfg.model.temperature,

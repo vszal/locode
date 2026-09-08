@@ -9,7 +9,6 @@ from pathlib import Path
 
 from locode import __full_version__, __version__
 from locode.config import Config
-from locode.model.client import ModelClient
 from locode.permissions import AUTO, PermissionPolicy
 from locode.scaffold import ensure_user_config, first_run_notice
 from locode.server.manager import SingleGpuManager
@@ -112,13 +111,13 @@ def _assemble(args):
     if args.no_markdown:
         cfg.ui.markdown = False
     manager = SingleGpuManager(cfg)
-    client = ModelClient(cfg.base_url)
     registry = build_registry(cfg)
-    return cfg, manager, client, registry
+    # No client here: the manager builds it (base.ModelBackendManager).
+    return cfg, manager, registry
 
 
 async def _headless(args) -> int:
-    cfg, manager, client, registry = _assemble(args)
+    cfg, manager, registry = _assemble(args)
     text = " ".join(args.prompt).strip()
     if not text and not sys.stdin.isatty():
         text = sys.stdin.read().strip()
@@ -150,7 +149,7 @@ async def _headless(args) -> int:
         on_delta, on_event = _write, tee(event_log, None)
 
     # Headless: no confirm/select -> ASK tools that weren't pre-allowed are denied.
-    loop = AgentLoop(client, manager, registry, policy, cfg, cwd=str(Path.cwd()),
+    loop = AgentLoop(manager, registry, policy, cfg, cwd=str(Path.cwd()),
                      on_delta=on_delta, on_event=on_event)
     if view is not None:
         view.loop = loop
@@ -172,11 +171,11 @@ async def _headless(args) -> int:
 
 
 async def _interactive(args) -> int:
-    cfg, manager, client, registry = _assemble(args)
+    cfg, manager, registry = _assemble(args)
     from locode.ui.repl import Repl
 
     event_log = EventLog(args.log_events) if args.log_events else None
-    repl = Repl(cfg, client, manager, registry, yolo=args.yolo,
+    repl = Repl(cfg, manager, registry, yolo=args.yolo,
                 event_log=event_log)
     try:
         return await repl.run(splash=not args.no_splash)
