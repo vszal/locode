@@ -1,0 +1,20 @@
+build 153
+locode bench — 1 case(s) x 1 model(s) x 3 = 3 run(s)
+Each run drives a real model against a real workspace; this takes minutes, not seconds.
+
+[1/3] repro-only · qwen38 · run 1 …
+    ok  80s  5 iterations
+[2/3] repro-only · qwen38 · run 2 …
+    ok  82s  5 iterations
+[3/3] repro-only · qwen38 · run 3 …
+    ok  81s  5 iterations
+
+case              qwen38
+----------------  ----------------
+repro-only        ok       81s
+----------------  ----------------
+solved            3/3
+time-to-done/pass 81s
+iterations/pass   5
+
+qwen38: solved 3/3 in 81s.

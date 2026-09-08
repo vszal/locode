@@ -11714,3 +11714,91 @@ and §5.146's lesson (`ps -o rss` is worthless for Metal) has a twin: **the fix
 for RSS was `vmmap` physical footprint, but footprint is the wrong ceiling for
 the co-residency gate.** M6.2 budgets `weights x 1.15 + live KV` against the
 wired cap, and treats footprint as diagnostic only.
+
+## §5.148 — the bisect that measured nothing, and the flag it produced
+
+M6.1's exit run scored 12/12, matching the archive. One number underneath it had
+moved: `repro-only` had gone 5/5/5 (archive, build 153) to 7/7/7. A refactor
+landing on the same commit as a moved number is exactly the situation rule 88
+exists for, so I set out to attribute it by measurement.
+
+The instrument was a `git worktree` per build, with the bench driven from inside
+it. Five rungs:
+
+| build | runner from | repro-only iterations | time-to-done |
+|---|---|---|---|
+| 153 (archived, 2026-09-04) | main tree | 5, 5, 5 | 95 / 95 / 89 s |
+| 153 (control, today) | worktree | 5, 5, 5 | 80 / 82 / 81 s |
+| 154 | worktree | 5, **9**, 5 | 82 / 112 / 80 s |
+| 155 | worktree | 7, 7, 7 | 106 / 101 / 101 s |
+| 156 | worktree | 7, 7, 7 | 106 / 102 / 104 s |
+| 158 (pre-seam) | worktree | 7, 7, 7 | 100 / 102 / 102 s |
+| 160 (post-seam) | main tree | 7, 7, 7 | 101 / 105 / 105 s |
+
+It reads beautifully. The control reproduces the archive, so the box has not
+drifted; the step lands between 154 and 155; pre- and post-seam agree to the
+iteration, so the seam is exonerated. I wrote all of that down and committed it.
+
+**It is wrong, and the table is an artefact.** `run_case` spawns the agent as a
+subprocess with `cwd=<bench workspace>` (`locode/bench/runner.py:309`). The
+worktree is not on that child's path, and the editable install's meta-path
+finder outranks `PYTHONPATH` regardless, so the child imports whatever `locode/`
+is sitting in the main tree:
+
+```
+parent (cwd=worktree b153) -> build 153   .../scratchpad/b153/locode/__init__.py
+child  (cwd=tempdir)       -> build 160   /Users/vszalvay/Code/locode/locode/__init__.py
+```
+
+Every rung ran **the same agent**. The only thing the worktree varied was the
+*runner*, and the runner's one behavioural difference across those builds is the
+argv it constructs: `GRADED_MAX_ITERATIONS` arrived in build 155, so 153's and
+154's runners pass no `--max-iterations` and HEAD's default of **150** reaches
+the child, while 155+ pin **50**. That single bit decides a nudge:
+
+```python
+iter_frac = i / max_iterations                    # 3/150 = 0.020  vs  3/50 = 0.060
+if iter_frac < wallclock_frac * slow_progress_ratio:   # 63.9/600 * 0.5 = 0.053
+```
+
+At `i=3` the unpinned runs clear the threshold and the pinned runs do not. So
+"builds 153-154" fire `slow progress vs wallclock` and "builds 155+" do not —
+a clean two-level step manufactured entirely by a flag.
+
+The trajectories confirm it rather than the arithmetic alone. Two kept runs are
+identical through iteration 2 — same 257-char opening reply, same `read_file` +
+`ls`, same 148-char reply, same `edit_file` — and diverge the moment the nudge
+does or does not fire. Nudged, the model does the minimum: run the script,
+update the plan, stop (6 iterations). Un-nudged, it goes and *verifies*: a
+`git stash` A/B that errors, then a hand-written buggy-vs-fixed comparison, then
+the script (7 iterations). **The two "extra" iterations are the model doing more
+thorough work because nothing told it to hurry.** Which is worth knowing on its
+own: the slow-progress nudge is not a tiebreaker, it visibly changes what the
+model chooses to do.
+
+### What survives
+
+- **M6.1's exit criterion stands.** The archive (build 153, main tree) and the
+  seam run (build 160, main tree) were both genuine HEAD runs; 12/12 against
+  12/12 is a sound comparison. The seam is a pure refactor with 1493 tests green.
+- **The attribution does not.** The pre-seam experiment ran the seam. The 5 -> 7
+  shift between builds 153 and 160 is real and is now **unattributed**.
+- **154's lone instability** (5, 9, 5, the only variance in the whole sweep) is
+  explained too: 154 is the one build whose runner pins neither the iteration
+  ceiling nor `--progress-grant 0`, so its graded runs had an extendable
+  wallclock — the rule-91 hole that 844e018 closed.
+
+### The rule
+
+Coined as **rule 94** (worktrees do not change what `locode bench` measures;
+bisect with a venv per build, or not at all). Two things made this expensive to
+catch, and both are worth naming. The result was *plausible* — a monotone step
+with a coherent story and a control that behaved — and plausibility is what a
+spurious result feels like from the inside. And the check that would have caught
+it in one second is trivial: **have the child print `locode.__build__`.** The
+bisect scripts printed the build from the *parent*, which is precisely the
+process whose version did not matter.
+
+The corollary for rule 88: a same-day control is necessary but not sufficient.
+Today's 153 control did reproduce the archive's 5/5/5 and did prove the box had
+not drifted — and it was measuring HEAD the whole time.

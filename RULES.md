@@ -249,6 +249,24 @@ L5864). Same rule, refined in place, no amendment.
   worthless for Metal, off by 13 GB): `vmmap` footprint is the right way to see
   what a process holds, and the wrong ceiling to admit a second one. §5.147.
 
+- **Rule 94: A git worktree does not change what `locode bench` measures — the
+  agent child imports the editable install, so bisect with a venv per build or
+  not at all.** `run_case` spawns `python -m locode` with `cwd=<bench
+  workspace>` (`locode/bench/runner.py:309`). The worktree is nowhere on that
+  child's path, and the editable install's meta-path finder outranks
+  `PYTHONPATH` anyway (§5.146's install note), so the child resolves to
+  whatever `locode/` currently sits in the main tree. Verified directly: parent
+  at `cwd=<worktree b153>` imports build 153, child at `cwd=<tempdir>` imports
+  build 160. A five-rung worktree bisect (153/154/155/156/158) therefore varied
+  exactly one thing — the **runner's argv** — and produced a clean, plausible,
+  entirely spurious step: the two builds whose runners predate the
+  `--max-iterations 50` pin let HEAD's default of 150 through, which drops
+  `iter_frac = i/150` under the slow-progress ratio and fires a nudge that the
+  pinned builds never fire. The result looked like a code regression and was a
+  flag. To bisect the agent, `pip install -e` each worktree into its own venv
+  and run that venv's interpreter; to check whether you are being fooled, have
+  the case print `locode.__build__` from *inside* the child. §5.148.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -262,4 +280,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **94**.
+graders. Next free number: **95**.

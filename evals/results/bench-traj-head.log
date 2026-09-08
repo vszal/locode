@@ -1,0 +1,17 @@
+locode bench — 1 case(s) x 1 model(s) x 1 = 1 run(s)
+Each run drives a real model against a real workspace; this takes minutes, not seconds.
+
+[1/1] repro-only · qwen38 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-rdlv5e4c
+    ok  109s  7 iterations
+
+case              qwen38
+----------------  ----------------
+repro-only        ok      109s
+----------------  ----------------
+solved            1/1
+time-to-done      109s
+iterations        7
+
+qwen38: solved 1/1 in 109s.
+TRAJ-DONE

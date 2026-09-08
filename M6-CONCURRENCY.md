@@ -126,26 +126,39 @@ must be invisible to the ladder.
 > measured on an otherwise-idle box, and rule 89 still applies — correctness
 > gates before either number means anything.
 
-> **CLOSED 2026-09-08 — PASSED, and measured rather than argued.**
+> **CLOSED 2026-09-08 — PASSED on its stated criterion.**
 > `AgentLoop.__init__` no longer takes a `client`; `pytest -q` 1493 green;
 > `locode bench -m qwen38 --repeat 3` returned **12/12**, matching the archive
-> exactly (`evals/results/bench-m6.1-seam.log`).
+> (`evals/results/bench-m6.1-seam.log`). That is the exit criterion and it is met.
 >
-> One iteration count did move against the archive — repro-only 5/5/5 → 7/7/7
-> — so it was **attributed by measurement, not by assertion**. A build-158
-> (pre-seam) worktree ran the same case ×3:
+> **RETRACTED, same day: the "I proved the seam didn't cause it" claim.**
+> One archived number had moved (repro-only 5/5/5 -> 7/7/7), so I ran a
+> build-158 *pre-seam* worktree, got 7/7/7, and concluded the seam was
+> exonerated. That experiment was incapable of showing anything. `run_case`
+> launches the agent as a subprocess with `cwd=<bench workspace>`
+> (`locode/bench/runner.py:309`), so the child resolves `locode` through the
+> editable install — **HEAD** — not through the worktree its runner came from.
+> Measured directly:
 >
-> | build | repro-only iterations | time-to-done |
-> |---|---|---|
-> | 153 (archive) | 5, 5, 5 | 95 / 95 / 89 s |
-> | 158 (pre-seam) | 7, 7, 7 | 100 / 102 / 102 s |
-> | 160 (post-seam) | 7, 7, 7 | 101 / 105 / 105 s |
+> ```
+> parent (cwd=worktree) -> build 153   .../scratchpad/b153/locode/__init__.py
+> child  (cwd=tempdir)  -> build 160   /Users/vszalvay/Code/locode/locode/__init__.py
+> ```
 >
-> The shift predates the seam and the seam adds nothing to it: pre- and
-> post-seam are the same trajectory to the iteration. It arrived somewhere in
-> builds 154–158, and note that the *extra two iterations cost ~7s total* —
-> per-iteration cost fell from ~19s to ~14s, so this is the loop taking more,
-> cheaper steps, not the model working harder. Bisected further in §5.148.
+> The "pre-seam" run *ran the seam*. So did every rung of the bisect I built on
+> top of it (154, 155, 156, and the 153 control). The only thing those runs
+> varied was the **runner's argv**: 153/154 pass no `--max-iterations`, so
+> HEAD's default of 150 applied and the slow-progress nudge fired (`iter_frac =
+> i/150` clears the ratio where `i/50` does not); 155+ pin it to 50 and the
+> nudge stays quiet. That single bit explains the whole ladder, 154's lone
+> instability included. See §5.148 and rule 94.
+>
+> What survives: the seam is a pure refactor, reviewed, 1493 tests green, and
+> its bench run scored 12/12 against the archive's 12/12 — both measured on
+> real HEADs, so that comparison is sound. What does **not** survive: any claim
+> about *where* the 5 -> 7 shift came from. It is real (archive build 153 and
+> today's build 160 were both genuine HEAD runs) and it is **unattributed**.
+> Attributing it needs a per-worktree venv, not a worktree.
 
 ### M6.2 — Config and the memory gate
 
