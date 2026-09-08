@@ -1,0 +1,43 @@
+===== greedy cell b153flat  --prompt-cache-bytes 1610612736 =====
+locode bench — 1 case(s) x 1 model(s) x 2 = 2 run(s)
+endpoint: http://127.0.0.1:8081
+Each run drives a real model against a real workspace; this takes minutes, not seconds.
+
+[1/2] repro-only · qwen38 · run 1 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-dr2u1hjp
+    ok  105s  8 iterations
+[2/2] repro-only · qwen38 · run 2 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-a0zx2t7k
+    ok  105s  8 iterations
+
+case              qwen38
+----------------  ----------------
+repro-only        ok      105s
+----------------  ----------------
+solved            2/2
+time-to-done/pass 105s
+iterations/pass   8
+
+qwen38: solved 2/2 in 105s.
+===== greedy cell headmeasured  --prompt-cache-bytes 2875326464 =====
+locode bench — 1 case(s) x 1 model(s) x 2 = 2 run(s)
+endpoint: http://127.0.0.1:8081
+Each run drives a real model against a real workspace; this takes minutes, not seconds.
+
+[1/2] repro-only · qwen38 · run 1 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-pb3_2gku
+    ok  112s  8 iterations
+[2/2] repro-only · qwen38 · run 2 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-tqpkvln3
+    ok  114s  8 iterations
+
+case              qwen38
+----------------  ----------------
+repro-only        ok      113s
+----------------  ----------------
+solved            2/2
+time-to-done/pass 113s
+iterations/pass   8
+
+qwen38: solved 2/2 in 113s.
+GREEDY-DONE

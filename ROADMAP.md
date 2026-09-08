@@ -11802,3 +11802,136 @@ process whose version did not matter.
 The corollary for rule 88: a same-day control is necessary but not sufficient.
 Today's 153 control did reproduce the archive's 5/5/5 and did prove the box had
 not drifted — and it was measuring HEAD the whole time.
+
+## §5.149 — the null that ate three findings
+
+§5.148 ended with a corrected instrument and an obvious next question: with the
+worktrees discredited, what *did* move `repro-only` from the archive's 5-6
+iterations to today's 7-8? The answer, after four experiments, is **nothing
+did**. The metric has a noise band of 5-8 and every candidate cause sat inside
+it. This section records the chase because the failure modes repeated, and each
+one produced a confident claim before the evidence justified one.
+
+### The 2x2 that looked decisive
+
+Non-editable venv per build, child build printed from a tempdir into every log
+(the rule-94 check):
+
+| agent build | server | repro-only | time |
+|---|---|---|---|
+| 153 | warm — HEAD-launched, 2.68 GB | 7, 7, 7 | 104s |
+| 160 | warm — HEAD-launched, 2.68 GB | 7, 7, 7 | 103s |
+| 153 | cold — 153 launched it, 1.50 GB | 5, 6, 6 | 99s |
+| 160 | cold — 160 launched it, 2.68 GB | 8, 8, 8 | 110s |
+
+One row of this survives and it is the useful one: **both agent builds against
+the same server give the same answer.** The 153-warm run never killed the
+standing server, and rule 94 established that every prior worktree run imported
+build 160, so the server it inherited was necessarily HEAD-launched. Same
+server, different agent build, identical 7,7,7. Whatever moves the number is not
+in the agent diff.
+
+The rest of the table invited a story: the cold cells differ only in which
+manager wrote the server's argv, and builds 157/158 changed exactly that —
+`build_launch_argv` gained a measured `--prompt-cache-bytes` (2.68 GB) in place
+of the profile's flat figure (1.50 GB). Its own docstring warns that the flat
+number "clamps the eviction target to zero and wipes the cache on every
+request." Mechanism, motive, and a monotone table.
+
+### Claim 1, withdrawn: the cache budget mediates via the nudge
+
+Predicted before running: 1.50 GB wipes the cache, turns get slower, wallclock
+outruns iterations, the slow-progress nudge fires, the model does the minimum —
+so 5-6 iterations against 7-8. Held the agent at HEAD, hand-launched both
+servers, `LOCODE_MANAGE_SERVER=no` so the child could not relaunch with its own
+argv, `--keep` for the events.
+
+Result: **6,6,6 vs 8,8,7.** I called the prediction confirmed. It was not, on
+two counts.
+
+*The mechanism was absent.* All six runs nudged exactly once, at i=2, in both
+cells (`nudged_slow` is one-shot). Per-iteration gaps were near-identical —
+41.9s prefill then 10.6s in both. The 1.50 GB budget forced no eviction that
+cost time; both cells grew the cache to ~2.0 GB. Nothing in the proposed chain
+happened.
+
+*The design could not confirm anything.* `temperature = 0.3`, no seed. For a
+3-vs-3 rank test the smallest attainable exact p is 0.10, so the experiment had
+no power to reach significance however clean it looked — and the archived b154
+cell had already produced **5, 9, 5** under one fixed configuration.
+
+### The greedy probe: the flag is inert
+
+`XDG_CONFIG_HOME` redirected the child to a config copy with `temperature = 0.0`
+(the real config untouched), removing sampling entirely. Two runs per cell:
+
+```
+1.50GB dr2u1hjp: 8 iter  sha=db3f7925a2e9
+1.50GB a0zx2t7k: 8 iter  sha=db3f7925a2e9
+2.68GB pb3_2gku: 8 iter  sha=db3f7925a2e9
+2.68GB tqpkvln3: 8 iter  sha=db3f7925a2e9
+```
+
+All four byte-identical in tool sequence across both server configs. Two facts:
+greedy decoding here is **exactly reproducible**, and `--prompt-cache-bytes` at
+1.50 vs 2.68 GB changes model output **not at all**.
+
+### Claim 2, withdrawn: repeats within an invocation are correlated
+
+Greedy said inert; temperature 0.3 showed perfect separation (six runs at 5-6,
+twelve at 7-8). To reconcile them I proposed that repeats inside one bench call
+share server cache state and so are not independent — which would explain the
+tight within-cell clustering (7,7,7 / 6,6,6 / 8,8,8) and make invocation the
+unit of analysis. Plausible, and wrong: the powered run below produced
+within-invocation spreads of 3, 3, 2 and 0, 0, 0 indifferently. The clustering
+was luck.
+
+### The powered run: p = 0.651
+
+Five independent invocations per cell, server restarted for each, cells
+**alternated** so machine drift could not align with the variable, at the real
+`temperature = 0.3`:
+
+| cell | runs | invocation means | mean |
+|---|---|---|---|
+| 1.50 GB | 8,8 6,6 6,8 7,7 6,7 | 8.0, 6.0, 7.0, 7.0, 6.5 | 6.90 |
+| 2.68 GB | 8,5 8,8 5,8 7,8 8,7 | 6.5, 8.0, 6.5, 7.5, 7.5 | 7.20 |
+
+Difference **0.30 iterations**; exact permutation test on invocation means
+**p = 0.651** (164/252). Pooled range **5-8**, SD **1.05**, n=20.
+
+### What this retracts
+
+Three findings from §5.148 and today die together, all of them differences
+smaller than the noise band:
+
+- the five-rung build ladder (5-6 -> 7);
+- the warm/cold server split (7,7,7 vs 8,8,8 and 5,6,6);
+- the `--prompt-cache-bytes` split (6,6,6 vs 8,8,7).
+
+And a fourth, from §5.148's explanation rather than its data: the claim that the
+`--max-iterations` denominator flipped the nudge. It does not. The 60 s grace
+means the nudge can only fire at i=2, and there `2/50 = 0.040` and
+`2/150 = 0.013` both clear `(64.8/600) x 0.5 = 0.054`. I had evaluated the
+inequality at i=3, an iteration the grace period forecloses. Ten runs pinned at
+50 nudged, every one. §5.148's *core* — the editable install means a worktree
+measures HEAD — was verified directly and stands.
+
+### What survives
+
+- Both agent builds against one server agree at 7,7,7. The M6.1 seam is not
+  visible in the metric.
+- Greedy decoding is exactly reproducible on this box, so **configuration
+  comparisons belong at `temperature = 0.0`**, where one run per cell detects a
+  real difference and four runs proved a null that twenty runs at 0.3 could only
+  bound.
+- `repro-only` at 0.3 is a 5-8 band. Rule 95.
+
+### The pattern worth naming
+
+Three times today the same shape: a plausible mechanism, a monotone table, a
+claim, and only then the check that killed it. The instrument error in §5.148
+was caught by an independent measurement; both errors here were caught by asking
+for the mechanism *after* announcing the result. The order is the bug. A
+difference this size needed its noise band established first — one afternoon of
+20 runs would have foreclosed the entire chase on day one.

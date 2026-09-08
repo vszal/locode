@@ -1,0 +1,51 @@
+===== cell b153flat  --prompt-cache-bytes 1610612736 =====
+server argv: /opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly --host 127.0.0.1 --port 8081 --chat-template-args {"enable_thinking": false} --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 1610612736
+locode bench — 1 case(s) x 1 model(s) x 3 = 3 run(s)
+endpoint: http://127.0.0.1:8081
+Each run drives a real model against a real workspace; this takes minutes, not seconds.
+
+[1/3] repro-only · qwen38 · run 1 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-pqvwfgd6
+    ok  99s  6 iterations
+[2/3] repro-only · qwen38 · run 2 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-3650syr1
+    ok  104s  6 iterations
+[3/3] repro-only · qwen38 · run 3 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-7dgivmr3
+    ok  102s  6 iterations
+
+case              qwen38
+----------------  ----------------
+repro-only        ok      102s
+----------------  ----------------
+solved            3/3
+time-to-done/pass 102s
+iterations/pass   6
+
+qwen38: solved 3/3 in 102s.
+===== cell headmeasured  --prompt-cache-bytes 2875326464 =====
+server argv: /opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly --host 127.0.0.1 --port 8081 --chat-template-args {"enable_thinking": false} --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 2875326464
+locode bench — 1 case(s) x 1 model(s) x 3 = 3 run(s)
+endpoint: http://127.0.0.1:8081
+Each run drives a real model against a real workspace; this takes minutes, not seconds.
+
+[1/3] repro-only · qwen38 · run 1 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-8rc2ccki
+    ok  107s  8 iterations
+[2/3] repro-only · qwen38 · run 2 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-7mf0dveq
+    ok  104s  8 iterations
+[3/3] repro-only · qwen38 · run 3 …
+    workspace kept: /var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-bench-repro-only-1ewnmzj4
+    ok  124s  7 iterations
+
+case              qwen38
+----------------  ----------------
+repro-only        ok      112s
+----------------  ----------------
+solved            3/3
+time-to-done/pass 112s
+iterations/pass   8
+
+qwen38: solved 3/3 in 112s.
+CACHEBYTES-DONE

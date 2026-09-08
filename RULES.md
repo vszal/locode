@@ -259,13 +259,34 @@ L5864). Same rule, refined in place, no amendment.
   at `cwd=<worktree b153>` imports build 153, child at `cwd=<tempdir>` imports
   build 160. A five-rung worktree bisect (153/154/155/156/158) therefore varied
   exactly one thing — the **runner's argv** — and produced a clean, plausible,
-  entirely spurious step: the two builds whose runners predate the
-  `--max-iterations 50` pin let HEAD's default of 150 through, which drops
-  `iter_frac = i/150` under the slow-progress ratio and fires a nudge that the
-  pinned builds never fire. The result looked like a code regression and was a
-  flag. To bisect the agent, `pip install -e` each worktree into its own venv
-  and run that venv's interpreter; to check whether you are being fooled, have
-  the case print `locode.__build__` from *inside* the child. §5.148.
+  entirely spurious step. To bisect the agent, `pip install -e` each worktree
+  into its own venv and run that venv's interpreter; to check whether you are
+  being fooled, have the case print `locode.__build__` from *inside* the child.
+  §5.148. **Rider retracted 2026-09-08:** this rule first blamed the step on the
+  `--max-iterations` denominator (150 vs 50 flipping the slow-progress nudge).
+  That is false. The 60 s grace means the nudge can only fire at i=2, where
+  `2/50 = 0.040` and `2/150 = 0.013` both clear `(64.8/600) x 0.5 = 0.054`, and
+  ten runs pinned at 50 nudged — every one. The step was noise (rule 95). The
+  rule's *core* — worktrees measure HEAD — was verified directly and stands.
+  §5.149.
+
+- **Rule 95: Establish the noise band before attributing a difference to a
+  cause — `repro-only` at `temperature = 0.3` spans 5-8 iterations, so compare
+  configurations at `temperature = 0.0`, where the harness is exactly
+  reproducible.** Measured 2026-09-08: 20 runs across 10 alternating,
+  server-restarted invocations put the pooled range at 5-8 with SD 1.05, and a
+  deliberately-varied server flag moved the invocation mean by 0.30 iterations
+  at exact permutation p = 0.651. Three separate "findings" — a five-rung build
+  ladder, a warm/cold server split, and a `--prompt-cache-bytes` split — were
+  all smaller than that band and all died at once. Two design corollaries.
+  **Power first:** a 3-vs-3 rank test cannot return an exact p below 0.10, so
+  three repeats per cell can never reach significance no matter how cleanly the
+  cells separate; if the design cannot produce a significant result, do not run
+  it as though it can. **Greedy for mechanism:** set `temperature = 0.0` via a
+  config copy under `XDG_CONFIG_HOME` (never edit the user's config) and the
+  trajectory reproduces byte-for-byte — four such runs settled a question that
+  twenty stochastic runs could only bound. Ask for the mechanism *before*
+  announcing the result, not after. §5.149.
 
 ## Not a rule
 
@@ -280,4 +301,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **95**.
+graders. Next free number: **96**.

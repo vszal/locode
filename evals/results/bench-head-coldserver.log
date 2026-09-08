@@ -1,0 +1,22 @@
+CHILD IMPORTS BUILD 160
+mlx servers before:        0
+locode bench — 1 case(s) x 1 model(s) x 3 = 3 run(s)
+Each run drives a real model against a real workspace; this takes minutes, not seconds.
+
+[1/3] repro-only · qwen38 · run 1 …
+    ok  117s  8 iterations
+[2/3] repro-only · qwen38 · run 2 …
+    ok  108s  8 iterations
+[3/3] repro-only · qwen38 · run 3 …
+    ok  105s  8 iterations
+
+case              qwen38
+----------------  ----------------
+repro-only        ok      110s
+----------------  ----------------
+solved            3/3
+time-to-done/pass 110s
+iterations/pass   8
+
+qwen38: solved 3/3 in 110s.
+COLDHEAD-DONE

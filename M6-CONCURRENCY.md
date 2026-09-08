@@ -147,11 +147,13 @@ must be invisible to the ladder.
 >
 > The "pre-seam" run *ran the seam*. So did every rung of the bisect I built on
 > top of it (154, 155, 156, and the 153 control). The only thing those runs
-> varied was the **runner's argv**: 153/154 pass no `--max-iterations`, so
-> HEAD's default of 150 applied and the slow-progress nudge fired (`iter_frac =
-> i/150` clears the ratio where `i/50` does not); 155+ pin it to 50 and the
-> nudge stays quiet. That single bit explains the whole ladder, 154's lone
-> instability included. See §5.148 and rule 94.
+> varied was the **runner's argv** — and as of 2026-09-08 not even that explains
+> the ladder. The nudge fires under *both* denominators: the 60 s grace means it
+> can only fire at i=2, where `2/50 = 0.040` and `2/150 = 0.013` both clear
+> `(64.8/600) x 0.5 = 0.054`. Ten runs pinned at 50 nudged, every one. The
+> ladder was **sampling noise**: `repro-only` at `temperature = 0.3` spans 5-8
+> iterations (SD 1.05, n=20) and a 5 -> 7 step sits inside that band. See
+> §5.148-5.149 and rules 94-95.
 >
 > What survives: the seam is a pure refactor, reviewed, 1493 tests green, and
 > its bench run scored 12/12 against the archive's 12/12 — both measured on
