@@ -67,6 +67,36 @@ which case local concurrency is dead, `max_resident` on a Metal backend is
 pinned to 1 forever, and M6 becomes a purely multi-*endpoint* feature. Either
 outcome is a result; do not build past this step without one.
 
+> **CLOSED 2026-09-08 — PASSED, with a cost. (§5.147, rule 93.)**
+> Staged behind a watchdog that hard-killed both servers at 16.5 GB GPU-wired.
+> Stage 1 (`qwen06`+`sushicoder`, floor 12.48 G): 6 requests, 0 failures, peak
+> 11.65 G. Stage 2, the pair specced above: **20 requests over 30.4 minutes of
+> alternating 41k-context load, 0 failures, 0 aborts**, peak GPU-wired
+> **15.53 G** against the 18.0 G cap — 2.47 G still in hand. Footprints
+> plateaued and never resumed climbing. `max_resident` on Metal is **not**
+> pinned to 1; M6 is not reduced to multi-endpoint.
+>
+> Three findings the spike was not asked for, which change M6.2:
+> 1. **Co-residency taxes the neighbour 31%.** qwythos9 ran a steady-state
+>    152.9 s per request co-resident vs **116.9 s alone** — same prompt, same
+>    footprint, only the neighbour differs. Co-resident round 1 matched solo
+>    (115.4 s); the tax began at round 2, once the second model was fully
+>    resident, and the compressor peaked at 11.09 G against a 3.74 G median. It
+>    is memory pressure, not compute contention, so it worsens as a pair
+>    approaches the cap. Fine for M6.5 escalation (the weak model idles while
+>    the strong one runs); a bad trade for steady parallel serving.
+> 2. **Budget against wired, not footprint (rule 93).** Combined footprint was
+>    20.1 G — over the cap — while only 15.53 G was wired. `resident_fits` must
+>    use the wired ceiling or it will refuse pairs that demonstrably work.
+> 3. **The table below is a floor, and the guard does not enforce a floor.**
+>    Those `need` figures are weights x1.15 + one live sequence with the stored
+>    prompt-cache budget at zero. Charge each server the budget it actually
+>    gets (`_resident_cache_bytes`) and **no pair fits at all** — qwen38 alone
+>    is 17.96 G of 18.0. Co-residency and the prompt cache compete for the same
+>    bytes, and the cache is what buys the 175x reuse of §5.146. **§13.6(a) is
+>    reopened by this:** `max_resident > 1` is not merely a memory decision, it
+>    is a decision to run the pool cache-poor. M6.2 must choose explicitly.
+
 ### M6.1 — The seam
 
 Extract a `ModelBackendManager` Protocol (`locode/server/base.py`) from

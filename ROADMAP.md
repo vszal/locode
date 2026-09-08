@@ -11619,3 +11619,98 @@ Corollary worth keeping: the flat per-model `prompt_cache_bytes` profile figure
 is the thing that made this model-dependent in the first place. Build 157
 replaced it at launch time with the model's real measured shape, so the
 threshold is no longer a lottery on how well a hand-written profile guessed.
+
+## §5.147 — two servers on one GPU: it holds, and it costs 31%
+
+M6.0 was the blocking spike: *can two `mlx_lm.server` processes hold wired
+buffers on one Apple GPU?* Everything else in M6 assumed yes, and the failure
+mode is a kernel panic rather than an exception — `profiles.py` records two,
+both from a single model that overcommitted. So the spike gated the milestone,
+and the exit criterion was a fact either way.
+
+**The answer is yes, with a measured price.**
+
+### Before starting: the table was right, but for the wrong reason
+
+§1's co-residency figures were computed with the memory guard that §5.146 proved
+under-counts by ~2.8 GB on a hybrid model, so I recomputed them under build 158
+before sizing anything. The pair figures survived — `qwen06+qwythos9` still
+comes to 16.00 GB of an 18.0 GB cap — because that table was already a *floor*:
+weights x 1.15 plus **one live sequence**, with the stored prompt-cache budget
+at zero.
+
+What did not survive is the figure the guard actually enforces. Charge each
+server its own stored prompt-cache budget on top of its live sequence — what
+`_resident_cache_bytes` returns, and what a real `locode`-launched server gets —
+and **no pair fits at all**:
+
+| model | weights x1.15 | live seq | floor | + stored budget |
+|---|---|---|---|---|
+| qwen06 | 0.36 | 4.44 | 4.79 | 9.23 |
+| qwen4i | 2.43 | 5.70 | 8.13 | 13.83 |
+| sushicoder | 6.37 | 1.32 | 7.69 | 9.19 |
+| qwythos9 | 9.89 | 1.32 | 11.21 | 12.71 |
+| qwen38 | 12.61 | 2.68 | 15.29 | 17.96 |
+
+Four pairs fit at the floor (`qwen06+sushicoder` 12.48, `qwen06+qwen4i` 12.92,
+`qwen4i+sushicoder` 15.81, `qwen06+qwythos9` 16.00). Zero fit with stored
+budgets. **Co-residency and the prompt cache are competing for the same bytes**
+— and the prompt cache is what buys the 175x reuse measured in §5.146. That
+tension is not in the M6 plan and M6.2 has to resolve it deliberately: a
+concurrent pool either runs cache-poor, or runs one model.
+
+### The spike
+
+Staged, because 2 GB of headroom against an unrecoverable failure is not where
+you start. A watchdog outside both servers sampled `vm_stat` every 2s and
+hard-killed everything at a GPU-wired estimate of 16.5 GB — the abort path could
+not live inside a process whose failure mode is a panic.
+
+- **Stage 1** (`qwen06:8082` + `sushicoder:8081`, floor 12.48 GB): 6 requests,
+  6 minutes, **0 failures**, peak GPU-wired 11.65 GB. Two servers returned 200s
+  concurrently. Co-residency is mechanically real.
+- **Stage 2** (`qwen06:8082` + `qwythos9:8081`, floor 16.00 GB), the spec's
+  pair, the full alternating load: **20 requests over 30.4 minutes, 0 failures,
+  0 aborts.** Peak GPU-wired **15.53 GB**, median 12.33, against the 18.0 GB
+  cap — **2.47 GB of headroom left at the peak.** Footprints plateaued (qwen06
+  6.4 GB, qwythos9 13.8 GB) and never resumed climbing.
+
+**Exit criterion met, affirmatively: a recorded procedure survived 30 minutes
+of alternating 41k-context load.** `max_resident` on a Metal backend is not
+pinned to 1. M6 is not reduced to multi-endpoint.
+
+### What it costs — the part the spike was not asked for
+
+Co-resident, qwythos9 held a steady-state median of **152.9s** per 35,702-token
+request. I then killed qwen06 and re-ran the identical load against qwythos9
+alone: **115.9 / 117.4 / 116.9s**, median **116.9s**.
+
+**Co-residency taxes the large model 31%** (152.9 / 116.9 = 1.31x), for the same
+prompt, same footprint (13.8 vs 13.9 GB), same server process — the only
+variable is the neighbour.
+
+The causal detail is in the first round: co-resident round 1 took **115.4s**,
+indistinguishable from solo. The tax appeared only from round 2, once qwen06's
+6.3 GB was fully resident — and the compressor tells the same story, peaking at
+**11.09 GB** against a 3.74 GB median. This is not GPU compute contention; it is
+memory pressure. Which means the tax is a function of *how full the box is*, not
+of concurrency as such, and it will get worse as pairs approach the cap.
+
+So the honest verdict is narrower than "concurrency works": **two models fit,
+and buying the second one costs a third of the first one's throughput.** For
+M6.5's escalation workload — hand a stuck turn to a stronger model — that is
+probably still worth it, since the weak model is idle while the strong one runs.
+For steady parallel serving it is a bad trade on this hardware.
+
+### Rule 93 — budget against the wired cap, not the footprint
+
+The measurement that nearly produced the wrong answer. At steady state the two
+processes reported a **combined physical footprint of 20.1 GB** (6.4 + 13.7) —
+comfortably *over* the 18.0 GB cap — while running perfectly well, because only
+**15.53 GB of it was wired**. Footprint counts mapped-but-evictable pages; the
+`iogpu.wired_limit_mb` ceiling counts wired GPU buffers. Had `resident_fits`
+budgeted against footprint it would have refused a pair that demonstrably works,
+and §5.146's lesson (`ps -o rss` is worthless for Metal) has a twin: **the fix
+for RSS was `vmmap` physical footprint, but footprint is the wrong ceiling for
+the co-residency gate.** M6.2 budgets `weights x 1.15 + live KV` against the
+wired cap, and treats footprint as diagnostic only.

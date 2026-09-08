@@ -237,6 +237,18 @@ L5864). Same rule, refined in place, no amendment.
   test the mechanism directly, without the client-side layers (chat template,
   tokenizer round-trip) that can independently break a prefix. §5.146.
 
+- **Rule 93: On a Metal box, gate co-residency on the *wired* cap, never on
+  physical footprint.** They differ by gigabytes and disagree about whether a
+  pair fits: two co-resident servers reported a combined physical footprint of
+  **20.1 GB** — over the 18.0 GB `iogpu.wired_limit_mb` ceiling — while running
+  30 minutes of alternating 41k-context load without a failure, because only
+  **15.53 GB** of that was wired. Footprint counts mapped-but-evictable pages;
+  the cap counts wired GPU buffers, and the panic fires on the latter. Budget
+  `weights x overhead + live KV` against the wired cap and keep footprint as a
+  diagnostic. This does not soften §5.146's rule about `ps -o rss` (still
+  worthless for Metal, off by 13 GB): `vmmap` footprint is the right way to see
+  what a process holds, and the wrong ceiling to admit a second one. §5.147.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -250,4 +262,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **93**.
+graders. Next free number: **94**.
