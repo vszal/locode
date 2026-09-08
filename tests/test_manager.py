@@ -10,6 +10,7 @@ from locode.model.profiles import profile_for
 from locode.server.manager import (
     GB,
     SingleGpuManager,
+    resident_fits,
     build_launch_argv,
     context_tokens_for,
     kv_cache_bytes,
@@ -1017,3 +1018,71 @@ def test_the_launch_flag_stays_the_unpadded_budget(monkeypatch):
     monkeypatch.setattr(mod, "_model_config", lambda mid: _DEVSTRAL_CFG)
     prof = profile_for("x")
     assert m._cache_bytes("x", prof) < m._resident_cache_bytes("x", prof)
+
+
+# --- resident_fits: the co-residency gate (M6.2, measured in ROADMAP §5.147) --
+#
+# The figures below are the ones the M6.0 spike actually ran on this box:
+# 24 GB RAM, a 5 GB reserve, an 18.0 GB wired cap, and per-model floors of
+# weights x1.15 + one live KV sequence.
+_RAM, _RESERVE, _WIRED = 24 * GB, 5 * GB, 18 * GB
+_QWEN06, _QWYTHOS9, _QWEN38 = int(4.79 * GB), int(11.21 * GB), int(15.29 * GB)
+
+
+def test_an_empty_pool_trivially_fits():
+    ok, need, budget = resident_fits([], _RAM, _RESERVE, _WIRED)
+    assert ok and need == 0 and budget == _WIRED
+
+
+def test_one_model_agrees_with_memory_fits():
+    """The set gate must not disagree with the single-model gate about one
+    model, or the two would refuse different things at the same ceiling."""
+    single = mod.memory_fits(8 * GB, 2 * GB, _RAM, _RESERVE, overhead=1.0,
+                             wired_limit=_WIRED)
+    pooled = resident_fits([8 * GB + 2 * GB], _RAM, _RESERVE, _WIRED)
+    assert single == pooled
+
+
+def test_the_pair_the_spike_actually_ran_is_admitted():
+    """qwen06 + qwythos9 = 16.0 G of an 18.0 G cap — 20 requests over 30
+    minutes of alternating 41k-context load, zero failures (§5.147)."""
+    ok, need, budget = resident_fits([_QWEN06, _QWYTHOS9], _RAM, _RESERVE, _WIRED)
+    assert ok
+    assert need == _QWEN06 + _QWYTHOS9
+    assert budget == _WIRED
+
+
+def test_qwythos9_plus_qwen38_is_refused():
+    """M6.2's named refusal: 26.5 G against an 18.0 G cap. This is the pair
+    M6.5's own escalation workload wants, so the gate has to say no and the
+    feature has to reach for a remote backend instead."""
+    ok, need, _ = resident_fits([_QWYTHOS9, _QWEN38], _RAM, _RESERVE, _WIRED)
+    assert not ok
+    assert need > _WIRED
+
+
+def test_the_wired_cap_binds_tighter_than_ram_minus_reserve():
+    """On this box RAM−reserve is 19.0 G and the wired cap is 18.0 G. A pool
+    admitted by the looser number panics the GPU driver."""
+    pair = [_QWEN06, int(13.5 * GB)]           # 18.29 G: under 19.0, over 18.0
+    assert resident_fits(pair, _RAM, _RESERVE, None)[0] is True
+    assert resident_fits(pair, _RAM, _RESERVE, _WIRED)[0] is False
+
+
+def test_the_gate_counts_wired_bytes_not_physical_footprint():
+    """Rule 93. The spike's two servers reported a combined physical footprint
+    of 20.1 GB — over the ceiling — while running clean, because only 15.53 GB
+    of it was wired. Feeding footprint to this gate refuses a configuration
+    that demonstrably works, so callers must pass wired figures."""
+    footprint = [int(6.4 * GB), int(13.7 * GB)]      # 20.1 G, what vmmap reports
+    wired = [_QWEN06, _QWYTHOS9]                     # 16.0 G, what the cap counts
+    assert resident_fits(footprint, _RAM, _RESERVE, _WIRED)[0] is False
+    assert resident_fits(wired, _RAM, _RESERVE, _WIRED)[0] is True
+
+
+def test_a_negative_need_cannot_buy_headroom_for_its_neighbour():
+    """An unknown/garbage size must not subtract from the total and let a
+    genuinely too-large model in alongside it."""
+    ok, need, _ = resident_fits([-(50 * GB), _QWEN38, _QWEN38], _RAM, _RESERVE, _WIRED)
+    assert not ok
+    assert need == 2 * _QWEN38

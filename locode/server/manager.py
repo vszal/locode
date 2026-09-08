@@ -641,6 +641,34 @@ def memory_fits(model_bytes: int, cache_bytes: int, total_ram: int,
     return need <= budget, need, budget
 
 
+def resident_fits(needs: list[int], total_ram: int, reserve_bytes: int,
+                  wired_limit: int | None = None):
+    """Pure: does this SET of models fit co-resident under the memory ceiling?
+
+    `memory_fits` asks the question for one model; this asks it for a pool.
+    Each entry in `needs` is one backend's already-computed requirement —
+    weights x overhead plus the KV cache that backend will actually hold —
+    because backends size their caches differently and the caller (not this
+    function) knows which figure applies to which endpoint.
+
+    **The ceiling is the wired cap, never physical footprint (rule 93).** Two
+    co-resident servers were measured at a combined 20.1 GB footprint — over
+    this box's 18.0 GB ceiling — while running 30 minutes of alternating
+    41k-context load without a failure, because only 15.53 GB of that was
+    wired. Budgeting on footprint refuses pairs that demonstrably work; the
+    panic fires on wired bytes, so those are what we count. See ROADMAP §5.147.
+
+    An empty set trivially fits. Returns (ok, estimated_need_bytes,
+    budget_bytes), the same shape `memory_fits` returns, so callers and error
+    messages can treat the one-model and many-model cases alike.
+    """
+    need = sum(max(int(n), 0) for n in needs)
+    budget = total_ram - reserve_bytes
+    if wired_limit is not None:
+        budget = min(budget, wired_limit)
+    return need <= budget, need, budget
+
+
 def term_wait_for(weight_bytes: int | None, base: float = 6.0) -> float:
     """Pure: seconds to let a SIGTERM'd server exit, given its weight size.
     Unknown size falls back to `base` — we only ever *extend* the wait on

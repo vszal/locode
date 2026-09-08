@@ -1,0 +1,40 @@
+locode bench — 4 case(s) x 1 model(s) x 3 = 12 run(s)
+Each run drives a real model against a real workspace; this takes minutes, not seconds.
+
+[1/12] exec-pinpoint · qwen38 · run 1 …
+    ok  130s  5 iterations
+[2/12] exec-pinpoint · qwen38 · run 2 …
+    ok  119s  5 iterations
+[3/12] exec-pinpoint · qwen38 · run 3 …
+    ok  119s  5 iterations
+[4/12] exec-bugfix · qwen38 · run 1 …
+    ok  120s  5 iterations
+[5/12] exec-bugfix · qwen38 · run 2 …
+    ok  120s  5 iterations
+[6/12] exec-bugfix · qwen38 · run 3 …
+    ok  120s  5 iterations
+[7/12] repro-only · qwen38 · run 1 …
+    ok  101s  7 iterations
+[8/12] repro-only · qwen38 · run 2 …
+    ok  105s  7 iterations
+[9/12] repro-only · qwen38 · run 3 …
+    ok  105s  7 iterations
+[10/12] multi-defect-blind · qwen38 · run 1 …
+    ok  176s  10 iterations
+[11/12] multi-defect-blind · qwen38 · run 2 …
+    ok  150s  6 iterations
+[12/12] multi-defect-blind · qwen38 · run 3 …
+    ok  162s  12 iterations
+
+case                qwen38
+------------------  ----------------
+exec-pinpoint       ok      123s
+exec-bugfix         ok      120s
+repro-only          ok      103s
+multi-defect-blind  ok      163s
+------------------  ----------------
+solved              12/12
+time-to-done/pass   509s
+iterations/pass     26
+
+qwen38: solved 12/12 in 509s.
