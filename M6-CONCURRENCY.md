@@ -126,6 +126,27 @@ must be invisible to the ladder.
 > measured on an otherwise-idle box, and rule 89 still applies — correctness
 > gates before either number means anything.
 
+> **CLOSED 2026-09-08 — PASSED, and measured rather than argued.**
+> `AgentLoop.__init__` no longer takes a `client`; `pytest -q` 1493 green;
+> `locode bench -m qwen38 --repeat 3` returned **12/12**, matching the archive
+> exactly (`evals/results/bench-m6.1-seam.log`).
+>
+> One iteration count did move against the archive — repro-only 5/5/5 → 7/7/7
+> — so it was **attributed by measurement, not by assertion**. A build-158
+> (pre-seam) worktree ran the same case ×3:
+>
+> | build | repro-only iterations | time-to-done |
+> |---|---|---|
+> | 153 (archive) | 5, 5, 5 | 95 / 95 / 89 s |
+> | 158 (pre-seam) | 7, 7, 7 | 100 / 102 / 102 s |
+> | 160 (post-seam) | 7, 7, 7 | 101 / 105 / 105 s |
+>
+> The shift predates the seam and the seam adds nothing to it: pre- and
+> post-seam are the same trajectory to the iteration. It arrived somewhere in
+> builds 154–158, and note that the *extra two iterations cost ~7s total* —
+> per-iteration cost fell from ~19s to ~14s, so this is the loop taking more,
+> cheaper steps, not the model working harder. Bisected further in §5.148.
+
 ### M6.2 — Config and the memory gate
 
 `[serving]` in `config.py` + `config.toml.example` (same change, per AGENTS.md):
