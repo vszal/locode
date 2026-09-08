@@ -141,3 +141,66 @@ def test_ui_defaults_and_toml_override(tmp_path):
     assert cfg.ui.markdown is False
     assert cfg.ui.timing is False
     assert cfg.ui.spinner is True   # untouched default survives
+
+
+# --- [serving] (M6.2) ------------------------------------------------------
+
+def test_serving_defaults_are_single_mode():
+    """Defaults must BE single mode: concurrent is opt-in, and so is
+    co-residency within it."""
+    cfg = Config()
+    assert cfg.serving.mode == "single"
+    assert cfg.serving.max_resident == 1
+    assert cfg.serving.max_inflight == 1
+    assert cfg.serving.router == "pin"
+    assert cfg.serving.backends == []
+
+
+def test_serving_backends_array_of_tables(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text(textwrap.dedent("""
+        [serving]
+        mode = "concurrent"
+        max_resident = 2
+
+        [[serving.backends]]
+        id = "local"
+        base_url = "http://127.0.0.1:8081"
+        managed = true
+        prompt_cache_gb = 3.5
+
+        [[serving.backends]]
+        id = "lan"
+        base_url = "http://10.0.0.5:8081"
+        managed = false
+    """))
+    cfg = Config.load(p)
+    assert cfg.serving.mode == "concurrent"
+    assert cfg.serving.max_resident == 2
+    assert [b.id for b in cfg.serving.backends] == ["local", "lan"]
+    assert cfg.serving.backends[0].prompt_cache_gb == 3.5
+    assert cfg.serving.backends[0].managed is True
+    assert cfg.serving.backends[1].managed is False
+    # undeclared budget stays 0.0, the sentinel for "use the automatic split"
+    assert cfg.serving.backends[1].prompt_cache_gb == 0.0
+
+
+def test_serving_backends_ignores_unknown_keys(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text(textwrap.dedent("""
+        [[serving.backends]]
+        id = "local"
+        nonsense = 42
+    """))
+    cfg = Config.load(p)
+    assert len(cfg.serving.backends) == 1
+    assert cfg.serving.backends[0].id == "local"
+    assert not hasattr(cfg.serving.backends[0], "nonsense")
+
+
+def test_serving_table_without_backends_keeps_the_default_list(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text("[serving]\nmode = \"concurrent\"\n")
+    cfg = Config.load(p)
+    assert cfg.serving.mode == "concurrent"
+    assert cfg.serving.backends == []

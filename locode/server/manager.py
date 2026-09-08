@@ -669,6 +669,40 @@ def resident_fits(needs: list[int], total_ram: int, reserve_bytes: int,
     return need <= budget, need, budget
 
 
+def resident_cache_bytes(declared_gb: float, solo_bytes: int,
+                         live_sequence_bytes: int, n_resident: int) -> int:
+    """Pure: the --prompt-cache-bytes one backend gets in a pool of `n_resident`.
+
+    This is M6.2's decision (c), answered 2026-09-08. A declared
+    `prompt_cache_gb` is charged **as written** — the memory gate and the server
+    launch both use it — because the failure mode here is a GPU panic rather
+    than an exception (rule 93), so the number that decides co-residency should
+    be a number somebody chose.
+
+    Absent (0.0), the backend falls back to (b)'s automatic 1/N split, which may
+    only ever **shrink** what a server would get alone, never grow it. That is
+    what makes `mode = "concurrent", max_resident = 1` byte-identical to single
+    mode: at n=1 the split returns the solo budget untouched.
+
+    The split is floored at ONE LIVE SEQUENCE, and that floor is not a rounding
+    detail. mlx evicts with `trim_to(max(0, total - active))`, so a budget below
+    a single live sequence clamps the eviction target to zero and wipes every
+    stored cache on every request (ROADMAP §5.144) — a "share" under that floor
+    buys no co-residency, it just destroys the reuse the cache exists for. At
+    the default `prompt_cache_multiple = 1.0` the solo budget IS one live
+    sequence, so the floor binds immediately for any n > 1: there is no cache
+    budget to split until a user raises that multiple. Splitting is a knob for
+    someone who has already bought slack, and the gate refusing a pair is the
+    honest outcome otherwise.
+    """
+    if declared_gb > 0:
+        return int(declared_gb * GB)
+    if n_resident <= 1:
+        return max(int(solo_bytes), 0)
+    share = max(int(solo_bytes), 0) // n_resident
+    return max(share, max(int(live_sequence_bytes), 0))
+
+
 def term_wait_for(weight_bytes: int | None, base: float = 6.0) -> float:
     """Pure: seconds to let a SIGTERM'd server exit, given its weight size.
     Unknown size falls back to `base` — we only ever *extend* the wait on

@@ -10,6 +10,7 @@ from locode.model.profiles import profile_for
 from locode.server.manager import (
     GB,
     SingleGpuManager,
+    resident_cache_bytes,
     resident_fits,
     build_launch_argv,
     context_tokens_for,
@@ -1086,3 +1087,57 @@ def test_a_negative_need_cannot_buy_headroom_for_its_neighbour():
     ok, need, _ = resident_fits([-(50 * GB), _QWEN38, _QWEN38], _RAM, _RESERVE, _WIRED)
     assert not ok
     assert need == 2 * _QWEN38
+
+
+# --- resident_cache_bytes: M6.2 decision (c), answered 2026-09-08 ----------
+# A declared prompt_cache_gb is charged as written; absent, the backend gets an
+# automatic 1/N split that may only shrink, floored at one live sequence.
+
+_LIVE = int(1.8 * GB)          # one live sequence at our peak context
+_SOLO = int(3.6 * GB)          # what this backend gets alone (multiple = 2.0)
+
+
+def test_a_declared_budget_is_charged_exactly_as_written():
+    assert resident_cache_bytes(4.0, _SOLO, _LIVE, 3) == int(4.0 * GB)
+
+
+def test_a_declared_budget_ignores_the_split_entirely():
+    """Declared means declared: N does not touch it. That is the whole point of
+    (c) — the number the gate charges is one a person chose."""
+    solo = [resident_cache_bytes(2.0, _SOLO, _LIVE, n) for n in (1, 2, 4, 9)]
+    assert solo == [int(2.0 * GB)] * 4
+
+
+def test_one_resident_returns_the_solo_budget_untouched():
+    """This is what makes mode=concurrent, max_resident=1 identical to single
+    mode — the exit criterion for M6.2."""
+    assert resident_cache_bytes(0.0, _SOLO, _LIVE, 1) == _SOLO
+
+
+def test_the_split_shrinks_when_there_is_slack_to_shrink():
+    assert resident_cache_bytes(0.0, _SOLO, _LIVE, 2) == _SOLO // 2
+
+
+def test_the_split_never_grows_a_budget():
+    for n in (1, 2, 3, 5, 8):
+        assert resident_cache_bytes(0.0, _SOLO, _LIVE, n) <= _SOLO
+
+
+def test_the_split_is_floored_at_one_live_sequence():
+    """Below one live sequence mlx's trim_to(max(0, total - active)) clamps to
+    zero and wipes every stored cache on each request (§5.144). A share under
+    the floor buys no co-residency, it only destroys reuse."""
+    assert resident_cache_bytes(0.0, _SOLO, _LIVE, 8) == _LIVE
+
+
+def test_at_the_default_multiple_there_is_nothing_to_split():
+    """server.prompt_cache_multiple = 1.0 makes the solo budget exactly one live
+    sequence, so the floor binds for any N > 1: splitting is a knob for someone
+    who has already bought slack, and refusing the pair is the honest outcome."""
+    for n in (2, 3, 4):
+        assert resident_cache_bytes(0.0, _LIVE, _LIVE, n) == _LIVE
+
+
+def test_a_negative_solo_budget_cannot_go_below_the_floor():
+    assert resident_cache_bytes(0.0, -1, _LIVE, 2) == _LIVE
+    assert resident_cache_bytes(0.0, -1, _LIVE, 1) == 0

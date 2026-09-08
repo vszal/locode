@@ -226,7 +226,24 @@ machine, and the failure is not recoverable in-process.
 > absent.** The reason is rule 93's reason — the failure mode here is a GPU
 > panic, not an exception — so the number the gate charges should be a number
 > someone chose, and the automatic split should only ever *shrink* what a
-> server asks for, never grow it. Not implemented pending an answer.
+> server asks for, never grow it.
+>
+> **ANSWERED (c), 2026-09-08. Implemented in build 161.** `[serving]` and
+> `[[serving.backends]]` are in `config.py` and `config.toml.example`;
+> `resident_cache_bytes` (beside `resident_fits`) charges a declared
+> `prompt_cache_gb` as written and otherwise applies the shrink-only 1/N split.
+> 1505 tests green.
+>
+> One consequence fell out of writing it and is worth stating, because it makes
+> (b) narrower than it looked: **the split is floored at one live sequence**,
+> since below that mlx's `trim_to(max(0, total - active))` clamps to zero and
+> wipes every stored cache on each request (§5.144) — a share under the floor
+> buys no co-residency, it only destroys the reuse. At the default
+> `prompt_cache_multiple = 1.0` the solo budget *is* one live sequence, so the
+> floor binds immediately for any N > 1: **there is nothing to split until the
+> user raises that multiple.** Automatic splitting is a knob for someone who has
+> already bought slack; for everyone else the gate refuses the pair, which is
+> finding 3 restated and the honest outcome.
 
 **Exit:** `resident_fits` unit-tested against the six-model table above,
 including the `qwythos9+qwen38` refusal; `config.toml.example` documents every

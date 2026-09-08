@@ -74,6 +74,40 @@ class ServerConfig:
 
 
 @dataclass
+class BackendConfig:
+    """One model-serving endpoint in a concurrent pool.
+
+    `prompt_cache_gb` is the M6.2 decision (c): the prompt-cache budget this
+    backend is *charged by the memory gate and launched with*. Written by a
+    person, because on this platform a wrong number panics the GPU driver
+    rather than raising (rule 93), so the figure that decides co-residency
+    should be one somebody chose. 0.0 means "not declared" and hands the
+    backend to the automatic 1/N split — see `resident_cache_bytes`.
+    """
+    id: str = ""
+    base_url: str = ""
+    managed: bool = True
+    prompt_cache_gb: float = 0.0
+
+
+@dataclass
+class ServingConfig:
+    """Concurrent serving. Defaults are single-mode behaviour, exactly.
+
+    `mode = "concurrent"` with nothing else set gets routing and no more: one
+    resident model, one in-flight request, every other behaviour identical to
+    single mode. Nothing is inferred from detected hardware — on macOS a wrong
+    inference panics the machine and the failure is not recoverable in-process,
+    so co-residency is opt-in by an explicit `max_resident`.
+    """
+    mode: str = "single"          # "single" | "concurrent"
+    max_resident: int = 1         # cap; resident_fits() is the real gate
+    max_inflight: int = 1
+    router: str = "pin"           # "pin" | "balance"
+    backends: list[BackendConfig] = field(default_factory=list)
+
+
+@dataclass
 class ModelConfig:
     # qwen38 (Qwen3.8-27B, 3-bit, ~11 GB) is the out-of-box default as of
     # 2026-09-06. It beat the previous default qwythos9 on `repro-only` — the one
@@ -476,6 +510,7 @@ class UIConfig:
 @dataclass
 class Config:
     server: ServerConfig = field(default_factory=ServerConfig)
+    serving: ServingConfig = field(default_factory=ServingConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
     permissions: PermissionsConfig = field(default_factory=PermissionsConfig)
@@ -501,6 +536,13 @@ class Config:
 
     def _merge_toml(self, raw: dict[str, Any]) -> None:
         _assign(self.server, raw.get("server", {}))
+        # [serving] is flat except for [[serving.backends]], an array of
+        # tables that _assign cannot build (it only sets scalar fields).
+        serving = dict(raw.get("serving", {}))
+        backends = serving.pop("backends", None)
+        _assign(self.serving, serving)
+        if backends is not None:
+            self.serving.backends = [_backend(b) for b in backends]
         _assign(self.model, raw.get("model", {}))
         _assign(self.agent, raw.get("agent", {}))
         _assign(self.editor, raw.get("editor", {}))
@@ -593,6 +635,13 @@ def _read_toml(path: Path) -> dict[str, Any]:
     except (OSError, tomllib.TOMLDecodeError):
         # A broken config shouldn't prevent startup; fall back to defaults.
         return {}
+
+
+def _backend(data: dict[str, Any]) -> BackendConfig:
+    """One [[serving.backends]] table -> BackendConfig, ignoring extra keys."""
+    b = BackendConfig()
+    _assign(b, data)
+    return b
 
 
 def _assign(obj: Any, data: dict[str, Any]) -> None:

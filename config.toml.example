@@ -47,6 +47,51 @@ memory_reserve_gb = 5.0
 # floor, so this never lowers a model's budget.
 prompt_cache_multiple = 1.0
 
+[serving]
+# Concurrent serving (M6). The defaults ARE single-mode behaviour: setting
+# mode = "concurrent" and nothing else gets you routing and no more — one
+# resident model, one in-flight request, everything else identical. Nothing is
+# inferred from detected hardware, because on macOS a wrong guess panics the GPU
+# driver rather than raising, and that failure is not recoverable in-process.
+mode = "single"        # "single" | "concurrent"
+# How many models may be RESIDENT at once. This is a cap the user opts into, not
+# the gate: resident_fits() still budgets the set against the tighter of
+# (RAM − server.memory_reserve_gb) and the macOS wired cap, and refuses a set
+# that doesn't fit. Co-residency also taxes the neighbour — two models measured
+# 152.9 s/request co-resident vs 116.9 s alone, memory pressure that worsens as
+# the pair approaches the cap. See ROADMAP §5.147.
+max_resident = 1
+max_inflight = 1       # requests in flight across the pool
+router = "pin"         # "pin" = alias sticks to a backend | "balance"
+
+# One table per endpoint. Omit the whole array to serve from [server] alone.
+# [[serving.backends]]
+# id = "local"
+# base_url = "http://127.0.0.1:8081"
+# managed = true       # locode owns the process (may start/stop/switch it)
+#
+# prompt_cache_gb: the prompt-cache budget this backend is CHARGED BY THE GATE
+#   and LAUNCHED WITH. Declared by a person on purpose — the number that decides
+#   co-residency should be one somebody chose, because getting it wrong panics
+#   the driver instead of raising an exception.
+#
+#   Omit it (or 0.0) and the backend gets an automatic 1/N split of what it
+#   would have had alone. That split may only ever SHRINK a server's budget,
+#   never grow it, which is why max_resident = 1 is byte-identical to single
+#   mode. The split is floored at one live sequence: below that, mlx's
+#   trim_to(max(0, total − active)) clamps to zero and wipes every stored cache
+#   on every request (§5.144), so a smaller "share" buys no co-residency, it
+#   just destroys the reuse. At the default server.prompt_cache_multiple = 1.0
+#   the solo budget IS one live sequence, so that floor binds immediately for
+#   any N > 1 — there is nothing to split until you raise the multiple. Raise it
+#   first, or declare a figure here, or expect the gate to refuse the pair.
+# prompt_cache_gb = 0.0
+#
+# [[serving.backends]]
+# id = "lan"
+# base_url = "http://10.0.0.5:8081"
+# managed = false      # not ours to start, stop, or budget
+
 [model]
 default = "qwen38"     # alias (or full "org/model" id) to load at startup
 #   Qwen3.8-27B 3-bit, ~11 GB. Beat qwythos9 on the one eval case with
