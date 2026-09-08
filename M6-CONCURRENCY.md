@@ -186,6 +186,33 @@ and no parallelism — every other behaviour identical to single mode. Nothing i
 inferred from detected hardware: on this platform a wrong inference panics the
 machine, and the failure is not recoverable in-process.
 
+> **Half done, 2026-09-08.** `resident_fits` is landed and unit-tested
+> (build 160, `tests/test_manager.py`), including the `qwythos9+qwen38`
+> refusal, the pair the spike actually ran, the wired cap binding tighter than
+> RAM−reserve, and a rule-93 case pinning that footprint figures must not be
+> fed to it. The `[serving]` table is **deliberately not written yet** — it is
+> an on-disk format (AGENTS.md: ask), and finding 3 above changed what its
+> defaults have to mean.
+>
+> **The decision, stated so it can be answered in one line.** `resident_fits`
+> charges each model a *floor*: weights x1.15 plus one live sequence, stored
+> prompt cache at zero. Charge the stored cache each server actually gets and
+> nothing co-resides — qwen38 alone is 17.96 G of 18.0. So `max_resident > 1`
+> cannot mean "fit two models as they are configured today"; it has to mean one
+> of:
+>
+> | | what it means | cost |
+> |---|---|---|
+> | **(a) refuse** | charge the full cache budget; on this box no pair is ever admitted | honest, and `max_resident > 1` becomes dead config here |
+> | **(b) split** | N resident models each get `1/N` of the cache budget, automatically | the pool silently goes cache-poor; §5.146's 175x reuse is what pays for it |
+> | **(c) declare** | per-backend `prompt_cache_gb` in `[[serving.backends]]`; `resident_fits` charges what is written | one more knob, but the trade is visible in the file the user edits |
+>
+> **Recommended: (c), with (b)'s split as the default when the field is
+> absent.** The reason is rule 93's reason — the failure mode here is a GPU
+> panic, not an exception — so the number the gate charges should be a number
+> someone chose, and the automatic split should only ever *shrink* what a
+> server asks for, never grow it. Not implemented pending an answer.
+
 **Exit:** `resident_fits` unit-tested against the six-model table above,
 including the `qwythos9+qwen38` refusal; `config.toml.example` documents every
 field; a `mode=concurrent, max_resident=1` run is indistinguishable from single.
