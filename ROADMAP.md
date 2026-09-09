@@ -12015,6 +12015,20 @@ if its scale has one step.
 The three finest scales in the repo are all unshipped, and all three are the
 document/e2e cases the archive records below ceiling.
 
+**Counting outcomes overstates resolution, though, and §5.136 already showed
+how.** `e2e-spec-to-code`'s ten outcome checks are eight *scaffolding* checks
+(did a file get written, does it contain a keyword) and two *substantive* ones
+(`own_tests_pass`, `independent_spec_check`). Eight passed 12/12 and two failed
+12/12: a constant 0.800, dynamic range zero, at ~50 minutes of GPU per arm. Its
+real scale is two steps, not ten, and `plan-doc` and `design-doc` are built from
+the same keyword-presence material, so they are suspect the same way until
+measured. A guard is a check true of the *seed*; a scaffolding check is one true
+of any model that produces plausible-looking output without doing the work. Rule
+90 catches the first by declaration. The second is invisible to it — §5.136 put
+it exactly right: the check is fine, the weighting is not — and only a sweep
+that watches which checks move can tell them apart. That is what §5.151 must
+report per check, not just per case.
+
 ### 3. The aider comparison table is wrong, in locode's favour
 
 §5.136's headline table reads "three decisive wins, one narrow loss", with aider
