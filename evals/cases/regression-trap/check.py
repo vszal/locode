@@ -116,6 +116,12 @@ BEHAVIOURS = ["lookup_ignores_case", "labels_preserve_entered_case",
               "lookup_folds_case_and_whitespace", "missing_lookup_returns_none"]
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"labels_preserve_entered_case", "whitespace_still_collapsed", "missing_lookup_returns_none", "did_not_edit_tests"}
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     got = _probe(ctx)
     results = {name: bool(got.get(name)) for name in BEHAVIOURS}

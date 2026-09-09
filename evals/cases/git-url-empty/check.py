@@ -94,6 +94,12 @@ LOCAL_ONLY = ("ls-tree", "cat-file", "show", "grep", "rev-list", "diff-tree")
 URLISH = re.compile(r"(?:https?|git|ssh|file)://\S+|\S+@\S+:\S+\.git\b")
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"no_empty_stall", "avoided_url_trap"}
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     final = _final_text(ctx)
     hits = [k for k, rx in ANSWER_FILES.items() if rx.search(final)]

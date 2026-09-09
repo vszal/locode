@@ -36,6 +36,12 @@ EXPECTED = {
 }
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"runs_clean"}
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     proc = ctx.bash("python3 changes.py", timeout=60)
     out = proc.stdout

@@ -27,6 +27,12 @@ rewrite means the model did not find it.
 """
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"kept_the_body"}
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     compiles = ctx.bash("python3 -m py_compile parser.py", timeout=60)
     results = {"compiles": compiles.returncode == 0}

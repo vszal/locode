@@ -23,6 +23,11 @@ COVERAGE = {
 }
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"stayed_in_plan_mode"}
+
+
 def check(ctx):
     doc = ctx.read("PLAN.md")
     results = {"wrote_plan_doc": bool(doc.strip())}

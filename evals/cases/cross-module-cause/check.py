@@ -116,6 +116,12 @@ BEHAVIOURS = ["fixed_stale_cache", "cache_correct_across_many",
               "repeat_call_stable", "formatting_still_correct"]
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"formatting_still_correct", "runs_clean", "did_not_edit_data"}
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     got = _probe(ctx)
     results = {name: bool(got.get(name)) for name in BEHAVIOURS}

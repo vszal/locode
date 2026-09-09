@@ -11,6 +11,12 @@ import re
 EXPECTED_TESTS = 14
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"suite_intact", "did_not_edit_tests"}
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     proc = ctx.bash("python3 -m pytest -q 2>&1 | tail -15", timeout=180)
     blob = proc.stdout + proc.stderr

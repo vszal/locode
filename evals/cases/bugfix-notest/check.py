@@ -60,6 +60,12 @@ EXPECTED_TOTAL = 226.00
 LAST_ROW_ONLY = {"Bakery": 12.00, "Dairy": 15.00, "Produce": 10.00, "Snacks": 15.00}
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"did_not_edit_data"}
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     proc = ctx.bash("python3 tally.py 2>&1", timeout=60)
     out = proc.stdout + proc.stderr

@@ -99,6 +99,12 @@ BEHAVIOURS = ["fixed_thousands_separator", "fixed_running_balance",
               "fixed_category_ranking", "fixed_month_key", "fixed_even_split"]
 
 
+# Rule 90: these are true of the UNTOUCHED seed, so they cannot be earned.
+# They veto the run to 0.0 when broken instead of paying a floor (ROADMAP 5.150).
+GUARDS = {"did_not_edit_tests"}
+DERIVED = {"fully_fixed"}
+
+
 def check(ctx):
     got = _probe(ctx)
     results = {name: bool(got.get(name)) for name in BEHAVIOURS}
