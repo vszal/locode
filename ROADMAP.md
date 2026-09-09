@@ -12738,3 +12738,75 @@ express a partial result, at a rate of **one partial run in twelve**. Against a
 suite where the number was previously zero in every sweep, that is progress and
 it is not yet enough to discriminate models. `contract-spread` is flat at 6/6 and
 should be understood as a length test, not a difficulty test.
+
+## §5.157 — rule 97 run over the whole archive: none of the four shipped cases can be analysed (2026-09-08)
+
+§5.156 amended rule 97 into a sweep-accumulation rule. `checkdeps._load` already
+pools across every directory handed to it, so the amended rule was executable
+immediately — no new instrument needed:
+
+```
+python evals/checkdeps.py evals/results/*/     # 69 sweeps, 1061 runs
+```
+
+### Five of twenty cases have enough mixed runs to say anything
+
+| case | k | mixed / runs | effective | dead weight |
+|---|---|---|---|---|
+| exec-stall-trap | 3 | 58/129 | 1 | 67% |
+| bugfix-notest | 5 | 13/32 | 2 | 40% |
+| plan-doc | 13 | 37/60 | 8 | 31% |
+| design-doc | 14 | 14/63 | 9 | 14% |
+| e2e-spec-to-code | 10 | 143/147 | 8 | 10% |
+
+Every case that can be analysed has dead weight, from a tenth to two thirds of
+its outcome mean. Nothing here contradicts §5.153; pooling the archive rather
+than one sweep sharpens the same picture and adds `plan-doc`'s four scaffolds.
+
+One reading changed under pooling. `exec-stall-trap`'s `tests_pass` is a **WALL**
+across the mixed runs — never once earned by a run that was partial. That is not
+in tension with §5.153's "`tests_pass` implies `escaped_without_grinding` with
+zero exceptions": the runs where `tests_pass` is true are all-true runs, which
+are unanimous and therefore excluded from the mixed subset by construction. The
+case's three checks collapse to **one** effective measurement.
+
+### The finding that matters: the shipped four are all unanalysable
+
+`locode/bench/cases/` ships `exec-bugfix`, `exec-pinpoint`, `multi-defect-blind`
+and `repro-only` — the cases a user runs to choose a model.
+
+| shipped case | k | mixed / runs |
+|---|---|---|
+| exec-bugfix | 2 | 4/295 |
+| exec-pinpoint | 1 | 0/24 |
+| multi-defect-blind | 5 | 0/12 |
+| repro-only | 2 | 1/52 |
+
+**Zero of the four clear `MIN_MIXED`, across 383 archived runs.** Not one of them
+has produced enough partial resolution, in the entire history of the suite, for
+rule 97 to have an opinion about it.
+
+This is §5.152's flat-suite verdict restated far more sharply, and derived from
+something else entirely — run *structure* over 1061 runs rather than score spread
+over 48. The shipped four are **pass/fail instruments, not measurement
+instruments.** For their actual job — "did this model solve it?" — that is
+defensible and arguably correct. It does mean their per-check scores carry no
+information a solved/unsolved bit does not, and no amount of re-weighting will
+change that, because the checks never disagree.
+
+### A structural limit worth stating once
+
+`exec-pinpoint` (k=1, 24 runs) and `exec-ambig` (k=1, 104 runs) can **never**
+produce a mixed run. With one outcome check, unanimity is a tautology. Rule 97 is
+not underpowered on a single-check case; it is **undefined** on one. A case
+authored with one outcome check is opting out of ever being audited for
+discrimination, which is a reason to prefer several checks even where one would
+do — and a reason not to read "cannot analyse" as "clean".
+
+### What this does and does not license
+
+It does not license editing the shipped cases. §5.150's standing decision holds
+and the pass/fail verdicts are rubric-independent (§5.151), so the archive stays
+comparable. What it licenses is a correction to how the shipped suite is
+described: report it as solved/unsolved, and stop quoting its per-case means as
+though the digits after the first were measuring anything.
