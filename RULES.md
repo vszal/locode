@@ -311,6 +311,24 @@ L5864). Same rule, refined in place, no amendment.
   Corollary: a case's untouched seed must score 0.000, and
   `tests/test_case_seeds.py` enforces it. §5.150, §5.151.
 
+- **Rule 97: Score only what discriminates — a check that never varies across
+  the runs that were not all-or-nothing is scaffolding, and paying it into the
+  mean is padding, not measurement.** Rule 90 is necessary and not sufficient:
+  it declares a guard by asking whether the check is true of the *untouched
+  seed*, which is answerable by inspection before any run exists. It cannot
+  catch a check that is false on the seed and true of every run that got far
+  enough to be partial — that property lives across a sweep, not in one run.
+  Measure it with `evals/checkdeps.py`, which restricts to MIXED runs (outcome
+  checks not unanimous — the only runs that can separate two checks), then
+  calls a check constant-true there `SCAFFOLD`, constant-false `WALL`, and
+  identically-moving checks `TWIN`s. Two caveats it exists to enforce: pooling
+  all-or-nothing runs manufactures agreement, and perfectly *anti*-correlated
+  checks are a trade-off worth keeping, not a duplicate worth merging. Type
+  specimen: `exec-stall-trap`'s `escaped_without_grinding` is implied by
+  `tests_pass` with zero exceptions in 129 runs, fires 126/129, and pays a third
+  of the outcome mean of the case named for it. The fix is to make such a check
+  veto as a guard rather than pay. §5.153.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -324,4 +342,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **97**.
+graders. Next free number: **98**.

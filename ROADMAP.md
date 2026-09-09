@@ -12310,3 +12310,100 @@ an axis nothing in the suite covered). Calibration against `qwen38` is running.
 Difficulty is asserted until those numbers land — a case built to restore range
 that turns out to be another flat 1.000 has restored nothing, and the first
 `contract-spread` run scored 1.000.
+
+## §5.153 — rule 90 was necessary and not sufficient: the check that is false on the seed and free to every model (2026-09-08)
+
+§5.150 left an open question the GPU could not answer: a case's score is a mean
+over its outcome checks, but nothing had ever asked whether those checks are
+*different measurements*. Fourteen checks that all flip together score like
+fourteen and resolve like one. That question is answerable from the archive
+alone, so it ran while the calibration sweep had the GPU.
+
+`evals/checkdeps.py` answers it, and getting it right took three passes — the
+first two produced confident, wrong numbers.
+
+### Two artifacts, both of which manufacture redundancy
+
+**Pass 1** pooled every run and clustered checks by identical outcome vectors.
+It reported `plan-hijack` collapsing 7 checks to 2, with a four-check cluster.
+That was an artifact: an all-true or all-false run makes *every* pair of checks
+agree, and 29 of `plan-hijack`'s 32 runs were unanimous. The cluster was a pile
+of runs that did everything or nothing, not a fact about the checks.
+
+**Pass 2** restricted to MIXED runs — those where the outcome checks were not
+unanimous, the only runs that can tell two checks apart. That killed the
+`plan-hijack` cluster and introduced the opposite artifact: a check that is
+constant *within* the mixed subset agrees with every other constant one, so
+`wrote_plan_doc` and `has_milestones` clustered on 37 runs in which both were
+simply always true. Pass 2 also labelled `escaped_without_grinding` a twin of
+`tests_pass` on 58 runs — impossible, since their marginals are 126/129 and
+68/129. The agreement test was matching up to *complement*, and two perfectly
+anti-correlated checks are not one measurement, they are a trade-off.
+
+**Pass 3** is what landed. Restrict to mixed runs; within them, a check that
+never varies is `SCAFFOLD` (constant-true) or `WALL` (constant-false) and counts
+zero; identical vectors are `TWIN`s paid twice; exact inverses are reported as
+`TRADEOFF` between twin-groups, pairwise, because an inverse relation does not
+chain — two inverses compose to a direct one.
+
+### The finding
+
+Only five cases have enough mixed runs to analyse at all; the rest are so
+all-or-nothing that the question cannot be put to them:
+
+| case | k | mixed/n | effective | dead weight |
+|---|---|---|---|---|
+| exec-stall-trap | 3 | 58/129 | 1 | **67%** |
+| bugfix-notest | 5 | 13/32 | 2 | 40% |
+| plan-doc | 13 | 37/60 | 8 | 31% |
+| design-doc | 14 | 14/63 | 9 | 14% |
+| e2e-spec-to-code | 10 | 143/147 | 8 | 10% |
+
+`exec-stall-trap` is the type specimen and it is worth stating exactly. Its
+`escaped_without_grinding` is `0 < iterations <= GRIND_LIMIT`. Over all 129
+archived runs the 2×2 against `tests_pass` is:
+
+| | tests_pass T | tests_pass F |
+|---|---|---|
+| **escaped T** | 68 | 58 |
+| **escaped F** | 0 | 3 |
+
+Zero in the off-diagonal: `tests_pass` implies `escaped_without_grinding`
+without exception, so it is a *strictly weaker* check that fires 126/129 — and
+its only three failures are `qwencoder14`, retired. On the case named for stall
+escape, the stall-escape check is free to every model still in use, and pays a
+third of the outcome mean.
+
+### Why rule 90 does not catch this
+
+This is the important part. Rule 90 declares a guard by asking whether the
+check is true of the **untouched seed**. The seed of `exec-stall-trap` runs zero
+iterations, so `0 < iterations` is *false* on the seed and the check passes
+rule 90's test cleanly. It is not a guard by that definition and never was.
+
+So rule 90 was necessary and not sufficient. It catches checks true of the seed,
+by inspection, before any run exists. It cannot catch a check that is false on
+the seed and true of every run that got far enough to be partial, because that
+property does not exist in a single run — it only appears across a sweep. The
+two need different instruments, which is why rule 97 is a separate rule and not
+an amendment.
+
+`plan-doc`'s four scaffolding checks (`wrote_plan_doc`, `has_milestones`,
+`plans_claim_work`, `plans_retry_work`) are the same shape: writing the plan
+document at all collects 31% of the mean before anything is judged.
+
+### What this does not say
+
+It does not say these checks should be deleted. A scaffolding check is a useful
+*guard* — it should veto, per rule 90's mechanism, not pay. And `bugfix-notest`'s
+`fixed_decoy <-inverse-> fixed_named` (TF=6, FT=7 across 13 mixed runs: the
+model fixes one or the other, never both, never neither) is a genuine finding
+about that case which merging the two would destroy.
+
+It also does not touch any archived comparison: dead weight inflates every arm
+equally, so it changes scores, not winners. What it changes is how much
+*resolution* an archived score difference represents — and on `exec-stall-trap`,
+two thirds of the mean was never resolving anything.
+
+Nine tests in `tests/test_checkdeps.py` pin all of it, including both artifacts
+that produced the wrong answers on the way here.
