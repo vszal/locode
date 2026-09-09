@@ -1,0 +1,31 @@
+!! working tree is dirty at 6322709 — each case spawns a fresh locode and imports the tree AS IT IS THEN, so edits made during this sweep change what is being measured. Fine for a probe; do not use these numbers as a baseline.
+
+[1/4] polyglot-pov · qwen38 · run 1…
+        score=1.00 iters=11 nudges=1 265.8s ok
+[2/4] polyglot-rest-api · qwen38 · run 1…
+        score=0.00 iters=24 nudges=6 703.7s STOPPED
+[3/4] polyglot-variable-length-quantity · qwen38 · run 1…
+        score=0.00 iters=10 nudges=5 331.1s ok
+[4/4] polyglot-wordy · qwen38 · run 1…
+        score=0.00 iters=28 nudges=5 757.9s STOPPED
+
+=== RESULTS · b162-polyglot-censorprobe ===
+overall score      : 0.250
+clean-finish rate  : 0.500
+total iterations   : 73
+total nudges       : 17  {'slow progress': 4, 'unverified edits': 2, 'context compacted': 2, 'truncated': 2, 'repeated call': 2, 'empty response': 1, 'same failure': 2, 'unchanged': 1, 'edited before running': 1}
+generation rate    : 25.7 chars/s
+
+case                      model          n  score  iter  nudge  clean    secs    ch/s
+-------------------------------------------------------------------------------------
+polyglot-pov              qwen38         1   1.00  11.0    1.0   1.00   265.8      30
+polyglot-rest-api         qwen38         1   0.00  24.0    6.0   0.00   703.7      25
+    ⏹ the model repeated the same tool call without making progress
+polyglot-variable-length-quantityqwen38         1   0.00  10.0    5.0   1.00   331.1      16
+polyglot-wordy            qwen38         1   0.00  28.0    5.0   0.00   757.9      28
+    ⏹ the model repeated the same tool call without making progress
+
+!! generated at 25.7 chars/s, below the 30 floor, but no run hit its time limit — so this is a slow model, not necessarily a sick box. The scores stand; do not compare this sweep's RATE against one from a different model.
+
+wrote /Users/vszalvay/Code/locode/evals/results/b162-polyglot-censorprobe/results.json
+CENSORPROBE-DONE Wed Sep  9 02:13:19 PDT 2026

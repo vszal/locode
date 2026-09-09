@@ -165,6 +165,28 @@ Keep on Opus **only** what truly needs it:
   degenerate model run overnight. Headless `-p` defaults the grant to 0 and both
   `locode bench` and `evals/harness.py` go through `-p`, so this is the default
   you get — **a new case must keep it that way.**
+- **A budget-stopped run is an unknown, not a failure** (rule 99). It scores 0.00
+  and averaging that in reads as "the model could not do it" when the truth is
+  "we did not find out" — 41 runs across 19 archived sweeps were counted that way
+  before anyone noticed. The harness now names them and calls their scores lower
+  bounds. Re-running one at a bigger budget draws a *fresh sample*, so a recovery
+  says the verdict was unstable, not that the clock was the constraint.
+- **Two instruments, two jobs.** `evals/polyglot.py` generates 34 cases from the
+  Python track of Aider's polyglot benchmark for **model selection**: resolution
+  comes from the item count, so the score has an analytic confidence interval and
+  needs no rubric hygiene at all. At four items nothing short of a 0.99
+  difference is detectable; at 34 it is 0.34 (§5.157, §5.159). The bespoke cases
+  stay for **harness regression** — repo navigation, `edit_file` exact-match,
+  path scoping, the tolerant parser — which polyglot does not touch. Generate
+  with `git clone --depth 1 https://github.com/Aider-AI/polyglot-benchmark /tmp/pg`
+  then `python evals/polyglot.py --src /tmp/pg`; validate with
+  `evals/polyglot_validate.py` before any sweep. Cases are gitignored, not
+  vendored — the content is Exercism's.
+- **An alarm's threshold belongs relative to the thing it judges.** The
+  generation-rate floor was absolute, so making a slower model the default turned
+  it into a 100%-false-positive alarm that condemned every sweep of the model the
+  project actually runs (§5.159). It now compares each model against the median
+  of its own archived sweeps.
 - Run `pytest -q` before declaring a task complete; state real results (don't
   claim green without running).
 

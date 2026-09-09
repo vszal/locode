@@ -12871,3 +12871,212 @@ failing tests help in general.
 `git_dirty: True` on the record: ROADMAP commits landed mid-sweep. `git diff`
 over `locode/` across the sweep window is empty, so the package under test never
 moved; only docs did.
+
+## §5.159 — the borrowed task set, and an alarm that had been lying for three months (2026-09-09)
+
+§5.157 ended on a structural complaint: the suite draws its resolution from
+*checks within a case*, a handful of hand-authored booleans whose statistical
+behaviour then has to be discovered empirically — which is what `percheck`,
+`checkdeps` and rules 90/95/97 all exist to police. Across 1061 archived runs
+none of the four shipped cases could be analysed at all. An established
+benchmark draws its resolution from somewhere else entirely: the *number of
+items*. That is not a better rubric, it is the absence of one. The exercise's own
+unit tests decide, so there is no scaffolding to detect and no guard to declare.
+
+So: `evals/polyglot.py` generates locode cases from the Python track of Aider's
+polyglot benchmark (Exercism), `evals/polyglot_validate.py` checks four seed
+properties per exercise without spending a model, and 34 of 34 validate. Content
+is cloned at generation time and gitignored, not vendored — it is Exercism's,
+under its track licences.
+
+`b161-polyglot-pilot` ran all 34 against `qwen38`, one run each.
+
+### The sweep told me not to believe it
+
+> `!!` generated at 24.1 chars/s, below the 30 floor, AND at least one run hit
+> its time limit. Every budget in the loop is a wallclock budget, so these scores
+> measure the machine as much as the agent. **Do not use them as a baseline.**
+
+That is a categorical instruction from the instrument, and taking it at face
+value would have thrown away the whole pilot. It has two halves and they come
+apart.
+
+**The rate half is a false positive, and always was.** qwen38's every archived
+sweep — all eleven — pools between 20.9 and 28.6 chars/s, median 25.5. It has
+never once cleared the 30 floor. The pilot's 24.1 is dead-centre normal. The
+floor was set in 2026-07 against a mix pooling ~72.8 chars/s, when every model in
+it cleared 30 comfortably; qwen38 became the config default on 2026-09-06 and
+decodes at a third of that. `_budget_bound`'s own docstring had already recorded
+that the assumption expired — *"a 27B 3-bit model decodes at ~22 chars/s on
+healthy hardware and still finishes well inside budget"* — and nobody moved the
+number.
+
+The failure mode is worth naming precisely, because it is not "a threshold was
+slightly off." **An absolute threshold cannot express the question the alarm is
+asking.** "Is this slow" is unanswerable; "is this slow *for this model*" is
+answerable, and only the second one indicts a box. Because the check was
+absolute, adopting a slower default model silently converted it into an alarm
+with a 100% false-positive rate — firing on every sweep of the model the project
+actually runs, which is strictly worse than no alarm, because it trains a reader
+to discard valid results.
+
+It had already cost something. §5.158 hit the same warning at 26.1 chars/s and
+had to spend a paragraph arguing that interleaving made it survivable. That
+argument is sound and now unnecessary: the box was fine. The rule-86
+reinstatement is stronger than it was written to be.
+
+The fix (`1a5ef68`) replaces the floor with the model's own history.
+`_rate_baseline` medians a model's archived sweeps — pooling chars over seconds
+*within* a sweep so one long case cannot outvote a short one, and excluding the
+sweep under judgement so it cannot vote on its own baseline — and `_judge_rate`
+fires below half of it. The threshold is calibrated on observed spread, not on a
+caught positive: the slowest legitimate archived sweep with real history sits at
+0.54 of its model's median (`b142-aidercmp-exec-pinpoint`, qythos9, 33.0 against
+61.6 over 43 sweeps), so 0.5 fires on nothing in the archive. That is a measured
+false-positive rate of zero and **not** a demonstrated true positive — the
+2026-07-22 memory-pressure throttle predates `gen_chars` and is not in
+`evals/results/` to re-test against. The comment says so. Under three sweeps of
+history there is no baseline and the absolute floor remains the fallback.
+
+### The time half was real, and was being reported as the wrong thing
+
+Four runs did hit the 600s wallclock — on a healthy box. The old code `and`-ed
+the two conditions into one verdict, so its vocabulary contained "the machine was
+sick" and nothing else. It could not say *the machine was fine and four runs ran
+out of time anyway*, which is what happened.
+
+They are now separate reports, and the second one is the one that matters:
+
+**A censored run is an unknown, not a failure.** The model was still working when
+the clock stopped. Recording it as 0.00 and averaging it in silently converts "we
+did not find out" into "it could not do it" — and the distance between those two
+readings is the entire width of the interval. The sweep now names the censored
+runs and states that their scores are lower bounds.
+
+`_censored` reads the agent's own `budget:` stop-reason marker rather than
+guessing at prose, and the first draft of this section had to be corrected
+because the loose version got it wrong. Substring-matching `"iteration"` filed
+`polyglot-scale-generator` as censored — its give-up reason narrates *"8
+iterations since the repeat was flagged changed nothing. Stopping rather than
+grinding; the fix needs a different idea"*, which is a verdict the model earned,
+counted as an unknown, inflating the upper bound by a whole case. `budget: no
+progress` is excluded from the other side: it fires because the model *stopped*
+working, which is the opposite of being interrupted, and counting it would
+inflate the bound the same way.
+
+Run over the archive, censoring turns out to have been invisible the whole time:
+**41 runs across 19 sweeps**, `r6-baseline` at 7 of 36. Every one of those was
+averaged in as a zero.
+
+### What the pilot actually says
+
+**23 of 34, a 0.676 pass rate, Wilson 95% CI [0.508, 0.809].**
+
+That interval is the entire argument for borrowing a task set, so it is worth
+being explicit about where it comes from. The score is a mean of 34 independent
+Bernoulli items, so its variance is analytic — no calibration sweep, no noise
+band, no rubric hygiene, no `checkdeps` pass. Under item heterogeneity (each item
+has its own difficulty `p_i`) the naive binomial CI is *conservative*, since
+`mean(p_i(1-p_i)) <= p̄(1-p̄)`, so the interval quoted is if anything too wide
+rather than too narrow. Compare the resolution directly:
+
+| items | pass rate | Wilson 95% CI | width | smallest detectable difference (80% power) |
+|---|---|---|---|---|
+| 4 (the shipped suite) | 3/4 = 0.750 | [0.301, 0.954] | 0.654 | 0.99 |
+| 4 | 4/4 = 1.000 | [0.510, 1.000] | 0.490 | 0.99 |
+| 34 (this pilot) | 23/34 = 0.676 | [0.508, 0.809] | 0.300 | 0.34 |
+| 100 | 0.680 | [0.583, 0.763] | 0.180 | 0.24 |
+
+At four items nothing short of *one model solves all four and the other solves
+none* is detectable. That is not a criticism of the four cases; it is arithmetic,
+and it is the same finding as §5.157 arriving by a different road. Note what
+repeats do and do not buy: six repeats of four cases estimate "pass rate on
+**these four tasks**" more precisely, but the target of inference is still four
+tasks — and §5.157 showed those four sit at ceiling, where extra repeats buy
+nothing at all.
+
+### A prediction that failed, on the record
+
+Before the results landed I flagged a confound: `beer-song`, `food-chain`,
+`bottle-song` and `proverb` are long-*output* exercises rather than hard-*logic*
+ones, so on a local model they might consume wallclock without testing much
+reasoning, and if the score split along that line the benchmark would be
+measuring generation throughput. **All four passed** — 4, 9, 7 and 4 iterations,
+84-225s, none near a budget. The prediction was wrong and the confound is not
+present. Recording it because a pre-registered prediction is only worth
+something if the misses are written down too.
+
+### How the eleven failures ended
+
+| how it ended | n |
+|---|---|
+| censored by a budget (unknown) | 4 |
+| clean finish, wrong answer | 3 |
+| repetition guard tripped | 3 |
+| reasoned give-up | 1 |
+
+Solved runs took a median of 6 iterations (range 4-15); failed runs a median of
+16 (range 4-28). The three clean finishes are the interesting ones —
+`bowling`, `forth`, `grade-school`, where the model declared itself done and the
+tests disagreed. That is a distinct failure mode from running out of clock, and
+one the bespoke suite has never surfaced, because a case at ceiling never gets
+the chance to be confidently wrong.
+
+### The censoring probe, and why it answers less than it looks like it does
+
+`b162-polyglot-censorprobe` re-ran only the four censored cases at 2.5x budget
+(1500s, 60 iterations), one run each, to find out whether those 0.00s were
+verdicts or unknowns:
+
+| case | pilot (600s) | probe (1500s) | how the probe ended |
+|---|---|---|---|
+| `polyglot-pov` | 0.00, censored at 600s | **1.00** in 265.8s, 11 iters | solved |
+| `polyglot-rest-api` | 0.00, censored at 600s | 0.00 at 703.7s | repetition guard |
+| `polyglot-variable-length-quantity` | 0.00, censored at 600s | 0.00 at 331.1s | clean finish, wrong answer |
+| `polyglot-wordy` | 0.00, censored at 600s | 0.00 at 757.9s | repetition guard |
+
+**None of the four hit the raised budget.** Given more clock, three of them
+terminated by some other means — so the probe did its job: it converted three
+unknowns into verdicts, and the censoring cost the pilot at most one case.
+
+So the pass rate is **23/34 = 0.676 at the flat 600s budget** (which is the
+rule-91-comparable number, and the one to quote), with the probe establishing
+that at most one of the eleven failures was an artefact of the clock.
+
+Now the part that answers less than it appears to. `pov` solved it in **265.8
+seconds — under half the budget it had already been given**. It did not need more
+time. On the pilot's draw it went down a path that burned 22 iterations and 600
+seconds; on the probe's draw it went down one that took 11 and finished. **The
+re-run is a fresh sample, not a continuation**, so "recovered at a larger budget"
+confounds the budget with the draw, and this one is plainly the draw.
+
+Which surfaces the pilot's real limitation, and it is not the box and not the
+clock: **n=1 per item.** A per-item outcome here is not deterministic, so no
+individual cell in that 34-row table means anything on its own. The aggregate is
+fine — a Wilson interval over 34 items treats each as exactly one Bernoulli draw,
+which is exactly what it is — but reading down the per-case column and concluding
+"qwen38 cannot do `forth`" is unsupported. Reading *across*, at 0.676 [0.508,
+0.809], is supported.
+
+### Rule 99
+
+Coined here: **a run stopped by a budget is an unknown, not a failure; report it
+as a bound and never let it average in as a zero.** Stated in full in `RULES.md`,
+with the corollary that re-running a censored case at a larger budget draws a
+fresh sample rather than resuming the old one, so a recovery is evidence the
+verdict was unstable and not evidence that the budget was binding.
+
+### What this does not replace
+
+Polyglot exercises are single-file, self-contained, write-from-spec problems.
+They do not exercise repo navigation, `edit_file` exact-match, path scoping, the
+repetition guard as a *subject*, or the tolerant tool parser — locode's own
+failure modes, and what the bespoke cases were built to catch. Two jobs, two
+instruments: the borrowed set for **model selection**, the bespoke cases for
+**harness regression**. §5.157's complaint was never that the bespoke cases are
+bad, only that they cannot resolve a model comparison, and 34 items now do that
+job instead of a 21st hand-authored rubric.
+
+Open, and deliberately not done here: a second model on the same 34 items. That
+is the comparison the instrument was built for, and one model's 0.676 is a
+calibration reading, not a result.

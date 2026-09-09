@@ -363,6 +363,27 @@ L5864). Same rule, refined in place, no amendment.
   chronology, because the second case was built after the first sweep ran.
   §5.152, §5.154.
 
+- **Rule 99: A run stopped by a budget is an unknown, not a failure — report it
+  as a bound, and never let it average in as a zero.** The model was still
+  working when the clock stopped; scoring it 0.00 silently converts "we did not
+  find out" into "it could not do it", and the distance between those readings is
+  the whole width of the interval. `evals/harness.py:_censored` identifies them
+  from the agent's own `budget:` stop-reason marker — never by substring-matching
+  prose, which filed `polyglot-scale-generator` as censored because its *give-up*
+  reason narrates "8 iterations since the repeat was flagged changed nothing"
+  (§5.159). Exclude `budget: no progress`: it fires because the model *stopped*
+  working, the opposite of being interrupted, and counting it inflates the bound
+  the same way. Two corollaries. **(a)** Censoring must be reported separately
+  from a slow box: the two were `and`-ed into one verdict until §5.159, which
+  left the harness able to say "the machine was sick" and unable to say "the
+  machine was fine and four runs ran out of time anyway" — the case that actually
+  occurred. **(b) Re-running a censored case at a larger budget draws a FRESH
+  SAMPLE, it does not resume the old one**, so a recovery is evidence the verdict
+  was unstable, not evidence the budget was binding — `polyglot-pov` went 0.00
+  (censored at 600s) to 1.00 in 265.8s, finishing in under half the budget it had
+  already been given. Scale: 41 runs across 19 archived sweeps are censored,
+  `r6-baseline` at 7 of 36, every one averaged in as a zero. §5.159.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
