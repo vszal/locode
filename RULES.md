@@ -164,19 +164,24 @@ L5864). Same rule, refined in place, no amendment.
   wrong expected total in `cross-module-cause`'s probe made a genuinely correct
   fix score 0.667 (§5.140). Both were invisible without a synthetic correct
   answer to grade.
-- **Rule 86 — SUSPENDED 2026-09-08, pending re-test (§5.154): a red test suite
-  localises every defect it covers, so a case built on one measures fixing
+- **Rule 86 — REINSTATED 2026-09-08 on a clean re-test (§5.158): a red test
+  suite localises every defect it covers, so a case built on one measures fixing
   rather than finding** — N failing tests is N pointed-at lines, not N units of
-  difficulty. The quantitative support is withdrawn: the 4.67 vs 9.50 iteration
-  gap (2.04x, "permutation p = 0.0022") had its two arms in two sweeps 26
-  minutes apart with no bridging case, so arm and server invocation are
-  perfectly aliased and the nuisance effect measured at §5.152 is 2.00x — the
-  same size as the signal (rule 98). What stands is the trajectory evidence,
-  which is not invocation-sensitive: with the suite the model ran `pytest -q`
+  difficulty. Suspended at §5.154 because the original 4.67 vs 9.50 gap put its
+  two arms in sweeps 26 minutes apart, perfectly aliasing arm with server
+  invocation against a nuisance effect of the same 2.00x size (rule 98). Re-run
+  as `b160-rule86-retest` with both arms **interleaved inside one invocation**
+  (server pid 41790 recorded on the sweep), pre-registered before the data
+  existed at "at least 1.5x AND non-overlapping": `multi-defect-suite`
+  4,4,4,4,4,4 against `multi-defect-blind` 11,6,11,11,10,10 — **4.00 vs 9.83, a
+  2.46x gap, complete separation, exact two-sided p = 0.0022**. All 12 runs
+  scored 1.000, so correctness gated before iterations were read (rule 89). The
+  effect is *larger* than the withdrawn claim, and a slow box cannot produce it
+  because both arms shared one server. The trajectory evidence stands as before
+  and was never invocation-sensitive: with the suite the model ran `pytest -q`
   once, was handed five tracebacks naming five functions and made five minimal
   edits; without it, it built its own probe and iterated probe -> fix -> probe.
-  Suspended rather than retracted for that reason. Do not cite the numbers.
-  §5.140, §5.152, §5.154.
+  §5.140, §5.152, §5.154, §5.158.
 - **Rule 87: read the losing runs before crediting a case with range** — if
   they fail a check for a reason the seed's own documentation licenses, the
   range is measuring the case's prose and will vanish once the contract is

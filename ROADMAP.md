@@ -12810,3 +12810,64 @@ and the pass/fail verdicts are rubric-independent (§5.151), so the archive stay
 comparable. What it licenses is a correction to how the shipped suite is
 described: report it as solved/unsolved, and stop quoting its per-case means as
 though the digits after the first were measuring anything.
+
+## §5.158 — rule 86 reinstated on a clean, pre-registered re-test (2026-09-08)
+
+`b160-rule86-retest`: `multi-defect-suite` and `multi-defect-blind`, qwen38,
+--repeat 6, both arms **interleaved inside one server invocation** (pid 41790,
+recorded on the sweep by e8fdd70). This is the design rule 98 demands and the
+one §5.141 lacked.
+
+The threshold was committed before the data existed: *"rule 86 is supported only
+if the gap is at least 1.5x AND the run-level distributions do not overlap."*
+
+### Correctness first, per rule 89
+
+All 12 runs scored **1.000**. The arms are tied on the only thing that gates, so
+iterations may be read.
+
+### The result
+
+| arm | iterations | mean | wallclock |
+|---|---|---|---|
+| multi-defect-suite | 4, 4, 4, 4, 4, 4 | **4.00** | 108.8s |
+| multi-defect-blind | 11, 6, 11, 11, 10, 10 | **9.83** | 169.1s |
+
+- gap **2.46x** — clears the registered 1.5x
+- suite max 4 < blind min 6 — **complete separation**, no overlap
+- exact two-sided permutation p = 2/C(12,6) = **0.0022**
+
+Both registered conditions met, with room. **Rule 86 is reinstated**, and the
+effect is *larger* than the 2.04x that was withdrawn, not smaller.
+
+### Why this one survives what §5.141's did not
+
+§5.141 put its arms in sweeps 26 minutes apart, so arm was perfectly aliased with
+server invocation — against a nuisance effect measured at exactly 2.00x, the same
+size as the signal. Here both arms alternate inside a single invocation, so any
+per-invocation state is shared by construction.
+
+The sweep supplies its own demonstration of why that matters. The harness warned
+it generated at 26.1 chars/s, below its 30 floor. On the old design that would be
+uninterpretable — a slow box could have manufactured the whole gap. Interleaved,
+it cannot: the slowness is applied to both arms equally, and the separation is
+still total.
+
+Wallclock agrees in direction (1.55x) and is weaker than iterations, which is the
+ordinary rule-88 disagreement and changes nothing here.
+
+### Two caveats worth keeping
+
+`multi-defect-suite` produced **4 iterations in all six runs, zero variance**, at
+2 nudges every time. A distribution that tight suggests the case is so
+well-signposted the model runs a near-fixed sequence. That strengthens rule 86's
+claim — the suite really does hand over the answer — while confirming the case is
+at ceiling and useless for discriminating models (§5.157's theme again).
+
+And the scope is narrow: this is one model on one case pair. It shows that *this*
+red suite localises *these* defects for *this* model. It is not evidence that
+failing tests help in general.
+
+`git_dirty: True` on the record: ROADMAP commits landed mid-sweep. `git diff`
+over `locode/` across the sweep window is empty, so the package under test never
+moved; only docs did.

@@ -150,7 +150,8 @@ Keep on Opus **only** what truly needs it:
   invocation** (rule 98). Restarting the server moves a fixed case+model's
   iteration mean by 2.00x, which is as large as anything the suite measures, so
   arms split across sweeps are confounded and the comparison is dead — that is
-  how §5.141's localisation result was lost, and rule 86 with it. `harness.py`
+  how §5.141's localisation result was lost, and rule 86 with it (both were
+  recovered at §5.158 by re-running the arms interleaved). `harness.py`
   now interleaves cases by construction and records the server fingerprint on
   every sweep; do not defeat either. Model-vs-model cannot obey this (two
   models cannot share an invocation), which is one more reason not to decide
