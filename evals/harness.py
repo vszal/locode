@@ -1304,6 +1304,26 @@ def _print_variance_table(row_infos: dict[str, dict]) -> None:
 # --------------------------------------------------------------------------
 # cli
 # --------------------------------------------------------------------------
+def _run_order(cases, models, repeat):
+    """`(model, case, repeat)` triples in the order a sweep should run them.
+
+    Repeat is the OUTER loop over cases, so a sweep goes case A, case B, case
+    C, case A, ... rather than all of A then all of B. Rule 98: arms of a
+    within-model comparison have to share a server invocation, and blocking
+    them defeats that even inside one sweep -- whatever drifts over an hour
+    (thermal, cache occupancy, whatever else §5.152's invocation effect is
+    made of) lands entirely on whichever case ran last. Interleaved, a drift
+    hits every case equally and cancels in the comparison.
+
+    Model stays outermost on purpose: switching model restarts the server, so
+    interleaving models would restart it every single run.
+    """
+    return [(model, case, rep)
+            for model in models
+            for rep in range(1, repeat + 1)
+            for case in cases]
+
+
 def cmd_run(args) -> int:
     cases = discover_cases(args.case or None)
     if not cases:
@@ -1359,24 +1379,23 @@ def cmd_run(args) -> int:
               flush=True)
 
     runs: list[RunResult] = []
-    total = len(cases) * len(args.model) * args.repeat
+    order = _run_order(cases, args.model, args.repeat)
+    total = len(order)
     n = 0
-    for model in args.model:
-        for case in cases:
-            for rep in range(1, args.repeat + 1):
-                n += 1
-                print(f"[{n}/{total}] {case.id} · {model} · run {rep}…",
-                      flush=True)
-                r = run_case(case, model, rep, results_dir, keep=not args.clean,
-                             agent_root=agent_root)
-                runs.append(r)
-                flag = "ok" if r.metrics.get("clean_finish") else "STOPPED"
-                print(f"        score={r.score:.2f} iters={r.metrics.get('iterations')} "
-                      f"nudges={r.metrics.get('nudges')} {r.seconds}s {flag}"
-                      + (f"  [{r.error}]" if r.error else ""), flush=True)
-                # Persist after every run: a long batch that dies partway is
-                # still worth the runs it completed.
-                _persist(results_dir, runs, label)
+    for model, case, rep in order:
+        n += 1
+        print(f"[{n}/{total}] {case.id} · {model} · run {rep}…",
+              flush=True)
+        r = run_case(case, model, rep, results_dir, keep=not args.clean,
+                     agent_root=agent_root)
+        runs.append(r)
+        flag = "ok" if r.metrics.get("clean_finish") else "STOPPED"
+        print(f"        score={r.score:.2f} iters={r.metrics.get('iterations')} "
+              f"nudges={r.metrics.get('nudges')} {r.seconds}s {flag}"
+              + (f"  [{r.error}]" if r.error else ""), flush=True)
+        # Persist after every run: a long batch that dies partway is
+        # still worth the runs it completed.
+        _persist(results_dir, runs, label)
     summary = summarize(runs)
     print_report(summary, f"RESULTS · {label}")
     # Flag a degraded sweep at the point it finishes, not an hour later when

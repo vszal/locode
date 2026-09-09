@@ -971,3 +971,46 @@ def test_rescore_leaves_the_score_alone_when_the_case_is_gone(
     out = capsys.readouterr().out
     assert "case no longer exists" in out
     assert "0 run(s) would change" in out
+
+
+# --- sweep ordering (rule 98) ----------------------------------------------
+
+class _OrderCase:
+    def __init__(self, cid):
+        self.id = cid
+
+
+def _order(cases, models, repeat):
+    from evals.harness import _run_order
+    return [(m, c.id, r) for m, c, r in
+            _run_order([_OrderCase(c) for c in cases], models, repeat)]
+
+
+def test_cases_interleave_rather_than_running_in_blocks():
+    # Rule 98: whatever drifts over an hour of sweep must hit every case
+    # equally. Blocked, it lands entirely on whichever case ran last.
+    got = _order(["a", "b"], ["m"], 3)
+    assert [c for _, c, _ in got] == ["a", "b", "a", "b", "a", "b"]
+
+
+def test_model_stays_outermost_so_the_server_restarts_once_per_model():
+    # Interleaving models would restart the server every single run.
+    got = _order(["a", "b"], ["m1", "m2"], 2)
+    assert [m for m, _, _ in got] == ["m1"] * 4 + ["m2"] * 4
+
+
+def test_every_case_model_repeat_combination_runs_exactly_once():
+    got = _order(["a", "b", "c"], ["m1", "m2"], 4)
+    assert len(got) == 24
+    assert len(set(got)) == 24
+
+
+def test_repeat_numbers_stay_one_based_per_case():
+    got = _order(["a"], ["m"], 3)
+    assert [r for _, _, r in got] == [1, 2, 3]
+
+
+def test_a_single_case_sweep_is_unchanged_by_interleaving():
+    # The common shape must not have been perturbed by the reordering.
+    assert _order(["a"], ["m"], 3) == [("m", "a", 1), ("m", "a", 2),
+                                       ("m", "a", 3)]
