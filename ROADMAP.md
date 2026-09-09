@@ -12574,3 +12574,61 @@ expose. Three tests pin that, including that an unidentifiable server records
 The running `b160-mdd-calib` sweep is confirmed single-invocation by direct
 probe (pid 36898, up 20:03:01), so its three cases *are* comparable with each
 other — which is what makes it usable as the partial rule-86 re-test.
+
+## §5.155 — the noise band is stored in a format no analysis tool can read (2026-09-08)
+
+Found while checking why `multi-defect-blind` shows only 12 archived runs when
+§5.152 measured it 12 times *in the band alone*.
+
+§5.152's band — 48 runs, the most load-bearing measurement of this milestone —
+was run through `locode bench`, which prints a table and writes a log. It does
+not write `results.json`. So those 48 runs carry **no stored per-check
+booleans**, and every tool that reads the archive is blind to them:
+`percheck`, `checkdeps`, `regrade_archive`, and `harness rescore` alike.
+
+Two consequences, and the second is worse than the first.
+
+**Rule 96 cannot be applied to them, ever.** The rule says a stored score is a
+snapshot of the rubric current when it was written, so re-derive from the
+stored booleans. There are none. If the guard/outcome declarations of those
+four cases change again — as they did at §5.142 and §5.150 — the band cannot be
+recomputed, only re-run. What survives is the pass/fail verdict, which §5.151
+established is rubric-independent; "48/48 solved" stands. The per-check detail
+behind it does not exist.
+
+**Rule 97 cannot be applied to them either.** `checkdeps` needs mixed runs to
+say anything, and it cannot see these at all. The band is exactly the sweep on
+which one would want to ask "which of these checks was doing any work?", and it
+is the one sweep that cannot answer.
+
+### The methodology fix, which needs no product change
+
+**Measure bands with `evals/harness.py run`, not `locode bench`.** Both drive
+the same cases through the same graders and both go through headless `-p`, so
+rule 91's flat wallclock holds either way; the harness additionally persists
+per-run checks, metrics, git head and (as of e8fdd70) the server fingerprint.
+`locode bench` is the *user-facing* path — its job is to print a verdict for
+someone choosing a model, and a log is the right output for that. It is not a
+research instrument and should stop being used as one.
+
+### Not done, because it is not mine to decide
+
+Making `locode bench` persist `results.json` would close the gap at the source.
+It is a shipped-path, on-disk-format change and the user's call, so it is
+recorded here rather than made. The methodology fix above is sufficient for the
+suite's own purposes.
+
+### Related: the band was not as flat as it looked
+
+The same check turned up a run the band could not have shown. Across 12
+archived `multi-defect-blind` runs there is now **one failure** — b160, score
+0.000, all five checks false, killed at 7 iterations by
+`the model repeated the same tool call without making progress`, in 74.7s
+against a 165-220s norm.
+
+That is not the case being hard. It is locode's repetition guard firing on a
+case the model otherwise solves 11 times out of 12, and it means a case
+recorded as FLAT at n=6 and n=12 has a tail at roughly 1-in-12. §5.152's
+conclusion is unchanged — the suite has no useful *score range* — but "flat"
+should be read as "flat apart from a rare agent-side stall", and a case's
+apparent flatness at n=6 is not evidence of no tail.
