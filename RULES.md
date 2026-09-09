@@ -164,12 +164,19 @@ L5864). Same rule, refined in place, no amendment.
   wrong expected total in `cross-module-cause`'s probe made a genuinely correct
   fix score 0.667 (§5.140). Both were invisible without a synthetic correct
   answer to grade.
-- **Rule 86: a red test suite localises every defect it covers, so a case built
-  on one measures fixing rather than finding** — N failing tests is N
-  pointed-at lines, not N units of difficulty. Measured, not assumed: the same
-  five defects with and without the suite scored identically (6/6 at 1.000 both
-  ways) and took 4.67 vs 9.50 iterations, a 2.04x gap with no overlap between
-  the sets (exact two-sided permutation p = 0.0022). §5.140.
+- **Rule 86 — SUSPENDED 2026-09-08, pending re-test (§5.154): a red test suite
+  localises every defect it covers, so a case built on one measures fixing
+  rather than finding** — N failing tests is N pointed-at lines, not N units of
+  difficulty. The quantitative support is withdrawn: the 4.67 vs 9.50 iteration
+  gap (2.04x, "permutation p = 0.0022") had its two arms in two sweeps 26
+  minutes apart with no bridging case, so arm and server invocation are
+  perfectly aliased and the nuisance effect measured at §5.152 is 2.00x — the
+  same size as the signal (rule 98). What stands is the trajectory evidence,
+  which is not invocation-sensitive: with the suite the model ran `pytest -q`
+  once, was handed five tracebacks naming five functions and made five minimal
+  edits; without it, it built its own probe and iterated probe -> fix -> probe.
+  Suspended rather than retracted for that reason. Do not cite the numbers.
+  §5.140, §5.152, §5.154.
 - **Rule 87: read the losing runs before crediting a case with range** — if
   they fail a check for a reason the seed's own documentation licenses, the
   range is measuring the case's prose and will vanish once the contract is
@@ -329,6 +336,22 @@ L5864). Same rule, refined in place, no amendment.
   of the outcome mean of the case named for it. The fix is to make such a check
   veto as a guard rather than pay. §5.153.
 
+- **Rule 98: Interleave the arms of a within-model comparison inside one server
+  invocation — arms split across sweeps are confounded with a nuisance effect as
+  large as anything the suite measures.** §5.152 measured the invocation effect
+  on a fixed case and model: `qwen38` on `repro-only` has archived invocation
+  means of 5.75, 5.25, 8.25, 6.00, 10.50 — a 2.00x swing with nothing varying
+  but the server restart. §5.141's localisation result (`multi-defect-suite`
+  4.67 vs `multi-defect-blind` 9.50, a 2.04x gap at "p = 0.0022") put its two
+  arms in two sweeps 26 minutes apart with no case bridging them, so arm and
+  invocation are perfectly aliased and the nuisance is the same size as the
+  signal; the permutation test's twelve exchangeable runs are really one per
+  arm. Model-vs-model comparisons cannot obey this rule — two models cannot
+  share an invocation — which is a further reason not to decide them on time
+  (rule 89). Corollary on how it gets in: the arms there were split by
+  chronology, because the second case was built after the first sweep ran.
+  §5.152, §5.154.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -342,4 +365,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **98**.
+graders. Next free number: **99**.

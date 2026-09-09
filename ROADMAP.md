@@ -10812,6 +10812,16 @@ to ~155s. Without a suite the model edited first, got nudged for it, then built
 its own `python3 -c` probe covering all five functions and iterated
 probe → fix → probe three times before it was satisfied.
 
+> **[§5.154, 2026-09-08] The iteration half of this result is withdrawn.** The
+> two arms ran in two different sweeps 26 minutes apart, with no case bridging
+> them, so arm and server invocation are perfectly aliased; the invocation
+> effect measured at §5.152 (2.00x on a fixed case and model) is the same size
+> as the 2.04x claimed here, and the permutation test's twelve exchangeable
+> runs are really one per arm. The scores (6/6 at 1.000 either way) and the
+> trajectory reading above are unaffected. Rule 86 is suspended pending a
+> re-test with both arms interleaved in one invocation; rule 98 was coined so
+> this does not recur.
+
 So localisation was doing substantial real work, and qwen38 is simply capable
 enough to do without it. That is worth having straight: the harness's own
 design note says score is outcome and the metrics are how painfully it got
@@ -12441,3 +12451,91 @@ as the reason rather than re-litigated later: a guard conversion here would move
 fifteen numbers and fix half a problem. `exec-stall-trap` needs its stall-escape
 predicate rewritten to distinguish "escaped the trap" from "did not engage with
 it", and until it gets one, its third check should be read as decoration.
+
+## §5.154 — the audit the milestone asked for: which archived claims rest on iterations, and which of those are confounded (2026-09-08)
+
+The milestone's third leg was "audit which archived claims rest on iterations
+or wallclock — those are now suspect." §5.152 withdrew the one that had reached
+`AGENTS.md` and stopped there. This is the sweep of the rest, and it found that
+the interesting question is not *which metric* a claim used but *how its arms
+were assigned to server invocations*.
+
+### The dividing line
+
+§5.152 measured the invocation effect: restart the server and one fixed
+case+model's iteration mean moves. For `qwen38` on `repro-only` the archived
+invocation means are 5.75, 5.25, and freshly 8.25, 6.00, 10.50 — a spread of
+**5.25 iterations, a 2.00x swing, with the case and the model held constant.**
+That number is the noise floor for any comparison whose arms sit in different
+invocations. Two kinds of claim are affected very differently:
+
+**Model vs model.** Irreducibly confounded, and not a design error: two models
+cannot share a server invocation, so every cross-model timing comparison in the
+archive carries an invocation component that no scheduling can remove. The
+honest response is to not decide on time — which is what rule 89 already says.
+
+**Case vs case, or lever vs lever, within one model.** These *can* share an
+invocation by interleaving the arms in a single sweep. When they do not, the
+nuisance effect and the signal are the same size and the comparison is dead.
+
+### The casualty: §5.141's localisation result
+
+§5.141's headline is that removing a red test suite doubled the work:
+`multi-defect-suite` 4.67 iterations against `multi-defect-blind` 9.50, "the
+two sets not overlapping at all (max 5 with tests, min 6 without; exact
+two-sided permutation p = 2/924 = 0.0022)". Rule 86 was coined from it.
+
+The numbers reproduce exactly from the events — 5,4,4,5,5,5 and 11,10,10,10,6,10.
+The design does not survive:
+
+| arm | sweep | invocation |
+|---|---|---|
+| `multi-defect-suite` (4.67) | `b150-newcases-calib` | one |
+| `multi-defect-blind` (9.50) | `b150-blind-calib`, ~26 min later | another |
+
+Arm, sweep and invocation are perfectly aliased, and **no case ran in both
+sweeps**, so nothing bridges them. The permutation test treats twelve runs as
+exchangeable; they are six-and-six from two invocations, so its effective n is
+one per arm and p = 0.0022 is not a p-value for the effect claimed.
+
+The effect sizes settle it. Claimed: 4.67 -> 9.50, **2.04x**. Nuisance,
+measured on a fixed case and model: 5.25 -> 10.50, **2.00x**. The experiment
+has no power to separate the two, and the third case in the first sweep is
+consistent with the alias — `cross-module-cause` ran 5,5,5,5,5,5, so
+*everything* in that invocation sat at five.
+
+### What is withdrawn and what stands
+
+Withdrawn: the 2.04x, the p = 0.0022, and the non-overlapping sets as evidence
+that localisation is what costs the iterations.
+
+Standing, and worth being fair about:
+
+- The **scores** are untouched — 6/6 at 1.000 either way. Score is not
+  invocation-sensitive in the way iterations are, and no verdict moves.
+- The **mechanism reading** in §5.141 is direct evidence and is not confounded:
+  the model ran `pytest -q` once, was handed five tracebacks naming five
+  functions, made five minimal edits, re-ran to green — versus building its own
+  `python3 -c` probe and iterating probe -> fix -> probe three times without a
+  suite. That is rule 3 (read the trajectory) paying off, and it is why rule 86
+  is suspended pending re-measurement rather than retracted.
+
+### The re-test, which is cheap
+
+One sweep, both cases interleaved, one invocation, 6 repeats each. It was never
+run that way because the second case was built after the first sweep had
+finished — the arms were split by chronology, not by choice, which is exactly
+how this kind of confound gets in.
+
+Partial evidence is already arriving: the running `b160-mdd-calib` sweep carries
+`multi-defect-blind` alongside two new cases in a single invocation. If it lands
+near 9.5 there while its neighbours sit elsewhere, the case-difficulty reading
+gains support; if it lands near 5, the original gap was the invocation. It
+cannot fully settle it — `multi-defect-suite` is not in that sweep — but it is
+free.
+
+**Rule 98: interleave the arms of a within-model comparison inside one server
+invocation; arms split across sweeps are confounded with a nuisance effect as
+large as anything the suite measures.** Coined here. Rule 95 said establish the
+noise band first; this says where to put the arms once you have it. §5.152,
+§5.154.
