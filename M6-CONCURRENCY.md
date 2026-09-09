@@ -10,6 +10,29 @@ models across managed and external backends.
 **Topologies:** all three (managed-local, managed-remote, external) from day
 one, because the router should not know which it is talking to.
 
+> ## ⏸ TRACK PAUSED after M6.2 — 2026-09-08, by the maintainer's call
+>
+> **Reason: local testing cannot carry this feature further.** Everything known
+> about co-residency comes from one spike, on one 24 GB M4 Pro, with one model
+> pair (§5.147). That is enough to believe co-residency *can* work; it is not
+> enough to ship a pool on, and no amount of further work on this box would
+> change that — the untested axes are other hardware, other pairs, sustained
+> parallel load, and behaviour past the wired cap, where the failure is a GPU
+> driver panic rather than an exception.
+>
+> **Landed and kept:** M6.0 (spike, closed), M6.1 (the backend seam, closed —
+> a pure refactor, 1493 tests green at the time), M6.2 (config + memory gate,
+> `[serving]`, `resident_fits`, `resident_cache_bytes`).
+>
+> **Not built:** M6.3 (`PoolManager` + router), M6.4 (the escalation slice),
+> M6.5 (pre-registered measurement). **Nothing reads `[serving]` yet** — setting
+> `mode = "concurrent"` changes no behaviour today. The config shape is
+> documented in `config.toml.example` and is stable to write against.
+>
+> The README's Project status section carries this caveat for users, including
+> the testing gaps that would have to close before the track resumes. Resuming
+> means starting at M6.3 against hardware that can actually exercise a pool.
+
 ---
 
 ## 1. The memory model, which is not what §5.5 assumed

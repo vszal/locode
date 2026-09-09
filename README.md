@@ -379,7 +379,7 @@ Configurable in `~/.config/locode/config.toml`.
 ## Project status
 
 locode is in production use for day-to-day local-model coding work, and is
-covered by a suite of ~1,385 tests that run without network access.
+covered by a suite of ~1,505 tests that run without network access.
 
 **In place:** the tolerant tool parser, the agent loop with its repeat/stall
 detectors and cancellation, the permission layer, filesystem + shell + web
@@ -387,9 +387,44 @@ tools, server lifecycle management with per-model memory budgeting, packaged
 installation (`install.sh`, `locode upgrade`, `locode uninstall`), and an eval
 harness used to gate behavioural changes.
 
-**Not yet:** concurrent multi-model serving, and `bash` sandboxing — shell
-commands run with your privileges, so use `deny_paths` and think before
-`--yolo` on an untrusted task.
+**Not yet:** `bash` sandboxing — shell commands run with your privileges, so
+use `deny_paths` and think before `--yolo` on an untrusted task.
+
+**Partial, and paused — concurrent multi-model serving.** The `[serving]`
+config block and the memory gate that decides whether two models may be
+co-resident are implemented and unit-tested. The pool manager and router that
+would *use* them are not, so **nothing reads `[serving]` yet**: setting
+`mode = "concurrent"` today changes no behaviour. The config shape is
+documented in `config.toml.example` so it is stable to write against, but treat
+the feature as unfinished.
+
+> ### ⚠️ This feature needs more testing
+>
+> What we actually know rests on **one spike, on one machine, with one model
+> pair**: two `mlx_lm.server` processes shared a single Metal GPU through 30
+> minutes of alternating 41k-context load without a failure. That is real
+> evidence co-residency *can* work, and it is nowhere near enough to call it
+> reliable. It also came with a measured cost — the neighbour ran 152.9 s per
+> request co-resident against 116.9 s alone, a **31% tax** that is memory
+> pressure, not compute contention, and so gets worse as a pair approaches the
+> memory ceiling.
+>
+> Untested, and needed before this track resumes: more than one model pair;
+> machines other than a 24 GB M4 Pro; anything but macOS/Metal; sustained
+> parallel load rather than alternating turns; behaviour at and past the wired
+> cap, where the failure mode is a **GPU driver panic rather than an
+> exception** — which is why co-residency is opt-in and nothing is inferred
+> from detected hardware; and recovery when one backend in a pool dies.
+>
+> A further limit worth knowing if you plan to use it: co-residency and the
+> prompt cache compete for the same bytes. Charge each server the cache budget
+> it actually gets and, on a 24 GB box, no pair fits at all — the largest
+> supported model alone needs 17.96 GB of an 18.0 GB ceiling. The automatic
+> 1/N cache split exists for this, but it is floored at one live sequence
+> (below that mlx wipes every stored cache on each request), and at the default
+> `server.prompt_cache_multiple = 1.0` that floor binds immediately. In
+> practice you must raise that multiple, or declare a per-backend
+> `prompt_cache_gb`, or expect the gate to refuse the pair.
 
 **Compatibility:** the config format and CLI flags are stable; anything in
 `locode.*` should be treated as internal.
