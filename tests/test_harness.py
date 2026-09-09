@@ -1014,3 +1014,47 @@ def test_a_single_case_sweep_is_unchanged_by_interleaving():
     # The common shape must not have been perturbed by the reordering.
     assert _order(["a"], ["m"], 3) == [("m", "a", 1), ("m", "a", 2),
                                        ("m", "a", 3)]
+
+
+# --- server identity recorded per sweep (rule 98) ---------------------------
+
+def test_persist_records_the_server_invocation(tmp_path, monkeypatch):
+    import json
+    import evals.harness as H
+    monkeypatch.setattr(H, "_SWEEP_SERVER", "unset")
+    monkeypatch.setattr(H, "server_fingerprint",
+                        lambda *a, **k: {"pid": "1", "started": "now",
+                                         "model": "m"})
+    H._persist(tmp_path, [], "lbl")
+    payload = json.loads((tmp_path / "results.json").read_text())
+    assert payload["server"] == {"pid": "1", "started": "now", "model": "m"}
+
+
+def test_the_fingerprint_is_probed_once_not_once_per_run(tmp_path, monkeypatch):
+    import json
+    # A sweep must record the invocation it STARTED under. Re-probing would
+    # overwrite the fingerprint if the server restarted partway -- the one
+    # event this record exists to expose.
+    import evals.harness as H
+    calls = []
+
+    def fake(*a, **k):
+        calls.append(1)
+        return {"pid": str(len(calls)), "started": "now", "model": "m"}
+
+    monkeypatch.setattr(H, "_SWEEP_SERVER", "unset")
+    monkeypatch.setattr(H, "server_fingerprint", fake)
+    H._persist(tmp_path, [], "lbl")
+    H._persist(tmp_path, [], "lbl")
+    assert len(calls) == 1
+    assert json.loads((tmp_path / "results.json").read_text())["server"]["pid"] == "1"
+
+
+def test_an_unidentifiable_server_records_null_rather_than_failing(tmp_path,
+                                                                   monkeypatch):
+    import json
+    import evals.harness as H
+    monkeypatch.setattr(H, "_SWEEP_SERVER", "unset")
+    monkeypatch.setattr(H, "server_fingerprint", lambda *a, **k: None)
+    H._persist(tmp_path, [], "lbl")
+    assert json.loads((tmp_path / "results.json").read_text())["server"] is None

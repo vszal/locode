@@ -1422,6 +1422,23 @@ def cmd_run(args) -> int:
     return 0
 
 
+_SWEEP_SERVER: dict | None | str = "unset"
+
+
+def sweep_server() -> dict | None:
+    """This process's model-server fingerprint, probed once and cached.
+
+    Probed once on purpose. A sweep has to record the invocation it *started*
+    under: re-probing per run would quietly overwrite the fingerprint if the
+    server restarted partway, which is the one event the record exists to
+    expose.
+    """
+    global _SWEEP_SERVER
+    if _SWEEP_SERVER == "unset":
+        _SWEEP_SERVER = server_fingerprint()
+    return _SWEEP_SERVER  # type: ignore[return-value]
+
+
 def _persist(results_dir: Path, runs: list[RunResult], label: str,
              provenance: dict | None = None) -> None:
     """Write results.json. `provenance` carries forward the git head/created
@@ -1435,6 +1452,12 @@ def _persist(results_dir: Path, runs: list[RunResult], label: str,
         "git_dirty": _git_dirty(),
         "runs": [asdict(r) for r in runs],
         "summary": summarize(runs),
+        # Rule 98: which server invocation a sweep ran under decides whether
+        # its numbers can be compared with another sweep's at all. Only
+        # `ab.py` recorded this, so 31 of 47 archived sweeps cannot be checked
+        # retroactively and §5.141's confound could not be ruled out from the
+        # file. Every sweep records it now.
+        "server": sweep_server(),
     }
     if provenance:
         payload.update(provenance)

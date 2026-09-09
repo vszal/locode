@@ -12539,3 +12539,38 @@ invocation; arms split across sweeps are confounded with a nuisance effect as
 large as anything the suite measures.** Coined here. Rule 95 said establish the
 noise band first; this says where to put the arms once you have it. §5.152,
 §5.154.
+
+### Addendum — how far the confound reaches, and the gap that stopped the audit
+
+Having found one split-arm comparison, the obvious question is how many others
+there are. The archive answers it partway, and the shape of the answer is worth
+recording.
+
+`ab.py` — which ran the lever work — puts **both arms in a single sweep** and
+already warns when the server has restarted since the previous sweep ("a
+restart alone has moved clean finishes by 40+ points before"). So lever A/B
+work was rule-98-compliant by construction; the confound entered through
+case-vs-case comparison, which no tool was enforcing.
+
+Better still, `ab.py` recorded the server fingerprint, and sixteen archived
+sweeps — `b119-readguard` through `b132-d1-clean` — all carry **pid 69851,
+started Sat Aug 8 16:18:10 2026**. One invocation across all sixteen, so
+cross-sweep comparisons within that band are demonstrably not invocation-
+confounded. That is a real clearance, not an assumption.
+
+The gap: **31 of 47 archived sweeps record no server at all**, because only
+`ab.py` ever wrote the field — a plain `harness.py run` sweep never did. That
+is why §5.141's confound had to be established from sweep timestamps and effect
+sizes rather than read off the file, and why it cannot be checked at all for
+the b140/b141/b150 bands.
+
+Closed: `harness.py` now records the fingerprint on every sweep, probed once
+per process and cached. Probed *once* deliberately — a sweep must record the
+invocation it started under, and re-probing per run would silently overwrite it
+if the server restarted partway, which is the single event the record exists to
+expose. Three tests pin that, including that an unidentifiable server records
+`null` rather than failing the sweep.
+
+The running `b160-mdd-calib` sweep is confirmed single-invocation by direct
+probe (pid 36898, up 20:03:01), so its three cases *are* comparable with each
+other — which is what makes it usable as the partial rule-86 re-test.
