@@ -334,7 +334,13 @@ L5864). Same rule, refined in place, no amendment.
   specimen: `exec-stall-trap`'s `escaped_without_grinding` is implied by
   `tests_pass` with zero exceptions in 129 runs, fires 126/129, and pays a third
   of the outcome mean of the case named for it. The fix is to make such a check
-  veto as a guard rather than pay. §5.153.
+  veto as a guard rather than pay. **Applicability, amended at §5.156: this is a
+  sweep-accumulation rule, not a calibration gate.** Mixed runs require models
+  that get *partway*, so repeats of one model on a new case typically produce
+  none — `b160-mdd-calib` gave 0/6, 0/6 and 1/6, and `checkdeps` declined all
+  three. Never convert a check on a handful of mixed runs; below `MIN_MIXED` the
+  refusal *is* the answer, and it doubles as a headroom reading, since "0/6
+  mixed" says the case does not discriminate within that model. §5.153, §5.156.
 
 - **Rule 98: Interleave the arms of a within-model comparison inside one server
   invocation — arms split across sweeps are confounded with a nuisance effect as

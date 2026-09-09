@@ -12632,3 +12632,109 @@ recorded as FLAT at n=6 and n=12 has a tail at roughly 1-in-12. §5.152's
 conclusion is unchanged — the suite has no useful *score range* — but "flat"
 should be read as "flat apart from a rare agent-side stall", and a case's
 apparent flatness at n=6 is not evidence of no tail.
+
+## §5.156 — the first partial run, and what n=6 cannot tell us (2026-09-08)
+
+`b160-mdd-calib`, one invocation, qwen38, three cases x 6.
+
+| case | mean | range | solved |
+|---|---|---|---|
+| contract-spread | 1.000 | flat | 6/6 |
+| multi-defect-blind | 0.833 | 0.000-1.000 | 5/6 |
+| multi-defect-deep | 0.867 | 0.200-1.000 | 5/6 |
+
+### The two failures are not the same kind of failure
+
+This is the distinction the score column hides. `multi-defect-blind` run 3 scored
+0.000 with **all five outcome checks false**, killed at 7 iterations by
+`the model repeated the same tool call without making progress`. Every check
+false is a *unanimous* run: it tells us the agent stalled, and nothing whatever
+about the case.
+
+`multi-defect-deep` run 3 scored **0.200 — one check true, four false**. That is
+the **first genuinely partial run the suite has ever produced.** Everything
+before it, across every sweep, has been all-or-nothing.
+
+### The partial run is rule 89, measured
+
+Rule 89 was coined from reasoning: correctness must gate before either clock,
+because "a give-up run is the fastest run on the board." Here is the instance.
+
+The run made **4 tool calls total** — `ls`, `read_file`, `edit_file`, `bash` —
+fixed the single easiest defect, and stopped. `stop_reason: null`,
+`clean_finish: true`, `tool_errors: 0`. Nothing killed it; the model decided it
+was done with four of five defects untouched.
+
+It is simultaneously **the fewest iterations in its block (4 against 12-14)** and,
+setting the stall aside, **the fastest run on the board (134.9s against
+292-795s)**. Both metrics rank the worst run first. Rule 89 now has a measured
+case and not just an argument.
+
+### Rule 97 cannot be applied to a calibration sweep
+
+Rule 97 says to run `checkdeps` on a new case's calibration sweep before
+believing its score range. Run on this one, it declines:
+
+```
+## contract-spread      k=4 outcome checks   0/6 runs mixed
+## multi-defect-blind   k=5 outcome checks   0/6 runs mixed
+   -- cannot analyse: every run was all-or-nothing
+```
+
+`checkdeps` needs runs where the outcome checks *disagree*. An all-false stall is
+as unanimous as a clean solve, so `multi-defect-blind`'s failure buys nothing;
+`multi-defect-deep` contributes exactly one mixed run, against `MIN_MIXED = 8`.
+
+**Rule 97 is a sweep-accumulation rule, not a calibration gate**, and the wording
+committed at §5.153 overstates when it can be used. It becomes applicable once a
+case has collected mixed runs — which requires models that get *partway*, i.e.
+models of differing strength, not six repeats of one. Amended in RULES.md.
+
+The refusal is still informative, just not in the way the rule claimed:
+**`checkdeps` declining to analyse is itself a headroom reading.** "0/6 mixed"
+says this case does not discriminate within this model — the same verdict §5.152
+reached about the flat suite, reached independently and from run structure rather
+than from score spread.
+
+### One rule-97 suspect, logged and deliberately not acted on
+
+`fixed_touching_spans` is 6/6 while the case's other four outcomes are 5/6 — the
+partial run scored exactly it and nothing else. That is the shape of a "did the
+model do anything at all" check, structurally like `exec-stall-trap`'s
+`escaped_without_grinding`. Logged as a suspect. **Not converted to a guard**:
+one mixed run is not evidence, and converting on n=1 is the error rule 97 exists
+to prevent.
+
+### This sweep predates its own fixes
+
+`b160-mdd-calib` started 20:02:56. The interleave fix landed 20:24:38 (7bc39bc)
+and the fingerprint 20:27:13 (e8fdd70). So it ran **blocked by case** and stored
+`"server": null`. No bug — it simply started first.
+
+The invocation was single (pid 36898, probed directly while it ran), so rule 98's
+2.00x confound is absent. But blocking means **position in the sweep is confounded
+with case**. Concretely: `multi-defect-deep`'s higher wallclock must not be read
+as the case being slower. It ran last. The chained rule-86 re-test runs on the
+fixed harness and does interleave.
+
+### A timing observation offered as a hypothesis, not a finding
+
+Run 13 (`multi-defect-deep` rep 1) took **794.6s at 9.6 generated chars/sec**
+against 24-32 c/s everywhere else in the sweep. Run 14 did the **same 14
+iterations in 358.4s**. Identical iteration count, 2.2x wallclock, adjacent runs,
+one invocation.
+
+That is the cleanest instance of rule 88's time/iteration disagreement in the
+archive, precisely because rule 98's confound cannot be present — same server,
+same case, same model, back to back. The low chars/sec says the model generated
+*slower per character*, not that it did more work. Cause unattributed. A
+prompt-cache miss at the head of a new case prefix is a plausible mechanism and
+nothing here tests it.
+
+### Milestone status: headroom is real but thin
+
+The "build 1-2 cases with real headroom" leg has produced one case that can
+express a partial result, at a rate of **one partial run in twelve**. Against a
+suite where the number was previously zero in every sweep, that is progress and
+it is not yet enough to discriminate models. `contract-spread` is flat at 6/6 and
+should be understood as a length test, not a difficulty test.

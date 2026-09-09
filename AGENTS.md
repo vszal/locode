@@ -139,9 +139,13 @@ Keep on Opus **only** what truly needs it:
   far enough to be partial — that only exists across a sweep. `exec-stall-trap`'s
   `escaped_without_grinding` is implied by `tests_pass` with zero exceptions in
   129 runs, fires 126/129, and pays a third of the mean on the case named for
-  it. Run `evals/checkdeps.py` on a new case's calibration sweep before
-  believing its score range; a check that never varies among the *mixed* runs
-  should veto as a guard, not pay.
+  it. A check that never varies among the *mixed* runs should veto as a guard,
+  not pay — measure it with `evals/checkdeps.py`. But this is a
+  **sweep-accumulation rule, not a calibration gate** (§5.156): mixed runs need
+  models that get *partway*, so repeats of one model on a new case usually give
+  none and `checkdeps` will decline. That refusal is the answer, and it doubles
+  as a headroom reading — "0/6 mixed" says the case does not discriminate within
+  that model. Never convert a check on a handful of mixed runs.
 - **Interleave the arms of a within-model comparison inside one server
   invocation** (rule 98). Restarting the server moves a fixed case+model's
   iteration mean by 2.00x, which is as large as anything the suite measures, so
