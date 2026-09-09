@@ -11935,3 +11935,159 @@ was caught by an independent measurement; both errors here were caught by asking
 for the mechanism *after* announcing the result. The order is the bug. A
 difference this size needed its noise band established first — one afternoon of
 20 runs would have foreclosed the entire chase on day one.
+
+## §5.150 — the instrument audit: what the bench can and cannot see (2026-09-08)
+
+§5.149 ended with a metric whose noise band swallowed four findings. The obvious
+next question is not "what else moved" but **"what can this instrument still
+detect at all?"** Every claim after this one — context summarization, a profile
+change, a model swap — gets measured on it. So it was audited before it was used
+again.
+
+Answering it needs a measurement — 12 runs per shipped case, §5.151 — but the
+audit that had to come first produced four findings on its own, and none of them
+was the one being looked for.
+
+### 1. Rule 90 was never applied to the research cases
+
+§5.142 split each grader's checks into outcomes (averaged), guards (veto only)
+and derived (reported only), because flat averaging paid an untouched seed 0.500
+on three of the four shipped cases. That fix landed on `locode/bench/cases/`.
+It never landed on `evals/cases/`.
+
+Grading every case's untouched seed — copy the seed, run the case's own
+`check()`, score it, expect 0.000 — shows what that cost:
+
+| case | seed score, as it stood | what it was paid for |
+|---|---|---|
+| `exec-ambig` | 0.500 | `suite_intact`, `did_not_edit_tests` |
+| `exec-from-plan` | 0.500 | `suite_intact`, `did_not_edit_tests` |
+| `exec-stall-trap` | 0.500 | those two + `finished_without_budget_stop` |
+| `regression-trap` | 0.444 | three "still works" checks + `did_not_edit_tests` |
+| `plan-hijack` | 0.375 | `runs_clean`, `did_not_hijack`, `no_plan_needed` |
+| `cross-module-cause` | 0.333 | `formatting_still_correct`, `runs_clean`, `did_not_edit_data` |
+| `git-url-empty` | 0.286 | `avoided_url_trap`, `no_empty_stall` |
+| `syntax-fix` | 0.250 | `kept_the_body` |
+| `diff-report` | 0.167 | `runs_clean` |
+| `multi-defect-suite` | 0.125 | `did_not_edit_tests` |
+| `plan-doc` | 0.077 | `stayed_in_plan_mode` |
+| `design-doc` | 0.067 | `stayed_in_design_mode` |
+| `bugfix-notest` | 0.143 | `did_not_edit_data` |
+| `e2e-spec-to-code` | 0.000 | — (no seed-true checks) |
+
+Thirteen of fourteen. All four shipped cases were already clean. Each research
+case now declares its guards; all eighteen score exactly 0.000 on their seed,
+and `tests/test_case_seeds.py` asserts it per case so a new case cannot forget.
+Verified by mutation: dropping `did_not_edit_tests` from `exec-ambig`'s GUARDS
+fails that test at 0.500.
+
+**What this does not touch.** `solved` requires a *full* score, which still
+demands every outcome true and every guard held, so archived pass/fail counts
+are unaffected — and so is every verdict quoted on `fully_fixed` or on a named
+boolean check, which is how the exec-ambig ship/revert decisions (§5.69, §5.71,
+§5.78) were actually reported. Only partial-credit means were on the inflated
+scale.
+
+One thing found and deliberately not fixed: `exec-stall-trap`'s
+`escaped_without_grinding` is `0 < iterations <= GRIND_LIMIT`, which a model
+that quits after one iteration passes. That is rule 89's give-up-is-the-fastest-
+run trap sitting inside a scored check. It is a case-design question, not a
+guard declaration, and that case is not a promotion candidate anyway.
+
+### 2. Half the shipped bench cannot express partial credit
+
+With guards out of the mean, the count of *outcome* checks is the resolution of
+each case's scale:
+
+| outcomes | cases |
+|---|---|
+| 1 (binary) | `exec-bugfix`, `exec-pinpoint`, `exec-ambig`, `exec-from-plan` |
+| 2 | `repro-only`, `exec-stall-trap`, `syntax-fix` |
+| 4-6 | `diff-report`, `git-url-empty`, `plan-hijack`, `regression-trap`, `multi-defect-blind`, `bugfix-notest`, `cross-module-cause`, `multi-defect-suite` |
+| 10-14 | `e2e-spec-to-code` (10), `plan-doc` (12), `design-doc` (14) |
+
+`exec-bugfix` and `exec-pinpoint` — half the shipped bench — have exactly one
+outcome check each. Their score is 0.0 or 1.0 and nothing between. Against a
+mid-range model they could report pass/fail and never graded progress. This is
+independent of the ceiling: even a case with headroom cannot report *how much*
+if its scale has one step.
+
+The three finest scales in the repo are all unshipped, and all three are the
+document/e2e cases the archive records below ceiling.
+
+### 3. The aider comparison table is wrong, in locode's favour
+
+§5.136's headline table reads "three decisive wins, one narrow loss", with aider
+scoring 0.500 on `exec-ambig`, `exec-pinpoint` and `repro-only`. Those 0.500s
+are the seed floor. Under flat averaging all four of those cases scored an
+untouched seed at *exactly* 0.500, and the table's own "aider edits applied"
+column already recorded **0/6** on two of them.
+
+This is not an inference. `graded.txt` stores the per-check booleans, and every
+one of the 18 aider runs on those three cases has every outcome false:
+`tests_pass: false` on the two exec cases, `fixed_ranking: false` and
+`report_shows_top_charge: false` on `repro-only`. Re-scoring those stored
+booleans under today's guards:
+
+| case | aider, as archived | aider, corrected |
+|---|---|---|
+| `exec-ambig` (n=6) | 0.500 | **0.000** |
+| `exec-pinpoint` (n=6) | 0.500 | **0.000** |
+| `repro-only` (n=6) | 0.500 | **0.000** |
+| `bugfix-notest` (n=1) | 1.000 | 1.000 (genuinely solved) |
+
+locode's own column needs no correction: `harness rescore --dry-run` on the
+archived sweeps reports 0 runs changed, because harness-graded results were
+rescored when §5.142 landed. The asymmetry is the whole lesson — locode's runs
+went through the harness and were re-derived; aider's went through
+`grade_external.py`, which wrote a *number* to `graded.txt` and was never
+revisited. `grade_external.py` calls the guard-aware scorer today, so the file is
+stale, not the script.
+
+Corrected, the comparison is three shutouts and one narrow loss, not three wins.
+
+### 4. The archive triage: 78 flagged, almost none dead
+
+Every comparative conclusion in `ROADMAP.md`, `RULES.md`, `AGENTS.md` and
+`MODELS.md` was classified by the metric carrying it: 381 conclusions, 246 on
+score, 78 resting on iterations or wallclock. Rule 95 puts those 78 in question.
+
+Reading them, they split three ways and only the third is at risk:
+
+- **Not a two-arm comparison at all** (~30). Corpus statistics and mechanism
+  measurements: "VERIFIED 67% at 16-25 iterations, 0% at 36+" (§5.38), prefill
+  vs generation time (§5.144), cache reuse at 175x (§5.146), the 31%
+  co-residency tax (§5.147). A noise band on a treatment effect says nothing
+  about a population description.
+- **Effect an order of magnitude outside any plausible band** (~20). §5.140's
+  4.67 → 9.50 with non-overlapping sets at p=0.0022; §5.125's thinking-ON
+  costing 3-8x wallclock with 2 of 6 prompts producing *zero* content in five
+  minutes; §5.126's 15.2 versus 1.17 round trips.
+- **Inside the band** — and here nearly every one had already been reported as
+  inconclusive, not credited, or explicitly retracted (§5.8a, §5.17b, §5.36,
+  §5.45, §5.148). The A/A rows (§5.30, §5.45) are not casualties at all: they
+  are the measurements that *establish* the band.
+
+Four decision-bearing rows were read in full rather than classified. All four
+survive, and for a reason worth stating: **they are arithmetic or mechanism
+claims, not treatment-effect measurements.** §5.43's `K=8` is a budget chosen
+off an explicit cost table that says it is fitted to n=1. §5.46's KEEP is a
+hard cap truncating doomed runs — the cap fires or it does not. §5.127's tail
+drop is two nudges becoming one, deterministically, and that section already
+declines to attribute the score delta. §5.125's margin is categorical.
+
+So the archive came through in far better shape than the flag count suggests,
+and not by luck: the noise-floor gate and rule 89 meant an iteration difference
+was almost never allowed to carry a decision by itself. §5.148 was the
+exception, and §5.149 caught it.
+
+**Rule 96: a stored score is a snapshot of the rubric that was current when it
+was written; when the rubric changes, re-derive every score from its stored
+per-check booleans rather than comparing numbers minted under different rules.**
+`harness rescore` does this for harness sweeps, which is why locode's archived
+columns needed nothing; anything graded outside it — a competitor through
+`grade_external.py`, a hand-graded arm — keeps a number frozen at the rubric of
+its day and will be compared against fresh ones without complaint. Store the
+booleans, which survive a rubric change; treat the number as derived. The aider
+comparison sat wrong for two milestones because a 0.500 that meant "did nothing"
+was read as partial credit. §5.150.

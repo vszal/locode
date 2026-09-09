@@ -288,6 +288,21 @@ L5864). Same rule, refined in place, no amendment.
   twenty stochastic runs could only bound. Ask for the mechanism *before*
   announcing the result, not after. §5.149.
 
+- **Rule 96: a stored score is a snapshot of the rubric current when it was
+  written; when the rubric changes, re-derive every score from its stored
+  per-check booleans rather than comparing numbers minted under different
+  rules.** `harness rescore` does this for harness sweeps, so locode's archived
+  columns survived the rule-90 guard split untouched. Anything graded *outside*
+  the harness — a competitor through `grade_external.py`, a hand-graded arm —
+  keeps a number frozen at the rubric of its day and will be compared against
+  freshly-minted ones without complaint. Store the per-check booleans, which
+  survive a rubric change; treat the score as derived. The §5.136 aider table
+  stood wrong for two milestones because an archived 0.500 that actually meant
+  "changed nothing, collected the guard floor" was read as partial credit — the
+  same misreading §5.142 had already corrected once, for a different tool.
+  Corollary: a case's untouched seed must score 0.000, and
+  `tests/test_case_seeds.py` enforces it. §5.150.
+
 ## Not a rule
 
 - **"the run key is `repeat`, not `rep`"** — a recurring typo, not a rule. Every
@@ -301,4 +316,4 @@ State it in full at the point of coining, in its own sentence, with the number �
 `**Rule N: <one sentence>.**` — and add the row here. A number attached to a
 parenthetical is how twelve of the fifty-two entries above ended up reconstructed
 rather than quoted, and how one ended up attached to the wrong idea in four
-graders. Next free number: **96**.
+graders. Next free number: **97**.
