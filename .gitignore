@@ -35,3 +35,6 @@ evals/results/CONTAMINATED-*/
 
 # generated from the polyglot benchmark clone (Exercism content, not vendored)
 evals/cases/polyglot-*/
+# the shared jest toolchain for the JavaScript track: ~99 MB of node_modules,
+# recreated by `python evals/polyglot.py --install-jsdeps`
+evals/.jsdeps/
