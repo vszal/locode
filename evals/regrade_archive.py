@@ -2,7 +2,8 @@
 stored per-check booleans under today's GUARDS/DERIVED declarations."""
 import json, sys
 from pathlib import Path
-sys.path.insert(0, "/Users/vszalvay/Code/locode")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 from locode.bench.runner import load_grader, _score
 
 ROOTS = ("locode/bench/cases", "evals/cases")
@@ -12,13 +13,13 @@ _cache = {}
 def decls(cid):
     if cid in _cache: return _cache[cid]
     for r in ROOTS:
-        d = Path(r)/cid
+        d = ROOT / r / cid
         if (d/"check.py").is_file():
             _, g, dv = load_grader(_C(d)); _cache[cid] = (g, dv); return _cache[cid]
     _cache[cid] = None; return None
 
 rows, missing = [], set()
-for f in sorted(Path("evals/results").rglob("results.json")):
+for f in sorted((ROOT / "evals" / "results").rglob("results.json")):
     data = json.loads(f.read_text())
     runs = data if isinstance(data, list) else data.get("runs", [])
     if not isinstance(runs, list): continue
