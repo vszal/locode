@@ -133,6 +133,24 @@ Keep on Opus **only** what truly needs it:
   seed 0.500 on three of the four shipped cases, and paid the same 0.500 to a
   run that neutered every assert in the suite. `DERIVED` names aggregates like
   `fully_fixed`, reported but kept out of the mean.
+- **Score only what discriminates** (rule 97). Rule 90 is necessary and not
+  sufficient. It catches a check true of the *untouched seed*, by inspection.
+  It cannot catch one that is false on the seed and true of every run that got
+  far enough to be partial — that only exists across a sweep. `exec-stall-trap`'s
+  `escaped_without_grinding` is implied by `tests_pass` with zero exceptions in
+  129 runs, fires 126/129, and pays a third of the mean on the case named for
+  it. Run `evals/checkdeps.py` on a new case's calibration sweep before
+  believing its score range; a check that never varies among the *mixed* runs
+  should veto as a guard, not pay.
+- **Interleave the arms of a within-model comparison inside one server
+  invocation** (rule 98). Restarting the server moves a fixed case+model's
+  iteration mean by 2.00x, which is as large as anything the suite measures, so
+  arms split across sweeps are confounded and the comparison is dead — that is
+  how §5.141's localisation result was lost, and rule 86 with it. `harness.py`
+  now interleaves cases by construction and records the server fingerprint on
+  every sweep; do not defeat either. Model-vs-model cannot obey this (two
+  models cannot share an invocation), which is one more reason not to decide
+  those on time.
 - **A graded run gets a flat wallclock** (rule 91). Interactively a turn's
   `max_wallclock_seconds` is a *floor*: real progress — a tool-call batch new to
   the turn, a bash that exited 0, a plan task completed — extends it by
