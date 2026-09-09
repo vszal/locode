@@ -1547,6 +1547,18 @@ def cmd_rescore(args) -> int:
         if checker is None or not workdir.is_dir():
             why = ("case no longer exists" if case is None
                    else "scratch workspace is gone (run with --clean?)")
+            # Re-running the checker needs the workspace; re-deriving the SCORE
+            # does not — the per-check booleans are in the file. Conflating the
+            # two made `rescore` report "0 runs changed" across an archive where
+            # 105 cells moved, because every sweep old enough to matter has had
+            # its tmp dir reaped (ROADMAP 5.151). So when the case still exists,
+            # re-derive from the stored checks under today's GUARDS/DERIVED.
+            # When the case is gone there are no declarations to apply, and
+            # scoring with empty guards would silently reinstate the flat
+            # average rule 90 exists to kill — so that run is left alone.
+            if checker is not None and checks:
+                score = _score(checks, guards, derived)
+                why += "; score re-derived from stored checks"
             print(f"  !! {raw['case']} · {raw['model']} — {why}; "
                   f"metrics rescored, checks kept as-is")
             # Checks were kept as-is, so the recorded validity is kept too — a

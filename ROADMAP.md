@@ -11944,7 +11944,7 @@ detect at all?"** Every claim after this one — context summarization, a profil
 change, a model swap — gets measured on it. So it was audited before it was used
 again.
 
-Answering it needs a measurement — 12 runs per shipped case, §5.151 — but the
+Answering it needs a measurement — 12 runs per shipped case, §5.152 — but the
 audit that had to come first produced four findings on its own, and none of them
 was the one being looked for.
 
@@ -12026,7 +12026,7 @@ measured. A guard is a check true of the *seed*; a scaffolding check is one true
 of any model that produces plausible-looking output without doing the work. Rule
 90 catches the first by declaration. The second is invisible to it — §5.136 put
 it exactly right: the check is fine, the weighting is not — and only a sweep
-that watches which checks move can tell them apart. That is what §5.151 must
+that watches which checks move can tell them apart. That is what §5.152 must
 report per check, not just per case.
 
 ### 3. The aider comparison table is wrong, in locode's favour
@@ -12105,3 +12105,108 @@ its day and will be compared against fresh ones without complaint. Store the
 booleans, which survive a rubric change; treat the number as derived. The aider
 comparison sat wrong for two milestones because a 0.500 that meant "did nothing"
 was read as partial credit. §5.150.
+
+## §5.151 — "locode's own column needs no correction" was wrong: 105 cells move
+
+§5.150 corrected aider's half of the comparison table and cleared locode's,
+on this evidence: `harness rescore --dry-run` over the archived sweeps reported
+**0 runs changed**. That was a false negative, and the section's tidy asymmetry
+— harness-graded results were re-derived, `grade_external.py` results were not —
+was the wrong lesson drawn from it.
+
+The tell came from tooling built for the next measurement. `percheck.py`, the
+per-check analyzer for §5.152, printed a score range of **0.333** on
+`b142-aidercmp-repro-only`. That case declares three guards, two outcomes and
+one derived key: a guard-aware score there can only be 0.000, 0.500 or 1.000.
+A third is 2/6 — the flat average over all six keys. The stored scores had never
+been re-derived at all.
+
+### What rescore was actually reporting
+
+`cmd_rescore` needs the scratch workspace to re-run a checker, and every sweep
+old enough to matter has had its tmp dir reaped. In that branch it printed
+`scratch workspace is gone; metrics rescored, checks kept as-is` and left
+`score = old_score`. That is right about the *checks* and wrong about the
+*score*: re-running a checker needs the workspace, but re-deriving a score from
+the stored per-check booleans needs nothing but the booleans and the case's
+`GUARDS`/`DERIVED`. Both are on disk. The two were conflated, so "0 runs
+changed" meant "0 runs could be re-checked", and read as "0 runs were wrong".
+
+This is rule 96's own failure mode, committed by the tool written to enforce it.
+The rule says treat a stored score as a snapshot and re-derive it; the rescore
+path had a special case where it silently did not.
+
+Fixed: when the case still exists but the workspace is gone, the score is now
+re-derived from the stored checks. When the *case* is gone there are no
+declarations to apply, and scoring with empty guards would reinstate the flat
+average rule 90 exists to kill — so those runs are left alone rather than
+"corrected" back toward the bug. Three tests in `tests/test_harness.py` pin all
+three paths, and each fails if the re-derivation is removed.
+
+### The scale of it
+
+Re-deriving every archived run from its stored booleans under today's
+declarations: **105 (sweep, case, model) cells move, every one of them
+downward.** Guards used to pay, and now they do not.
+
+| |delta| | cells |
+|---|---|
+| >= 0.25 | 48 |
+| 0.10 - 0.25 | 15 |
+| 0.05 - 0.10 | 17 |
+| < 0.05 | 25 |
+
+Forty of the 105 go to exactly 0.000. The distribution is the shape the bug
+predicts: the large deltas land on the execution cases, where a handful of
+guards were half the mean and a model that did nothing collected 0.500; the
+sub-0.05 deltas land on `plan-doc` and `design-doc`, where removing one guard
+from a fourteen-key average barely moves the number.
+
+### What survives, and what does not
+
+Two checks decide how much of the archive this costs.
+
+**Solved counts: zero changes, archive-wide.** `solved` requires a full score,
+which requires every outcome true *and* every guard held — the same bar before
+and after. Every pass/fail verdict, every `fully_fixed` count, and every
+conclusion resting on "n of m runs solved it" stands untouched. That was
+asserted in §5.150 from the definition; it is now measured across every run on
+disk.
+
+**Winner flips: three, and only one is real.** Comparing each sweep's arms
+before and after:
+
+| sweep · case | as archived | re-derived |
+|---|---|---|
+| `r10-complete` · `exec-stall-trap` | qwencoder14 0.389, qythos9 **0.722** | 0.000 — 0.000 |
+| `r11-repeat` · `exec-bugfix` | qwencoder14 0.417, qythos9 **0.500** | 0.000 — 0.000 |
+| `r6-baseline` · `plan-doc` | **qwencoder14 0.643**, qythos9 0.361 | 0.000 — **qythos9 0.308** |
+
+The first two are not really reversals: both arms collapse to a shared shutout,
+so what died is a lead one model never earned, not a ranking. The third is a
+genuine inversion, and it is the cleanest illustration of rule 90 in the
+archive. `qwencoder14` scored 0.643 on all three `plan-doc` runs with
+`stayed_in_plan_mode` **false on all three** — it left plan mode and started
+editing, violating the one thing the case exists to test, and was paid nine of
+fourteen keys for the work it did while violating it. `qythos9` held the guard
+and scored below it. Under the veto the ranking is the right way round.
+
+That row is cited nowhere. §5.141's `r6-baseline` table compares iterations
+against wall-clock and does not use `plan-doc`, so rule 88's finding is
+unaffected.
+
+### The standing correction
+
+§5.150 section 3's table is still right about aider. Its closing claim —
+"locode's own column needs no correction" — is **retracted**. The corrected
+reading of §5.136's comparison: aider is shut out 0.000 on the three hard cases,
+and locode's `repro-only` figure is **0.667 (n=12)**, not the 0.819 published
+there, nor the 0.717 §5.138 revised it to. The conclusion is unchanged in
+direction and larger in margin, which is exactly why it went unexamined for two
+milestones: nobody audits a number that is winning.
+
+The archived `results.json` files are **not rewritten**. The fix makes
+`harness rescore` able to do it, but a bulk rewrite of the historical record is
+a separate decision, and every conclusion drawn from those files is now known to
+be safe or corrected above. Re-derive on read (rule 96); do not quietly restate
+the past.

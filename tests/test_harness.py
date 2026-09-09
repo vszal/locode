@@ -899,3 +899,75 @@ def test_no_setup_script_is_not_an_error(tmp_path):
     ws = tmp_path / "ws"
     ws.mkdir()
     assert h._run_setup(case, ws) == ""
+
+
+# --- cmd_rescore: score re-derivation without a workspace -----------------
+# A rescore that cannot re-run the checker can still re-derive the score: the
+# per-check booleans are in results.json, and GUARDS/DERIVED live in the case.
+# Conflating "workspace gone" with "nothing to do" made rescore report zero
+# changes across an archive where 105 cells moved (ROADMAP 5.151).
+def _rescore_fixture(tmp_path, checks, guards="{'g'}", derived="set()"):
+    case = tmp_path / "cases" / "c"
+    case.mkdir(parents=True)
+    (case / "case.json").write_text("{}")
+    (case / "prompt.md").write_text("do the thing\n")
+    (case / "check.py").write_text(
+        f"GUARDS = {guards}\nDERIVED = {derived}\n"
+        "def check(ctx):\n    raise AssertionError('workspace is gone')\n")
+    results = tmp_path / "results" / "sweep"
+    (results / "events").mkdir(parents=True)
+    (results / "events" / "c__m__r1.jsonl").write_text(
+        '{"phase": "assistant_start", "t": 1.0}\n')
+    import json
+    (results / "results.json").write_text(json.dumps({
+        "label": "sweep",
+        "runs": [{
+            "case": "c", "track": "t", "model": "m", "repeat": 1,
+            "score": 0.750, "checks": checks, "metrics": {},
+            "returncode": 0, "timed_out": False, "seconds": 1.0,
+            "workdir": str(tmp_path / "gone"),
+        }],
+    }))
+    return results
+
+
+def _rescore(monkeypatch, results, tmp_path):
+    monkeypatch.setattr(harness, "CASE_ROOTS", [tmp_path / "cases"])
+    args = type("A", (), {"results": str(results), "dry_run": True})()
+    assert harness.cmd_rescore(args) == 0
+    import json
+    return json.loads((results / "results.json").read_text())
+
+
+def test_rescore_rederives_score_when_workspace_is_gone(
+        tmp_path, monkeypatch, capsys):
+    # Three of four checks true, but one of them is the guard: under rule 90
+    # the two outcomes are what is averaged, so 0.750 flat becomes 0.500.
+    results = _rescore_fixture(
+        tmp_path, {"g": True, "a": True, "b": False, "c2": True},
+        guards="{'g'}", derived="{'c2'}")
+    _rescore(monkeypatch, results, tmp_path)
+    out = capsys.readouterr().out
+    assert "score re-derived from stored checks" in out
+    assert "0.750 -> 0.500" in out
+
+
+def test_rescore_failed_guard_vetoes_without_a_workspace(
+        tmp_path, monkeypatch, capsys):
+    results = _rescore_fixture(
+        tmp_path, {"g": False, "a": True, "b": True}, guards="{'g'}")
+    _rescore(monkeypatch, results, tmp_path)
+    assert "0.750 -> 0.000" in capsys.readouterr().out
+
+
+def test_rescore_leaves_the_score_alone_when_the_case_is_gone(
+        tmp_path, monkeypatch, capsys):
+    # No case means no GUARDS to apply, and scoring with empty guards would
+    # silently reinstate the flat average. Better to change nothing.
+    results = _rescore_fixture(tmp_path, {"g": True, "a": True, "b": False})
+    monkeypatch.setattr(harness, "CASE_ROOTS", [tmp_path / "empty"])
+    args = type("A", (), {"results": str(results), "dry_run": True})()
+    assert harness.cmd_rescore(args) == 0
+    out = capsys.readouterr().out
+    assert "case no longer exists" in out
+    assert "0 run(s) would change" in out
