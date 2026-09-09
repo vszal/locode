@@ -797,11 +797,37 @@ def print_report(summary: dict, title: str = "") -> None:
 
 
 # A sweep generating below this is not measuring the agent, it is measuring the
-# box. Set well under the ~72.8 chars/s a healthy full sweep pools at, so normal
-# variation and a slower model mix never trip it — the failure this exists to
-# catch ran at ~11 chars/s, an order of magnitude down, when a draining battery
-# put the host into Low Power Mode overnight.
+# box. Kept only as the fallback for a model with no archived history: an
+# ABSOLUTE floor cannot express "slow for this model" and so it eventually
+# indicts one. It was set under the ~72.8 chars/s a healthy full sweep pooled at
+# in 2026-07, when every model in the mix cleared it comfortably; qwen38 became
+# the config default in 2026-09 and decodes at 20.9-28.6 chars/s across all 11
+# of its archived sweeps — it has never once cleared 30, so the floor fired on
+# every qwen38 sweep ever run, including the healthy ones (§5.159). An alarm
+# with a 100% false-positive rate on the default model is worse than no alarm;
+# it taught a reader to discard a valid sweep. Prefer _rate_baseline below.
 MIN_GEN_RATE = 30.0
+
+# What the alarm actually wants to know is not "is this slow" but "is this slow
+# FOR THIS MODEL" — the 2026-07-22 throttle ran at ~11 chars/s against a ~106
+# baseline, a tenth. So compare each model against the median of its own
+# archived sweeps and fire on a large relative drop.
+#
+# Half, calibrated on the observed spread rather than on a caught positive: over
+# every archived sweep with enough history to have a baseline, the slowest
+# legitimate one sits at 0.54 of its model's median (b142-aidercmp-exec-pinpoint,
+# qythos9, 33.0 against 61.6 over 43 sweeps) and the distribution thins steadily
+# from there. 0.5 therefore fires on nothing in the archive, where the old
+# absolute floor fired on all 11 qwen38 sweeps. Note what that does and does not
+# establish: it is a measured false-positive rate of zero, and it is NOT a
+# demonstrated true positive — the 2026-07-22 sweep predates `gen_chars` and is
+# not in `evals/results/` to re-test against. If a throttle is ever caught, put
+# its ratio here.
+RATE_DEGRADED_FRACTION = 0.5
+
+# Below this many prior sweeps the median is not a baseline, it is one number
+# with a rounding error, so fall back to the absolute floor.
+MIN_RATE_HISTORY = 3
 
 # The absolute rate floor only means "throttled box" once the sweep has
 # generated enough text that its chars/s reflects sustained decoding rather than
@@ -818,6 +844,82 @@ MIN_GEN_CHARS_PER_RUN = 800.0
 # remaining runs a fair sample; above it, whatever went wrong went wrong broadly
 # enough that the surviving runs are a self-selected subset, not a sample.
 _MAX_INVALID_RATE = 0.20
+
+
+def _rate_baseline(model: str, exclude: str = "") -> tuple[float | None, int]:
+    """`(median pooled chars/s across this model's archived sweeps, n sweeps)`.
+
+    Reads the archive rather than a hard-coded table so the baseline tracks the
+    box: a machine that gets faster, a quant that gets swapped, a model that
+    joins the mix all move it without anyone remembering to edit a constant.
+    `exclude` drops the sweep being judged, which would otherwise vote on its
+    own baseline. Pools chars over seconds WITHIN a sweep before taking the
+    median ACROSS sweeps, so one long case cannot outvote a short one and one
+    bad night cannot drag the baseline down with it."""
+    rates = []
+    if not RESULTS_DIR.is_dir():
+        return None, 0
+    for path in RESULTS_DIR.glob("*/results.json"):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        if exclude and data.get("label") == exclude:
+            continue
+        chars = seconds = 0.0
+        for run in data.get("runs", []):
+            if run.get("model") != model:
+                continue
+            metrics = run.get("metrics") or {}
+            chars += metrics.get("gen_chars") or 0
+            seconds += metrics.get("gen_seconds") or 0.0
+        if chars and seconds:
+            rates.append(chars / seconds)
+    if not rates:
+        return None, 0
+    return statistics.median(rates), len(rates)
+
+
+def _rate_degraded(runs: list[RunResult], label: str) -> list[tuple]:
+    """Which models in this sweep generated far below their own history.
+
+    One entry per degraded model: `(model, rate, baseline, n_sweeps)`, with
+    `baseline` None when the verdict came from the absolute floor instead. Per
+    model, not per sweep: a mixed sweep pools a fast model and a slow one into a
+    number that describes neither, and it is the individual model's runs that
+    would be time-censored."""
+    out = []
+    for model in dict.fromkeys(r.model for r in runs):
+        rate = _mean_rate([r for r in runs if r.model == model])
+        verdict = _judge_rate(model, rate, label)
+        if verdict:
+            out.append(verdict)
+    return out
+
+
+def _judge_rate(model: str, rate: float | None, label: str) -> tuple | None:
+    """`(model, rate, baseline, n_sweeps)` if this rate is degraded, else None.
+    Split out from `_rate_degraded` because the pre/post gate has a summary
+    rather than a list of runs, and both paths must agree on what "slow" means
+    — two thresholds for one question is how the absolute floor drifted stale
+    unnoticed in the first place."""
+    if not rate:
+        return None
+    baseline, n = _rate_baseline(model, exclude=label)
+    if baseline is not None and n >= MIN_RATE_HISTORY:
+        return (model, rate, baseline, n) if rate < baseline * RATE_DEGRADED_FRACTION else None
+    return (model, rate, None, n) if rate < MIN_GEN_RATE else None
+
+
+def _describe_degraded(entry: tuple) -> str:
+    """One clause naming what the rate was measured against, so a reader can
+    tell "slow for this model" from "slow, and we had nothing to compare to"."""
+    model, rate, baseline, n = entry
+    if baseline is None:
+        return (f"{model} generated at {rate:.1f} chars/s, below the absolute "
+                f"{MIN_GEN_RATE:.0f} floor (no archived baseline for it yet)")
+    return (f"{model} generated at {rate:.1f} chars/s, {rate / baseline:.0%} of "
+            f"its own {baseline:.1f} baseline over {n} archived sweep(s)")
 
 
 def _rate_is_trustworthy(summary: dict) -> bool:
@@ -841,13 +943,34 @@ def _budget_bound(runs) -> bool:
     hardware and still finishes well inside budget (qwen38, 2026-09-06: 138s of
     a 600s budget, nothing timed out). Slowness and invalidity are different
     claims, and the rate alone cannot tell them apart — so ask the budget."""
+    return bool(_censored(runs))
+
+
+def _censored(runs) -> list:
+    """The runs that were still working when a budget stopped them.
+
+    Named for what it is: right-censoring. The model did not fail these, it ran
+    out of clock, and the difference matters because a censored 0.00 is an
+    unknown while an ordinary 0.00 is a verdict. Iteration exhaustion counts too
+    — it is the same censoring through a different budget, and a run that used
+    all 40 iterations tells us as little as one that used all 600 seconds."""
+    out = []
     for r in runs:
-        if getattr(r, "timed_out", False):
-            return True
-        reason = ((getattr(r, "metrics", None) or {}).get("stop_reason") or "")
-        if "wallclock" in reason.lower() or "time limit" in reason.lower():
-            return True
-    return False
+        reason = ((getattr(r, "metrics", None) or {}).get("stop_reason") or "").lower()
+        if getattr(r, "timed_out", False) or (
+                # The agent's own marker for "a limit stopped me", so this reads
+                # the loop's intent instead of guessing at prose. Substring
+                # matching on "iteration" does NOT work: a give-up reason says
+                # "8 iterations since the repeat was flagged changed nothing",
+                # which is a verdict, not censoring — it misfiled scale-generator
+                # as censored on the §5.159 pilot.
+                reason.startswith("budget:")
+                # …except the idle timeout, which fires because the model STOPPED
+                # working. Censoring means we interrupted progress; this is the
+                # absence of progress, and counting it inflates the upper bound.
+                and not reason.startswith("budget: no progress")):
+            out.append(r)
+    return out
 
 
 def _power_state() -> tuple[bool | None, str]:
@@ -988,16 +1111,23 @@ def _validity_warnings(baseline: dict, candidate: dict) -> list[str]:
             f"candidate generated at {cr:.1f} chars/s vs the baseline's "
             f"{br:.1f} ({cr / br:.0%}) — the box was slower, and every budget "
             "in the loop is a wallclock budget")
-    elif cr and cr < MIN_GEN_RATE and _rate_is_trustworthy(candidate):
-        # The relative check above needs a baseline that recorded throughput,
-        # and no sweep before 2026-07-22 did — so against every existing
-        # baseline it silently skips. An absolute floor needs nothing to compare
-        # against, which makes it the check that actually fires on a degraded
-        # run. `elif` only because the relative message is strictly more
+    elif cr and _rate_is_trustworthy(candidate):
+        # The relative check above needs a BASELINE SWEEP that recorded
+        # throughput, and no sweep before 2026-07-22 did — so against every
+        # older baseline it silently skips. Fall back to the model's own
+        # archived history, which needs nothing from the baseline sweep at all.
+        # `elif` only because the baseline-vs-candidate message is strictly more
         # informative when both would trip.
-        warnings.append(
-            f"candidate generated at {cr:.1f} chars/s, below the {MIN_GEN_RATE:.0f} "
-            "floor — that is a throttled or contended box, not a slow agent")
+        # Only when ONE model is in play: `cr` is pooled over the whole sweep,
+        # so on a mixed sweep it describes neither model and would be compared
+        # against the wrong history. Better silent than confidently misattributed.
+        models = {row.get("model") for row in candidate.get("rows", {}).values()}
+        entry = (_judge_rate(models.pop(), cr, candidate.get("label", ""))
+                 if len(models) == 1 else None)
+        if entry:
+            warnings.append(_describe_degraded(entry)
+                            + " — that is a throttled or contended box, "
+                              "not a slow agent")
     return warnings
 
 
@@ -1399,22 +1529,36 @@ def cmd_run(args) -> int:
     summary = summarize(runs)
     print_report(summary, f"RESULTS · {label}")
     # Flag a degraded sweep at the point it finishes, not an hour later when
-    # someone tries to compare it. The rate is the sweep's own number, so this
-    # needs no baseline to fire.
-    rate = summary.get("gen_rate")
-    if rate and rate < MIN_GEN_RATE and _rate_is_trustworthy(summary):
-        if _budget_bound(runs):
-            print(f"\n!! generated at {rate:.1f} chars/s, below the "
-                  f"{MIN_GEN_RATE:.0f} floor, AND at least one run hit its time "
-                  "limit. Every budget in the loop is a wallclock budget, so "
-                  "these scores measure the machine as much as the agent. Do "
-                  "not use them as a baseline.", flush=True)
+    # someone tries to compare it. Two INDEPENDENT questions, deliberately
+    # reported separately — the old code and-ed them into one verdict and so
+    # could only say "the box was sick", never "the box was fine and four runs
+    # ran out of time anyway", which is what actually happened at §5.159.
+    degraded = _rate_degraded(runs, label) if _rate_is_trustworthy(summary) else []
+    censored = _censored(runs)
+    if degraded:
+        for entry in degraded:
+            print(f"\n!! {_describe_degraded(entry)}.", flush=True)
+        if censored:
+            print("   …AND at least one run hit its time limit. Every budget in "
+                  "the loop is a wallclock budget, so these scores measure the "
+                  "machine as much as the agent. Do not use them as a baseline.",
+                  flush=True)
         else:
-            print(f"\n!! generated at {rate:.1f} chars/s, below the "
-                  f"{MIN_GEN_RATE:.0f} floor, but no run hit its time limit — "
-                  "so this is a slow model, not necessarily a sick box. The "
-                  "scores stand; do not compare this sweep's RATE against one "
-                  "from a different model.", flush=True)
+            print("   …but no run hit its time limit, so this is a slow box, not "
+                  "a spoiled sweep. The scores stand.", flush=True)
+    if censored:
+        # A censored run is an UNKNOWN, not a failure: the model was still
+        # working when the clock stopped. Reporting it as 0.00 silently turns
+        # "we did not find out" into "it could not do it", and the difference is
+        # the whole width of the confidence interval.
+        print(f"\n!! {len(censored)} of {len(runs)} run(s) hit a time or "
+              "iteration budget while still working — their scores are LOWER "
+              "BOUNDS, not verdicts:", flush=True)
+        for r in censored:
+            print(f"     {r.case}· {r.model} r{r.repeat}  score={r.score:.2f} "
+                  f"{r.seconds:.0f}s", flush=True)
+        print("   Re-run just those at a larger budget before quoting the rate.",
+              flush=True)
     if len(runs) < total:
         print(f"\n!! only {len(runs)} of {total} runs completed — partial sweep.",
               flush=True)
