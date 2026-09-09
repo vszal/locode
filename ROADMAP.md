@@ -12407,3 +12407,37 @@ two thirds of the mean was never resolving anything.
 
 Nine tests in `tests/test_checkdeps.py` pin all of it, including both artifacts
 that produced the wrong answers on the way here.
+
+### Reconciling with §5.150, which found this check first and left it
+
+§5.150 already flagged `escaped_without_grinding`, for a *different* defect: it
+is `0 < iterations <= GRIND_LIMIT`, so a model that quits after one iteration
+passes it — rule 89's give-up-is-the-fastest-run trap sitting inside a scored
+check. It was deliberately not fixed, on the grounds that this is case design
+rather than a guard declaration, and the case is not a promotion candidate.
+
+That decision stands, and the new evidence does not overturn it — but the two
+defects compound, and it is worth being exact about what each fix would buy.
+
+Moving the check into `GUARDS`, which is what rule 97 prescribes in general,
+was measured against the whole archive: **15 of 129 runs move** (14 by -0.500,
+one by -0.167) and **zero solved-counts change**, because the existing guards —
+chiefly `finished_without_budget_stop` at 85/129 — already veto most of the
+affected runs to 0.000. That -0.500 on fourteen runs is exactly what the
+padding was worth.
+
+But that fix does not address §5.150's complaint at all. A run that quits after
+one iteration has `escaped_without_grinding` **true**, so it passes the guard
+just as it passed the check; vetoing on a condition the give-up run satisfies
+penalises nothing. The two findings want different repairs:
+
+| defect | fix | what it costs |
+|---|---|---|
+| free to every model (§5.153) | declare it a guard | 15 archived runs move, 0 verdicts |
+| rewards giving up (§5.150) | redefine the predicate — case design | a new case identity |
+
+So the case is left alone, per §5.150's standing decision, and this is recorded
+as the reason rather than re-litigated later: a guard conversion here would move
+fifteen numbers and fix half a problem. `exec-stall-trap` needs its stall-escape
+predicate rewritten to distinguish "escaped the trap" from "did not engage with
+it", and until it gets one, its third check should be read as decoration.
