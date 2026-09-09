@@ -13080,3 +13080,96 @@ job instead of a 21st hand-authored rubric.
 Open, and deliberately not done here: a second model on the same 34 items. That
 is the comparison the instrument was built for, and one model's 0.676 is a
 calibration reading, not a result.
+
+## §5.160 — the borrowed set earns its keep: qwen38 over qwythos9, p = 0.0034 on 34 paired items (2026-09-09)
+
+`b163-polyglot-qwythos9` ran the previous default over the same 34 items
+`b161` ran the current one over. This is the comparison the instrument was built
+for, and the one AGENTS.md's switch-defaults recommendation has been resting on a
+single case to make.
+
+| | qwen38 | qwythos9 |
+|---|---|---|
+| solved | **23/34 = 0.676** | **12/34 = 0.353** |
+| Wilson 95% CI | [0.508, 0.809] | [0.212, 0.518] |
+
+### The paired test is the one that matters
+
+Both models faced identical items, so the design is **paired**, and pairing is
+free here in a way it never is with the bespoke suite — a borrowed task set hands
+you the same 34 problems for every model you point at it. Discordant pairs:
+**qwen38 solved 12 that qwythos9 did not; qwythos9 solved 1 that qwen38 did not**
+(`variable-length-quantity`). McNemar, exact two-sided binomial on 13 discordant
+pairs: **p = 0.0034**.
+
+Note what pairing buys. The two unpaired Wilson intervals *overlap* ([0.508,
+0.809] against [0.212, 0.518]) — read as two independent proportions this is not
+a significant difference. Paired, it is decisive at p = 0.0034. The unpaired
+reading throws away the fact that both models attempted the same `forth`, the
+same `bowling`, the same `zebra-puzzle`, and item difficulty is exactly the
+nuisance variance pairing removes.
+
+So the standing recommendation survives a much harder test than the one that
+produced it. §5.138 rested the default on `repro-only`, 20/20 against 9/20 — one
+case. This is 34 items, one run each, and it agrees.
+
+### The confound runs the right way
+
+Model-vs-model cannot obey rule 98: two models cannot share a server invocation.
+The route by which a different invocation could bias a *pass rate* — as opposed
+to a timing — is censoring, since every budget in the loop is a wallclock budget.
+Rule 99's new report makes that auditable, and it goes the wrong way for the
+winner: **qwen38's arm had four censored runs, qwythos9's had one.** The slower
+model lost more runs to the clock and still won by 12-1 on discordant pairs. If
+invocation asymmetry is doing anything here it is suppressing the gap, not
+manufacturing it.
+
+The rate alarm stayed silent on both arms, which is the §5.159 fix working in
+production: qwythos9 generated at ~60 chars/s, ordinary for it, and the old
+absolute floor would have said nothing either — but qwen38's 24.1 would have been
+condemned again.
+
+### A submission that hangs the suite is a failure, not an ungraded run
+
+qwythos9's `sgf-parsing` came back **ungraded**: `checker raised: TimeoutExpired`.
+The submitted `parse()` collects children with
+
+    while end < len(node) and node[end] != ')':
+        child, end = _parse_node(node, end)
+
+and `_parse_node` returns `(None, start)` *unchanged* when the character is not
+`(`. So `end` never advances, `parse` spins forever, and pytest never returns.
+Confirmed by re-running the kept workspace: still hanging at 45s.
+
+The grader let `TimeoutExpired` escape, so the run was dropped from the
+denominator — which quietly **excuses the model for the worst class of defect it
+can ship.** A submission that will not terminate is a failed submission. Fixed in
+`evals/polyglot.py`'s template and in all 34 generated graders, with the patch
+extracted from the template by regex so the two cannot drift.
+
+Worth keeping the distinction from rule 99 sharp, because they look alike and
+point opposite ways:
+
+- **Rule 99 (unknown):** a budget stopped the **agent** while it was working. We
+  interrupted it, so we did not find out.
+- **This (verdict):** the agent finished and handed over an **artefact** that does
+  not terminate. Nobody interrupted anything; the deliverable is broken.
+
+The correction moves qwythos9 from 12/33 to 12/34 — against the model that was
+already losing, which is the direction an honest fix should be checked in.
+McNemar is untouched: `sgf-parsing` is a failure for both models either way, so
+the pair is concordant and contributes nothing to the test.
+
+### What this does not establish
+
+One run per item per model. Per-item outcomes are not deterministic (§5.159:
+`pov` flipped 0.00 to 1.00 on a re-draw), so no individual row is evidence about
+either model — only the column totals and the discordant counts are. And it is
+one language, 34 items, on one box. The claim supported is "qwen38 solves
+materially more of this Python task set than qwythos9", which is precisely the
+claim AGENTS.md needed and did not have.
+
+Follow-up worth doing: the Python track is all 34 exercises there are. More
+resolution means another language — JavaScript needs only `node` — which would
+roughly double the item count and take the smallest detectable difference from
+0.34 toward 0.24.

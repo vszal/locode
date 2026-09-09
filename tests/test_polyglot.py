@@ -8,7 +8,9 @@ the real repo.
 """
 import importlib.util
 import json
+import subprocess
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -329,3 +331,62 @@ def test_prompt_md_names_instructions_stub_and_every_protected_file(
     assert "paasio.py" in prompt
     assert "paasio_test.py" in prompt
     assert "test_utils.py" in prompt
+
+
+# --------------------------------------------------------------------------
+# 10. A submission that hangs the test suite is a FAILURE, not an ungraded run.
+# --------------------------------------------------------------------------
+
+def _leap_check(tmp_path, monkeypatch):
+    cases = tmp_path / "cases"
+    monkeypatch.setattr(polyglot, "CASES", cases)
+    practice = _src_root(tmp_path)
+    _make_exercise(practice, "leap")
+    polyglot.build(tmp_path / "src")
+    return _load_check(cases / "polyglot-leap" / "check.py", "_hangcheck")
+
+
+class _Ctx:
+    """A CheckCtx stand-in whose bash() does whatever the test needs."""
+
+    def __init__(self, workdir, behaviour):
+        self.workdir, self._behaviour = workdir, behaviour
+
+    def bash(self, cmd, timeout=120):
+        return self._behaviour(cmd, timeout)
+
+
+def test_a_hanging_test_suite_scores_false_rather_than_raising(
+        tmp_path, monkeypatch):
+    """§5.160. Letting TimeoutExpired escape marks the run "checker raised",
+    which drops it from the denominator and quietly excuses the model for the
+    worst defect it can ship — qwythos9's `sgf_parsing.parse` never advanced its
+    index, so pytest ran forever and the run vanished from the score."""
+    mod = _leap_check(tmp_path, monkeypatch)
+
+    def hang(cmd, timeout):
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    result = mod.check(_Ctx(tmp_path / "cases" / "polyglot-leap" / "seed", hang))
+    assert result["tests_pass"] is False
+
+
+def test_any_checker_exception_is_a_failure_not_a_crash(tmp_path, monkeypatch):
+    """Broader than the timeout: whatever goes wrong running the model's code,
+    the answer is "these tests did not pass", never an exception out of the
+    grader."""
+    mod = _leap_check(tmp_path, monkeypatch)
+
+    def boom(cmd, timeout):
+        raise OSError("no such interpreter")
+
+    seed = tmp_path / "cases" / "polyglot-leap" / "seed"
+    assert mod.check(_Ctx(seed, boom))["tests_pass"] is False
+
+
+def test_a_passing_suite_is_still_true(tmp_path, monkeypatch):
+    """The guard must not swallow the ordinary path."""
+    mod = _leap_check(tmp_path, monkeypatch)
+    ok = lambda cmd, timeout: SimpleNamespace(returncode=0, stdout="", stderr="")
+    seed = tmp_path / "cases" / "polyglot-leap" / "seed"
+    assert mod.check(_Ctx(seed, ok))["tests_pass"] is True

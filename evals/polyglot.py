@@ -105,7 +105,23 @@ def _unmodified(ctx):
 
 
 def _tests_pass(ctx):
-    proc = ctx.bash("python3 -m pytest " + TEST_FILE + " -q 2>&1", timeout=120)
+    """False on a timeout, never an exception.
+
+    A submission that makes the suite hang is a FAILED submission, not an
+    ungraded one, and the difference is not pedantic: letting `TimeoutExpired`
+    escape marks the run "checker raised" and drops it from the denominator,
+    which quietly excuses the model for the worst class of defect it can ship.
+    qwythos9 wrote an `sgf_parsing.parse` whose child loop never advances its
+    index, so pytest ran forever (§5.160).
+
+    Distinct from rule 99, which is about a budget stopping the AGENT mid-work
+    — an unknown, because we interrupted it. Here the agent finished and handed
+    over an artefact that does not terminate. That is a property of the
+    deliverable, so it is a verdict."""
+    try:
+        proc = ctx.bash("python3 -m pytest " + TEST_FILE + " -q 2>&1", timeout=120)
+    except Exception:
+        return False
     return proc.returncode == 0
 '''
 

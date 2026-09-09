@@ -1,0 +1,2332 @@
+{
+  "label": "b163-polyglot-qwythos9",
+  "created": "2026-09-09 04:07:49",
+  "git_head": "35253fd",
+  "git_dirty": true,
+  "runs": [
+    {
+      "case": "polyglot-affine-cipher",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 12,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "write_file": 2,
+          "bash": 4,
+          "edit_file": 2
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.273,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "same failure": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 163.3,
+        "model_seconds": 161.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 123.7,
+        "gen_chars": 6074,
+        "gen_chars_per_sec": 49.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 163.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-affine-cipher__qwythos9__r1-eyh6xham",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-beer-song",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 2,
+          "write_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 73.1,
+        "model_seconds": 72.8,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 72.8,
+        "gen_chars": 2407,
+        "gen_chars_per_sec": 33.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 73.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-beer-song__qwythos9__r1-onpeeviu",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-book-store",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 1,
+          "write_file": 2,
+          "bash": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 146.3,
+        "model_seconds": 146.0,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 145.9,
+        "gen_chars": 8569,
+        "gen_chars_per_sec": 58.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 146.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-book-store__qwythos9__r1-zjs00gy2",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-bottle-song",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 27,
+        "tool_calls": 26,
+        "tool_calls_by_name": {
+          "read_file": 8,
+          "write_file": 9,
+          "bash": 9
+        },
+        "tool_errors": 9,
+        "tool_error_rate": 0.346,
+        "nudges": 11,
+        "nudges_by_reason": {
+          "same failure": 8,
+          "stale reading": 1,
+          "context compacted": 1,
+          "unchanged": 1
+        },
+        "stop_reason": "`bottle_song_test.py::BottleSongTest::test_all_verses` still fails \u2014 8 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 220.8,
+        "model_seconds": 217.7,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 217.7,
+        "gen_chars": 9378,
+        "gen_chars_per_sec": 43.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 220.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-bottle-song__qwythos9__r1-v_2g9xxv",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-bowling",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 14,
+        "tool_calls": 14,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "write_file": 5,
+          "bash": 5
+        },
+        "tool_errors": 5,
+        "tool_error_rate": 0.357,
+        "nudges": 6,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "same failure": 3,
+          "unchanged": 1,
+          "context compacted": 1
+        },
+        "stop_reason": "edits kept hitting the same error without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 330.0,
+        "model_seconds": 328.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 328.0,
+        "gen_chars": 21444,
+        "gen_chars_per_sec": 65.4,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 330.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-bowling__qwythos9__r1-f2iy_k_a",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-connect",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 15,
+        "tool_calls": 15,
+        "tool_calls_by_name": {
+          "read_file": 6,
+          "update_plan": 1,
+          "write_file": 4,
+          "bash": 4
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.267,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "same failure": 3,
+          "unchanged": 1
+        },
+        "stop_reason": "edits kept hitting the same error without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 169.1,
+        "model_seconds": 167.7,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 167.6,
+        "gen_chars": 10752,
+        "gen_chars_per_sec": 64.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 169.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-connect__qwythos9__r1-4xi60zm9",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-dominoes",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 13,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "update_plan": 2,
+          "bash": 4,
+          "write_file": 2
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.273,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "same failure": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 135.1,
+        "model_seconds": 134.0,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 134.0,
+        "gen_chars": 7718,
+        "gen_chars_per_sec": 57.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 135.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-dominoes__qwythos9__r1-fnr34jzf",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-dot-dsl",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "bash": 2,
+          "write_file": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 61.8,
+        "model_seconds": 61.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 61.1,
+        "gen_chars": 3884,
+        "gen_chars_per_sec": 63.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 61.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-dot-dsl__qwythos9__r1-712d3rdv",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-food-chain",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 29,
+        "tool_calls": 25,
+        "tool_calls_by_name": {
+          "read_file": 6,
+          "update_plan": 2,
+          "write_file": 8,
+          "bash": 9
+        },
+        "tool_errors": 8,
+        "tool_error_rate": 0.32,
+        "nudges": 12,
+        "nudges_by_reason": {
+          "same failure": 5,
+          "context compacted": 2,
+          "repeated call": 2,
+          "unchanged": 1,
+          "stale reading": 1,
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 347.5,
+        "model_seconds": 344.3,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 344.2,
+        "gen_chars": 19275,
+        "gen_chars_per_sec": 56.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 347.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-food-chain__qwythos9__r1-tshktetl",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-forth",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 16,
+        "tool_calls": 14,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "update_plan": 1,
+          "write_file": 5,
+          "bash": 4
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.286,
+        "nudges": 6,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "same failure": 2,
+          "context compacted": 2,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 372.6,
+        "model_seconds": 370.9,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 370.8,
+        "gen_chars": 23648,
+        "gen_chars_per_sec": 63.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 372.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-forth__qwythos9__r1-_dprleba",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-go-counting",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 22,
+        "tool_calls": 20,
+        "tool_calls_by_name": {
+          "read_file": 6,
+          "update_plan": 1,
+          "write_file": 6,
+          "bash": 7
+        },
+        "tool_errors": 7,
+        "tool_error_rate": 0.35,
+        "nudges": 7,
+        "nudges_by_reason": {
+          "repetition loop": 1,
+          "slow progress": 1,
+          "same failure": 4,
+          "context compacted": 1
+        },
+        "stop_reason": "`go_counting_test.py::GoCountingTest::test_a_stone_and_not_a_territory_on_5x5_board` still fails \u2014 8 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 487.1,
+        "model_seconds": 484.7,
+        "plan_updates": 1,
+        "truncations": 1,
+        "gen_seconds": 484.6,
+        "gen_chars": 33371,
+        "gen_chars_per_sec": 68.9,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 487.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-go-counting__qwythos9__r1-s0vw69c0",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-grade-school",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 13,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "update_plan": 1,
+          "write_file": 1,
+          "bash": 3,
+          "edit_file": 2
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.273,
+        "nudges": 5,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "same failure": 2,
+          "unchanged": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 137.0,
+        "model_seconds": 136.0,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 135.9,
+        "gen_chars": 5402,
+        "gen_chars_per_sec": 39.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 137.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-grade-school__qwythos9__r1-k5npv5is",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-grep",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 1,
+          "write_file": 3,
+          "bash": 3
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.333,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "same failure": 1,
+          "context compacted": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 159.4,
+        "model_seconds": 158.4,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 158.3,
+        "gen_chars": 8997,
+        "gen_chars_per_sec": 56.8,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 159.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-grep__qwythos9__r1-ny16orpj",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-hangman",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "update_plan": 1,
+          "write_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.25,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "same failure": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 95.1,
+        "model_seconds": 94.4,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 94.4,
+        "gen_chars": 5732,
+        "gen_chars_per_sec": 60.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 95.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-hangman__qwythos9__r1-d24qptnr",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-list-ops",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 39.4,
+        "model_seconds": 39.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 39.0,
+        "gen_chars": 2146,
+        "gen_chars_per_sec": 55.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 39.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-list-ops__qwythos9__r1-9pb5pnmb",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-paasio",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 27,
+        "tool_calls": 23,
+        "tool_calls_by_name": {
+          "read_file": 8,
+          "bash": 6,
+          "update_plan": 4,
+          "write_file": 1,
+          "edit_file": 4
+        },
+        "tool_errors": 6,
+        "tool_error_rate": 0.261,
+        "nudges": 8,
+        "nudges_by_reason": {
+          "context compacted": 2,
+          "open plan tasks": 2,
+          "same failure": 2,
+          "edit reverted": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 377.5,
+        "model_seconds": 374.7,
+        "plan_updates": 4,
+        "truncations": 0,
+        "gen_seconds": 374.6,
+        "gen_chars": 12032,
+        "gen_chars_per_sec": 32.1,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 377.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-paasio__qwythos9__r1-wxeqkwx1",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-phone-number",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 2,
+          "write_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 55.9,
+        "model_seconds": 55.6,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 55.6,
+        "gen_chars": 3810,
+        "gen_chars_per_sec": 68.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 56.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-phone-number__qwythos9__r1-u6le3l36",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-pig-latin",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 14,
+        "tool_calls": 12,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "write_file": 4,
+          "bash": 4
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.333,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "same failure": 3,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 122.1,
+        "model_seconds": 120.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 120.7,
+        "gen_chars": 7485,
+        "gen_chars_per_sec": 62.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 122.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-pig-latin__qwythos9__r1-zf85zn8g",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-poker",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 15,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "read_file": 8,
+          "update_plan": 1,
+          "write_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.154,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "same failure": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 284.9,
+        "model_seconds": 284.2,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 284.2,
+        "gen_chars": 17532,
+        "gen_chars_per_sec": 61.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 285.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-poker__qwythos9__r1-vghe3eaq",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-pov",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 14,
+        "tool_calls": 12,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "bash": 5,
+          "write_file": 3
+        },
+        "tool_errors": 5,
+        "tool_error_rate": 0.417,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "same failure": 2,
+          "context compacted": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 241.6,
+        "model_seconds": 239.8,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 239.8,
+        "gen_chars": 15492,
+        "gen_chars_per_sec": 64.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 241.6,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-pov__qwythos9__r1-kxvo1m9c",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-proverb",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 2,
+          "write_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 28.2,
+        "model_seconds": 27.8,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 27.8,
+        "gen_chars": 1379,
+        "gen_chars_per_sec": 49.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 28.3,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-proverb__qwythos9__r1-ofa22vz7",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-react",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 30,
+        "tool_calls": 27,
+        "tool_calls_by_name": {
+          "read_file": 5,
+          "update_plan": 1,
+          "write_file": 1,
+          "bash": 15,
+          "edit_file": 5
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.148,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "repetition loop": 2,
+          "context compacted": 1
+        },
+        "stop_reason": "budget: the turn's wallclock ran out while generating (~68 chars into this reply)",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 600.1,
+        "model_seconds": 598.5,
+        "plan_updates": 1,
+        "truncations": 2,
+        "gen_seconds": 598.4,
+        "gen_chars": 35903,
+        "gen_chars_per_sec": 60.0,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 600.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-react__qwythos9__r1-blcp5stn",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-rest-api",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 17,
+        "tool_calls": 16,
+        "tool_calls_by_name": {
+          "read_file": 6,
+          "write_file": 1,
+          "bash": 4,
+          "edit_file": 5
+        },
+        "tool_errors": 5,
+        "tool_error_rate": 0.312,
+        "nudges": 4,
+        "nudges_by_reason": {
+          "same failure": 2,
+          "context compacted": 1,
+          "unchanged": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 353.7,
+        "model_seconds": 352.1,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 352.1,
+        "gen_chars": 22275,
+        "gen_chars_per_sec": 63.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 353.8,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-rest-api__qwythos9__r1-fgz0mefx",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-robot-name",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 5,
+        "tool_calls": 4,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "write_file": 1,
+          "bash": 1
+        },
+        "tool_errors": 0,
+        "tool_error_rate": 0.0,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 21.3,
+        "model_seconds": 21.0,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 20.9,
+        "gen_chars": 1202,
+        "gen_chars_per_sec": 57.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 21.4,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-robot-name__qwythos9__r1-uyh_o6qt",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-scale-generator",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 10,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "update_plan": 1,
+          "write_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.25,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "same failure": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 128.0,
+        "model_seconds": 127.3,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 127.2,
+        "gen_chars": 6059,
+        "gen_chars_per_sec": 47.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 128.1,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-scale-generator__qwythos9__r1-5__34vj_",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-sgf-parsing",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {},
+      "metrics": {
+        "iterations": 13,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 1,
+          "write_file": 3,
+          "bash": 5
+        },
+        "tool_errors": 5,
+        "tool_error_rate": 0.455,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "slow progress": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 497.1,
+        "model_seconds": 257.0,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 257.0,
+        "gen_chars": 20106,
+        "gen_chars_per_sec": 78.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 497.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-sgf-parsing__qwythos9__r1-h5xx4x_e",
+      "error": "checker raised: TimeoutExpired: Command 'python3 -m pytest sgf_parsing_test.py -q 2>&1' timed out after 120 seconds",
+      "invalid": "checker raised: TimeoutExpired: Command 'python3 -m pytest sgf_parsing_test.py -q 2>&1' timed out after 120 seconds",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-simple-linked-list",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 19,
+        "tool_calls": 16,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "update_plan": 2,
+          "write_file": 1,
+          "bash": 5,
+          "edit_file": 3,
+          "replace_lines": 1
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.25,
+        "nudges": 5,
+        "nudges_by_reason": {
+          "same failure": 2,
+          "open plan tasks": 2,
+          "unchanged": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 100.8,
+        "model_seconds": 99.0,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 98.9,
+        "gen_chars": 5658,
+        "gen_chars_per_sec": 57.2,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 101.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-simple-linked-list__qwythos9__r1-b772k5nc",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-transpose",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 13,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 1,
+          "write_file": 4,
+          "bash": 4
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.364,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 115.4,
+        "model_seconds": 114.0,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 113.9,
+        "gen_chars": 7374,
+        "gen_chars_per_sec": 64.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 115.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-transpose__qwythos9__r1-ao4_l59g",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-tree-building",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 16,
+        "tool_calls": 14,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "update_plan": 2,
+          "bash": 5,
+          "write_file": 4
+        },
+        "tool_errors": 4,
+        "tool_error_rate": 0.286,
+        "nudges": 2,
+        "nudges_by_reason": {
+          "same failure": 1,
+          "open plan tasks": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 160.1,
+        "model_seconds": 158.3,
+        "plan_updates": 2,
+        "truncations": 0,
+        "gen_seconds": 158.3,
+        "gen_chars": 11285,
+        "gen_chars_per_sec": 71.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 160.2,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-tree-building__qwythos9__r1-ckr1snz9",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-two-bucket",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 8,
+        "tool_calls": 6,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 1,
+          "write_file": 2,
+          "bash": 1
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.167,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 108.9,
+        "model_seconds": 108.5,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 108.5,
+        "gen_chars": 6863,
+        "gen_chars_per_sec": 63.3,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 109.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-two-bucket__qwythos9__r1-4807ok0n",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-variable-length-quantity",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 14,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "read_file": 2,
+          "update_plan": 3,
+          "write_file": 1,
+          "bash": 4,
+          "edit_file": 3
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.231,
+        "nudges": 1,
+        "nudges_by_reason": {
+          "same failure": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 91.8,
+        "model_seconds": 90.5,
+        "plan_updates": 3,
+        "truncations": 0,
+        "gen_seconds": 90.4,
+        "gen_chars": 5941,
+        "gen_chars_per_sec": 65.7,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 91.9,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-variable-length-quantity__qwythos9__r1-_ty8_4dq",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-wordy",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 11,
+        "tool_calls": 9,
+        "tool_calls_by_name": {
+          "read_file": 4,
+          "update_plan": 1,
+          "write_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 2,
+        "tool_error_rate": 0.222,
+        "nudges": 3,
+        "nudges_by_reason": {
+          "edited before running": 1,
+          "same failure": 1,
+          "repeated call": 1
+        },
+        "stop_reason": "the model repeated the same tool call without making progress",
+        "clean_finish": false,
+        "infra_error": null,
+        "wallclock": 114.4,
+        "model_seconds": 113.7,
+        "plan_updates": 1,
+        "truncations": 0,
+        "gen_seconds": 113.6,
+        "gen_chars": 7004,
+        "gen_chars_per_sec": 61.6,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 114.5,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-wordy__qwythos9__r1-lf5pedp6",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-zebra-puzzle",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 1.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": true
+      },
+      "metrics": {
+        "iterations": 6,
+        "tool_calls": 5,
+        "tool_calls_by_name": {
+          "read_file": 1,
+          "write_file": 2,
+          "bash": 2
+        },
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "nudges": 0,
+        "nudges_by_reason": {},
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 19.9,
+        "model_seconds": 19.3,
+        "plan_updates": 0,
+        "truncations": 0,
+        "gen_seconds": 19.2,
+        "gen_chars": 855,
+        "gen_chars_per_sec": 44.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 20.0,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-zebra-puzzle__qwythos9__r1-5ucfjfra",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    },
+    {
+      "case": "polyglot-zipper",
+      "track": "execute",
+      "model": "qwythos9",
+      "repeat": 1,
+      "score": 0.0,
+      "checks": {
+        "spec_unmodified": true,
+        "tests_pass": false
+      },
+      "metrics": {
+        "iterations": 12,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "read_file": 3,
+          "bash": 3,
+          "write_file": 2
+        },
+        "tool_errors": 3,
+        "tool_error_rate": 0.375,
+        "nudges": 5,
+        "nudges_by_reason": {
+          "repetition loop": 1,
+          "same failure": 1,
+          "context compacted": 1,
+          "never seen green": 1,
+          "repeated call": 1
+        },
+        "stop_reason": null,
+        "clean_finish": true,
+        "infra_error": null,
+        "wallclock": 185.6,
+        "model_seconds": 184.5,
+        "plan_updates": 0,
+        "truncations": 1,
+        "gen_seconds": 184.4,
+        "gen_chars": 9127,
+        "gen_chars_per_sec": 49.5,
+        "harness_timeout": false
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "seconds": 185.7,
+      "workdir": "/var/folders/ft/74tf8j4s283dnhtdljcpqd5r0000gp/T/locode-eval-polyglot-zipper__qwythos9__r1-xucytjzv",
+      "error": "",
+      "invalid": "",
+      "arm": ""
+    }
+  ],
+  "summary": {
+    "overall_score": 0.364,
+    "clean_finish_rate": 0.424,
+    "total_nudges": 112,
+    "total_iterations": 456,
+    "nudge_histogram": {
+      "edited before running": 8,
+      "same failure": 48,
+      "open plan tasks": 9,
+      "repeated call": 17,
+      "stale reading": 2,
+      "context compacted": 14,
+      "unchanged": 7,
+      "repetition loop": 4,
+      "slow progress": 1,
+      "edit reverted": 1,
+      "never seen green": 1
+    },
+    "n_runs": 34,
+    "n_valid": 33,
+    "invalid_runs": 1,
+    "invalid_rate": 0.029,
+    "invalid_reasons": {
+      "checker raised": 1
+    },
+    "gen_rate": 58.8,
+    "gen_chars": 366179,
+    "rows": {
+      "polyglot-affine-cipher::qwythos9": {
+        "case": "polyglot-affine-cipher",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 12,
+        "nudges_mean": 2,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 163.4,
+        "gen_rate_mean": 49.1,
+        "stop_reasons": []
+      },
+      "polyglot-beer-song::qwythos9": {
+        "case": "polyglot-beer-song",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 8,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 73.3,
+        "gen_rate_mean": 33.1,
+        "stop_reasons": []
+      },
+      "polyglot-book-store::qwythos9": {
+        "case": "polyglot-book-store",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 8,
+        "nudges_mean": 1,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 146.4,
+        "gen_rate_mean": 58.7,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-bottle-song::qwythos9": {
+        "case": "polyglot-bottle-song",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 27,
+        "nudges_mean": 11,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 220.9,
+        "gen_rate_mean": 43.1,
+        "stop_reasons": [
+          "`bottle_song_test.py::BottleSongTest::test_all_verses` still fails \u2014 8 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea"
+        ]
+      },
+      "polyglot-bowling::qwythos9": {
+        "case": "polyglot-bowling",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 14,
+        "nudges_mean": 6,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 330.0,
+        "gen_rate_mean": 65.4,
+        "stop_reasons": [
+          "edits kept hitting the same error without making progress"
+        ]
+      },
+      "polyglot-connect::qwythos9": {
+        "case": "polyglot-connect",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 15,
+        "nudges_mean": 4,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 169.2,
+        "gen_rate_mean": 64.2,
+        "stop_reasons": [
+          "edits kept hitting the same error without making progress"
+        ]
+      },
+      "polyglot-dominoes::qwythos9": {
+        "case": "polyglot-dominoes",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 13,
+        "nudges_mean": 3,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 135.2,
+        "gen_rate_mean": 57.6,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-dot-dsl::qwythos9": {
+        "case": "polyglot-dot-dsl",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 6,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 61.9,
+        "gen_rate_mean": 63.6,
+        "stop_reasons": []
+      },
+      "polyglot-food-chain::qwythos9": {
+        "case": "polyglot-food-chain",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 29,
+        "nudges_mean": 12,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 347.6,
+        "gen_rate_mean": 56.0,
+        "stop_reasons": []
+      },
+      "polyglot-forth::qwythos9": {
+        "case": "polyglot-forth",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 16,
+        "nudges_mean": 6,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 372.7,
+        "gen_rate_mean": 63.8,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-go-counting::qwythos9": {
+        "case": "polyglot-go-counting",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 22,
+        "nudges_mean": 7,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 487.2,
+        "gen_rate_mean": 68.9,
+        "stop_reasons": [
+          "`go_counting_test.py::GoCountingTest::test_a_stone_and_not_a_territory_on_5x5_board` still fails \u2014 8 iterations since the repeat was flagged changed nothing. Stopping rather than grinding; the fix needs a different idea"
+        ]
+      },
+      "polyglot-grade-school::qwythos9": {
+        "case": "polyglot-grade-school",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 13,
+        "nudges_mean": 5,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 137.1,
+        "gen_rate_mean": 39.7,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-grep::qwythos9": {
+        "case": "polyglot-grep",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 11,
+        "nudges_mean": 4,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 159.5,
+        "gen_rate_mean": 56.8,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-hangman::qwythos9": {
+        "case": "polyglot-hangman",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 10,
+        "nudges_mean": 2,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 95.2,
+        "gen_rate_mean": 60.7,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-list-ops::qwythos9": {
+        "case": "polyglot-list-ops",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 5,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 39.5,
+        "gen_rate_mean": 55.0,
+        "stop_reasons": []
+      },
+      "polyglot-paasio::qwythos9": {
+        "case": "polyglot-paasio",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 27,
+        "nudges_mean": 8,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 377.6,
+        "gen_rate_mean": 32.1,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-phone-number::qwythos9": {
+        "case": "polyglot-phone-number",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 8,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 56.0,
+        "gen_rate_mean": 68.5,
+        "stop_reasons": []
+      },
+      "polyglot-pig-latin::qwythos9": {
+        "case": "polyglot-pig-latin",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 14,
+        "nudges_mean": 4,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 122.3,
+        "gen_rate_mean": 62.0,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-poker::qwythos9": {
+        "case": "polyglot-poker",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 15,
+        "nudges_mean": 2,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 285.1,
+        "gen_rate_mean": 61.7,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-pov::qwythos9": {
+        "case": "polyglot-pov",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 14,
+        "nudges_mean": 4,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 241.6,
+        "gen_rate_mean": 64.6,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-proverb::qwythos9": {
+        "case": "polyglot-proverb",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 8,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 28.3,
+        "gen_rate_mean": 49.6,
+        "stop_reasons": []
+      },
+      "polyglot-react::qwythos9": {
+        "case": "polyglot-react",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 30,
+        "nudges_mean": 3,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 600.1,
+        "gen_rate_mean": 60.0,
+        "stop_reasons": [
+          "budget: the turn's wallclock ran out while generating (~68 chars into this reply)"
+        ]
+      },
+      "polyglot-rest-api::qwythos9": {
+        "case": "polyglot-rest-api",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 17,
+        "nudges_mean": 4,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 353.8,
+        "gen_rate_mean": 63.3,
+        "stop_reasons": []
+      },
+      "polyglot-robot-name::qwythos9": {
+        "case": "polyglot-robot-name",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 5,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 21.4,
+        "gen_rate_mean": 57.5,
+        "stop_reasons": []
+      },
+      "polyglot-scale-generator::qwythos9": {
+        "case": "polyglot-scale-generator",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 10,
+        "nudges_mean": 3,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 128.1,
+        "gen_rate_mean": 47.6,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-sgf-parsing::qwythos9": {
+        "case": "polyglot-sgf-parsing",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 0,
+        "n_invalid": 1,
+        "invalid_reasons": {
+          "checker raised": 1
+        },
+        "score_mean": null,
+        "score_min": null,
+        "scores": [],
+        "iterations_mean": null,
+        "nudges_mean": null,
+        "clean_finish_rate": null,
+        "seconds_mean": null,
+        "gen_rate_mean": null,
+        "stop_reasons": []
+      },
+      "polyglot-simple-linked-list::qwythos9": {
+        "case": "polyglot-simple-linked-list",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 19,
+        "nudges_mean": 5,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 101.0,
+        "gen_rate_mean": 57.2,
+        "stop_reasons": []
+      },
+      "polyglot-transpose::qwythos9": {
+        "case": "polyglot-transpose",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 13,
+        "nudges_mean": 1,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 115.5,
+        "gen_rate_mean": 64.7,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-tree-building::qwythos9": {
+        "case": "polyglot-tree-building",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 16,
+        "nudges_mean": 2,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 160.2,
+        "gen_rate_mean": 71.3,
+        "stop_reasons": []
+      },
+      "polyglot-two-bucket::qwythos9": {
+        "case": "polyglot-two-bucket",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 8,
+        "nudges_mean": 1,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 109.0,
+        "gen_rate_mean": 63.3,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-variable-length-quantity::qwythos9": {
+        "case": "polyglot-variable-length-quantity",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 14,
+        "nudges_mean": 1,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 91.9,
+        "gen_rate_mean": 65.7,
+        "stop_reasons": []
+      },
+      "polyglot-wordy::qwythos9": {
+        "case": "polyglot-wordy",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 11,
+        "nudges_mean": 3,
+        "clean_finish_rate": 0.0,
+        "seconds_mean": 114.5,
+        "gen_rate_mean": 61.7,
+        "stop_reasons": [
+          "the model repeated the same tool call without making progress"
+        ]
+      },
+      "polyglot-zebra-puzzle::qwythos9": {
+        "case": "polyglot-zebra-puzzle",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 1.0,
+        "score_min": 1.0,
+        "scores": [
+          1.0
+        ],
+        "iterations_mean": 6,
+        "nudges_mean": 0,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 20.0,
+        "gen_rate_mean": 44.5,
+        "stop_reasons": []
+      },
+      "polyglot-zipper::qwythos9": {
+        "case": "polyglot-zipper",
+        "track": "execute",
+        "model": "qwythos9",
+        "n": 1,
+        "n_invalid": 0,
+        "invalid_reasons": {},
+        "score_mean": 0.0,
+        "score_min": 0.0,
+        "scores": [
+          0.0
+        ],
+        "iterations_mean": 12,
+        "nudges_mean": 5,
+        "clean_finish_rate": 1.0,
+        "seconds_mean": 185.7,
+        "gen_rate_mean": 49.5,
+        "stop_reasons": []
+      }
+    },
+    "_weights": {
+      "polyglot-affine-cipher": 1.0,
+      "polyglot-beer-song": 1.0,
+      "polyglot-book-store": 1.0,
+      "polyglot-bottle-song": 1.0,
+      "polyglot-bowling": 1.0,
+      "polyglot-connect": 1.0,
+      "polyglot-dominoes": 1.0,
+      "polyglot-dot-dsl": 1.0,
+      "polyglot-food-chain": 1.0,
+      "polyglot-forth": 1.0,
+      "polyglot-go-counting": 1.0,
+      "polyglot-grade-school": 1.0,
+      "polyglot-grep": 1.0,
+      "polyglot-hangman": 1.0,
+      "polyglot-list-ops": 1.0,
+      "polyglot-paasio": 1.0,
+      "polyglot-phone-number": 1.0,
+      "polyglot-pig-latin": 1.0,
+      "polyglot-poker": 1.0,
+      "polyglot-pov": 1.0,
+      "polyglot-proverb": 1.0,
+      "polyglot-react": 1.0,
+      "polyglot-rest-api": 1.0,
+      "polyglot-robot-name": 1.0,
+      "polyglot-scale-generator": 1.0,
+      "polyglot-sgf-parsing": 1.0,
+      "polyglot-simple-linked-list": 1.0,
+      "polyglot-transpose": 1.0,
+      "polyglot-tree-building": 1.0,
+      "polyglot-two-bucket": 1.0,
+      "polyglot-variable-length-quantity": 1.0,
+      "polyglot-wordy": 1.0,
+      "polyglot-zebra-puzzle": 1.0,
+      "polyglot-zipper": 1.0
+    }
+  },
+  "server": {
+    "pid": "51826",
+    "started": "Wed Sep 9 02:17:01 2026",
+    "model": "sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx",
+    "argv": "/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/mlx_lm.server --model sahilchachra/Qwythos-9B-Claude-Mythos-5-1M-mxfp8-mlx --host 127.0.0.1 --port 8081 --chat-template-args {\"enable_thinking\": false} --max-tokens 8192 --prompt-cache-size 4 --prompt-cache-bytes 1610612736"
+  }
+}

@@ -41,11 +41,18 @@ The **primary executor.** Drive it headless: `locode -p "<spec>" -m <alias>
   claim never held at all: on solved runs the archive has qwen38 at 94-96s and
   qwythos9 at 95-99s. Rule 89 is why the recommendation survives its own
   evidence — correctness gates before either clock, and 20/20 against 9/20 is
-  not a close call.
+  not a close call. Corroborated at §5.160 on a task set it was not tuned
+  against: **23/34 against qwythos9's 12/34** over the 34 polyglot items,
+  and paired (both models, same items) that is 12 discordant wins to 1,
+  **McNemar exact p = 0.0034**. The recommendation no longer rests on a
+  single case.
 - **`qwythos9`** (Qwen3.5-9B Claude-distill, ~9.6 GB, the previous default) —
   still the reliable editor and the right pick on a memory-tight machine, where
   qwen38's ~11 GB will not fit. Clean fenced tool JSON, correct arg keys,
-  reliable multi-step editor with zero edit-match misses in eval.
+  reliable multi-step editor with zero edit-match misses in eval. But the gap on
+  *write-from-spec* work is now measured and it is wide: **12/34 against qwen38's
+  23/34** on polyglot (§5.160). Prefer it for editing an existing tree under a
+  memory ceiling, not for authoring a module from a description.
 - **`devstral24`** (Mistral-Small 24B agentic coder, ~14 GB) — the heavier
   executor: reach for it on broader multi-file changes, or when you want it to
   narrate its reasoning as it works. Capability-equal to qwythos9 on probes so
