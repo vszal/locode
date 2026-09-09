@@ -1,0 +1,44 @@
+CALIB RELEASED Tue Sep  8 21:16:33 PDT 2026
+!! working tree is dirty at 1880d0a — each case spawns a fresh locode and imports the tree AS IT IS THEN, so edits made during this sweep change what is being measured. Fine for a probe; do not use these numbers as a baseline.
+
+[1/12] multi-defect-blind · qwen38 · run 1…
+        score=1.00 iters=11 nudges=3 182.5s ok
+[2/12] multi-defect-suite · qwen38 · run 1…
+        score=1.00 iters=4 nudges=2 109.1s ok
+[3/12] multi-defect-blind · qwen38 · run 2…
+        score=1.00 iters=6 nudges=3 153.8s ok
+[4/12] multi-defect-suite · qwen38 · run 2…
+        score=1.00 iters=4 nudges=2 108.7s ok
+[5/12] multi-defect-blind · qwen38 · run 3…
+        score=1.00 iters=11 nudges=3 173.9s ok
+[6/12] multi-defect-suite · qwen38 · run 3…
+        score=1.00 iters=4 nudges=2 108.9s ok
+[7/12] multi-defect-blind · qwen38 · run 4…
+        score=1.00 iters=11 nudges=3 174.4s ok
+[8/12] multi-defect-suite · qwen38 · run 4…
+        score=1.00 iters=4 nudges=2 108.2s ok
+[9/12] multi-defect-blind · qwen38 · run 5…
+        score=1.00 iters=10 nudges=3 163.0s ok
+[10/12] multi-defect-suite · qwen38 · run 5…
+        score=1.00 iters=4 nudges=2 109.1s ok
+[11/12] multi-defect-blind · qwen38 · run 6…
+        score=1.00 iters=10 nudges=3 167.0s ok
+[12/12] multi-defect-suite · qwen38 · run 6…
+        score=1.00 iters=4 nudges=2 109.1s ok
+
+=== RESULTS · b160-rule86-retest ===
+overall score      : 1.000
+clean-finish rate  : 1.000
+total iterations   : 83
+total nudges       : 30  {'edited before running': 6, 'slow progress': 12, 'unverified edits': 12}
+generation rate    : 26.1 chars/s
+
+case                      model          n  score  iter  nudge  clean    secs    ch/s
+-------------------------------------------------------------------------------------
+multi-defect-blind        qwen38         6   1.00   9.8    3.0   1.00   169.1      28
+multi-defect-suite        qwen38         6   1.00   4.0    2.0   1.00   108.8      23
+
+!! generated at 26.1 chars/s, below the 30 floor, but no run hit its time limit — so this is a slow model, not necessarily a sick box. The scores stand; do not compare this sweep's RATE against one from a different model.
+
+wrote /Users/vszalvay/Code/locode/evals/results/b160-rule86-retest/results.json
+RETEST-DONE Tue Sep  8 21:44:23 PDT 2026
