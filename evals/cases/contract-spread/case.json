@@ -1,0 +1,9 @@
+{
+  "id": "contract-spread",
+  "track": "execute",
+  "description": "one contract change (store.get returns None -> raises KeyError) that must be applied consistently across three callers, each needing a different adaptation while preserving its current user-visible behaviour. The multi-file-consistency axis, which no other case covers: partial credit is per call site, so a model that edits the store and stops scores 0.25 (ROADMAP 5.152).",
+  "allow_tools": ["read_file", "write_file", "append_file", "edit_file", "replace_lines", "bash", "ls", "grep", "glob", "update_plan"],
+  "timeout": 1200,
+  "weight": 1.5,
+  "extra_args": ["--max-iterations", "60", "--max-wallclock", "900"]
+}
