@@ -32,10 +32,16 @@ The **primary executor.** Drive it headless: `locode -p "<spec>" -m <alias>
   2026-09-06) — the everyday execution workhorse. Beat qwythos9 on `repro-only`,
   the one eval case with headroom left, 20/20 perfect runs to 9/20 (p=0.0138
   even granting qwythos9 its best sweep; ROADMAP §5.138). Ties at ceiling on the
-  other three cases. Needs ~5-6 iterations where qwythos9 needs ~9, which makes
-  it **faster in wallclock despite decoding ~4x slower per character** — judge a
-  local model by time-to-done, not tokens/sec (rule 88); the step count is why
-  it wins, not the verdict itself.
+  other three cases. **Correctness is the whole of the case for it** — the
+  iteration and wallclock halves of this recommendation were withdrawn at
+  §5.152. The "~5-6 iterations against qwythos9's ~9" held only on the two
+  build-153 invocations it was measured on; twelve fresh runs across three
+  invocations give qwen38 **8.25 (range 5-12)**, overlapping qwythos9's 8.0-10.0
+  entirely, and the shift is still unattributed (§5.148, §5.149). The wallclock
+  claim never held at all: on solved runs the archive has qwen38 at 94-96s and
+  qwythos9 at 95-99s. Rule 89 is why the recommendation survives its own
+  evidence — correctness gates before either clock, and 20/20 against 9/20 is
+  not a close call.
 - **`qwythos9`** (Qwen3.5-9B Claude-distill, ~9.6 GB, the previous default) —
   still the reliable editor and the right pick on a memory-tight machine, where
   qwen38's ~11 GB will not fit. Clean fenced tool JSON, correct arg keys,

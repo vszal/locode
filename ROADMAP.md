@@ -12210,3 +12210,103 @@ The archived `results.json` files are **not rewritten**. The fix makes
 a separate decision, and every conclusion drawn from those files is now known to
 be safe or corrected above. Re-derive on read (rule 96); do not quietly restate
 the past.
+
+## §5.152 — the noise band, measured: the suite has no score range left at all
+
+§5.150 deferred the measurement it needed: twelve runs per shipped case, at the
+default model, with the server restarted between blocks so between-invocation
+spread is captured rather than averaged away. Three invocations x four repeats
+x four cases = 48 runs, `evals/results/bench-band-qwen38.log`.
+
+### The headline is a flat line
+
+**48 of 48 runs scored 1.000.** Not "high" — identical.
+
+| case | n | score | iterations | s/run |
+|---|---|---|---|---|
+| `exec-pinpoint` | 12 | **1.000 FLAT** | 5-8 | 126 |
+| `exec-bugfix` | 12 | **1.000 FLAT** | 5-8 | 132 |
+| `repro-only` | 12 | **1.000 FLAT** | 5-12 | 119 |
+| `multi-defect-blind` | 12 | **1.000 FLAT** | 4-10 | 172 |
+
+There is no noise band to establish, because there is no variation to bound.
+The shipped suite cannot rank two models, cannot detect a regression, and
+cannot be made to by running it more times. `repro-only` was described as "the
+one eval case with headroom left" as recently as `AGENTS.md`; it is at ceiling
+too. Every remaining signal in this suite is in a metric rule 89 says must not
+decide anything on its own.
+
+### Restarting the server moves the mean more than repeating the run does
+
+With score dead, iterations is all that varies, so the design's second question
+becomes the useful one. One-way ANOVA on invocation, per case:
+
+| case | invocation means | sd within | sd between | F | detectable? |
+|---|---|---|---|---|---|
+| `exec-pinpoint` | 5.00 5.00 7.25 | 0.87 | 1.22 | 9.00 | **yes** |
+| `exec-bugfix` | 5.00 6.25 8.00 | 0.87 | 1.44 | 12.11 | **yes** |
+| `repro-only` | 8.25 6.00 10.50 | 0.93 | 2.20 | 23.52 | **yes** |
+| `multi-defect-blind` | 8.00 8.50 8.50 | 2.40 | 0.00 | 0.06 | no |
+
+On three of four cases the between-invocation component **exceeds** the
+within-invocation one. A sweep run in a single invocation — which is how nearly
+every sweep in this archive was run, since the harness drives all repeats
+against one server — measures `sd within` and reports a precision it does not
+have. On `repro-only` that understates the spread by better than a factor of
+two.
+
+**It is not the box degrading.** Invocation is confounded with time order here,
+so thermal drift is the obvious rival explanation, and it is ruled out on two
+counts. There is no trend by position inside an invocation (run 1 to run 4:
+7.67, 7.08, 6.17, 7.83). And invocation 3, the slow one by iterations, was the
+*fastest* per iteration — 18.5 s/iteration against 21.3 and 21.0. A throttled
+box takes longer per step; this one took less and used more steps. What moved
+is the trajectory, not the clock.
+
+What the design cannot settle is *restart* versus *this particular invocation*:
+k=3 is three draws, and invocations 1 and 2 agree closely (6.56, 6.44) while 3
+sits apart (8.56). Either reading carries the same practical consequence, which
+is the one that matters here.
+
+**Minimum detectable difference:** two 12-run arms must differ by roughly **1.8
+to 2.9 iterations**, depending on the case, before the gap outruns the noise.
+
+### What this costs a shipped claim
+
+`AGENTS.md` recommended `qwen38` partly on "needs ~5-6 iterations where
+qwythos9 needs ~9". Re-examined at the right unit of analysis — the invocation
+mean, since that is where the variance lives:
+
+| model | invocation means on `repro-only` | source |
+|---|---|---|
+| `qwen38` | 5.75, 5.25 | archive, build 153 |
+| `qwen38` | **8.25, 6.00, 10.50** | this sweep, build 160+ |
+| `qwythos9` | 8.00, 9.17, 9.83, 10.00 | archive |
+
+The archived `qwen38` figure came from **two** invocations that happened to
+agree, giving a pooled sd of 0.76 that made 5.45 look solid. Three fresh
+invocations span 6.00 to 10.50 and overlap `qwythos9` completely. This is the
+same unattributed 5 -> 7/8 shift §5.148 and §5.149 chased and failed to pin on
+any cause; what is new is that it comes with a variance increase, which is why
+§5.149's "noise band of 5-8" was itself too narrow. The band is 5-12.
+
+The wallclock half never held at all. On solved runs the archive gives `qwen38`
+94-96s and `qwythos9` 95-99s — the same number.
+
+So both time-based halves of that recommendation are withdrawn, and the
+recommendation itself stands, because 20/20 perfect runs against 9/20 is a
+*correctness* result and rule 89 puts correctness ahead of either clock.
+`AGENTS.md` is corrected accordingly. This is rule 89 doing exactly the job it
+was coined for: the conclusion was right, and two of the three reasons given
+for it were not.
+
+### What comes next
+
+Two cases were built against this diagnosis rather than after it, on separate
+axes, each validated at both ends and for independence before landing:
+`multi-defect-deep` (defect subtlety, the difficulty-matched sibling of the
+saturated `multi-defect-blind`) and `contract-spread` (multi-file consistency,
+an axis nothing in the suite covered). Calibration against `qwen38` is running.
+Difficulty is asserted until those numbers land — a case built to restore range
+that turns out to be another flat 1.000 has restored nothing, and the first
+`contract-spread` run scored 1.000.
