@@ -13173,3 +13173,58 @@ Follow-up worth doing: the Python track is all 34 exercises there are. More
 resolution means another language — JavaScript needs only `node` — which would
 roughly double the item count and take the smallest detectable difference from
 0.34 toward 0.24.
+
+## §5.161 — a second language, and what it took to make the seed honest (2026-09-09)
+
+§5.159 borrowed Aider's polyglot set for the Python track because resolution
+comes from the item count, and §5.160 spent it: qwen38 over qwythos9, p =
+0.0034 on 34 paired items. That is one language. A result on one language is a
+result about a model's Python, and the claim the project actually wants to make
+is about a model's coding. So: JavaScript.
+
+The generator became multi-track. A `Track` names the per-language particulars
+— where the stub and spec live, what the reference solution is called, what
+command runs the tests, what has to be installed first — and everything else in
+`polyglot.py` is now language-agnostic. Two constraints shaped it.
+
+**The Python track had to come out byte-identical.** Rule 96 says a stored
+score is a snapshot of the rubric that produced it, so any drift in
+`prompt.md`, `case.json`, or the seed would strand §5.160's 68 runs. Two near
+misses got through the first draft and were caught by diffing against a
+pre-refactor snapshot: the grader command quietly changed from `python3` to
+`python`, and `case.json`'s description got reworded. Both are now frozen
+fields on the `Track` (`check_run`, `desc`) rather than things a refactor can
+touch in passing. The verification is not a text grep — my first attempt at one
+reported 34 spurious differences because the old grader built its command by
+concatenation and the new one stores a literal. The real check loads both
+grader modules and records what `ctx.bash` actually receives: **34/34
+equivalent** on command, timeout, `SPEC_SHAS`, and `GUARDS`.
+
+**The JavaScript seed is not the file Exercism ships.** The track follows the
+`xtest` convention — every test after the first is disabled, and the student
+un-skips as they go. Across the 49 exercises that is **855 of 906 tests
+disabled**. Left alone, a model would satisfy one test per exercise and the
+grader would call it done, which is not the same task the Python track poses at
+all. The generator rewrites `xtest`/`xit`/`xdescribe` back to live before
+hashing the spec, so the guard protects the file the model is actually being
+graded against. (BSD `sed` cannot express the word boundary this needs; it is a
+Python `re.sub`.)
+
+Two exercises then failed validation, and both failures were the validator
+doing its job rather than a bug in it:
+
+- **`ledger` failed `PASSES_REF`** — its own reference solution renders
+  01/01/2015 as 12/31/2014 in a US timezone. `TZ=UTC` is now pinned in both the
+  grader's command and the one shown to the model.
+- **`ledger` then failed `FAILS_EMPTY`** — it is a *refactoring* exercise, and
+  its instructions say so: the stub "consistently passes the test suite" (11/11,
+  untouched). There is nothing here for `tests_pass` to measure. It is excluded
+  by name, loudly, with the reason recorded in the track rather than in a
+  comment somewhere.
+
+That leaves **48 items**, validated 48/48 on all four seed properties. The jest
+toolchain is one shared ~99 MB install symlinked into each workspace by the
+case's `setup.sh`, and like the cases themselves it is gitignored — the content
+is Exercism's and the project vendors none of it.
+
+The sweep — qwen38 against qwythos9, 48 paired items — is running.

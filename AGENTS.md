@@ -178,17 +178,28 @@ Keep on Opus **only** what truly needs it:
   before anyone noticed. The harness now names them and calls their scores lower
   bounds. Re-running one at a bigger budget draws a *fresh sample*, so a recovery
   says the verdict was unstable, not that the clock was the constraint.
-- **Two instruments, two jobs.** `evals/polyglot.py` generates 34 cases from the
-  Python track of Aider's polyglot benchmark for **model selection**: resolution
-  comes from the item count, so the score has an analytic confidence interval and
-  needs no rubric hygiene at all. At four items nothing short of a 0.99
-  difference is detectable; at 34 it is 0.34 (§5.157, §5.159). The bespoke cases
-  stay for **harness regression** — repo navigation, `edit_file` exact-match,
-  path scoping, the tolerant parser — which polyglot does not touch. Generate
-  with `git clone --depth 1 https://github.com/Aider-AI/polyglot-benchmark /tmp/pg`
-  then `python evals/polyglot.py --src /tmp/pg`; validate with
-  `evals/polyglot_validate.py` before any sweep. Cases are gitignored, not
-  vendored — the content is Exercism's.
+- **Two instruments, two jobs.** `evals/polyglot.py` generates cases from Aider's
+  polyglot benchmark for **model selection**: resolution comes from the item
+  count, so the score has an analytic confidence interval and needs no rubric
+  hygiene at all. At four items nothing short of a 0.99 difference is
+  detectable; at 34 it is 0.34 (§5.157, §5.159). Two tracks ship — `python` (34
+  items) and `javascript` (48; §5.161) — and a track is one `Track` dataclass,
+  so adding Go or Rust is a declaration, not a rewrite. The bespoke cases stay
+  for **harness regression** — repo navigation, `edit_file` exact-match, path
+  scoping, the tolerant parser — which polyglot does not touch. Generate with
+  `git clone --depth 1 https://github.com/Aider-AI/polyglot-benchmark /tmp/pg`
+  then `python evals/polyglot.py --src /tmp/pg [--track javascript]`; JavaScript
+  additionally needs `--install-jsdeps` once. **Always validate with
+  `evals/polyglot_validate.py --track <t>` before a sweep** — it is what caught
+  both JavaScript blockers, and on that track it is not optional: the seed there
+  is not the file Exercism ships (855 of 906 tests arrive disabled and the
+  generator un-skips them), so a silent miss would grade a model on one test per
+  exercise. Cases are gitignored, not vendored — the content is Exercism's.
+- **A borrowed task set does not change the delegation contract.** The bespoke
+  cases and the two polyglot tracks are all graded the same way, by the same
+  `CheckCtx`, under the same rules 89-99. Nothing from Exercism is tracked,
+  vendored, or shipped in the wheel: `locode bench` still runs exactly the four
+  cases in `locode/bench/cases/`.
 - **An alarm's threshold belongs relative to the thing it judges.** The
   generation-rate floor was absolute, so making a slower model the default turned
   it into a 100%-false-positive alarm that condemned every sweep of the model the
