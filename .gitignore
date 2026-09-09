@@ -38,3 +38,6 @@ evals/cases/polyglot-*/
 # the shared jest toolchain for the JavaScript track: ~99 MB of node_modules,
 # recreated by `python evals/polyglot.py --install-jsdeps`
 evals/.jsdeps/
+# aider, installed in its own venv for the harness-vs-harness comparison so
+# it never enters this project's dependency set (evals/aider_compare.py)
+evals/.aidervenv/
