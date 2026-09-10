@@ -151,6 +151,33 @@ def assert_server_serves(base_url: str, model_id: str) -> None:
 # the two arms
 # --------------------------------------------------------------------------
 
+def server_alive(base_url: str, model_id: str, timeout: int = 60) -> bool:
+    """Can the endpoint still complete a one-token request?
+
+    `mlx_lm.server` handles requests serially, so one generation that never
+    returns wedges every request behind it -- permanently, and silently. That
+    happened here: a single stalled case left the server accepting connections
+    and answering `/models` while completing nothing, for seven hours. Every
+    subsequent case would have burned its full budget and been recorded as an
+    unknown, and a sweep of 34 unknowns is a wasted night that still produces a
+    tidy-looking table.
+
+    So this is checked between cases, and a failure aborts the run rather than
+    degrading it. `/models` is not enough: a wedged server still answers it.
+    """
+    import urllib.request
+    body = json.dumps({"model": model_id, "max_tokens": 1,
+                       "messages": [{"role": "user", "content": "hi"}]}).encode()
+    req = urllib.request.Request(
+        v1(base_url) + "/chat/completions", data=body,
+        headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as fh:
+            return bool(json.load(fh).get("choices"))
+    except Exception:
+        return False
+
+
 def _budget_stopped(stop_reason: str, seconds: float, budget: float) -> bool:
     """[rule 99] Did this run end without telling us whether the model could?
 
@@ -404,6 +431,13 @@ def main(argv):
 
     pairs = []
     for i, case in enumerate(cases):
+        if i and not server_alive(args.base_url, model_id):
+            print(f"\n!! server at {args.base_url} is wedged -- it accepts "
+                  f"connections but completes nothing.\n"
+                  f"   Aborting after {i} of {len(cases)} cases rather than "
+                  f"recording the rest as unknowns.\n"
+                  f"   Restart it and re-run; results so far are written.")
+            break
         pair = Pair(case_id=case.id)
         gmod = _grader_module(case)
         test_cmd = _test_command(gmod)

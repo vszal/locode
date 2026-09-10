@@ -232,3 +232,44 @@ def test_no_progress_is_a_real_verdict_not_an_unknown():
 
 def test_a_fast_clean_finish_is_not_an_unknown():
     assert not A._budget_stopped(stop_reason="done", seconds=188.0, budget=600)
+
+
+# --------------------------------------------------------------------------
+# 6. A wedged server must abort the run, not degrade it.
+# --------------------------------------------------------------------------
+
+def _fake_completion(monkeypatch, behaviour):
+    import urllib.request
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return json.dumps({"choices": [{"message": {}}]}).encode()
+
+    def opener(req, timeout=None):
+        if behaviour == "ok":
+            return _Resp()
+        if behaviour == "hang":
+            raise TimeoutError("timed out")
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(urllib.request, "urlopen", opener)
+
+
+def test_a_completing_server_is_alive(monkeypatch):
+    _fake_completion(monkeypatch, "ok")
+    assert A.server_alive("http://127.0.0.1:8081", "org/M")
+
+
+def test_a_server_that_answers_but_never_completes_is_not_alive(monkeypatch):
+    """The real failure: mlx_lm.server kept accepting connections and serving
+    `/models` for seven hours while completing nothing, because one stalled
+    generation blocks every request behind it. A `/models` probe calls that
+    healthy; only a real completion catches it."""
+    _fake_completion(monkeypatch, "hang")
+    assert not A.server_alive("http://127.0.0.1:8081", "org/M")
+
+
+def test_an_unreachable_server_is_not_alive(monkeypatch):
+    _fake_completion(monkeypatch, "refused")
+    assert not A.server_alive("http://127.0.0.1:8081", "org/M")
