@@ -89,6 +89,10 @@ class Pair:
     case_id: str
     locode: ArmResult = None
     aider: ArmResult = None
+    # [rule 98] Which server invocation both arms of this pair ran under. Both
+    # always share one; a restart between cases bumps this, so the analysis can
+    # see where the boundaries fell.
+    invocation: int = 0
 
 
 # --------------------------------------------------------------------------
@@ -150,6 +154,40 @@ def assert_server_serves(base_url: str, model_id: str) -> None:
 # --------------------------------------------------------------------------
 # the two arms
 # --------------------------------------------------------------------------
+
+def boot_server(model: str, base_url: str, model_id: str,
+                tries: int = 2) -> bool:
+    """Kill whatever is on the endpoint and bring a fresh server up.
+
+    `mlx_lm.server` wedges: it goes on accepting connections and answering
+    `/models` while completing nothing, and once it does, every remaining case
+    burns its full budget. The trigger is not yet known. Two plausible causes
+    were tested directly and both were ruled out -- killing a client mid-stream
+    left the server answering in 1.2s, and six distinct 5000-character prompts
+    against a four-slot prompt cache did too. So this recovers rather than
+    explains, which is the honest description of it.
+
+    Recovery is a locode warm-up turn with server management left ON, so the
+    server comes up under locode's own launch args rather than a copy of them
+    that can drift.
+
+    [rule 98] Liveness is only ever checked *between* cases, so both arms of a
+    pair always share one invocation. A restart adds an invocation boundary
+    across cases, which the pairing already absorbs.
+    """
+    for attempt in range(1, tries + 1):
+        subprocess.run(["pkill", "-f", "mlx_lm"], capture_output=True)
+        time.sleep(3)
+        env = dict(os.environ, NO_COLOR="1")
+        env.pop("LOCODE_MANAGE_SERVER", None)   # let locode own the process
+        subprocess.run([str(LOCODE_BIN), "-p", "Reply with the single word: ready",
+                        "-m", model, "--max-iterations", "2", "--no-splash"],
+                       env=env, capture_output=True, text=True, timeout=600)
+        if server_alive(base_url, model_id, timeout=120):
+            print(f"   server restarted (attempt {attempt})")
+            return True
+    return False
+
 
 def server_alive(base_url: str, model_id: str, timeout: int = 60) -> bool:
     """Can the endpoint still complete a one-token request?
@@ -430,15 +468,17 @@ def main(argv):
           f"budget={args.budget}s  -> {out_dir}")
 
     pairs = []
+    restarts = 0
     for i, case in enumerate(cases):
         if i and not server_alive(args.base_url, model_id):
-            print(f"\n!! server at {args.base_url} is wedged -- it accepts "
-                  f"connections but completes nothing.\n"
-                  f"   Aborting after {i} of {len(cases)} cases rather than "
-                  f"recording the rest as unknowns.\n"
-                  f"   Restart it and re-run; results so far are written.")
-            break
-        pair = Pair(case_id=case.id)
+            print(f"\n!! server wedged after {i} of {len(cases)} cases -- it "
+                  f"accepts connections but completes nothing. Restarting.")
+            restarts += 1
+            if not boot_server(args.model, args.base_url, model_id):
+                print("   restart failed; aborting rather than recording the "
+                      "rest as unknowns. Results so far are written.")
+                break
+        pair = Pair(case_id=case.id, invocation=restarts)
         gmod = _grader_module(case)
         test_cmd = _test_command(gmod)
         stub, protected = _stub(case), _protected(gmod)
@@ -472,6 +512,7 @@ def main(argv):
             "label": label, "model": args.model, "model_id": model_id,
             "base_url": args.base_url, "budget": args.budget,
             "pairs": [{"case_id": p.case_id,
+                       "invocation": p.invocation,
                        "locode": asdict(p.locode) if p.locode else None,
                        "aider": asdict(p.aider) if p.aider else None}
                       for p in pairs],

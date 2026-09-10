@@ -273,3 +273,51 @@ def test_a_server_that_answers_but_never_completes_is_not_alive(monkeypatch):
 def test_an_unreachable_server_is_not_alive(monkeypatch):
     _fake_completion(monkeypatch, "refused")
     assert not A.server_alive("http://127.0.0.1:8081", "org/M")
+
+
+# --------------------------------------------------------------------------
+# 7. Recovery from a wedge, and its limit.
+# --------------------------------------------------------------------------
+
+def test_boot_gives_up_after_its_retries_rather_than_looping(monkeypatch):
+    """A wedge that a restart cannot clear must end the run. Retrying forever
+    would spend the night proving the server is broken."""
+    calls = []
+    monkeypatch.setattr(A.subprocess, "run",
+                        lambda *a, **k: calls.append(a) or SimpleNamespace(returncode=0))
+    monkeypatch.setattr(A.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(A, "server_alive", lambda *a, **k: False)
+    assert A.boot_server("qwen38", "http://127.0.0.1:8081", "org/M", tries=2) is False
+
+
+def test_boot_stops_as_soon_as_the_server_answers(monkeypatch):
+    seen = {"n": 0}
+
+    def alive(*a, **k):
+        seen["n"] += 1
+        return seen["n"] >= 1
+
+    monkeypatch.setattr(A.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0))
+    monkeypatch.setattr(A.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(A, "server_alive", alive)
+    assert A.boot_server("qwen38", "http://127.0.0.1:8081", "org/M", tries=3) is True
+    assert seen["n"] == 1
+
+
+def test_recovery_lets_locode_own_the_server_it_is_starting(monkeypatch):
+    """The arms run with LOCODE_MANAGE_SERVER=no so neither can restart the
+    endpoint under the other. Recovery is the one place that must not inherit
+    it, or the warm-up turn will decline to start anything."""
+    envs = []
+
+    def run(cmd, **kw):
+        envs.append(kw.get("env") or {})
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setenv("LOCODE_MANAGE_SERVER", "no")
+    monkeypatch.setattr(A.subprocess, "run", run)
+    monkeypatch.setattr(A.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(A, "server_alive", lambda *a, **k: True)
+    A.boot_server("qwen38", "http://127.0.0.1:8081", "org/M")
+    warm = [e for e in envs if e]
+    assert warm and "LOCODE_MANAGE_SERVER" not in warm[-1]

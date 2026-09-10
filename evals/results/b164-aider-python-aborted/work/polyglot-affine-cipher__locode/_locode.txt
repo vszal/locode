@@ -1,0 +1,10 @@
+
+
+```tool
+{"name": "write_file", "args": {"path": "affine_cipher.py", "content": "import math\n\nM = 26\n\n\ndef _check_coprime(a, b):\n    if math.gcd(a, M) != 1:\n        raise ValueError(\"a and m must be coprime.\")\n\n\ndef _transform(text, a, b, decode=False):\n    _check_coprime(a, b)\n    out = []\n    for ch in text:\n        if ch.isalpha():\n            i = ord(ch.lower()) - ord(\"a\")\n            if decode:\n                # find modular inverse of a mod 26\n                inv = next(x for x in range(1, M) if (a * x) % M == 1)\n                i = (inv * (i - b)) % M\n            else:\n                i = (a * i + b) % M\n            out.append(chr(i + ord(\"a\")))\n        elif ch.isdigit():\n            out.append(ch)\n    return \"\".join(out)\n\n\ndef encode(plain_text, a, b):\n    _check_coprime(a, b)\n    letters = _transform(plain_text, a, b)\n    return \" \".join(letters[i:i + 5] for i in range(0, len(letters), 5))\n\n\ndef decode(ciphered_text, a, b):\n    return _transform(ciphered_text, a, b, decode=True)\n"}}
+``````tool
+{"name": "bash", "args": {"cmd": "python -m pytest affine_cipher_test.py -q"}}
+```All 16 tests pass. The implementation is complete:
+
+- **`encode(plain_text, a, b)`** — validates `a` is coprime to 26 (raises `ValueError("a and m must be coprime.")` otherwise), maps each letter via `E(x) = (ai + b) mod 26`, keeps digits as-is, drops spaces/punctuation, and groups output into blocks of 5.
+- **`decode(ciphered_text, a, b)`** — same coprime check, then applies `D(y) = (a⁻¹)(y − b) mod 26` using the modular inverse of `a`.

@@ -1,0 +1,26 @@
+=== START Wed Sep  9 22:13:48 PDT 2026 ===
+=== START Wed Sep  9 22:20:47 PDT 2026 ===
+ready
+=== WARMED Wed Sep  9 22:22:06 PDT 2026 ===
+34 cases  model=qwen38 (lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly)  budget=600s  -> /Users/vszalvay/Code/locode/evals/results/b164-aider-python
+[1/34] polyglot-affine-cipher                 locode=1.00 (  139s, 4 it)  aider=1.00 (  138s, 1 att)
+[2/34] polyglot-beer-song                     locode=1.00 (  570s, 10 it)  aider=1.00 (  234s, 1 att)
+[3/34] polyglot-book-store                    locode=0.00 (  549s, 21 it)  aider=0.00 (  600s, 3 att)  [budget]
+[4/34] polyglot-bottle-song                   locode=1.00 (  206s, 6 it)  aider=1.00 (  308s, 2 att)
+[5/34] polyglot-bowling                       locode=0.00 (  600s, 11 it)  aider=0.00 (  600s, 1 att)  [budget]
+
+!! server at http://127.0.0.1:8081 is wedged -- it accepts connections but completes nothing.
+   Aborting after 5 of 34 cases rather than recording the rest as unknowns.
+   Restart it and re-run; results so far are written.
+
+====================================================================
+solved   locode 3/5      aider 3/5
+discordant pairs: locode-only 0, aider-only 0
+McNemar: no discordant pairs -- no evidence either way
+
+[rule 99] 3 run(s) stopped by the budget -- these are unknowns, and their 0.00s are lower bounds, not failures:
+  polyglot-book-store/aider polyglot-bowling/locode polyglot-bowling/aider
+
+on the 3 cases BOTH solved (rule 89: correctness gated first):
+  median seconds   locode    206   aider    234
+=== DONE rc=0 Wed Sep  9 23:29:03 PDT 2026 ===

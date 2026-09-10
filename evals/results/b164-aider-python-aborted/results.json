@@ -1,0 +1,174 @@
+{
+  "label": "b164-aider-python",
+  "model": "qwen38",
+  "model_id": "lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly",
+  "base_url": "http://127.0.0.1:8081",
+  "budget": 600,
+  "pairs": [
+    {
+      "case_id": "polyglot-affine-cipher",
+      "locode": {
+        "arm": "locode",
+        "case_id": "polyglot-affine-cipher",
+        "score": 1.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": true
+        },
+        "seconds": 138.7,
+        "attempts": 1,
+        "iterations": 4,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-affine-cipher__locode"
+      },
+      "aider": {
+        "arm": "aider",
+        "case_id": "polyglot-affine-cipher",
+        "score": 1.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": true
+        },
+        "seconds": 137.8,
+        "attempts": 1,
+        "iterations": 0,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-affine-cipher__aider"
+      }
+    },
+    {
+      "case_id": "polyglot-beer-song",
+      "locode": {
+        "arm": "locode",
+        "case_id": "polyglot-beer-song",
+        "score": 1.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": true
+        },
+        "seconds": 570.2,
+        "attempts": 1,
+        "iterations": 10,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-beer-song__locode"
+      },
+      "aider": {
+        "arm": "aider",
+        "case_id": "polyglot-beer-song",
+        "score": 1.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": true
+        },
+        "seconds": 234.4,
+        "attempts": 1,
+        "iterations": 0,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-beer-song__aider"
+      }
+    },
+    {
+      "case_id": "polyglot-book-store",
+      "locode": {
+        "arm": "locode",
+        "case_id": "polyglot-book-store",
+        "score": 0.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": false
+        },
+        "seconds": 548.7,
+        "attempts": 1,
+        "iterations": 21,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-book-store__locode"
+      },
+      "aider": {
+        "arm": "aider",
+        "case_id": "polyglot-book-store",
+        "score": 0.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": false
+        },
+        "seconds": 600.0,
+        "attempts": 3,
+        "iterations": 0,
+        "budget_stopped": true,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-book-store__aider"
+      }
+    },
+    {
+      "case_id": "polyglot-bottle-song",
+      "locode": {
+        "arm": "locode",
+        "case_id": "polyglot-bottle-song",
+        "score": 1.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": true
+        },
+        "seconds": 206.3,
+        "attempts": 1,
+        "iterations": 6,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-bottle-song__locode"
+      },
+      "aider": {
+        "arm": "aider",
+        "case_id": "polyglot-bottle-song",
+        "score": 1.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": true
+        },
+        "seconds": 307.9,
+        "attempts": 2,
+        "iterations": 0,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-bottle-song__aider"
+      }
+    },
+    {
+      "case_id": "polyglot-bowling",
+      "locode": {
+        "arm": "locode",
+        "case_id": "polyglot-bowling",
+        "score": 0.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": false
+        },
+        "seconds": 600.3,
+        "attempts": 1,
+        "iterations": 11,
+        "budget_stopped": true,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-bowling__locode"
+      },
+      "aider": {
+        "arm": "aider",
+        "case_id": "polyglot-bowling",
+        "score": 0.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": false
+        },
+        "seconds": 600.0,
+        "attempts": 1,
+        "iterations": 0,
+        "budget_stopped": true,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-python/work/polyglot-bowling__aider"
+      }
+    }
+  ]
+}
