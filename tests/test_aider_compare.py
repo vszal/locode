@@ -204,3 +204,31 @@ def test_grader_module_loads_a_real_generated_case():
     mod = A._grader_module(cases[0])
     assert A._test_command(mod).startswith("python3 -m pytest")
     assert A._protected(mod)
+
+
+# --------------------------------------------------------------------------
+# 5. Rule 99: a run that spent its whole budget is an unknown.
+# --------------------------------------------------------------------------
+
+def test_a_stalled_server_is_recorded_as_unknown_not_as_failure():
+    """The failure this actually caught: the server accepted the request and
+    returned zero characters for the full 600s. The turn ended in `error` with
+    no stop_reason, so the precise signal was absent and the run was scored a
+    flat 0.00 -- reading as "the model could not do it" when the truth is "we
+    never found out". That is the exact confusion rule 99 exists to prevent."""
+    assert A._budget_stopped(stop_reason="", seconds=600.2, budget=600)
+
+
+def test_a_budget_stop_is_believed_when_the_events_say_so():
+    assert A._budget_stopped(stop_reason="budget: wallclock", seconds=42.0, budget=600)
+
+
+def test_no_progress_is_a_real_verdict_not_an_unknown():
+    """`budget: no progress` means the loop stopped because the model had
+    stopped doing anything, which is a finding about the model."""
+    assert not A._budget_stopped(stop_reason="budget: no progress", seconds=42.0,
+                                 budget=600)
+
+
+def test_a_fast_clean_finish_is_not_an_unknown():
+    assert not A._budget_stopped(stop_reason="done", seconds=188.0, budget=600)

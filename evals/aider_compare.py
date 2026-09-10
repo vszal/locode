@@ -124,11 +124,15 @@ def origin(base_url: str) -> str:
 
 
 def assert_server_serves(base_url: str, model_id: str) -> None:
-    """Fail loudly if the endpoint is not offering the weights we asked for.
+    """Fail loudly if the endpoint cannot serve the weights we asked for.
 
-    Cheap, and it forecloses the worst failure mode this script has: a silent
-    fallback to whatever the server happened to have loaded would produce a
-    perfectly plausible table comparing two harnesses on two different models.
+    Weaker than it looks, and worth being honest about: `mlx_lm.server` lists
+    every model in the local cache, not the one currently resident, so this
+    proves the id is *serveable*, not that it is loaded. What actually keeps
+    the arms on the same weights is that both pass the same id explicitly and
+    the server honours it. This catches the blunt version of the mistake -- a
+    typo'd or uninstalled model -- before six hours of GPU go into a table
+    comparing two harnesses on two different models.
     """
     import urllib.request
     url = v1(base_url) + "/models"
@@ -146,6 +150,26 @@ def assert_server_serves(base_url: str, model_id: str) -> None:
 # --------------------------------------------------------------------------
 # the two arms
 # --------------------------------------------------------------------------
+
+def _budget_stopped(stop_reason: str, seconds: float, budget: float) -> bool:
+    """[rule 99] Did this run end without telling us whether the model could?
+
+    The event stop_reason is the precise signal, but it is not always there: a
+    server that accepts the request and then returns nothing ends the turn in
+    `error` with no reason at all, having consumed the entire budget. That is
+    an unknown in exactly rule 99's sense, so the wallclock is the fallback --
+    otherwise a stalled server is recorded as the model failing the task, which
+    is the misreading the rule was written to stop.
+
+    `budget: no progress` is the one budget stop that is *not* an unknown: the
+    loop ended because the model had stopped doing anything, and that is a
+    finding about the model.
+    """
+    stop = (stop_reason or "").lower()
+    if stop.startswith("budget: no progress"):
+        return False
+    return stop.startswith("budget:") or seconds >= budget - 5
+
 
 def run_locode(case, model, workdir, budget, base_url) -> ArmResult:
     """One graded locode run, invoked the way evals/harness.py invokes it."""
@@ -183,8 +207,7 @@ def run_locode(case, model, workdir, budget, base_url) -> ArmResult:
     return ArmResult(
         arm="locode", case_id=case.id, score=0.0, checks={}, seconds=seconds,
         attempts=1, iterations=metrics.get("iterations") or 0,
-        budget_stopped=stop.startswith("budget:")
-                       and not stop.startswith("budget: no progress"),
+        budget_stopped=_budget_stopped(stop, seconds, budget),
         workdir=str(workdir),
     ), events, stdout
 
@@ -213,6 +236,14 @@ def run_aider(case, model_id, workdir, budget, base_url, test_cmd,
             "--yes-always",             # headless: never prompt
             "--no-stream", "--no-pretty", "--no-analytics",
             "--no-check-update", "--no-show-model-warnings",
+            # Aider scrapes any URL it finds in the prompt, and `--yes-always`
+            # turns that into consent to pip-install playwright and pandoc
+            # mid-run. On `dot-dsl` -- whose instructions cite graphviz.org,
+            # Wikipedia and martinfowler.com -- that ate the entire budget on
+            # the network before a line of code was written. Handicapping aider
+            # with its own feature is not the comparison we are making, and a
+            # graded run must not reach the network at all.
+            "--no-detect-urls", "--disable-playwright",
             "--map-tokens", "0",        # single-file exercises; no repo map
             "--no-auto-commits",
             "--test-cmd", test_cmd,

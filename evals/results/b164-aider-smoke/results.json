@@ -1,0 +1,75 @@
+{
+  "label": "b164-aider-smoke",
+  "model": "qwen38",
+  "model_id": "lukaskremla/Qwen3.8-27B-3bit-MLX-TextOnly",
+  "base_url": "http://127.0.0.1:8081",
+  "budget": 600,
+  "pairs": [
+    {
+      "case_id": "polyglot-bottle-song",
+      "locode": {
+        "arm": "locode",
+        "case_id": "polyglot-bottle-song",
+        "score": 1.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": true
+        },
+        "seconds": 187.7,
+        "attempts": 1,
+        "iterations": 7,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-smoke/work/polyglot-bottle-song__locode"
+      },
+      "aider": {
+        "arm": "aider",
+        "case_id": "polyglot-bottle-song",
+        "score": 1.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": true
+        },
+        "seconds": 245.2,
+        "attempts": 2,
+        "iterations": 0,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-smoke/work/polyglot-bottle-song__aider"
+      }
+    },
+    {
+      "case_id": "polyglot-dot-dsl",
+      "locode": {
+        "arm": "locode",
+        "case_id": "polyglot-dot-dsl",
+        "score": 0.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": false
+        },
+        "seconds": 600.2,
+        "attempts": 1,
+        "iterations": 1,
+        "budget_stopped": false,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-smoke/work/polyglot-dot-dsl__locode"
+      },
+      "aider": {
+        "arm": "aider",
+        "case_id": "polyglot-dot-dsl",
+        "score": 0.0,
+        "checks": {
+          "spec_unmodified": true,
+          "tests_pass": false
+        },
+        "seconds": 600.0,
+        "attempts": 1,
+        "iterations": 0,
+        "budget_stopped": true,
+        "error": "",
+        "workdir": "/Users/vszalvay/Code/locode/evals/results/b164-aider-smoke/work/polyglot-dot-dsl__aider"
+      }
+    }
+  ]
+}

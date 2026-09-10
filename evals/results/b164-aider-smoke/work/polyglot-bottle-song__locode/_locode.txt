@@ -1,0 +1,6 @@
+
+All 7 tests pass. `bottle_song.py` now implements `recite(start, take=1)`:
+
+- Each verse has four lines; the first two repeat the current bottle count, the third is the fixed "should accidentally fall" line, and the fourth gives the next count.
+- Singular/plural is handled: `One green bottle` / `no green bottles` vs `green bottles` for the rest.
+- Verses are joined with a blank line between them, matching the test expectations.
